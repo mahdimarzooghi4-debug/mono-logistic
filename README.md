@@ -78,3 +78,5 @@ Business decisions should be documented here before they become product or imple
 - [Mono Service Boundaries v1](docs/10-service-boundaries-v1.md)
 - [Mono Event Model v1](docs/11-event-model-v1.md)
 - [Mono B2B API Contract v1](docs/12-api-contract-v1.md)
+- [Mono Data Architecture v1](docs/13-data-architecture-v1.md)
+- [Mono Runtime Decision Architecture v1](docs/14-runtime-decision-architecture-v1.md)
