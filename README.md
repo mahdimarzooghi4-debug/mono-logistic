@@ -74,3 +74,5 @@ Business decisions should be documented here before they become product or imple
 
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)
+- [Mono Domain Model v1](docs/09-domain-model-v1.md)
+- [Mono Service Boundaries v1](docs/10-service-boundaries-v1.md)
