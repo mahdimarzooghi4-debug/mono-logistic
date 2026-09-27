@@ -80,3 +80,6 @@ Business decisions should be documented here before they become product or imple
 - [Mono B2B API Contract v1](docs/12-api-contract-v1.md)
 - [Mono Data Architecture v1](docs/13-data-architecture-v1.md)
 - [Mono Runtime Decision Architecture v1](docs/14-runtime-decision-architecture-v1.md)
+- [Mono Security Architecture v1](docs/15-security-architecture-v1.md)
+- [Mono Observability Architecture v1](docs/16-observability-architecture-v1.md)
+- [Mono Deployment & Infrastructure Architecture v1](docs/17-deployment-infrastructure-architecture-v1.md)
