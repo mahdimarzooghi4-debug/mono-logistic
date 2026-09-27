@@ -86,3 +86,5 @@ Business decisions should be documented here before they become product or imple
 - [Mono Product Backlog v1](docs/18-product-backlog-v1.md)
 - [Mono MVP Scope v1](docs/19-mvp-scope-v1.md)
 - [Mono Epics Roadmap v1](docs/20-epics-roadmap-v1.md)
+- [Mono Product Architecture v1](docs/21-product-architecture-v1.md)
+- [Mono UX Flows v1](docs/22-ux-flows-v1.md)
