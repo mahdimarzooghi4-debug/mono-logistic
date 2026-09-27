@@ -93,3 +93,35 @@ Product design must expose operational truth clearly:
 - action history
 
 The UI must never hide whether data is estimated, committed, delayed, or manually overridden.
+
+
+## Automatic Caller Context
+
+The Operations Console must support an automatic incoming-call context state.
+
+When the telephony / VoIP / call-center integration receives an inbound caller ID, Mono resolves that number against known customer, recipient, order and Mission data and automatically opens the relevant context for the operator.
+
+The operator must not need to search manually before seeing the caller's active logistics context.
+
+For a recognized caller, the automatic context shows:
+
+- caller / recipient name
+- phone number
+- customer account
+- customer order ID
+- active Mission ID
+- current Mission state
+- committed promise and current ETA
+- SLA health
+- assigned courier and active Route
+- pickup branch / origin
+- destination
+- latest operational event
+- cancellation eligibility
+- open incident / exception if any
+
+If multiple active orders match the caller, Mono shows the active-order list and highlights the most recent / most operationally relevant order.
+
+If no match is found, the call state still opens automatically with the incoming phone number and a fast fallback search.
+
+The automatic caller context is an Operations Console state, not a separate logistics core. Telephony is an integration channel; Mission and Order truth remain in the shared Mono Core.
