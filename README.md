@@ -34,6 +34,7 @@ Hana
 - [Courier, Trust, Zones & Capacity](docs/04-courier-zones-trust-capacity.md)
 - [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 - [Hana Urban Delivery Configuration](docs/customers/hana/urban-delivery-configuration.md)
+- [Unified B2B Policy & Capability Model](docs/06-b2b-policy-capability-model.md)
 
 ## Current Phase-1 Decisions
 
