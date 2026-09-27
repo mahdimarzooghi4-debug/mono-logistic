@@ -32,6 +32,7 @@ Hana
 - [Hana Phase 1 Operating Model](docs/02-hana-phase-1-operating-model.md)
 - [Pricing, Batching & Settlement](docs/03-pricing-batching-settlement.md)
 - [Courier, Trust, Zones & Capacity](docs/04-courier-zones-trust-capacity.md)
+- [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 
 ## Current Phase-1 Decisions
 
