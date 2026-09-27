@@ -133,3 +133,29 @@ Every critical flow must show:
 - reason when blocked
 - customer/courier impact
 - audit history for operational actions
+
+
+## 11. Incoming Call / Customer Context Flow
+
+```
+Inbound Call
+-> Telephony / VoIP sends caller ID
+-> Mono resolves caller
+-> Operations Console automatically opens caller context
+-> Show active order(s) + Mission context
+-> Operator reviews live delivery state
+-> Open Mission Detail / incident / allowed action
+```
+
+Recognized caller:
+- no manual search required before context appears
+- show caller identity, customer order ID, Mission, ETA / Promise, SLA, courier, route, origin, destination and latest event
+- if more than one active order exists, show all active matches and emphasize the most relevant one
+
+Unknown caller:
+- automatically open an unmatched-caller state
+- preserve incoming phone number
+- provide immediate fallback search by order ID, Mission ID, name or phone
+
+UX rule:
+**Incoming call -> context first, search second.**
