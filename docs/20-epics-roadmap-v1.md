@@ -150,11 +150,16 @@
 ## Post-MVP Expansion
 
 ### Merchant B2B
-- Dashboard
+- Merchant Dashboard
+- Merchant Mobile App
 - subscription plans
 - manual Mission creation
 - branches
 - billing
+- notifications / exception handling
+- branch-aware mobile operations
+
+Merchant Mobile rollout should follow the approved product-design and refined backlog in `docs/23-merchant-mobile-backlog-v1.md`.
 
 ### Mode Expansion
 - Van
