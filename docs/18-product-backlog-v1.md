@@ -504,7 +504,51 @@ Dashboard must use the same application/core rules as API customers.
 - CI checks
 - release approval
 
-## 25. Deferred Epics
+## 25. Epic E23 — Merchant Mobile App
+
+Merchant Mobile is a distinct operational surface for business users and must not be implemented as a responsive copy of Merchant Dashboard.
+
+### P0 capabilities
+- authentication / tenant bootstrap
+- branch-aware Home
+- active deliveries
+- Delivery Detail
+- committed promise vs current ETA
+- Create Delivery
+- feasibility
+- quote + confirm
+- notifications
+- exception context
+- cancellation where allowed
+- contextual support
+- empty / loading / error / no-feasibility / success states
+- mobile observability and security baseline
+
+### P1 capabilities
+- finance summary
+- profile
+- notification preferences
+- security / sessions refinements
+
+### Web-first administration
+- organization members / access
+- integrations / webhooks
+- visual identity / co-branding
+- advanced workspace configuration
+- deep billing / reconciliation
+- bulk administration
+
+Detailed refined backlog:
+- `docs/23-merchant-mobile-backlog-v1.md`
+
+### Acceptance
+- Mobile and Web use the same Mono Core rules.
+- Mobile never invents separate Mission, Promise, cancellation or authorization logic.
+- Notification opens exact operational context when available.
+- Branch context is explicit before operational actions.
+- Committed Promise and current ETA are visually and semantically distinct.
+
+## 26. Deferred Epics
 
 Not required for first Hana launch:
 
@@ -520,7 +564,7 @@ Not required for first Hana launch:
 - customer self-service Policy Builder
 - multi-region deployment
 
-## 26. Backlog Rule
+## 27. Backlog Rule
 
 Every implementation item must trace back to:
 
