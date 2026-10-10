@@ -11,7 +11,8 @@ public static class MonoApiKeyScopeCatalog
     private static readonly FrozenSet<string> SupportedScopes = new[]
     {
         "branches.read",
-        "delivery-requests.write"
+        "delivery-requests.write",
+        "delivery-requests.read"
     }.ToFrozenSet(StringComparer.Ordinal);
 
     public static IReadOnlySet<string> All => SupportedScopes;

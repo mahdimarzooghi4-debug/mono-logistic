@@ -125,7 +125,20 @@ The response has `delivery_request_id` and `status: RECEIVED`. A retry with the 
 
 ## 7. Evaluate / Quote
 
-Future capability: request intake currently records `RECEIVED` only. Feasibility evaluation, quotes, committed promises, and the read endpoint below are not implemented.
+The implemented `GET /v1/delivery-requests/{delivery_request_id}` requires `delivery-requests.read` and returns only the authenticated customer's request summary. An unknown or foreign-customer ID returns 404, without exposing another tenant's data.
+
+Current response:
+
+```json
+{
+  "delivery_request_id": "drq_...",
+  "external_reference": "ORDER-123",
+  "status": "RECEIVED",
+  "created_at": "2026-10-10T12:00:00Z"
+}
+```
+
+Feasibility evaluation, quotes, and committed promises remain future capabilities. The example below describes a future response after those capabilities are implemented.
 
 Query:
 

@@ -49,6 +49,7 @@ public sealed class PostgresDeliveryRequestRepositoryTests(ITestOutputHelper out
 
         var first = await repository.CreateOrReplayAsync(branch.BranchId, "ORDER-1", "retry-1", payload);
         var replay = await repository.CreateOrReplayAsync(branch.BranchId, "ORDER-1", "retry-1", payload);
+        var statusForOwner = await repository.FindStatusAsync(first.DeliveryRequestId);
         var changed = await repository.CreateOrReplayAsync(
             branch.BranchId, "ORDER-1", "retry-1", payload.Replace("ORDER-1", "ORDER-2", StringComparison.Ordinal));
         var otherTenantPayload = new DeliveryRequestInput
@@ -65,9 +66,15 @@ public sealed class PostgresDeliveryRequestRepositoryTests(ITestOutputHelper out
             dataSource, new FixedCustomerContext(otherCustomer.CustomerId));
         var otherTenant = await otherTenantRepository.CreateOrReplayAsync(
             otherBranch.BranchId, "ORDER-1", "retry-1", otherTenantPayload);
+        var statusForOtherCustomer = await otherTenantRepository.FindStatusAsync(first.DeliveryRequestId);
 
         Assert.Equal(DeliveryRequestWriteOutcome.Created, first.Outcome);
         Assert.Equal("RECEIVED", first.Status);
+        Assert.NotNull(statusForOwner);
+        Assert.Equal(first.DeliveryRequestId, statusForOwner.DeliveryRequestId);
+        Assert.Equal("ORDER-1", statusForOwner.ExternalReference);
+        Assert.Equal("RECEIVED", statusForOwner.Status);
+        Assert.Null(statusForOtherCustomer);
         Assert.Equal(DeliveryRequestWriteOutcome.Replayed, replay.Outcome);
         Assert.Equal(first.DeliveryRequestId, replay.DeliveryRequestId);
         Assert.Equal(DeliveryRequestWriteOutcome.Conflict, changed.Outcome);
