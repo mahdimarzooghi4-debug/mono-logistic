@@ -140,11 +140,7 @@ Current response:
 
 Feasibility evaluation, quotes, and committed promises remain future capabilities. The example below describes a future response after those capabilities are implemented.
 
-Query:
-
-```
-GET /v1/delivery-requests/{delivery_request_id}
-```
+Future feasibility response example:
 
 Possible result:
 

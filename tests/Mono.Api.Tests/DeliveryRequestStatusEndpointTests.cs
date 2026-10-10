@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+using System.Text.Json;
 using Mono.Api.Domain;
 using Mono.Api.Security;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -51,26 +51,35 @@ public sealed class DeliveryRequestStatusEndpointTests
         var created = await repo.CreateOrReplayAsync(
             branch.BranchId, request.ExternalReference, "status-endpoint", request.ToCanonicalJson());
 
-        using var ownerClient = CreateClient(dataSource, customer.CustomerId, ["delivery-requests.read"]);
-        using var otherClient = CreateClient(dataSource, otherCustomer.CustomerId, ["delivery-requests.read"]);
+        await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.read"]);
+        await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.read"]);
+        using var ownerClient = ownerFactory.CreateClient();
+        using var otherClient = otherFactory.CreateClient();
+        ownerClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
+        otherClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
         var ownerResponse = await ownerClient.GetAsync($"/v1/delivery-requests/{created.DeliveryRequestId}");
         var otherResponse = await otherClient.GetAsync($"/v1/delivery-requests/{created.DeliveryRequestId}");
+        var unknownResponse = await ownerClient.GetAsync(
+            "/v1/delivery-requests/drq_00000000000000000000000000000000");
 
         Assert.Equal(System.Net.HttpStatusCode.OK, ownerResponse.StatusCode);
-        var response = await ownerResponse.Content.ReadFromJsonAsync<DeliveryRequestStatusResponse>();
+        var responseJson = await ownerResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Store", responseJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Customer", responseJson, StringComparison.Ordinal);
+        var response = JsonSerializer.Deserialize<DeliveryRequestStatusResponse>(responseJson);
         Assert.NotNull(response);
         Assert.Equal(created.DeliveryRequestId, response.DeliveryRequestId);
         Assert.Equal("ORDER-STATUS-1", response.ExternalReference);
         Assert.Equal("RECEIVED", response.Status);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, otherResponse.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, unknownResponse.StatusCode);
     }
 
-    private static HttpClient CreateClient(
+    private static WebApplicationFactory<Program> CreateFactory(
         NpgsqlDataSource dataSource,
         string customerId,
-        IReadOnlyList<string> scopes)
-    {
-        var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        IReadOnlyList<string> scopes) =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<NpgsqlDataSource>();
@@ -86,10 +95,6 @@ public sealed class DeliveryRequestStatusEndpointTests
                         true,
                         scopes)));
             }));
-        var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
-        return client;
-    }
 
     private sealed record FixedCustomerContext(string CustomerId) : ICustomerContext;
 
