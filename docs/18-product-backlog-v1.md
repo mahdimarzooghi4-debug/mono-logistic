@@ -46,6 +46,7 @@ Epic
 - Sprint 012 adds an internal read-only view of configuration versions and append-only audit history for Mono administrators
 - Sprint 013 adds a provider-neutral OIDC JWT validation boundary for Mono operations, strict issuer/audience/signature/lifetime validation, and MFA-gated administrator claims; the identity provider and endpoint remain unconfigured
 - Sprint 014 verifies the operations JWT boundary end-to-end with a local test issuer and signed tokens; no external provider is contacted
+- Sprint 015 exposes read-only customer service configuration versions and audit history through Mono administrator-only operations routes.
 - enabled modes
 - coverage
 - policy set binding
