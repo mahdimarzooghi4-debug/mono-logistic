@@ -41,6 +41,7 @@ Epic
 
 ### E1.4 Service Configuration
 - customer-specific service configuration
+- Sprint 010 establishes versioned, effective-dated customer/service configuration lookup with tenant scoping and fail-closed ambiguity handling
 - enabled modes
 - coverage
 - policy set binding

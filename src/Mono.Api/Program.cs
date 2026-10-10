@@ -9,6 +9,7 @@ builder.Services.AddHealthChecks();
 builder.Services.AddMonoCustomerTenantAuthorization();
 builder.Services.AddMonoApiKeyAuthentication(builder.Configuration);
 builder.Services.AddScoped<CustomerBranchRepository>();
+builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
 
 var app = builder.Build();
