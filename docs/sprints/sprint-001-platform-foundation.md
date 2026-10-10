@@ -15,7 +15,7 @@ Create the smallest runnable and testable Mono application foundation on the acc
 - Add a .NET 10 solution and ASP.NET Core API project.
 - Add liveness and readiness endpoints.
 - Add integration tests for both health endpoints.
-- Add GitHub Actions build and test workflow.
+- Add a multi-stage Docker image build and verify it in GitHub Actions CI.
 - Document that health endpoints currently verify process health only; database, queue, and map checks are not yet connected.
 
 ## Acceptance criteria
@@ -23,9 +23,10 @@ Create the smallest runnable and testable Mono application foundation on the acc
 1. `dotnet restore Mono.sln` succeeds.
 2. `dotnet build Mono.sln --configuration Release` succeeds with no compile errors.
 3. `dotnet test Mono.sln --configuration Release` passes both endpoint tests.
-4. Both `/health/live` and `/health/ready` return HTTP 200 and report `Healthy`.
-5. No customer, courier, mission, location, or financial production data is fabricated.
-6. No secrets or external AI/model API integrations are introduced.
+4. `docker build --tag mono-api:ci .` succeeds.
+5. Both `/health/live` and `/health/ready` return HTTP 200 and report `Healthy`.
+6. No customer, courier, mission, location, or financial production data is fabricated.
+7. No secrets or external AI/model API integrations are introduced.
 
 ## Out of scope
 
