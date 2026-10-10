@@ -200,13 +200,16 @@ Extensible:
 ### E6.1 Zone Model
 - Sprint 044 defines the geometry-neutral City → Operating Zone → Micro-zone model and validates required parents, parent-kind relationships, and unique zone IDs.
 - Geometry references, status labels, and capacity-policy IDs remain opaque metadata; the model does not define geometry, lifecycle transitions, coverage, or capacity.
-- Sprint 045 adds a structural courier zone-approval model for preferred zones, Mono-approved zones, and an optional primary zone. It verifies references against a supplied valid registry and requires approvals to be within preferences.
-- Approval is recorded as domain data only; geographic boundary enforcement, zone lifecycle, persistence, authorization, and operations endpoints remain future work.
+- Geometry references, status labels, and capacity-policy IDs remain opaque metadata; the model does not define geometry, lifecycle transitions, coverage, or capacity. Courier preference and approval records are in E6.2.
+- Geographic boundary enforcement and zone operations remain future work.
 
 ### E6.2 Courier Zone Approval
 - preferred zones
 - approved zones
+- optional primary zone
 - hard operating boundaries
+- Sprint 045 adds a structural model for preferred zones, Mono-approved zones, and an optional primary zone. It verifies references against a supplied valid registry and requires approvals to be within preferences.
+- Approval is recorded as domain data only; geographic boundary enforcement, zone lifecycle, persistence, authorization, and operations endpoints remain future work.
 
 ### E6.3 Capacity
 - registered
