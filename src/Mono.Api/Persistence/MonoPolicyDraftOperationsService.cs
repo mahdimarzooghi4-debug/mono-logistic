@@ -13,8 +13,6 @@ public sealed class MonoPolicyDraftOperationsService(
 {
     private static readonly Regex PolicyIdPattern = new(
         @"\Apol_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-    private static readonly Regex AuditIdPattern = new(
-        @"\Apa_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly HashSet<string> Scopes = new(StringComparer.Ordinal)
     {
         "PLATFORM", "SERVICE", "CUSTOMER", "BRANCH", "ZONE", "CONTRACT", "MISSION", "RUNTIME"
