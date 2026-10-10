@@ -21,6 +21,39 @@ public sealed class CustomerBranchRepositoryTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public async Task Branch_listing_is_customer_scoped_and_stably_ordered()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ApplyMigrationsAsync(dataSource);
+
+        var customer = Customer.Create("Mono Branch List Test", "ACTIVE");
+        var otherCustomer = Customer.Create("Mono Other Branch List Test", "ACTIVE");
+        await InsertCustomerAsync(dataSource, customer);
+        await InsertCustomerAsync(dataSource, otherCustomer);
+
+        var repository = new CustomerBranchRepository(dataSource, new FixedCustomerContext(customer.CustomerId));
+        var zulu = Branch.Create(customer.CustomerId, "Zulu", "ACTIVE", address: "Z address");
+        var alpha = Branch.Create(customer.CustomerId, "Alpha", "ACTIVE", address: "A address");
+        var foreign = Branch.Create(otherCustomer.CustomerId, "Foreign", "ACTIVE");
+        await repository.CreateBranchAsync(zulu);
+        await repository.CreateBranchAsync(alpha);
+        var otherRepository = new CustomerBranchRepository(dataSource, new FixedCustomerContext(otherCustomer.CustomerId));
+        await otherRepository.CreateBranchAsync(foreign);
+
+        var branches = await repository.ListBranchesAsync();
+
+        Assert.Equal(new[] { alpha.BranchId, zulu.BranchId }, branches.Select(branch => branch.BranchId));
+        Assert.All(branches, branch => Assert.Equal(customer.CustomerId, branch.CustomerId));
+    }
+
+    [Fact]
     public async Task Branch_lookup_is_scoped_to_its_customer_and_foreign_key_is_enforced()
     {
         var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");

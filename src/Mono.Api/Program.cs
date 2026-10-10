@@ -1,3 +1,5 @@
+using Mono.Api.Api;
+using Mono.Api.Persistence;
 using Mono.Api.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHealthChecks();
 builder.Services.AddMonoCustomerTenantAuthorization();
 builder.Services.AddMonoApiKeyAuthentication(builder.Configuration);
+builder.Services.AddScoped<CustomerBranchRepository>();
 
 var app = builder.Build();
 
@@ -16,6 +19,7 @@ app.UseAuthorization();
 // alongside the corresponding infrastructure integration.
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
+app.MapBranchEndpoints();
 
 app.Run();
 
