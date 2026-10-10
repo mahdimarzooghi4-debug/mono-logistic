@@ -60,7 +60,9 @@ public sealed class DeliveryLocationResolver(IMapsGateway mapsGateway)
 
         return new ResolvedDeliveryLocation(
             geocode.Location,
-            geocode.FormattedAddress ?? address,
+            string.IsNullOrWhiteSpace(geocode.FormattedAddress)
+                ? address
+                : geocode.FormattedAddress.Trim(),
             LocationResolutionSource.GeocodedAddress);
     }
 }
