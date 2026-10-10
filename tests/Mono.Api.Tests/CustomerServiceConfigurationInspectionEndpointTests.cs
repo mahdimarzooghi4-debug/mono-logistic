@@ -81,6 +81,7 @@ public sealed class CustomerServiceConfigurationInspectionEndpointTests
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapCustomerServiceConfigurationInspectionEndpoints();
+            app.MapCustomerServiceConfigurationAuthoringEndpoints();
             await app.StartAsync();
             await using (app)
             using (var client = app.GetTestClient())
