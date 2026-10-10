@@ -78,7 +78,7 @@ Required JSON fields:
 - `external_reference` (1–128 characters)
 - `branch_id` (an active branch belonging to the authenticated customer)
 - `pickup` and `dropoff` location objects, each with an address or coordinate pair
-- `shipment` (Phase 1: BAG_BASED, positive bag_count, positive optional weight, S/M/L load class)
+- `shipment` (Phase 1: BAG_BASED, positive bag_count, positive optional weight, S/M/L load class; optional positive package_count and estimated_volume_m3; optional temperature_class AMBIENT/CHILLED/FROZEN)
 - `requested_service`: `URBAN_DELIVERY`
 - `requested_priority`: `STANDARD`
 - optional `estimated_ready_at` timestamp
@@ -113,13 +113,18 @@ Example:
     "load_class": "M",
     "fragile": false,
     "liquid": true,
-    "keep_upright": true
+    "keep_upright": true,
+    "package_count": 3,
+    "estimated_volume_m3": 0.025,
+    "temperature_class": "AMBIENT"
   },
   "requested_service": "URBAN_DELIVERY",
   "requested_priority": "STANDARD",
   "estimated_ready_at": "2026-09-27T12:10:00Z"
 }
 ```
+
+New shipment facts are optional in v1; volume is expressed in cubic metres. When omitted, they remain absent from the normalized canonical payload so existing idempotent retries keep matching the original request. No equality between bag_count and package_count is inferred.
 
 The response has `delivery_request_id` and `status: RECEIVED`. A retry with the same key and normalized body returns the same values. No quote, feasibility decision, promise, or Mission is implied by receipt.
 
