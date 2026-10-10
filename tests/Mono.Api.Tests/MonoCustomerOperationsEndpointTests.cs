@@ -346,6 +346,53 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(2, secondVersionBody.RootElement.GetProperty("versionNumber").GetInt32());
                 Assert.Equal("DRAFT", secondVersionBody.RootElement.GetProperty("status").GetString());
 
+                using var createSecondPolicy = new HttpRequestMessage(HttpMethod.Post, "/operations/v1/policies")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        policyType = "SERVICE_WINDOW",
+                        scope = "PLATFORM",
+                        enforcementType = "HARD",
+                        priority = 1,
+                        definition = new { mode = "ON_DEMAND" },
+                        reason = "Create second policy for pagination"
+                    })
+                };
+                createSecondPolicy.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.Created,
+                    (await client.SendAsync(createSecondPolicy)).StatusCode);
+
+                using var firstPageRequest = new HttpRequestMessage(HttpMethod.Get, "/operations/v1/policies?page_size=1");
+                firstPageRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var firstPageResponse = await client.SendAsync(firstPageRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, firstPageResponse.StatusCode);
+                using var firstPageBody = System.Text.Json.JsonDocument.Parse(
+                    await firstPageResponse.Content.ReadAsStringAsync());
+                Assert.Single(firstPageBody.RootElement.GetProperty("policies").EnumerateArray());
+                var policyCursor = firstPageBody.RootElement.GetProperty("nextCursor").GetString();
+                Assert.NotNull(policyCursor);
+
+                using var secondPageRequest = new HttpRequestMessage(
+                    HttpMethod.Get, "/operations/v1/policies?page_size=1&cursor=" + Uri.EscapeDataString(policyCursor!));
+                secondPageRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var secondPageResponse = await client.SendAsync(secondPageRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, secondPageResponse.StatusCode);
+                using var secondPageBody = System.Text.Json.JsonDocument.Parse(
+                    await secondPageResponse.Content.ReadAsStringAsync());
+                Assert.Single(secondPageBody.RootElement.GetProperty("policies").EnumerateArray());
+                Assert.Equal(System.Text.Json.JsonValueKind.Null,
+                    secondPageBody.RootElement.GetProperty("nextCursor").ValueKind);
+
+                using var invalidCursor = new HttpRequestMessage(
+                    HttpMethod.Get, "/operations/v1/policies?cursor=invalid");
+                invalidCursor.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest,
+                    (await client.SendAsync(invalidCursor)).StatusCode);
+
                 using var detail = new HttpRequestMessage(HttpMethod.Get, $"/operations/v1/policies/{policyId}");
                 detail.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
                     "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
@@ -391,6 +438,21 @@ public sealed class MonoCustomerOperationsEndpointTests
                 missing.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
                     "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
                 Assert.Equal(System.Net.HttpStatusCode.NotFound, (await client.SendAsync(missing)).StatusCode);
+
+                await using var database = await dataSource.OpenConnectionAsync();
+                await using var mutateVersion = new NpgsqlCommand("""
+                    UPDATE policy_versions SET definition = '{}'::jsonb
+                    WHERE policy_id = @policy_id AND version_number = 1;
+                    """, database);
+                mutateVersion.Parameters.AddWithValue("policy_id", NpgsqlDbType.Text, policyId);
+                await Assert.ThrowsAsync<PostgresException>(() => mutateVersion.ExecuteNonQueryAsync());
+
+                await using var mutateAudit = new NpgsqlCommand("""
+                    UPDATE policy_audit SET reason = 'tampered'
+                    WHERE policy_id = @policy_id;
+                    """, database);
+                mutateAudit.Parameters.AddWithValue("policy_id", NpgsqlDbType.Text, policyId);
+                await Assert.ThrowsAsync<PostgresException>(() => mutateAudit.ExecuteNonQueryAsync());
             }
         }
     }
