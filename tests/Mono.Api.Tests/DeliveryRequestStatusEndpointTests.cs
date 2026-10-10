@@ -1,7 +1,9 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
+using Mono.Api.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,6 +53,10 @@ public sealed class DeliveryRequestStatusEndpointTests
             dataSource, new FixedCustomerContext(customer.CustomerId));
         var created = await repo.CreateOrReplayAsync(
             branch.BranchId, request.ExternalReference, "status-endpoint", request.ToCanonicalJson());
+        var second = await repo.CreateOrReplayAsync(
+            branch.BranchId, "ORDER-STATUS-2", "status-endpoint-2", (request with { ExternalReference = "ORDER-STATUS-2" }).ToCanonicalJson());
+        var third = await repo.CreateOrReplayAsync(
+            branch.BranchId, "ORDER-STATUS-3", "status-endpoint-3", (request with { ExternalReference = "ORDER-STATUS-3" }).ToCanonicalJson());
 
         await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.read"]);
         await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.read"]);
@@ -62,6 +68,19 @@ public sealed class DeliveryRequestStatusEndpointTests
         var otherResponse = await otherClient.GetAsync($"/v1/delivery-requests/{created.DeliveryRequestId}");
         var unknownResponse = await ownerClient.GetAsync(
             "/v1/delivery-requests/drq_00000000000000000000000000000000");
+        var firstPageResponse = await ownerClient.GetAsync("/v1/delivery-requests?page_size=2");
+        var firstPageJson = await firstPageResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Store", firstPageJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Customer", firstPageJson, StringComparison.Ordinal);
+        var firstPage = JsonSerializer.Deserialize<DeliveryRequestPageResponse>(firstPageJson);
+        Assert.NotNull(firstPage);
+        var secondPageResponse = await ownerClient.GetAsync(
+            $"/v1/delivery-requests?page_size=2&cursor={firstPage.NextCursor}");
+        var secondPageJson = await secondPageResponse.Content.ReadAsStringAsync();
+        var secondPage = JsonSerializer.Deserialize<DeliveryRequestPageResponse>(secondPageJson);
+        var foreignCursorResponse = await otherClient.GetAsync(
+            $"/v1/delivery-requests?cursor={created.DeliveryRequestId}");
+        var invalidSizeResponse = await ownerClient.GetAsync("/v1/delivery-requests?page_size=101");
 
         Assert.Equal(System.Net.HttpStatusCode.OK, ownerResponse.StatusCode);
         var responseJson = await ownerResponse.Content.ReadAsStringAsync();
@@ -74,6 +93,22 @@ public sealed class DeliveryRequestStatusEndpointTests
         Assert.Equal("RECEIVED", response.Status);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, otherResponse.StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, unknownResponse.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, firstPageResponse.StatusCode);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.NotNull(firstPage.NextCursor);
+        Assert.Equal(System.Net.HttpStatusCode.OK, secondPageResponse.StatusCode);
+        Assert.Single(secondPage!.Items);
+        Assert.Null(secondPage.NextCursor);
+        var listedIds = firstPage.Items.Concat(secondPage!.Items)
+            .Select(item => item.DeliveryRequestId)
+            .ToArray();
+        Assert.Equal(3, listedIds.Length);
+        Assert.Equal(3, listedIds.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(
+            new[] { created.DeliveryRequestId, second.DeliveryRequestId, third.DeliveryRequestId }.Order(StringComparer.Ordinal),
+            listedIds.Order(StringComparer.Ordinal));
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, foreignCursorResponse.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidSizeResponse.StatusCode);
     }
 
     private static WebApplicationFactory<Program> CreateFactory(
@@ -127,7 +162,8 @@ public sealed class DeliveryRequestStatusEndpointTests
                  {
                      "Mono.Api.Tests.Migrations.001_customer_branch.sql",
                      "Mono.Api.Tests.Migrations.002_customer_api_keys.sql",
-                     "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql"
+                     "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql",
+                     "Mono.Api.Tests.Migrations.004_delivery_request_list_index.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)

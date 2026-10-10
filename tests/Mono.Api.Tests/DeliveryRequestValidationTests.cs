@@ -41,6 +41,13 @@ public sealed class DeliveryRequestValidationTests
     }
 
     [Theory]
+    [InlineData("drq_0123456789abcdef0123456789abcdef", true)]
+    [InlineData("drq_ABCDEF0123456789ABCDEF0123456789", false)]
+    [InlineData("request-1", false)]
+    public void Delivery_request_cursor_ids_have_a_strict_format(string value, bool expected) =>
+        Assert.Equal(expected, DeliveryRequestInputValidator.IsValidDeliveryRequestId(value));
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("with space")]

@@ -25,5 +25,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.002_customer_api_keys.sql" />
     <EmbeddedResource Include="../../db/migrations/003_delivery_request_intake.sql"
                       LogicalName="Mono.Api.Tests.Migrations.003_delivery_request_intake.sql" />
+    <EmbeddedResource Include="../../db/migrations/004_delivery_request_list_index.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.004_delivery_request_list_index.sql" />
   </ItemGroup>
 </Project>

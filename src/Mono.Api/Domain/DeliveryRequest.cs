@@ -122,6 +122,10 @@ public static class DeliveryRequestInputValidator
         @"\Abr_[0-9a-f]{32}\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    private static readonly Regex DeliveryRequestIdPattern = new(
+        @"\Adr_[0-9a-f]{32}\z",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private const int MaxTextLength = 500;
 
     public static IReadOnlyList<string> Validate(DeliveryRequestInput input)
@@ -166,6 +170,9 @@ public static class DeliveryRequestInputValidator
 
         return errors;
     }
+
+    public static bool IsValidDeliveryRequestId(string? value) =>
+        !string.IsNullOrEmpty(value) && DeliveryRequestIdPattern.IsMatch(value);
 
     public static bool IsValidIdempotencyKey(string? value) =>
         !string.IsNullOrEmpty(value) &&
@@ -216,3 +223,8 @@ public sealed record DeliveryRequestStatusResponse(
     [property: JsonPropertyName("external_reference")] string ExternalReference,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
+
+
+public sealed record DeliveryRequestPageResponse(
+    [property: JsonPropertyName("items")] IReadOnlyList<DeliveryRequestStatusResponse> Items,
+    [property: JsonPropertyName("next_cursor")] string? NextCursor);

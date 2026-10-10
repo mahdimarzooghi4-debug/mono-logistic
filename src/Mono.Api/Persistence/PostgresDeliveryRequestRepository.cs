@@ -111,6 +111,84 @@ public sealed class PostgresDeliveryRequestRepository(
             reader.GetFieldValue<DateTimeOffset>(3));
     }
 
+    public async Task<DeliveryRequestPageResponse?> ListStatusAsync(
+        int pageSize,
+        string? cursor,
+        CancellationToken cancellationToken = default)
+    {
+        if (pageSize is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(pageSize), "Page size must be between 1 and 100.");
+
+        var customerId = customerContext.CustomerId;
+        DateTimeOffset? cursorCreatedAt = null;
+        if (cursor is not null)
+        {
+            const string cursorSql = """
+                SELECT created_at
+                FROM delivery_requests
+                WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id;
+                """;
+            await using var cursorConnection = await dataSource.OpenConnectionAsync(cancellationToken);
+            await using var cursorCommand = new NpgsqlCommand(cursorSql, cursorConnection);
+            cursorCommand.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            cursorCommand.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, cursor);
+            await using var cursorReader = await cursorCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await cursorReader.ReadAsync(cancellationToken))
+                return null;
+
+            cursorCreatedAt = cursorReader.GetFieldValue<DateTimeOffset>(0);
+        }
+
+        const string firstPageSql = """
+            SELECT delivery_request_id, external_reference, status, created_at
+            FROM delivery_requests
+            WHERE customer_id = @customer_id
+            ORDER BY created_at DESC, delivery_request_id DESC
+            LIMIT @take;
+            """;
+        const string nextPageSql = """
+            SELECT delivery_request_id, external_reference, status, created_at
+            FROM delivery_requests
+            WHERE customer_id = @customer_id
+              AND (created_at < @cursor_created_at
+                   OR (created_at = @cursor_created_at AND delivery_request_id < @cursor_id))
+            ORDER BY created_at DESC, delivery_request_id DESC
+            LIMIT @take;
+            """;
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+        command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
+        if (cursor is not null)
+        {
+            command.Parameters.AddWithValue("cursor_created_at", NpgsqlDbType.TimestampTz, cursorCreatedAt!.Value);
+            command.Parameters.AddWithValue("cursor_id", NpgsqlDbType.Text, cursor);
+        }
+
+        var items = new List<DeliveryRequestStatusResponse>(pageSize + 1);
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(new DeliveryRequestStatusResponse(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetFieldValue<DateTimeOffset>(3)));
+            }
+        }
+
+        string? nextCursor = null;
+        if (items.Count > pageSize)
+        {
+            items.RemoveAt(items.Count - 1);
+            nextCursor = items[^1].DeliveryRequestId;
+        }
+
+        return new DeliveryRequestPageResponse(items, nextCursor);
+    }
+
     private static void AddParameters(
         NpgsqlCommand command,
         string deliveryRequestId,
