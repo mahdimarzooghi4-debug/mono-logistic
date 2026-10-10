@@ -46,6 +46,7 @@ public sealed class MonoCustomerOperationsEndpointTests
             builder.Services.AddSingleton(dataSource);
             builder.Services.AddScoped<MonoCustomerOperationsService>();
             builder.Services.AddScoped<MonoBranchOperationsService>();
+            builder.Services.AddScoped<MonoApiKeyOperationsService>();
             var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
             oidcConfiguration.SigningKeys.Add(signingKey);
             builder.Services.PostConfigure<JwtBearerOptions>(MonoOperationsDefaults.Scheme, options =>
@@ -62,6 +63,7 @@ public sealed class MonoCustomerOperationsEndpointTests
             app.UseAuthorization();
             app.MapMonoCustomerOperationsEndpoints();
             app.MapMonoBranchOperationsEndpoints();
+            app.MapMonoApiKeyOperationsEndpoints();
             await app.StartAsync();
             await using (app)
             using (var client = app.GetTestClient())
@@ -367,6 +369,85 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(51.41, branchHistory[^1].Longitude);
                 Assert.Equal(new[] { "CREATED", "UPDATED" }, branchHistory.Select(x => x.Action));
                 Assert.Equal("verified address correction", branchHistory[^1].Reason);
+
+                var issuedAt = DateTimeOffset.UtcNow;
+                var issuedKey = MonoApiKeyIssuer.Create(
+                    customerId, ["branches.read"], issuedAt.AddDays(7), issuedAt);
+                await new PostgresApiKeyProvisioner(dataSource).CreateAsync(issuedKey.Credential);
+                var revokePath = $"/operations/v1/customers/{customerId}/api-keys/{issuedKey.Credential.KeyId}/revoke";
+
+                using var unauthenticatedRevoke = new HttpRequestMessage(HttpMethod.Post, revokePath)
+                {
+                    Content = JsonContent.Create(new { reason = "security rotation" })
+                };
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthenticatedRevoke)).StatusCode);
+
+                using var nonAdminRevoke = new HttpRequestMessage(HttpMethod.Post, revokePath)
+                {
+                    Content = JsonContent.Create(new { reason = "security rotation" })
+                };
+                nonAdminRevoke.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminRevoke)).StatusCode);
+
+                using var wrongCustomerRevoke = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"/operations/v1/customers/cus_00000000000000000000000000000000/api-keys/{issuedKey.Credential.KeyId}/revoke")
+                {
+                    Content = JsonContent.Create(new { reason = "tenant boundary test" })
+                };
+                wrongCustomerRevoke.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(wrongCustomerRevoke)).StatusCode);
+
+                using var revoke = new HttpRequestMessage(HttpMethod.Post, revokePath)
+                {
+                    Content = JsonContent.Create(new { reason = "customer credential rotation" })
+                };
+                revoke.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var revokedResponse = await client.SendAsync(revoke);
+                Assert.Equal(System.Net.HttpStatusCode.OK, revokedResponse.StatusCode);
+                using var revokedBody = System.Text.Json.JsonDocument.Parse(
+                    await revokedResponse.Content.ReadAsStringAsync());
+                Assert.Equal(issuedKey.Credential.KeyId,
+                    revokedBody.RootElement.GetProperty("keyId").GetString());
+                Assert.False(revokedBody.RootElement.TryGetProperty("secret", out _));
+
+                var storedCredential = await new PostgresApiKeyCredentialStore(dataSource)
+                    .FindAsync(issuedKey.Credential.KeyId, CancellationToken.None);
+                Assert.NotNull(storedCredential);
+                Assert.NotNull(storedCredential.RevokedAt);
+                Assert.False(ApiKeyCredentialVerifier.TryValidate(
+                    issuedKey.Value, storedCredential, DateTimeOffset.UtcNow, out _));
+
+                using var repeatedRevoke = new HttpRequestMessage(HttpMethod.Post, revokePath)
+                {
+                    Content = JsonContent.Create(new { reason = "duplicate revocation" })
+                };
+                repeatedRevoke.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.Conflict,
+                    (await client.SendAsync(repeatedRevoke)).StatusCode);
+
+                await using var keyAuditConnection = await dataSource.OpenConnectionAsync();
+                await using var keyAuditCommand = new NpgsqlCommand("""
+                    SELECT action, actor_id, reason
+                    FROM customer_api_key_operations_audit
+                    WHERE key_id = @key_id AND customer_id = @customer_id;
+                    """, keyAuditConnection);
+                keyAuditCommand.Parameters.AddWithValue("key_id", NpgsqlDbType.Text, issuedKey.Credential.KeyId);
+                keyAuditCommand.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+                await using var keyAuditReader = await keyAuditCommand.ExecuteReaderAsync();
+                Assert.True(await keyAuditReader.ReadAsync());
+                Assert.Equal("REVOKED", keyAuditReader.GetString(0));
+                Assert.Equal("admin-test", keyAuditReader.GetString(1));
+                Assert.Equal("customer credential rotation", keyAuditReader.GetString(2));
+                Assert.False(await keyAuditReader.ReadAsync());
             }
         }
     }
@@ -408,7 +489,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.007_customer_service_configuration_retirement.sql",
             "Mono.Api.Tests.Migrations.008_customer_operations_audit.sql",
             "Mono.Api.Tests.Migrations.009_branch_operations_audit.sql",
-            "Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql"
+            "Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql",
+            "Mono.Api.Tests.Migrations.011_customer_api_key_operations_audit.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)
