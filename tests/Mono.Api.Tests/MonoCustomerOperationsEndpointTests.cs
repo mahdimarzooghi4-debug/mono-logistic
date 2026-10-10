@@ -117,6 +117,48 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.DoesNotContain("HANA", body.RootElement.GetProperty("customerId").GetString()!,
                     StringComparison.OrdinalIgnoreCase);
 
+                var customerPath = $"/operations/v1/customers/{customerId}";
+                using var unauthorizedCustomerRead = new HttpRequestMessage(HttpMethod.Get, customerPath);
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthorizedCustomerRead)).StatusCode);
+                using var nonAdminCustomerRead = new HttpRequestMessage(HttpMethod.Get, customerPath);
+                nonAdminCustomerRead.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminCustomerRead)).StatusCode);
+
+                using var customerRead = new HttpRequestMessage(HttpMethod.Get, customerPath);
+                customerRead.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var customerReadResponse = await client.SendAsync(customerRead);
+                Assert.Equal(System.Net.HttpStatusCode.OK, customerReadResponse.StatusCode);
+                using var customerReadBody = System.Text.Json.JsonDocument.Parse(
+                    await customerReadResponse.Content.ReadAsStringAsync());
+                Assert.Equal(customerId, customerReadBody.RootElement.GetProperty("customerId").GetString());
+                Assert.Equal("PENDING", customerReadBody.RootElement.GetProperty("status").GetString());
+                Assert.Equal("Mono Test Merchant", customerReadBody.RootElement.GetProperty("legalName").GetString());
+
+                using var customerAuditRead = new HttpRequestMessage(HttpMethod.Get, customerPath + "/audit");
+                customerAuditRead.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var customerAuditResponse = await client.SendAsync(customerAuditRead);
+                Assert.Equal(System.Net.HttpStatusCode.OK, customerAuditResponse.StatusCode);
+                using var customerAuditBody = System.Text.Json.JsonDocument.Parse(
+                    await customerAuditResponse.Content.ReadAsStringAsync());
+                var initialAuditEntry = Assert.Single(
+                    customerAuditBody.RootElement.GetProperty("entries").EnumerateArray());
+                Assert.Equal("CREATED", initialAuditEntry.GetProperty("action").GetString());
+                Assert.Equal("admin-test", initialAuditEntry.GetProperty("actorId").GetString());
+                Assert.Equal("approved onboarding request", initialAuditEntry.GetProperty("reason").GetString());
+
+                using var missingCustomerRead = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    "/operations/v1/customers/cus_00000000000000000000000000000000");
+                missingCustomerRead.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(missingCustomerRead)).StatusCode);
+
                 var activatePath = $"/operations/v1/customers/{customerId}/activate";
                 using var nonAdminActivate = new HttpRequestMessage(HttpMethod.Post, activatePath)
                 {
@@ -135,6 +177,27 @@ public sealed class MonoCustomerOperationsEndpointTests
                     "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
                 Assert.Equal(System.Net.HttpStatusCode.NoContent,
                     (await client.SendAsync(activate)).StatusCode);
+
+                using var activeCustomerRead = new HttpRequestMessage(HttpMethod.Get, customerPath);
+                activeCustomerRead.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var activeCustomerResponse = await client.SendAsync(activeCustomerRead);
+                using var activeCustomerBody = System.Text.Json.JsonDocument.Parse(
+                    await activeCustomerResponse.Content.ReadAsStringAsync());
+                Assert.Equal("ACTIVE", activeCustomerBody.RootElement.GetProperty("status").GetString());
+
+                using var fullCustomerAuditRead = new HttpRequestMessage(HttpMethod.Get, customerPath + "/audit");
+                fullCustomerAuditRead.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var fullCustomerAuditResponse = await client.SendAsync(fullCustomerAuditRead);
+                using var fullCustomerAuditBody = System.Text.Json.JsonDocument.Parse(
+                    await fullCustomerAuditResponse.Content.ReadAsStringAsync());
+                var lifecycleEntries = fullCustomerAuditBody.RootElement.GetProperty("entries")
+                    .EnumerateArray().ToArray();
+                Assert.Equal(new[] { "CREATED", "ACTIVATED" },
+                    lifecycleEntries.Select(entry => entry.GetProperty("action").GetString()));
+                Assert.Equal("contract signed and verified",
+                    lifecycleEntries[1].GetProperty("reason").GetString());
                 var branchPath = $"/operations/v1/customers/{customerId}/branches";
                 using var unauthorizedBranch = new HttpRequestMessage(HttpMethod.Post, branchPath)
                 {
