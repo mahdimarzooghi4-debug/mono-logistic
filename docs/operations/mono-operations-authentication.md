@@ -21,4 +21,4 @@ The trusted issuer must issue:
 
 After signature/issuer/audience/lifetime validation, the API adds a reserved `mono/identity_domain=operations` marker. Tokens containing that reserved claim are rejected. Operations services accept only a validated identity with exactly one `sub`.
 
-Do not expose the `MONO_ADMIN` claim directly from user-editable profile data. The OIDC provider and its MFA claim-mapping policy must be selected and reviewed before enabling the scheme in an operational environment. No operations HTTP routes are mapped by this sprint.
+Do not expose the `MONO_ADMIN` claim directly from user-editable profile data. The OIDC provider and its MFA claim-mapping policy must be selected and reviewed before enabling the scheme in an operational environment. The read-only customer service configuration inspection routes use this boundary; their contract is documented in [Customer Service Configuration Inspection API](customer-service-configuration-inspection-api.md). Configuration authoring and activation routes remain unavailable.
