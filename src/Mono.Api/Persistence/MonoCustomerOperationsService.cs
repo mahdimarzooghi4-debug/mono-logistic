@@ -1,0 +1,182 @@
+using System.Text.RegularExpressions;
+using Mono.Api.Domain;
+using Mono.Api.Security;
+using Npgsql;
+using NpgsqlTypes;
+
+namespace Mono.Api.Persistence;
+
+/// <summary>Customer registry operations reserved for authenticated Mono administrators.</summary>
+public sealed class MonoCustomerOperationsService(
+    NpgsqlDataSource dataSource,
+    IMonoOperationsContext operationsContext)
+{
+    private static readonly Regex CustomerIdPattern = new(
+        @"\Acus_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    public async Task<ManagedCustomerSummary> CreatePendingAsync(
+        string legalName,
+        string? displayName,
+        string? customerType,
+        string? defaultChannel,
+        string? defaultCurrency,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        ArgumentException.ThrowIfNullOrWhiteSpace(legalName);
+        if (legalName.Trim().Length > 256)
+            throw new ArgumentException("Legal name must be at most 256 characters.", nameof(legalName));
+        ValidateOptional(displayName, 128, nameof(displayName));
+        ValidateOptional(customerType, 64, nameof(customerType));
+        ValidateOptional(defaultChannel, 64, nameof(defaultChannel));
+        ValidateOptional(defaultCurrency, 3, nameof(defaultCurrency));
+        ValidateReason(reason);
+
+        var customer = Customer.Create(
+            legalName, "PENDING", displayName, customerType, defaultChannel,
+            string.IsNullOrWhiteSpace(defaultCurrency) ? null : defaultCurrency.Trim().ToUpperInvariant());
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        const string insertSql = """
+            INSERT INTO customers (
+                customer_id, legal_name, display_name, status, customer_type,
+                default_channel, default_currency, created_at)
+            VALUES (
+                @customer_id, @legal_name, @display_name, @status, @customer_type,
+                @default_channel, @default_currency, @created_at);
+            """;
+        await using (var insert = new NpgsqlCommand(insertSql, connection, transaction))
+        {
+            insert.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customer.CustomerId);
+            insert.Parameters.AddWithValue("legal_name", NpgsqlDbType.Text, customer.LegalName);
+            AddNullable(insert, "display_name", NpgsqlDbType.Text, customer.DisplayName);
+            insert.Parameters.AddWithValue("status", NpgsqlDbType.Text, customer.Status);
+            AddNullable(insert, "customer_type", NpgsqlDbType.Text, customer.CustomerType);
+            AddNullable(insert, "default_channel", NpgsqlDbType.Text, customer.DefaultChannel);
+            AddNullable(insert, "default_currency", NpgsqlDbType.Text, customer.DefaultCurrency);
+            insert.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, customer.CreatedAt);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await InsertAuditAsync(connection, transaction, customer.CustomerId,
+            "CREATED", actorId, reason, customer.CreatedAt, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return ManagedCustomerSummary.From(customer);
+    }
+
+    public async Task ActivateAsync(
+        string customerId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        customerId = NormalizeCustomerId(customerId);
+        ValidateReason(reason);
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        string status;
+        await using (var select = new NpgsqlCommand("""
+            SELECT status FROM customers WHERE customer_id = @customer_id FOR UPDATE;
+            """, connection, transaction))
+        {
+            select.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            var value = await select.ExecuteScalarAsync(cancellationToken);
+            if (value is null)
+                throw new KeyNotFoundException("Customer was not found.");
+            status = (string)value;
+        }
+
+        if (!string.Equals(status, "PENDING", StringComparison.Ordinal))
+            throw new InvalidOperationException("Only a pending customer can be activated.");
+
+        var activatedAt = DateTimeOffset.UtcNow;
+        await using (var update = new NpgsqlCommand("""
+            UPDATE customers SET status = 'ACTIVE'
+            WHERE customer_id = @customer_id AND status = 'PENDING';
+            """, connection, transaction))
+        {
+            update.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
+                throw new InvalidOperationException("Customer status changed before activation.");
+        }
+
+        await InsertAuditAsync(connection, transaction, customerId,
+            "ACTIVATED", actorId, reason, activatedAt, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private string RequireAdministrator()
+    {
+        if (string.IsNullOrWhiteSpace(operationsContext.ActorId) ||
+            !operationsContext.Roles.Contains(MonoOperationsRoles.Administrator, StringComparer.Ordinal))
+            throw new UnauthorizedAccessException("An authenticated Mono administrator is required.");
+        return operationsContext.ActorId;
+    }
+
+    private static string NormalizeCustomerId(string customerId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(customerId);
+        var normalized = customerId.Trim();
+        if (!CustomerIdPattern.IsMatch(normalized))
+            throw new ArgumentException("Customer ID is invalid.", nameof(customerId));
+        return normalized;
+    }
+
+    private static void ValidateOptional(string? value, int maxLength, string parameter)
+    {
+        if (value?.Trim().Length > maxLength)
+            throw new ArgumentException($"Value must be at most {maxLength} characters.", parameter);
+    }
+
+    private static void ValidateReason(string reason)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        if (reason.Trim().Length > 1000)
+            throw new ArgumentException("Reason must be at most 1000 characters.", nameof(reason));
+    }
+
+    private static void AddNullable(NpgsqlCommand command, string name, NpgsqlDbType type, string? value) =>
+        command.Parameters.AddWithValue(name, type,
+            string.IsNullOrWhiteSpace(value) ? DBNull.Value : value.Trim());
+
+    private static async Task InsertAuditAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string customerId,
+        string action,
+        string actorId,
+        string reason,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO customer_operations_audit (
+                audit_id, customer_id, action, actor_id, reason, occurred_at)
+            VALUES (@audit_id, @customer_id, @action, @actor_id, @reason, @occurred_at);
+            """, connection, transaction);
+        command.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, "coa_" + Guid.NewGuid().ToString("N"));
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+        command.Parameters.AddWithValue("action", NpgsqlDbType.Text, action);
+        command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+        command.Parameters.AddWithValue("reason", NpgsqlDbType.Text, reason.Trim());
+        command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, occurredAt);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+}
+
+public sealed record ManagedCustomerSummary(
+    string CustomerId,
+    string LegalName,
+    string? DisplayName,
+    string Status,
+    string? CustomerType,
+    string? DefaultChannel,
+    string? DefaultCurrency,
+    DateTimeOffset CreatedAt)
+{
+    public static ManagedCustomerSummary From(Customer customer) =>
+        new(customer.CustomerId, customer.LegalName, customer.DisplayName, customer.Status,
+            customer.CustomerType, customer.DefaultChannel, customer.DefaultCurrency, customer.CreatedAt);
+}
