@@ -191,9 +191,8 @@ public sealed class MonoCustomerOperationsEndpointTests
                 var secondAudit = Assert.Single(
                     auditPageTwoBody.RootElement.GetProperty("entries").EnumerateArray());
                 Assert.Equal("UPDATED", secondAudit.GetProperty("action").GetString());
-                Assert.Null(secondAudit.GetProperty("nextCursor").ValueKind == System.Text.Json.JsonValueKind.Null
-                    ? null
-                    : secondAudit.GetProperty("nextCursor").GetString());
+                Assert.Equal(System.Text.Json.JsonValueKind.Null,
+                    auditPageTwoBody.RootElement.GetProperty("nextCursor").ValueKind);
 
                 using var invalidAuditCursor = new HttpRequestMessage(
                     HttpMethod.Get, detailPath + "/audit?cursor=invalid");
