@@ -45,9 +45,12 @@ public sealed class DeliveryRequestValidationTests
     [InlineData("with space")]
     [InlineData("comma,inside")]
     [InlineData("bad/slash")]
-    [InlineData("too-long-too-long-too-long-too-long-too-long-too-long-too-long-too-long-too-long-too-long-too-long-too-long-too-long-too-long")]
     public void Idempotency_key_rejects_invalid_values(string? key) =>
         Assert.False(DeliveryRequestInputValidator.IsValidIdempotencyKey(key));
+
+    [Fact]
+    public void Idempotency_key_rejects_values_longer_than_128_characters() =>
+        Assert.False(DeliveryRequestInputValidator.IsValidIdempotencyKey(new string('x', 129)));
 
     [Theory]
     [InlineData("request-1")]
