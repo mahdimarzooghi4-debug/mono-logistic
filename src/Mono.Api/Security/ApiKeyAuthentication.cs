@@ -90,7 +90,7 @@ public sealed class MonoApiKeyAuthenticationHandler(
     IOptionsMonitor<MonoApiKeyAuthenticationOptions> options,
     ILoggerFactory logger,
     System.Text.Encodings.Web.UrlEncoder encoder,
-    IApiKeyCredentialStore credentialStore,
+    IServiceProvider services,
     TimeProvider timeProvider)
     : AuthenticationHandler<MonoApiKeyAuthenticationOptions>(options, logger, encoder)
 {
@@ -106,6 +106,7 @@ public sealed class MonoApiKeyAuthenticationHandler(
         if (keyId is null)
             return AuthenticateResult.Fail("Invalid API key.");
 
+        var credentialStore = services.GetRequiredService<IApiKeyCredentialStore>();
         var credential = await credentialStore.FindAsync(keyId, Context.RequestAborted);
         return ApiKeyCredentialVerifier.TryValidate(key, credential, timeProvider.GetUtcNow(), out var principal)
             ? AuthenticateResult.Success(new AuthenticationTicket(principal!, Scheme.Name))
