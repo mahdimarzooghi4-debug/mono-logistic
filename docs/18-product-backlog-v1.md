@@ -177,6 +177,7 @@ Extensible:
 ## 7. Epic E5 — Maps, Geocoding & Location
 
 ### E5.1 Maps Gateway
+- Sprint 041 defines a provider-neutral in-process contract for geocode, reverse geocode, route estimates, and route matrices with WGS84 coordinate and provider-response validation; no provider or network integration is selected.
 - provider abstraction
 - geocode
 - reverse geocode
