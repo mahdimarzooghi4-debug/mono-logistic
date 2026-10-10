@@ -45,7 +45,9 @@ public sealed class MonoCustomerOperationsEndpointTests
             builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
             builder.Services.AddSingleton(dataSource);
             builder.Services.AddScoped<MonoCustomerOperationsService>();
+            builder.Services.AddScoped<MonoCustomerExternalIdentifierOperationsService>();
             builder.Services.AddScoped<MonoBranchOperationsService>();
+            builder.Services.AddScoped<MonoBranchInspectionService>();
             builder.Services.AddScoped<MonoBranchExternalIdentifierOperationsService>();
             var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
             oidcConfiguration.SigningKeys.Add(signingKey);
