@@ -1,5 +1,6 @@
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
+using Mono.Api.Security;
 using Npgsql;
 using Xunit;
 using Xunit.Abstractions;
@@ -32,8 +33,8 @@ public sealed class CustomerBranchRepositoryTests(ITestOutputHelper output)
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ApplyInitialMigrationAsync(dataSource);
 
-        var repository = new CustomerBranchRepository(dataSource);
         var customer = Customer.Create("Mono Integration Test", "ACTIVE");
+        var repository = new CustomerBranchRepository(dataSource, new FixedCustomerContext(customer.CustomerId));
         var branch = Branch.Create(
             customer.CustomerId,
             "Test Branch",
@@ -42,21 +43,41 @@ public sealed class CustomerBranchRepositoryTests(ITestOutputHelper output)
             latitude: 35.7,
             longitude: 51.4);
 
-        await repository.CreateCustomerAsync(customer);
+        await InsertCustomerAsync(dataSource, customer);
         await repository.CreateBranchAsync(branch);
 
-        var foundForOwner = await repository.FindBranchAsync(customer.CustomerId, branch.BranchId);
+        var foundForOwner = await repository.FindBranchAsync(branch.BranchId);
         Assert.NotNull(foundForOwner);
         Assert.Equal(customer.CustomerId, foundForOwner.CustomerId);
         Assert.Equal(branch.BranchId, foundForOwner.BranchId);
         Assert.Equal(35.7, foundForOwner.Latitude);
-        Assert.Null(await repository.FindBranchAsync("cus_00000000000000000000000000000000", branch.BranchId));
+        var otherTenantId = "cus_00000000000000000000000000000000";
+        var otherTenantRepository = new CustomerBranchRepository(dataSource, new FixedCustomerContext(otherTenantId));
+        Assert.Null(await otherTenantRepository.FindBranchAsync(branch.BranchId));
 
-        var orphan = Branch.Create(
-            "cus_00000000000000000000000000000000",
-            "Orphan Branch",
-            "ACTIVE");
-        await Assert.ThrowsAsync<PostgresException>(() => repository.CreateBranchAsync(orphan));
+        var wrongTenantBranch = Branch.Create(otherTenantId, "Wrong Tenant", "ACTIVE");
+        await Assert.ThrowsAsync<CustomerContextUnavailableException>(() => repository.CreateBranchAsync(wrongTenantBranch));
+
+        var orphan = Branch.Create(otherTenantId, "Orphan Branch", "ACTIVE");
+        await Assert.ThrowsAsync<PostgresException>(() => otherTenantRepository.CreateBranchAsync(orphan));
+    }
+
+    private sealed record FixedCustomerContext(string CustomerId) : ICustomerContext;
+
+    private static async Task InsertCustomerAsync(NpgsqlDataSource dataSource, Customer customer)
+    {
+        const string sql = """
+            INSERT INTO customers (customer_id, legal_name, status, created_at)
+            VALUES (@customer_id, @legal_name, @status, @created_at);
+            """;
+
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", customer.CustomerId);
+        command.Parameters.AddWithValue("legal_name", customer.LegalName);
+        command.Parameters.AddWithValue("status", customer.Status);
+        command.Parameters.AddWithValue("created_at", customer.CreatedAt);
+        await command.ExecuteNonQueryAsync();
     }
 
     private static async Task ApplyInitialMigrationAsync(NpgsqlDataSource dataSource)
