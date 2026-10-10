@@ -115,6 +115,26 @@ A constraint passes when its fact satisfies its operator against the configured 
 
 The preview resolves active and effective versions for the supplied context and requested time using the same precedence ordering as `GET /operations/v1/policies/effective`. It does not merge same-family policies, resolve contradictions, apply optimizer behavior, persist a decision record, or execute a delivery decision.
 
+## Optimization policy input contract
+
+Optimization policy versions use a `WEIGHTED_SUM` definition with a non-empty subset of the architecture's scoring criteria:
+
+```json
+{
+  "scoringModel": "WEIGHTED_SUM",
+  "criteria": [
+    { "name": "eta", "weight": 0.6, "priority": 10 },
+    { "name": "cost", "weight": 0.4, "priority": 5 }
+  ]
+}
+```
+
+Supported criterion names are `eta`, `detour`, `route_density`, `pickup_fit`, `capacity_balance`, and `cost`. Each name may appear once. Weights are non-negative JSON decimals; no total-weight normalization is imposed. Priorities are positive integers retained as policy input metadata.
+
+Optimization definitions are validated when a Draft is created and again when it is activated. A malformed definition or unsupported criterion is rejected. The configuration is returned through the existing policy inspection and effective-policy resolution routes.
+
+This sprint establishes the configuration contract only. It does not normalize runtime measurements, calculate scores, use priorities to break ties, rank candidates, or apply decisions. The configured inputs remain downstream of HARD eligibility and cannot make an ineligible candidate eligible.
+
 ## Errors
 
 - `400 INVALID_REQUEST`: invalid policy fields, definition, dates, reason, page size, or cursor.

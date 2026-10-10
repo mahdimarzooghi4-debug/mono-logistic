@@ -127,6 +127,8 @@ public sealed class MonoPolicyDraftOperationsService(
             ?? throw new PolicyVersionNotFoundException();
         if (requested.Status != "DRAFT")
             throw new PolicyVersionStateConflictException("Only a Draft policy version can be activated.");
+        if (requested.EnforcementType == "OPTIMIZATION")
+            OptimizationPolicyConfigurationValidator.Validate(requested.Definition);
         if (requested.EffectiveTo is not null && requested.EffectiveTo <= now)
             throw new PolicyVersionStateConflictException("An expired policy version cannot be activated.");
 
@@ -468,6 +470,8 @@ public sealed class MonoPolicyDraftOperationsService(
     {
         var normalizedEnforcement = NormalizeChoice(enforcementType, EnforcementTypes,
             "Policy enforcement type is invalid.");
+        if (normalizedEnforcement == "OPTIMIZATION")
+            OptimizationPolicyConfigurationValidator.Validate(definition);
         if (effectiveFrom is not null && effectiveTo is not null && effectiveTo <= effectiveFrom)
             throw new ArgumentException("Effective end must be later than effective start.");
         if (definition.ValueKind != JsonValueKind.Object)

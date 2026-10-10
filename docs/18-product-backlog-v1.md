@@ -99,6 +99,7 @@ Epic
 - candidate exclusion
 
 ### E2.4 Optimization Policy Inputs
+- Sprint 036 validates configurable WEIGHTED_SUM inputs (supported criteria, non-negative weights, positive priorities) without calculating scores or ranking candidates.
 - weights
 - priorities
 - scoring configuration
