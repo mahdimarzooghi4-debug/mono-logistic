@@ -21,7 +21,7 @@ public sealed class CourierLocationUpdateTests
         Assert.Equal("crr_1", normalized.CourierId);
         Assert.Equal("rte_1", normalized.ActiveRouteId);
         Assert.Equal(TimeSpan.Zero, normalized.ObservedAt!.Value.Offset);
-        Assert.Equal(new DateTimeOffset(2026, 10, 10, 8, 30, 0, TimeSpan.Zero), normalized.ObservedAt);
+        Assert.Equal(new DateTimeOffset(2026, 10, 10, 9, 0, 0, TimeSpan.Zero), normalized.ObservedAt);
     }
 
     [Fact]
