@@ -1,6 +1,6 @@
 # Mono Logistics
 
-Mono is a logistics technology and operations platform.
+Mono is an independent logistics technology and operations business. Hana is its first customer; Mono's ownership and long-term scope are independent of any one customer.
 
 ## Vision
 
@@ -25,6 +25,13 @@ Hana
   -> Delivery
   -> Settlement
 ```
+
+## Visual Identity
+
+- [Mono brand system in Figma](https://www.figma.com/design/TsYT48l66ee34uvOoS9XI2/mono-lgestic?node-id=0-1)
+- Figma includes English and Persian logo lockups, icon, usage rules, brand handoff assets, and typography.
+- Primary cyan: `#00A8C6`; tagline gray: `#4A4F57`; reverse dark: `#090E1C`; white: `#FFFFFF`.
+- Typography: Inter for English/Latin and Vazirmatn for Persian.
 
 ## Business Foundation
 
@@ -88,3 +95,4 @@ Business decisions should be documented here before they become product or imple
 - [Mono Epics Roadmap v1](docs/20-epics-roadmap-v1.md)
 - [Mono Product Architecture v1](docs/21-product-architecture-v1.md)
 - [Mono UX Flows v1](docs/22-ux-flows-v1.md)
+- [Merchant Mobile Backlog v1](docs/23-merchant-mobile-backlog-v1.md)
