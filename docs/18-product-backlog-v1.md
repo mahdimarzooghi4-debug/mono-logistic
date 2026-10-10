@@ -44,6 +44,7 @@ Epic
 - Sprint 010 establishes versioned, effective-dated customer/service configuration lookup with tenant scoping and fail-closed ambiguity handling
 - Sprint 011 adds internal Draft creation and audited activation, requiring trusted Mono administrator context; no public endpoint or Hana configuration is added
 - Sprint 012 adds an internal read-only view of configuration versions and append-only audit history for Mono administrators
+- Sprint 013 adds a provider-neutral OIDC JWT validation boundary for Mono operations, strict issuer/audience/signature/lifetime validation, and MFA-gated administrator claims; the identity provider and endpoint remain unconfigured
 - enabled modes
 - coverage
 - policy set binding
