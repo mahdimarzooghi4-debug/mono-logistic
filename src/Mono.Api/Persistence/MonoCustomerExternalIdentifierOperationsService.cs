@@ -225,4 +225,4 @@ public sealed record CustomerExternalIdentifierAuditSummary(
     string Reason,
     DateTimeOffset OccurredAt);
 
-public sealed class DuplicateCustomerExternalIdentifierException : Exception;
+public sealed class DuplicateCustomerExternalIdentifierException : Exception { }
