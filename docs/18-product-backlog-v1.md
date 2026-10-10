@@ -42,6 +42,7 @@ Epic
 ### E1.4 Service Configuration
 - customer-specific service configuration
 - Sprint 010 establishes versioned, effective-dated customer/service configuration lookup with tenant scoping and fail-closed ambiguity handling
+- Sprint 011 adds internal Draft creation and audited activation, requiring trusted Mono administrator context; no public endpoint or Hana configuration is added
 - enabled modes
 - coverage
 - policy set binding
