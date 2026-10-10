@@ -123,7 +123,7 @@ public static class DeliveryRequestInputValidator
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private static readonly Regex DeliveryRequestIdPattern = new(
-        @"\Adr_[0-9a-f]{32}\z",
+        @"\Adrq_[0-9a-f]{32}\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     private const int MaxTextLength = 500;
