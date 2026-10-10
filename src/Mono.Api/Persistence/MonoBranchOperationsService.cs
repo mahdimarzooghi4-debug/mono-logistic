@@ -195,7 +195,7 @@ public sealed class MonoBranchOperationsService(
         }
 
         await transaction.CommitAsync(cancellationToken);
-        return updated with { BranchId = branchId.Trim() };
+        return ManagedBranchSummary.From(updated with { BranchId = branchId.Trim() });
     }
 
     private string RequireAdministrator()
