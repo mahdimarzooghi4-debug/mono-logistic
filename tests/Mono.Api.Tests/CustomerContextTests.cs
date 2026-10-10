@@ -88,6 +88,9 @@ public sealed class CustomerContextTests
         Assert.True(authorizationContext.HasSucceeded);
     }
 
+    private static HttpContextAccessor CreateAccessor(ClaimsIdentity identity) =>
+        CreateAccessor(new ClaimsPrincipal(identity));
+
     private static HttpContextAccessor CreateAccessor(ClaimsPrincipal principal) =>
         new() { HttpContext = new DefaultHttpContext { User = principal } };
 
