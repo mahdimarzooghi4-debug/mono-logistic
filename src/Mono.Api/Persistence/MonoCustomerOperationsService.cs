@@ -83,10 +83,10 @@ public sealed class MonoCustomerOperationsService(
                 "SELECT created_at FROM customers WHERE customer_id = @customer_id;",
                 cursorConnection);
             cursorCommand.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, cursor);
-            var cursorValue = await cursorCommand.ExecuteScalarAsync(cancellationToken);
-            if (cursorValue is null)
+            await using var cursorReader = await cursorCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await cursorReader.ReadAsync(cancellationToken))
                 return null;
-            cursorCreatedAt = (DateTimeOffset)cursorValue;
+            cursorCreatedAt = cursorReader.GetFieldValue<DateTimeOffset>(0);
         }
 
         const string firstPageSql = """
