@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS policies (
     created_at timestamp with time zone NOT NULL,
     created_by text NOT NULL CHECK (length(btrim(created_by)) > 0),
     CHECK ((scope = 'PLATFORM' AND scope_id IS NULL) OR
-           (scope <> 'PLATFORM' AND length(btrim(scope_id)) > 0))
+           (scope <> 'PLATFORM' AND scope_id IS NOT NULL AND length(btrim(scope_id)) > 0))
 );
 
 CREATE TABLE IF NOT EXISTS policy_versions (
@@ -66,3 +66,31 @@ DROP TRIGGER IF EXISTS policy_audit_no_truncate ON policy_audit;
 CREATE TRIGGER policy_audit_no_truncate
     BEFORE TRUNCATE ON policy_audit
     FOR EACH STATEMENT EXECUTE FUNCTION reject_policy_audit_mutation();
+
+CREATE OR REPLACE FUNCTION reject_policy_version_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'policy versions cannot be deleted';
+    END IF;
+    IF OLD.policy_id IS DISTINCT FROM NEW.policy_id
+       OR OLD.version_number IS DISTINCT FROM NEW.version_number
+       OR OLD.enforcement_type IS DISTINCT FROM NEW.enforcement_type
+       OR OLD.priority IS DISTINCT FROM NEW.priority
+       OR OLD.effective_from IS DISTINCT FROM NEW.effective_from
+       OR OLD.effective_to IS DISTINCT FROM NEW.effective_to
+       OR OLD.definition IS DISTINCT FROM NEW.definition
+       OR OLD.created_at IS DISTINCT FROM NEW.created_at
+       OR OLD.created_by IS DISTINCT FROM NEW.created_by THEN
+        RAISE EXCEPTION 'policy version definitions are immutable';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS policy_versions_immutable_definition ON policy_versions;
+CREATE TRIGGER policy_versions_immutable_definition
+    BEFORE UPDATE OR DELETE ON policy_versions
+    FOR EACH ROW EXECUTE FUNCTION reject_policy_version_mutation();
