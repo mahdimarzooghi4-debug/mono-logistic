@@ -8,7 +8,8 @@ builder.Services.AddMonoApiKeyAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseAuthentication();
+// Customer authentication is invoked by its explicit authorization policy.
+// Health endpoints therefore remain independent of credential storage.
 app.UseAuthorization();
 
 // These endpoints report process readiness only. Dependency checks will be added
