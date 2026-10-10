@@ -133,6 +133,13 @@ public sealed class MonoCustomerOperationsEndpointTests
                 using var invalidPageSizeResponse = await client.SendAsync(invalidPageSize);
                 Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidPageSizeResponse.StatusCode);
 
+                using var invalidStatus = new HttpRequestMessage(
+                    HttpMethod.Get, customerListPath + "?status=SUSPENDED");
+                invalidStatus.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var invalidStatusResponse = await client.SendAsync(invalidStatus);
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidStatusResponse.StatusCode);
+
                 using var invalidCursor = new HttpRequestMessage(HttpMethod.Get, customerListPath + "?cursor=invalid");
                 invalidCursor.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
                     "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
@@ -187,6 +194,43 @@ public sealed class MonoCustomerOperationsEndpointTests
                 var secondPageCustomer = Assert.Single(
                     nextCustomerPage.RootElement.GetProperty("customers").EnumerateArray());
                 Assert.Equal(customerId, secondPageCustomer.GetProperty("customerId").GetString());
+
+                using var activateSecondCustomer = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/customers/{secondCustomerId}/activate")
+                {
+                    Content = JsonContent.Create(new { reason = "status filter test" })
+                };
+                activateSecondCustomer.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var activateSecondCustomerResponse = await client.SendAsync(activateSecondCustomer);
+                Assert.Equal(System.Net.HttpStatusCode.NoContent, activateSecondCustomerResponse.StatusCode);
+
+                using var activeCustomerList = new HttpRequestMessage(
+                    HttpMethod.Get, customerListPath + "?status=ACTIVE&page_size=1");
+                activeCustomerList.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var activeCustomerListResponse = await client.SendAsync(activeCustomerList);
+                Assert.Equal(System.Net.HttpStatusCode.OK, activeCustomerListResponse.StatusCode);
+                using var activeCustomerListBody = System.Text.Json.JsonDocument.Parse(
+                    await activeCustomerListResponse.Content.ReadAsStringAsync());
+                var listedActiveCustomer = Assert.Single(
+                    activeCustomerListBody.RootElement.GetProperty("customers").EnumerateArray());
+                Assert.Equal(secondCustomerId, listedActiveCustomer.GetProperty("customerId").GetString());
+                Assert.Equal("ACTIVE", listedActiveCustomer.GetProperty("status").GetString());
+
+                using var pendingCustomerList = new HttpRequestMessage(
+                    HttpMethod.Get, customerListPath + "?status=pending&page_size=1");
+                pendingCustomerList.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var pendingCustomerListResponse = await client.SendAsync(pendingCustomerList);
+                Assert.Equal(System.Net.HttpStatusCode.OK, pendingCustomerListResponse.StatusCode);
+                using var pendingCustomerListBody = System.Text.Json.JsonDocument.Parse(
+                    await pendingCustomerListResponse.Content.ReadAsStringAsync());
+                var listedPendingCustomer = Assert.Single(
+                    pendingCustomerListBody.RootElement.GetProperty("customers").EnumerateArray());
+                Assert.Equal(customerId, listedPendingCustomer.GetProperty("customerId").GetString());
+                Assert.Equal("PENDING", listedPendingCustomer.GetProperty("status").GetString());
 
                 var customerPath = $"/operations/v1/customers/{customerId}";
                 using var unauthorizedCustomerRead = new HttpRequestMessage(HttpMethod.Get, customerPath);
