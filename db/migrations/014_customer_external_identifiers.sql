@@ -7,13 +7,18 @@ CREATE TABLE IF NOT EXISTS customer_external_identifiers (
         CHECK (namespace ~ '^[a-z0-9][a-z0-9._-]{0,63}$'),
     external_id text NOT NULL
         CHECK (length(btrim(external_id)) BETWEEN 1 AND 256),
+    status text NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'RETIRED')),
     created_at timestamp with time zone NOT NULL,
-    CONSTRAINT customer_external_identifiers_namespace_external_id_key
-        UNIQUE (namespace, external_id)
+    retired_at timestamp with time zone NULL,
+    CHECK ((status = 'ACTIVE') = (retired_at IS NULL))
 );
 
 CREATE INDEX IF NOT EXISTS customer_external_identifiers_customer_history_idx
     ON customer_external_identifiers (customer_id, namespace, external_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS customer_external_identifiers_active_namespace_external_id_key
+    ON customer_external_identifiers (namespace, external_id)
+    WHERE status = 'ACTIVE';
 
 CREATE TABLE IF NOT EXISTS customer_external_identifier_audit (
     audit_id text PRIMARY KEY
@@ -23,7 +28,7 @@ CREATE TABLE IF NOT EXISTS customer_external_identifier_audit (
     customer_id text NOT NULL REFERENCES customers(customer_id),
     namespace text NOT NULL,
     external_id text NOT NULL,
-    action text NOT NULL CHECK (action IN ('ADDED')),
+    action text NOT NULL CHECK (action IN ('ADDED', 'RETIRED')),
     actor_id text NOT NULL CHECK (length(btrim(actor_id)) > 0),
     reason text NOT NULL CHECK (length(btrim(reason)) BETWEEN 1 AND 1000),
     occurred_at timestamp with time zone NOT NULL
