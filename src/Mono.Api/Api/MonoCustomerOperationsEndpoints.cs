@@ -12,6 +12,7 @@ public static class MonoCustomerOperationsEndpoints
         endpoints.MapGet("/operations/v1/customers", async (
                 [FromQuery(Name = "page_size")] int? pageSize,
                 string? cursor,
+                string? status,
                 MonoCustomerOperationsService customers,
                 CancellationToken cancellationToken) =>
             {
@@ -22,9 +23,16 @@ public static class MonoCustomerOperationsEndpoints
                         new ApiError("INVALID_REQUEST", "page_size must be between 1 and 100.")));
                 }
 
+                var normalizedStatus = status?.Trim().ToUpperInvariant();
+                if (normalizedStatus is not null && normalizedStatus is not ("PENDING" or "ACTIVE"))
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "status must be PENDING or ACTIVE.")));
+                }
+
                 try
                 {
-                    var page = await customers.ListAsync(size, cursor, cancellationToken);
+                    var page = await customers.ListAsync(size, cursor, normalizedStatus, cancellationToken);
                     return page is null
                         ? Results.BadRequest(new ApiErrorResponse(
                             new ApiError("INVALID_CURSOR", "The cursor is invalid.")))
