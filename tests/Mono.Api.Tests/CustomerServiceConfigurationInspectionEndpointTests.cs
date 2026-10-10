@@ -139,6 +139,35 @@ public sealed class CustomerServiceConfigurationInspectionEndpointTests
                 Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
                     (await client.SendAsync(unauthorizedCreate)).StatusCode);
 
+                using var invalidCreate = new HttpRequestMessage(HttpMethod.Post, authoringPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        effectiveFrom = DateTimeOffset.UtcNow.AddHours(1),
+                        effectiveTo = (DateTimeOffset?)null,
+                        configuration = new[] { "configuration must be an object" },
+                        reason = "invalid payload test"
+                    })
+                };
+                invalidCreate.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var invalidCreateResponse = await client.SendAsync(invalidCreate);
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidCreateResponse.StatusCode);
+
+                var missingConfigurationId = "scf_" + Guid.NewGuid().ToString("N");
+                using var missingActivation = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"/operations/v1/customers/{customerId}/service-configurations/{missingConfigurationId}/activate")
+                {
+                    Content = JsonContent.Create(new { reason = "missing draft test" })
+                };
+                missingActivation.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(missingActivation)).StatusCode);
+
                 var effectiveFrom = DateTimeOffset.UtcNow.AddHours(1);
                 using var createDraft = new HttpRequestMessage(HttpMethod.Post, authoringPath)
                 {
