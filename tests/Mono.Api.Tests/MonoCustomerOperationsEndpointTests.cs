@@ -117,6 +117,7 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.DoesNotContain("HANA", body.RootElement.GetProperty("customerId").GetString()!,
                     StringComparison.OrdinalIgnoreCase);
 
+                const string customerListPath = "/operations/v1/customers";
                 using var customerNameSearch = new HttpRequestMessage(
                     HttpMethod.Get, customerListPath + "?search=mono%20test%20merchant&page_size=1");
                 customerNameSearch.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
@@ -147,7 +148,6 @@ public sealed class MonoCustomerOperationsEndpointTests
                 using var invalidSearchResponse = await client.SendAsync(invalidSearch);
                 Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidSearchResponse.StatusCode);
 
-                const string customerListPath = "/operations/v1/customers";
                 using var unauthenticatedCustomerList = new HttpRequestMessage(HttpMethod.Get, customerListPath);
                 Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
                     (await client.SendAsync(unauthenticatedCustomerList)).StatusCode);
