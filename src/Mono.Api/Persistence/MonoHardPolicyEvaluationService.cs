@@ -55,6 +55,9 @@ public static class HardPolicyEvaluator
 
     private static HardPolicyResult EvaluatePolicy(ResolvedPolicyVersion policy, JsonElement facts)
     {
+        if (string.Equals(policy.PolicyType, "MODE_CAPABILITY", StringComparison.Ordinal))
+            return EvaluateModeCapabilityPolicy(policy, facts);
+
         if (policy.Definition.ValueKind != JsonValueKind.Object ||
             !policy.Definition.TryGetProperty("constraints", out var constraints) ||
             constraints.ValueKind != JsonValueKind.Array ||
@@ -86,6 +89,33 @@ public static class HardPolicyEvaluator
         return new HardPolicyResult(
             policy.PolicyId, policy.VersionNumber, distinctReasons.Length == 0,
             distinctReasons.Length > 0, distinctReasons);
+    }
+
+    private static HardPolicyResult EvaluateModeCapabilityPolicy(
+        ResolvedPolicyVersion policy, JsonElement facts)
+    {
+        try
+        {
+            ModeCapabilityPolicyConfigurationValidator.Validate(policy.Definition);
+        }
+        catch (ArgumentException)
+        {
+            return Failed(policy, "POLICY_DEFINITION_UNSUPPORTED");
+        }
+
+        if (!facts.TryGetProperty("mode", out var mode))
+            return Failed(policy, "POLICY_FACT_MISSING");
+        if (mode.ValueKind != JsonValueKind.String)
+            return Failed(policy, "POLICY_DEFINITION_UNSUPPORTED");
+
+        var modeCode = mode.GetString() ?? string.Empty;
+        var supportedModes = policy.Definition.GetProperty("modes");
+        var isSupported = supportedModes.EnumerateArray().Any(item =>
+            string.Equals(item.GetString(), modeCode, StringComparison.Ordinal));
+
+        return isSupported
+            ? new HardPolicyResult(policy.PolicyId, policy.VersionNumber, true, false, [])
+            : Failed(policy, "MODE_NOT_SUPPORTED");
     }
 
     private static bool TryReadConstraint(
