@@ -9,6 +9,35 @@ public static class MonoCustomerOperationsEndpoints
     public static IEndpointRouteBuilder MapMonoCustomerOperationsEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/operations/v1/customers", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                string? cursor,
+                MonoCustomerOperationsService customers,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "page_size must be between 1 and 100.")));
+                }
+
+                try
+                {
+                    var page = await customers.ListAsync(size, cursor, cancellationToken);
+                    return page is null
+                        ? Results.BadRequest(new ApiErrorResponse(
+                            new ApiError("INVALID_CURSOR", "The cursor is invalid.")))
+                        : Results.Ok(page);
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The cursor is invalid.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapGet("/operations/v1/customers/{customerId}", async (
                 string customerId,
                 MonoCustomerOperationsService customers,
