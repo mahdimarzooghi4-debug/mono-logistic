@@ -30,6 +30,12 @@ Do not run the command in CI, capture its output in build logs, or paste the key
 
 This read-only route requires Mono administrator authentication with issuer-asserted MFA. It returns each credential's key ID, customer ID, scopes, creation time, expiry, and revocation time in stable order. A known customer with no credentials receives an empty `apiKeys` array; an unknown customer returns `404 CUSTOMER_NOT_FOUND`. The response never contains the raw key or its stored hash. Key validity still depends on the credential expiry, revocation state, and customer status.
 
+## Inspect credential audit history
+
+`GET /operations/v1/customers/{customerId}/api-keys/{keyId}/audit`
+
+This read-only route requires Mono administrator authentication with issuer-asserted MFA. It returns the selected customer's key audit events in chronological order, including action, administrator ID, reason, and timestamp. An existing key with no audit events receives an empty `entries` array; an unknown key or a key belonging to another customer returns `404 API_KEY_NOT_FOUND`. The response contains no credential secret or stored hash and does not change key or audit data.
+
 ## Revoke a credential
 
 `POST /operations/v1/customers/{customerId}/api-keys/{keyId}/revoke`
