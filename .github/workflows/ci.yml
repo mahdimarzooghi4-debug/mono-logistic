@@ -27,3 +27,5 @@ jobs:
         run: dotnet build Mono.sln --no-restore --configuration Release
       - name: Test
         run: dotnet test Mono.sln --no-build --configuration Release --logger "trx;LogFileName=mono-tests.trx"
+      - name: Build container image
+        run: docker build --tag mono-api:ci .
