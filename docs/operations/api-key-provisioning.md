@@ -24,6 +24,12 @@ Only scopes in the source-controlled scope catalog are accepted. The catalog con
 
 Do not run the command in CI, capture its output in build logs, or paste the key into source control, tickets, chat, or unapproved storage. Use HTTPS when sending the value to Hana.
 
+## Inspect credentials
+
+`GET /operations/v1/customers/{customerId}/api-keys`
+
+This read-only route requires Mono administrator authentication with issuer-asserted MFA. It returns each credential's key ID, customer ID, scopes, creation time, expiry, and revocation time in stable order. A known customer with no credentials receives an empty `apiKeys` array; an unknown customer returns `404 CUSTOMER_NOT_FOUND`. The response never contains the raw key or its stored hash. Key validity still depends on the credential expiry, revocation state, and customer status.
+
 ## Revoke a credential
 
 `POST /operations/v1/customers/{customerId}/api-keys/{keyId}/revoke`
