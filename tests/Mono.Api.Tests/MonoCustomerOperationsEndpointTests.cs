@@ -382,9 +382,9 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(System.Net.HttpStatusCode.OK, secondPageResponse.StatusCode);
                 using var secondPageBody = System.Text.Json.JsonDocument.Parse(
                     await secondPageResponse.Content.ReadAsStringAsync());
-                Assert.Single(secondPageBody.RootElement.GetProperty("policies").EnumerateArray());
-                Assert.Equal(System.Text.Json.JsonValueKind.Null,
-                    secondPageBody.RootElement.GetProperty("nextCursor").ValueKind);
+                var secondPolicy = Assert.Single(secondPageBody.RootElement.GetProperty("policies").EnumerateArray());
+                Assert.True(StringComparer.Ordinal.Compare(
+                    secondPolicy.GetProperty("policyId").GetString(), policyCursor) > 0);
 
                 using var invalidCursor = new HttpRequestMessage(
                     HttpMethod.Get, "/operations/v1/policies?cursor=invalid");
