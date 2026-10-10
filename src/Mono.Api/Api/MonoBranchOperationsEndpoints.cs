@@ -118,7 +118,9 @@ public static class MonoBranchOperationsEndpoints
     }
 }
 
-public sealed record ManagedBranchListResponse(IReadOnlyList<ManagedBranchSummary> Branches);\n\npublic sealed record UpdateMonoBranchRequest(
+public sealed record ManagedBranchListResponse(IReadOnlyList<ManagedBranchSummary> Branches);
+
+public sealed record UpdateMonoBranchRequest(
     string? Name,
     string? Address,
     double? Latitude,
