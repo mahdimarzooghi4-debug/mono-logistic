@@ -150,7 +150,15 @@ public sealed class MonoApiKeyOperationsService(
     }
 }
 
-public sealed record ApiKeyInspectionSummary(\n    string KeyId,\n    string CustomerId,\n    IReadOnlyList<string> Scopes,\n    DateTimeOffset CreatedAt,\n    DateTimeOffset ExpiresAt,\n    DateTimeOffset? RevokedAt);\n\npublic sealed record ApiKeyRevocationSummary(
+public sealed record ApiKeyInspectionSummary(
+    string KeyId,
+    string CustomerId,
+    IReadOnlyList<string> Scopes,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset ExpiresAt,
+    DateTimeOffset? RevokedAt);
+
+public sealed record ApiKeyRevocationSummary(
     string KeyId,
     string CustomerId,
     DateTimeOffset RevokedAt);
