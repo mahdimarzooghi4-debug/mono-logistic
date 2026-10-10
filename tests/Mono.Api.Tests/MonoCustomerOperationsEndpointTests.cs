@@ -432,19 +432,19 @@ public sealed class MonoCustomerOperationsEndpointTests
                 using var activatedFirst = await client.SendAsync(activateFirst);
                 Assert.Equal(System.Net.HttpStatusCode.OK, activatedFirst.StatusCode);
 
+                using var draftRetire = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/2/retire")
+                { Content = JsonContent.Create(new { reason = "Invalid draft retirement" }) };
+                draftRetire.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.Conflict, (await client.SendAsync(draftRetire)).StatusCode);
+
                 using var activateSecond = new HttpRequestMessage(
                     HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/2/activate")
                 { Content = JsonContent.Create(new { reason = "Replace first policy version" }) };
                 activateSecond.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
                     "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
                 Assert.Equal(System.Net.HttpStatusCode.OK, (await client.SendAsync(activateSecond)).StatusCode);
-
-                using var draftRetire = new HttpRequestMessage(
-                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/1/retire")
-                { Content = JsonContent.Create(new { reason = "Invalid draft retirement" }) };
-                draftRetire.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
-                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
-                Assert.Equal(System.Net.HttpStatusCode.Conflict, (await client.SendAsync(draftRetire)).StatusCode);
 
                 using var retireSecond = new HttpRequestMessage(
                     HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/2/retire")
