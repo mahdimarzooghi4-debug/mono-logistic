@@ -192,10 +192,8 @@ Extensible:
 - Zone resolution is deferred until E6.1 defines the zone registry and geometry.
 
 ### E5.3 Courier Location Ingestion
-- GPS event endpoint
-- current position projection
-- freshness
-- mission-aware tracking
+- Sprint 043 adds a provider-neutral GPS update contract, validation, a per-courier latest-position projection primitive, and freshness evaluation with a caller-supplied age limit; no threshold is invented.
+- No durable storage or GPS endpoint is added yet. Authenticated ingestion and mission-aware tracking depend on Courier identity/auth (E9), Mission/Route lifecycle, and an approved tracking/retention policy.
 
 ## 8. Epic E6 — Zone & Capacity
 
