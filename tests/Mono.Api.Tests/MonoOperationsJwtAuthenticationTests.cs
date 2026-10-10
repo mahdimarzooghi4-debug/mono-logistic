@@ -29,7 +29,8 @@ public sealed class MonoOperationsJwtAuthenticationTests
         await using var app = await CreateAppAsync(Authority, Audience, trustedKey);
         using var client = app.GetTestClient();
 
-        var valid = await client.GetAsync("/operations");
+        var validToken = CreateToken(trustedKey, Authority, Audience);
+        var valid = await SendTokenAsync(client, validToken);
         Assert.Equal(System.Net.HttpStatusCode.OK, valid.StatusCode);
         Assert.Equal("staff-1", await valid.Content.ReadAsStringAsync());
 
