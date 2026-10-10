@@ -21,7 +21,7 @@ Creates the next version in `DRAFT` status and appends a `DRAFT_CREATED` audit e
 
 ## Activate a Draft
 
-`POST /operations/v1/customers/{customerId}/services/{serviceCode}/configurations/{serviceConfigurationId}/activate`
+`POST /operations/v1/customers/{customerId}/service-configurations/{serviceConfigurationId}/activate`
 
 Request body:
 
