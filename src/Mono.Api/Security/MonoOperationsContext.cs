@@ -24,7 +24,7 @@ public static class MonoOperationsClaimTypes
     public const string ActorId = "sub";
     public const string Role = "mono/role";
     public const string MultiFactor = "mono/mfa";
-    internal const string IdentityDomain = "mono/identity_domain";
+    public const string IdentityDomain = "mono/identity_domain";
 }
 
 public static class MonoOperationsDefaults
