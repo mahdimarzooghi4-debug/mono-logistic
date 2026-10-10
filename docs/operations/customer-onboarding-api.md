@@ -31,6 +31,13 @@ Creates a new customer with a Mono-generated opaque ID and `PENDING` status. The
 
 Only a `PENDING` customer can be activated. The status transition to `ACTIVE` and the `ACTIVATED` audit record are committed together. Successful activation returns `204 No Content`. Credential provisioning remains a separate operational action.
 
+## Inspect a customer
+
+- `GET /operations/v1/customers/{customerId}` returns the customer registry summary, including current status.
+- `GET /operations/v1/customers/{customerId}/audit` returns the append-only `CREATED` and `ACTIVATED` history in chronological order, with administrator ID, reason, and timestamp.
+
+Both read routes require Mono administrator authentication with issuer-asserted MFA. They are customer-scoped, return `404 CUSTOMER_NOT_FOUND` for unknown IDs, and do not mutate customer or audit data.
+
 ## Errors
 
 - `400 INVALID_REQUEST`: missing/invalid customer fields, ID, or reason.
