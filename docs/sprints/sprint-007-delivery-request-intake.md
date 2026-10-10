@@ -1,6 +1,6 @@
 # Sprint 007 — Idempotent Delivery Request Intake
 
-- Status: Draft PR / CI pending
+- Status: Draft PR / CI passing; review pending
 - Phase: A — Platform Foundation
 - Epic: E3 — Delivery Request & Mission / E16 — B2B API / E20 — Security
 - Branch: `sprint-007-delivery-request-intake`
