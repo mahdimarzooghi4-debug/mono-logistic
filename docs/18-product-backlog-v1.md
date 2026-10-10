@@ -93,6 +93,7 @@ Epic
 - runtime context
 
 ### E2.3 Hard Policy Evaluation
+- Sprint 035 adds an MFA-gated HARD policy evaluation preview with pass/fail, reason codes, fail-closed unsupported definitions, and candidate exclusion; it is not connected to delivery intake.
 - pass/fail
 - reason codes
 - candidate exclusion

@@ -19,19 +19,16 @@ builder.Services.AddScoped<MonoBranchInspectionService>();
 builder.Services.AddScoped<MonoBranchExternalIdentifierOperationsService>();
 builder.Services.AddScoped<MonoPolicyDraftOperationsService>();
 builder.Services.AddScoped<MonoEffectivePolicyResolutionService>();
+builder.Services.AddScoped<MonoHardPolicyEvaluationService>();
 builder.Services.AddScoped<CustomerBranchRepository>();
 builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
 
 var app = builder.Build();
 
-// Customer authentication is invoked by its explicit authorization policy.
-// Health endpoints therefore remain independent of credential storage.
 app.UseAuthentication();
 app.UseAuthorization();
 
-// These endpoints report process readiness only. Dependency checks will be added
-// alongside the corresponding infrastructure integration.
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
 app.MapBranchEndpoints();
@@ -43,6 +40,7 @@ app.MapMonoApiKeyOperationsEndpoints();
 app.MapMonoBranchOperationsEndpoints();
 app.MapMonoBranchExternalIdentifierOperationsEndpoints();
 app.MapMonoPolicyDraftOperationsEndpoints();
+app.MapMonoHardPolicyEvaluationEndpoints();
 
 app.Run();
 
