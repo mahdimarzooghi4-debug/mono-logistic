@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
