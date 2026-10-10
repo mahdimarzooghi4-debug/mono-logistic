@@ -75,6 +75,7 @@ Epic
 ## 4. Epic E2 — Policy Engine
 
 ### E2.1 Policy CRUD
+- Sprint 032 adds MFA-gated policy draft creation, immutable version history, paginated listing, and append-only audit inspection; activation and evaluation remain out of scope.
 - create policy
 - version policy
 - activate/retire policy
