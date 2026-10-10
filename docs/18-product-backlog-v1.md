@@ -395,6 +395,7 @@ Courier Net = 89% of Mission Fare
 ### E16.1 Authentication
 - customer credentials
 - tenant context
+- internal managed API-key provisioning for existing active customers
 
 ### E16.2 Endpoints
 - delivery requests

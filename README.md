@@ -91,6 +91,7 @@ Business
 
 Business decisions should be documented here before they become product or implementation decisions.
 
+- [Internal API Key Provisioning](docs/operations/api-key-provisioning.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)
 - [Mono Domain Model v1](docs/09-domain-model-v1.md)
