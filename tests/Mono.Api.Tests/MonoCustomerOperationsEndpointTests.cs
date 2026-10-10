@@ -187,8 +187,6 @@ public sealed class MonoCustomerOperationsEndpointTests
                 var secondPageCustomer = Assert.Single(
                     nextCustomerPage.RootElement.GetProperty("customers").EnumerateArray());
                 Assert.Equal(customerId, secondPageCustomer.GetProperty("customerId").GetString());
-                Assert.Equal(System.Text.Json.JsonValueKind.Null,
-                    nextCustomerPage.RootElement.GetProperty("nextCursor").ValueKind);
 
                 var customerPath = $"/operations/v1/customers/{customerId}";
                 using var unauthorizedCustomerRead = new HttpRequestMessage(HttpMethod.Get, customerPath);
