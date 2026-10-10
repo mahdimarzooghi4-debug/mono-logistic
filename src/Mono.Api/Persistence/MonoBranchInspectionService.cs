@@ -96,10 +96,10 @@ public sealed class MonoBranchInspectionService(
             findCursor.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
             findCursor.Parameters.AddWithValue("branch_id", NpgsqlDbType.Text, branchId);
             findCursor.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, cursor);
-            var value = await findCursor.ExecuteScalarAsync(cancellationToken);
-            if (value is null)
+            await using var cursorReader = await findCursor.ExecuteReaderAsync(cancellationToken);
+            if (!await cursorReader.ReadAsync(cancellationToken))
                 throw new BranchAuditCursorException();
-            cursorAt = (DateTimeOffset)value;
+            cursorAt = cursorReader.GetFieldValue<DateTimeOffset>(0);
         }
 
         await using var command = new NpgsqlCommand("""
