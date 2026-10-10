@@ -26,9 +26,13 @@ builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
 
 var app = builder.Build();
 
+// Customer authentication is invoked by its explicit authorization policy.
+// Health endpoints therefore remain independent of credential storage.
 app.UseAuthentication();
 app.UseAuthorization();
 
+// These endpoints report process readiness only. Dependency checks will be added
+// alongside the corresponding infrastructure integration.
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
 app.MapBranchEndpoints();
