@@ -20,6 +20,12 @@ This internal route is reserved for Mono operations administrators. It requires 
 
 The customer must exist and have `ACTIVE` status. Mono generates the branch ID and stores the new branch as `ACTIVE`. Coordinates are optional, but latitude and longitude must be supplied together and remain within geographic ranges. Operating hours, when supplied, must be a JSON object; the API preserves that object without imposing a schedule schema. A branch creation audit entry records the customer, branch, administrator, reason, and time in the same transaction.
 
+## Inspect customer branches
+
+`GET /operations/v1/customers/{customerId}/branches`
+
+The route requires Mono administrator authentication with issuer-asserted MFA. It returns branch summaries ordered by name and branch ID for the requested existing customer, including each branch's current status. An existing customer with no branches receives an empty `branches` array. Unknown customer IDs return `404 CUSTOMER_NOT_FOUND`; malformed customer IDs return `400 INVALID_REQUEST`. This read view does not change branch state or append audit events.
+
 ## Replace branch details
 
 `PUT /operations/v1/customers/{customerId}/branches/{branchId}`
