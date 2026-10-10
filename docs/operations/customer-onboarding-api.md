@@ -31,6 +31,14 @@ Creates a new customer with a Mono-generated opaque ID and `PENDING` status. The
 
 Only a `PENDING` customer can be activated. The status transition to `ACTIVE` and the `ACTIVATED` audit record are committed together. Successful activation returns `204 No Content`. Credential provisioning remains a separate operational action.
 
+## List customers
+
+`GET /operations/v1/customers?page_size=50&cursor=cus_...`
+
+Returns customer registry summaries ordered by `createdAt` descending, then `customerId` descending. The default page size is 50; accepted values are 1–100. When another page exists, `nextCursor` contains the last customer ID in the current page. Pass it as `cursor` to continue. The cursor is scoped to an existing customer record; malformed or unknown cursors return `400 INVALID_CURSOR`. The response contains registry metadata only and does not include credentials or audit history.
+
+This route requires Mono administrator authentication with issuer-asserted MFA.
+
 ## Inspect a customer
 
 - `GET /operations/v1/customers/{customerId}` returns the customer registry summary, including current status.
@@ -40,7 +48,8 @@ Both read routes require Mono administrator authentication with issuer-asserted 
 
 ## Errors
 
-- `400 INVALID_REQUEST`: missing/invalid customer fields, ID, or reason.
+- `400 INVALID_REQUEST`: missing/invalid customer fields, ID, reason, or page size.
+- `400 INVALID_CURSOR`: malformed or unknown customer-list cursor.
 - `404 CUSTOMER_NOT_FOUND`: customer ID is unknown.
 - `409 CUSTOMER_CONFLICT`: customer is not in `PENDING` status.
 - `401` and `403`: missing/invalid administrator authentication or insufficient role.
