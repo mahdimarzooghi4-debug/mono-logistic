@@ -165,6 +165,9 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal("merchant-001",
                     addedExternalIdentifierBody.RootElement.GetProperty("externalId").GetString());
 
+                var externalIdentifierId =
+                    addedExternalIdentifierBody.RootElement.GetProperty("identifierId").GetString()!;
+
                 using var externalIdentifierAudit = new HttpRequestMessage(
                     HttpMethod.Get, externalIdentifiersPath + "/audit");
                 externalIdentifierAudit.Headers.Authorization =
@@ -324,6 +327,72 @@ public sealed class MonoCustomerOperationsEndpointTests
                         "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
                 Assert.Equal(System.Net.HttpStatusCode.Conflict,
                     (await client.SendAsync(crossCustomerDuplicateIdentifier)).StatusCode);
+
+                var retireExternalIdentifierPath =
+                    externalIdentifiersPath + "/" + externalIdentifierId + "/retire";
+                using var unauthenticatedRetire = new HttpRequestMessage(
+                    HttpMethod.Post, retireExternalIdentifierPath)
+                {
+                    Content = JsonContent.Create(new { reason = "retirement authorization test" })
+                };
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthenticatedRetire)).StatusCode);
+
+                using var retireExternalIdentifier = new HttpRequestMessage(
+                    HttpMethod.Post, retireExternalIdentifierPath)
+                {
+                    Content = JsonContent.Create(new { reason = "source account reassigned" })
+                };
+                retireExternalIdentifier.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var retireExternalIdentifierResponse =
+                    await client.SendAsync(retireExternalIdentifier);
+                Assert.Equal(System.Net.HttpStatusCode.NoContent, retireExternalIdentifierResponse.StatusCode);
+
+                using var retiredExternalIdentifiers = new HttpRequestMessage(
+                    HttpMethod.Get, externalIdentifiersPath);
+                retiredExternalIdentifiers.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var retiredExternalIdentifiersResponse =
+                    await client.SendAsync(retiredExternalIdentifiers);
+                using var retiredExternalIdentifiersBody = System.Text.Json.JsonDocument.Parse(
+                    await retiredExternalIdentifiersResponse.Content.ReadAsStringAsync());
+                Assert.Empty(retiredExternalIdentifiersBody.RootElement.GetProperty("identifiers").EnumerateArray());
+
+                using var addReassignedIdentifier = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"/operations/v1/customers/{secondCustomerId}/external-identifiers")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = "hana",
+                        externalId = "merchant-001",
+                        reason = "verified account transfer"
+                    })
+                };
+                addReassignedIdentifier.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var reassignedIdentifierResponse = await client.SendAsync(addReassignedIdentifier);
+                Assert.Equal(System.Net.HttpStatusCode.Created, reassignedIdentifierResponse.StatusCode);
+
+                using var auditAfterRetirement = new HttpRequestMessage(
+                    HttpMethod.Get, externalIdentifiersPath + "/audit");
+                auditAfterRetirement.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var auditAfterRetirementResponse = await client.SendAsync(auditAfterRetirement);
+                using var auditAfterRetirementBody = System.Text.Json.JsonDocument.Parse(
+                    await auditAfterRetirementResponse.Content.ReadAsStringAsync());
+                var identifierAuditEntries =
+                    auditAfterRetirementBody.RootElement.GetProperty("entries").EnumerateArray().ToArray();
+                Assert.Equal(2, identifierAuditEntries.Length);
+                Assert.Equal("ADDED", identifierAuditEntries[0].GetProperty("action").GetString());
+                Assert.Equal("RETIRED", identifierAuditEntries[1].GetProperty("action").GetString());
+                Assert.Equal("source account reassigned",
+                    identifierAuditEntries[1].GetProperty("reason").GetString());
 
                 using var firstCustomerPageRequest = new HttpRequestMessage(
                     HttpMethod.Get, customerListPath + "?page_size=1");
