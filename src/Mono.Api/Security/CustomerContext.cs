@@ -15,6 +15,7 @@ public static class MonoAuthorizationPolicies
 {
     public const string CustomerTenant = "mono.customer-tenant";
     public const string BranchesRead = "mono.branches.read";
+    public const string DeliveryRequestsWrite = "mono.delivery-requests.write";
 }
 
 public interface ICustomerContext
@@ -121,6 +122,13 @@ public static class CustomerTenantServiceCollectionExtensions
                 policy.RequireAuthenticatedUser();
                 policy.AddRequirements(new CustomerTenantRequirement());
                 policy.AddRequirements(new MonoScopeRequirement("branches.read"));
+            });
+            options.AddPolicy(MonoAuthorizationPolicies.DeliveryRequestsWrite, policy =>
+            {
+                policy.AddAuthenticationSchemes(MonoApiKeyDefaults.Scheme);
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new CustomerTenantRequirement());
+                policy.AddRequirements(new MonoScopeRequirement("delivery-requests.write"));
             });
         });
 
