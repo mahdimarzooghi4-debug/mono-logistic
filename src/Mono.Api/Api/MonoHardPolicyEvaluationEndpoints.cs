@@ -10,7 +10,6 @@ public static class MonoHardPolicyEvaluationEndpoints
     public static IEndpointRouteBuilder MapMonoHardPolicyEvaluationEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-
         endpoints.MapPost(
             "/operations/v1/policies/modes/eligible",
             async (
