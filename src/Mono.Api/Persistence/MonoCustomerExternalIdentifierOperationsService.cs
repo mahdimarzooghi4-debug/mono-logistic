@@ -251,7 +251,7 @@ public sealed class MonoCustomerExternalIdentifierOperationsService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         var normalized = value.Trim();
-        if (!Regex.IsMatch(normalized, @"\\Acei_[0-9a-f]{32}\\z", RegexOptions.CultureInvariant))
+        if (!Regex.IsMatch(normalized, @"\Acei_[0-9a-f]{32}\z", RegexOptions.CultureInvariant))
             throw new ArgumentException("External identifier ID is invalid.", nameof(value));
         return normalized;
     }
