@@ -45,6 +45,7 @@ public sealed class MonoCustomerOperationsEndpointTests
             builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
             builder.Services.AddSingleton(dataSource);
             builder.Services.AddScoped<MonoCustomerOperationsService>();
+            builder.Services.AddScoped<MonoCustomerExternalIdentifierOperationsService>();
             builder.Services.AddScoped<MonoBranchOperationsService>();
             builder.Services.AddScoped<MonoApiKeyOperationsService>();
             var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
@@ -116,6 +117,114 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal("IRT", body.RootElement.GetProperty("defaultCurrency").GetString());
                 Assert.DoesNotContain("HANA", body.RootElement.GetProperty("customerId").GetString()!,
                     StringComparison.OrdinalIgnoreCase);
+
+                var externalIdentifiersPath =
+                    $"/operations/v1/customers/{customerId}/external-identifiers";
+                using var unauthenticatedIdentifiers = new HttpRequestMessage(
+                    HttpMethod.Get, externalIdentifiersPath);
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthenticatedIdentifiers)).StatusCode);
+                using var nonAdminIdentifiers = new HttpRequestMessage(
+                    HttpMethod.Get, externalIdentifiersPath);
+                nonAdminIdentifiers.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminIdentifiers)).StatusCode);
+
+                using var emptyIdentifiers = new HttpRequestMessage(
+                    HttpMethod.Get, externalIdentifiersPath);
+                emptyIdentifiers.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var emptyIdentifiersResponse = await client.SendAsync(emptyIdentifiers);
+                Assert.Equal(System.Net.HttpStatusCode.OK, emptyIdentifiersResponse.StatusCode);
+                using var emptyIdentifiersBody = System.Text.Json.JsonDocument.Parse(
+                    await emptyIdentifiersResponse.Content.ReadAsStringAsync());
+                Assert.Empty(emptyIdentifiersBody.RootElement.GetProperty("identifiers").EnumerateArray());
+
+                using var addExternalIdentifier = new HttpRequestMessage(
+                    HttpMethod.Post, externalIdentifiersPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = " HANA ",
+                        externalId = "merchant-001",
+                        reason = "verified first-party customer mapping"
+                    })
+                };
+                addExternalIdentifier.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var addedExternalIdentifier = await client.SendAsync(addExternalIdentifier);
+                Assert.Equal(System.Net.HttpStatusCode.Created, addedExternalIdentifier.StatusCode);
+                using var addedExternalIdentifierBody = System.Text.Json.JsonDocument.Parse(
+                    await addedExternalIdentifier.Content.ReadAsStringAsync());
+                Assert.Equal("hana",
+                    addedExternalIdentifierBody.RootElement.GetProperty("namespace").GetString());
+                Assert.Equal("merchant-001",
+                    addedExternalIdentifierBody.RootElement.GetProperty("externalId").GetString());
+
+                using var externalIdentifierAudit = new HttpRequestMessage(
+                    HttpMethod.Get, externalIdentifiersPath + "/audit");
+                externalIdentifierAudit.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var externalIdentifierAuditResponse = await client.SendAsync(externalIdentifierAudit);
+                Assert.Equal(System.Net.HttpStatusCode.OK, externalIdentifierAuditResponse.StatusCode);
+                using var externalIdentifierAuditBody = System.Text.Json.JsonDocument.Parse(
+                    await externalIdentifierAuditResponse.Content.ReadAsStringAsync());
+                var externalIdentifierAuditEntry = Assert.Single(
+                    externalIdentifierAuditBody.RootElement.GetProperty("entries").EnumerateArray());
+                Assert.Equal("ADDED", externalIdentifierAuditEntry.GetProperty("action").GetString());
+                Assert.Equal("admin-test", externalIdentifierAuditEntry.GetProperty("actorId").GetString());
+                Assert.Equal("verified first-party customer mapping",
+                    externalIdentifierAuditEntry.GetProperty("reason").GetString());
+
+                using var duplicateExternalIdentifier = new HttpRequestMessage(
+                    HttpMethod.Post, externalIdentifiersPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = "hana",
+                        externalId = "merchant-001",
+                        reason = "duplicate mapping test"
+                    })
+                };
+                duplicateExternalIdentifier.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var duplicateExternalIdentifierResponse =
+                    await client.SendAsync(duplicateExternalIdentifier);
+                Assert.Equal(System.Net.HttpStatusCode.Conflict,
+                    duplicateExternalIdentifierResponse.StatusCode);
+
+                using var invalidExternalNamespace = new HttpRequestMessage(
+                    HttpMethod.Post, externalIdentifiersPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = "not a namespace",
+                        externalId = "merchant-002",
+                        reason = "invalid namespace test"
+                    })
+                };
+                invalidExternalNamespace.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var invalidExternalNamespaceResponse =
+                    await client.SendAsync(invalidExternalNamespace);
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest,
+                    invalidExternalNamespaceResponse.StatusCode);
+
+                using var unknownCustomerIdentifiers = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    "/operations/v1/customers/cus_00000000000000000000000000000000/external-identifiers");
+                unknownCustomerIdentifiers.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(unknownCustomerIdentifiers)).StatusCode);
 
                 const string customerListPath = "/operations/v1/customers";
                 using var customerNameSearch = new HttpRequestMessage(
@@ -198,6 +307,23 @@ public sealed class MonoCustomerOperationsEndpointTests
                 using var secondCreatedBody = System.Text.Json.JsonDocument.Parse(
                     await secondCreated.Content.ReadAsStringAsync());
                 var secondCustomerId = secondCreatedBody.RootElement.GetProperty("customerId").GetString()!;
+
+                using var crossCustomerDuplicateIdentifier = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"/operations/v1/customers/{secondCustomerId}/external-identifiers")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = "hana",
+                        externalId = "merchant-001",
+                        reason = "cross-customer uniqueness test"
+                    })
+                };
+                crossCustomerDuplicateIdentifier.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.Conflict,
+                    (await client.SendAsync(crossCustomerDuplicateIdentifier)).StatusCode);
 
                 using var firstCustomerPageRequest = new HttpRequestMessage(
                     HttpMethod.Get, customerListPath + "?page_size=1");
@@ -805,7 +931,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql",
             "Mono.Api.Tests.Migrations.011_customer_api_key_operations_audit.sql",
             "Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql",
-            "Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql"
+            "Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql",
+            "Mono.Api.Tests.Migrations.014_customer_external_identifiers.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)
