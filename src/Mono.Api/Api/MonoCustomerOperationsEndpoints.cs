@@ -9,6 +9,48 @@ public static class MonoCustomerOperationsEndpoints
     public static IEndpointRouteBuilder MapMonoCustomerOperationsEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/operations/v1/customers/{customerId}", async (
+                string customerId,
+                MonoCustomerOperationsService customers,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var customer = await customers.FindAsync(customerId, cancellationToken);
+                    return customer is null
+                        ? Results.NotFound(new ApiErrorResponse(
+                            new ApiError("CUSTOMER_NOT_FOUND", "Customer was not found.")))
+                        : Results.Ok(customer);
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Customer ID is invalid.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet("/operations/v1/customers/{customerId}/audit", async (
+                string customerId,
+                MonoCustomerOperationsService customers,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var entries = await customers.ListAuditAsync(customerId, cancellationToken);
+                    return entries is null
+                        ? Results.NotFound(new ApiErrorResponse(
+                            new ApiError("CUSTOMER_NOT_FOUND", "Customer was not found.")))
+                        : Results.Ok(new MonoCustomerAuditListResponse(entries));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Customer ID is invalid.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapPost("/operations/v1/customers", async (
                 CreateMonoCustomerRequest request,
                 MonoCustomerOperationsService customers,
@@ -68,6 +110,9 @@ public static class MonoCustomerOperationsEndpoints
         return endpoints;
     }
 }
+
+public sealed record MonoCustomerAuditListResponse(
+    IReadOnlyList<MonoCustomerAuditSummary> Entries);
 
 public sealed record CreateMonoCustomerRequest(
     string? LegalName,
