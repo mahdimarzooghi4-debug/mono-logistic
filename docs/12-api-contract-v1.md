@@ -98,8 +98,8 @@ Example request:
     "address_text": "Customer address",
     "latitude": 35.7100,
     "longitude": 51.4200,
-    "contact_name": "Recipient",
-    "contact_phone": "+98...",
+    "recipient_name": "Recipient",
+    "recipient_phone": "+98...",
     "address_details": "Unit 4"
   },
   "shipment": {
