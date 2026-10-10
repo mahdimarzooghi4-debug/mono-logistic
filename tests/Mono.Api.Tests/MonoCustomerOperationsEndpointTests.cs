@@ -528,6 +528,133 @@ public sealed class MonoCustomerOperationsEndpointTests
         }
     }
 
+
+    [Fact]
+    public async Task Effective_policy_resolution_filters_by_context_and_dates_and_orders_precedence()
+    {
+        var dataSource = await CreateDataSourceAsync();
+        if (dataSource is null) return;
+        await using (dataSource)
+        using (var rsa = RSA.Create(2048))
+        {
+            var signingKey = new RsaSecurityKey(rsa) { KeyId = "effective-policy-resolution-test-key" };
+            var builder = WebApplication.CreateBuilder();
+            builder.WebHost.UseTestServer();
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MonoOperations:Authority"] = Authority,
+                ["MonoOperations:Audience"] = Audience
+            });
+            builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
+            builder.Services.AddSingleton(dataSource);
+            builder.Services.AddScoped<MonoPolicyDraftOperationsService>();
+            builder.Services.AddScoped<MonoEffectivePolicyResolutionService>();
+            var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
+            oidcConfiguration.SigningKeys.Add(signingKey);
+            builder.Services.PostConfigure<JwtBearerOptions>(MonoOperationsDefaults.Scheme, options =>
+            {
+                options.ConfigurationManager =
+                    new StaticConfigurationManager<OpenIdConnectConfiguration>(oidcConfiguration);
+                options.TokenValidationParameters.ValidIssuer = Authority;
+                options.TokenValidationParameters.ValidAudience = Audience;
+                options.TokenValidationParameters.IssuerSigningKey = signingKey;
+            });
+
+            var app = builder.Build();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.MapMonoPolicyDraftOperationsEndpoints();
+            await app.StartAsync();
+            await using (app)
+            using (var client = app.GetTestClient())
+            {
+                const string customerId = "cus_00000000000000000000000000000001";
+                const string otherCustomerId = "cus_00000000000000000000000000000002";
+                const string serviceId = "svc_urban_delivery";
+                const string zoneId = "zon_test";
+
+                async Task<string> CreateAndActivateAsync(
+                    string policyType, string scope, string? scopeId, DateTimeOffset? effectiveFrom = null)
+                {
+                    using var create = new HttpRequestMessage(HttpMethod.Post, "/operations/v1/policies")
+                    {
+                        Content = JsonContent.Create(new
+                        {
+                            policyType,
+                            scope,
+                            scopeId,
+                            enforcementType = "HARD",
+                            priority = 10,
+                            effectiveFrom,
+                            definition = new { enabled = true },
+                            reason = "Effective resolver integration test"
+                        })
+                    };
+                    create.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                    using var created = await client.SendAsync(create);
+                    Assert.Equal(System.Net.HttpStatusCode.Created, created.StatusCode);
+                    using var createdBody = System.Text.Json.JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+                    var policyId = createdBody.RootElement.GetProperty("policyId").GetString()!;
+
+                    using var activate = new HttpRequestMessage(
+                        HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/1/activate")
+                    {
+                        Content = JsonContent.Create(new { reason = "Effective resolver integration test" })
+                    };
+                    activate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                    using var activated = await client.SendAsync(activate);
+                    Assert.Equal(System.Net.HttpStatusCode.OK, activated.StatusCode);
+                    return policyId;
+                }
+
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.GetAsync("/operations/v1/policies/effective")).StatusCode);
+                using var forbidden = new HttpRequestMessage(HttpMethod.Get, "/operations/v1/policies/effective");
+                forbidden.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await client.SendAsync(forbidden)).StatusCode);
+
+                await CreateAndActivateAsync("PLATFORM_BASELINE", "PLATFORM", null);
+                await CreateAndActivateAsync("CUSTOMER_RULE", "CUSTOMER", customerId);
+                await CreateAndActivateAsync("ZONE_RULE", "ZONE", zoneId);
+                await CreateAndActivateAsync("OTHER_CUSTOMER_RULE", "CUSTOMER", otherCustomerId);
+                var futureStart = DateTimeOffset.UtcNow.AddHours(1);
+                await CreateAndActivateAsync("FUTURE_SERVICE_RULE", "SERVICE", serviceId, futureStart);
+
+                var baseQuery = $"service_id={serviceId}&customer_id={customerId}&zone_id={zoneId}";
+                using var currentRequest = new HttpRequestMessage(
+                    HttpMethod.Get, "/operations/v1/policies/effective?" + baseQuery);
+                currentRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var currentResponse = await client.SendAsync(currentRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, currentResponse.StatusCode);
+                using var currentBody = System.Text.Json.JsonDocument.Parse(await currentResponse.Content.ReadAsStringAsync());
+                var currentPolicies = currentBody.RootElement.GetProperty("policies").EnumerateArray().ToArray();
+                Assert.Equal(3, currentPolicies.Length);
+                Assert.Equal(new[] { "PLATFORM", "CUSTOMER", "ZONE" },
+                    currentPolicies.Select(policy => policy.GetProperty("scope").GetString()).ToArray());
+                Assert.DoesNotContain(currentPolicies,
+                    policy => policy.GetProperty("policyType").GetString() == "OTHER_CUSTOMER_RULE");
+                Assert.All(currentPolicies, policy => Assert.Equal(1, policy.GetProperty("versionNumber").GetInt32()));
+
+                var futureQuery = baseQuery + "&requested_at=" +
+                    Uri.EscapeDataString(futureStart.AddMinutes(1).ToString("O"));
+                using var futureRequest = new HttpRequestMessage(
+                    HttpMethod.Get, "/operations/v1/policies/effective?" + futureQuery);
+                futureRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var futureResponse = await client.SendAsync(futureRequest);
+                using var futureBody = System.Text.Json.JsonDocument.Parse(await futureResponse.Content.ReadAsStringAsync());
+                var futurePolicies = futureBody.RootElement.GetProperty("policies").EnumerateArray().ToArray();
+                Assert.Equal(4, futurePolicies.Length);
+                Assert.Equal(new[] { "PLATFORM", "SERVICE", "CUSTOMER", "ZONE" },
+                    futurePolicies.Select(policy => policy.GetProperty("scope").GetString()).ToArray());
+            }
+        }
+    }
+
     [Fact]
     public async Task Branch_detail_and_audit_are_admin_only_customer_scoped_and_paginated()
     {
