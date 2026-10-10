@@ -380,6 +380,15 @@ public sealed class MonoCustomerOperationsEndpointTests
                     await emptyKeyListResponse.Content.ReadAsStringAsync());
                 Assert.Empty(emptyKeyListBody.RootElement.GetProperty("apiKeys").EnumerateArray());
 
+                using var missingCustomerKeyListRequest = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    "/operations/v1/customers/cus_00000000000000000000000000000000/api-keys");
+                missingCustomerKeyListRequest.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var missingCustomerKeyListResponse = await client.SendAsync(missingCustomerKeyListRequest);
+                Assert.Equal(System.Net.HttpStatusCode.NotFound, missingCustomerKeyListResponse.StatusCode);
+
                 using var unauthorizedKeyListRequest = new HttpRequestMessage(HttpMethod.Get, apiKeysPath);
                 Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
                     (await client.SendAsync(unauthorizedKeyListRequest)).StatusCode);
