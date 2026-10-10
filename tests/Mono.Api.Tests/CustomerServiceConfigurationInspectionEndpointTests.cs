@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -64,6 +65,7 @@ public sealed class CustomerServiceConfigurationInspectionEndpointTests
             builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
             builder.Services.AddSingleton(dataSource);
             builder.Services.AddScoped<CustomerServiceConfigurationInspectionService>();
+            builder.Services.AddScoped<CustomerServiceConfigurationAuthoringService>();
             var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
             oidcConfiguration.SigningKeys.Add(signingKey);
             builder.Services.PostConfigure<JwtBearerOptions>(MonoOperationsDefaults.Scheme, options =>
@@ -121,6 +123,84 @@ public sealed class CustomerServiceConfigurationInspectionEndpointTests
                 Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidLimitResponse.StatusCode);
                 Assert.Contains("INVALID_REQUEST",
                     await invalidLimitResponse.Content.ReadAsStringAsync());
+
+                var authoringPath =
+                    $"/operations/v1/customers/{customerId}/services/URBAN_DELIVERY/configurations";
+                using var unauthorizedCreate = new HttpRequestMessage(HttpMethod.Post, authoringPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        effectiveFrom = DateTimeOffset.UtcNow.AddHours(1),
+                        effectiveTo = (DateTimeOffset?)null,
+                        configuration = new { modes = new[] { "WALK" } },
+                        reason = "test"
+                    })
+                };
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthorizedCreate)).StatusCode);
+
+                var effectiveFrom = DateTimeOffset.UtcNow.AddHours(1);
+                using var createDraft = new HttpRequestMessage(HttpMethod.Post, authoringPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        effectiveFrom,
+                        effectiveTo = (DateTimeOffset?)null,
+                        configuration = new { internalValue = "do-not-echo" },
+                        reason = "operations approval reference"
+                    })
+                };
+                createDraft.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var createdDraftResponse = await client.SendAsync(createDraft);
+                Assert.Equal(System.Net.HttpStatusCode.Created, createdDraftResponse.StatusCode);
+                var createdDraftBody = await createdDraftResponse.Content.ReadAsStringAsync();
+                Assert.DoesNotContain("do-not-echo", createdDraftBody);
+                using var createdDraftDocument = JsonDocument.Parse(createdDraftBody);
+                var createdDraftId = createdDraftDocument.RootElement
+                    .GetProperty("serviceConfigurationId").GetString()!;
+
+                var activatePath =
+                    $"/operations/v1/customers/{customerId}/service-configurations/{createdDraftId}/activate";
+                using var activateDraft = new HttpRequestMessage(HttpMethod.Post, activatePath)
+                {
+                    Content = JsonContent.Create(new { reason = "authorized activation" })
+                };
+                activateDraft.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var activatedResponse = await client.SendAsync(activateDraft);
+                Assert.Equal(System.Net.HttpStatusCode.NoContent, activatedResponse.StatusCode);
+
+                using var overlappingDraft = new HttpRequestMessage(HttpMethod.Post, authoringPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        effectiveFrom = effectiveFrom.AddHours(1),
+                        effectiveTo = (DateTimeOffset?)null,
+                        configuration = new { internalValue = "conflict" },
+                        reason = "overlap test"
+                    })
+                };
+                overlappingDraft.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var overlappingResponse = await client.SendAsync(overlappingDraft);
+                Assert.Equal(System.Net.HttpStatusCode.Created, overlappingResponse.StatusCode);
+                using var overlapDocument = JsonDocument.Parse(
+                    await overlappingResponse.Content.ReadAsStringAsync());
+                var overlappingId = overlapDocument.RootElement
+                    .GetProperty("serviceConfigurationId").GetString()!;
+                using var activateOverlap = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"/operations/v1/customers/{customerId}/service-configurations/{overlappingId}/activate")
+                {
+                    Content = JsonContent.Create(new { reason = "must conflict" })
+                };
+                activateOverlap.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var overlapActivationResponse = await client.SendAsync(activateOverlap);
+                Assert.Equal(System.Net.HttpStatusCode.Conflict, overlapActivationResponse.StatusCode);
             }
         }
     }
