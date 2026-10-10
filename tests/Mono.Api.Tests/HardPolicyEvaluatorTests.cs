@@ -112,6 +112,59 @@ public sealed class HardPolicyEvaluatorTests
         Assert.Contains("POLICY_DEFINITION_UNSUPPORTED", response.ReasonCodes);
     }
 
+    [Fact]
+    public void EligibleModePreviewIntersectsEffectiveCapabilityPolicies()
+    {
+        using var facts = JsonDocument.Parse("""{"distance_km":3}""");
+        var response = EligibleModeEvaluator.Evaluate(Resolution(
+            Policy("default-modes", "HARD", """{"modes":["WALK","BIKE","CAR"]}""", "MODE_CAPABILITY"),
+            Policy("customer-modes", "HARD", """{"modes":["BIKE","CAR"]}""", "MODE_CAPABILITY")),
+            facts.RootElement);
+
+        Assert.Equal(new[] { "BIKE", "CAR" }, response.EligibleModes);
+        Assert.Equal(new[] { "WALK", "BIKE", "CAR" }, response.Candidates.Select(candidate => candidate.Mode));
+        Assert.False(response.Candidates[0].Eligible);
+        Assert.Equal(new[] { "MODE_NOT_SUPPORTED" }, response.Candidates[0].ReasonCodes);
+    }
+
+    [Fact]
+    public void EligibleModePreviewAppliesOtherHardConstraintsPerCandidate()
+    {
+        using var facts = JsonDocument.Parse("""{"distance_km":3}""");
+        var response = EligibleModeEvaluator.Evaluate(Resolution(
+            Policy("modes", "HARD", """{"modes":["WALK","BIKE","CAR"]}""", "MODE_CAPABILITY"),
+            Policy("no-walk", "HARD", """{"constraints":[{"fact":"mode","operator":"NE","value":"WALK","reasonCode":"WALK_NOT_ALLOWED"}]}""")),
+            facts.RootElement);
+
+        Assert.Equal(new[] { "BIKE", "CAR" }, response.EligibleModes);
+        Assert.Contains("WALK_NOT_ALLOWED", response.Candidates[0].ReasonCodes);
+    }
+
+    [Fact]
+    public void EligibleModePreviewFailsClosedWithoutCapabilityPolicy()
+    {
+        using var facts = JsonDocument.Parse("""{}""");
+        var response = EligibleModeEvaluator.Evaluate(Resolution(
+            Policy("other", "HARD", """{"enabled":true}""")), facts.RootElement);
+
+        Assert.Empty(response.EligibleModes);
+        Assert.Empty(response.Candidates);
+        Assert.Equal(new[] { "MODE_CAPABILITY_POLICY_MISSING" }, response.ReasonCodes);
+    }
+
+    [Fact]
+    public void EligibleModePreviewFailsClosedForMalformedCapabilityPolicy()
+    {
+        using var facts = JsonDocument.Parse("""{}""");
+        var response = EligibleModeEvaluator.Evaluate(Resolution(
+            Policy("modes", "HARD", """{"modes":["BIKE","BIKE"]}""", "MODE_CAPABILITY")),
+            facts.RootElement);
+
+        Assert.Empty(response.EligibleModes);
+        Assert.Empty(response.Candidates);
+        Assert.Equal(new[] { "POLICY_DEFINITION_UNSUPPORTED" }, response.ReasonCodes);
+    }
+
     private static EffectivePolicyResolutionResponse Resolution(params ResolvedPolicyVersion[] policies) =>
         new(DateTimeOffset.Parse("2026-01-01T00:00:00Z"), policies);
 

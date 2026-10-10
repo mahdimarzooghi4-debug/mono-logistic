@@ -86,7 +86,7 @@ Current `MODE_CAPABILITY` draft definition:
 }
 ```
 
-The authoring validator accepts 1–32 unique uppercase mode identifiers, including future identifiers such as `VAN`, `PICKUP`, and `TRUCK`. Draft data records the catalog only; it does not enable a mode or establish live vehicle/courier availability. HARD policy preview checks a candidate's normalized `mode` fact against the effective catalog and excludes candidates whose mode is absent. This preview does not establish live vehicle/courier availability or connect to delivery intake.
+The authoring validator accepts 1–32 unique uppercase mode identifiers, including future identifiers such as `VAN`, `PICKUP`, and `TRUCK`. Draft data records the catalog only; it does not enable a mode or establish live vehicle/courier availability. HARD policy preview checks a candidate's normalized `mode` fact against the effective catalog and excludes candidates whose mode is absent. The administrator-only `POST /operations/v1/policies/modes/eligible` preview evaluates each distinct mode from effective catalogs against all applicable HARD policies and returns both candidate outcomes and the eligible mode list. This preview does not establish live vehicle/courier availability or connect to delivery intake.
 ## 5. Vehicle Policy
 
 Controls:
