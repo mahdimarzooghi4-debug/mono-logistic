@@ -15,6 +15,47 @@ public sealed class MonoApiKeyOperationsService(
     private static readonly Regex KeyIdPattern = new(
         @"\Akey_[0-9a-f]{16}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    public async Task<IReadOnlyList<ApiKeyInspectionSummary>> ListForCustomerAsync(
+        string customerId,
+        CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        customerId = NormalizeCustomerId(customerId);
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using (var customer = new NpgsqlCommand(
+            "SELECT 1 FROM customers WHERE customer_id = @customer_id;",
+            connection))
+        {
+            customer.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            if (await customer.ExecuteScalarAsync(cancellationToken) is null)
+                throw new KeyNotFoundException("Customer was not found.");
+        }
+
+        await using var command = new NpgsqlCommand("""
+            SELECT key_id, customer_id, scopes, created_at, expires_at, revoked_at
+            FROM customer_api_keys
+            WHERE customer_id = @customer_id
+            ORDER BY created_at DESC, key_id;
+            """, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var keys = new List<ApiKeyInspectionSummary>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            keys.Add(new ApiKeyInspectionSummary(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetFieldValue<string[]>(2),
+                reader.GetFieldValue<DateTimeOffset>(3),
+                reader.GetFieldValue<DateTimeOffset>(4),
+                reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5)));
+        }
+
+        return keys;
+    }
+
     public async Task<ApiKeyRevocationSummary> RevokeAsync(
         string customerId,
         string keyId,
@@ -109,7 +150,7 @@ public sealed class MonoApiKeyOperationsService(
     }
 }
 
-public sealed record ApiKeyRevocationSummary(
+public sealed record ApiKeyInspectionSummary(\n    string KeyId,\n    string CustomerId,\n    IReadOnlyList<string> Scopes,\n    DateTimeOffset CreatedAt,\n    DateTimeOffset ExpiresAt,\n    DateTimeOffset? RevokedAt);\n\npublic sealed record ApiKeyRevocationSummary(
     string KeyId,
     string CustomerId,
     DateTimeOffset RevokedAt);
