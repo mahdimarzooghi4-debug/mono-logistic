@@ -189,6 +189,30 @@ public sealed class CustomerServiceConfigurationInspectionEndpointTests
                 var createdDraftId = createdDraftDocument.RootElement
                     .GetProperty("serviceConfigurationId").GetString()!;
 
+                var otherCustomerId = "cus_" + Guid.NewGuid().ToString("N");
+                await using (var connection = await dataSource.OpenConnectionAsync())
+                await using (var insert = new NpgsqlCommand("""
+                    INSERT INTO customers (customer_id, legal_name, status, created_at)
+                    VALUES (@id, 'Mono Other Customer Test', 'ACTIVE', @at);
+                    """, connection))
+                {
+                    insert.Parameters.AddWithValue("id", NpgsqlDbType.Text, otherCustomerId);
+                    insert.Parameters.AddWithValue("at", NpgsqlDbType.TimestampTz, DateTimeOffset.UtcNow);
+                    await insert.ExecuteNonQueryAsync();
+                }
+
+                using var wrongCustomerActivation = new HttpRequestMessage(
+                    HttpMethod.Post,
+                    $"/operations/v1/customers/{otherCustomerId}/service-configurations/{createdDraftId}/activate")
+                {
+                    Content = JsonContent.Create(new { reason = "wrong customer test" })
+                };
+                wrongCustomerActivation.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(wrongCustomerActivation)).StatusCode);
+
                 using var nonAdminCreate = new HttpRequestMessage(HttpMethod.Post, authoringPath)
                 {
                     Content = JsonContent.Create(new
