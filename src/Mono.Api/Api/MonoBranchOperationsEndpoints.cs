@@ -10,6 +10,29 @@ public static class MonoBranchOperationsEndpoints
     public static IEndpointRouteBuilder MapMonoBranchOperationsEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/operations/v1/customers/{customerId}/branches", async (
+                string customerId,
+                MonoBranchOperationsService branches,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var result = await branches.ListForCustomerAsync(customerId, cancellationToken);
+                    return Results.Ok(new ManagedBranchListResponse(result));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Customer ID is invalid.")));
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("CUSTOMER_NOT_FOUND", "Customer was not found.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapPost("/operations/v1/customers/{customerId}/branches", async (
                 string customerId,
                 CreateMonoBranchRequest request,
@@ -95,7 +118,7 @@ public static class MonoBranchOperationsEndpoints
     }
 }
 
-public sealed record UpdateMonoBranchRequest(
+public sealed record ManagedBranchListResponse(IReadOnlyList<ManagedBranchSummary> Branches);\n\npublic sealed record UpdateMonoBranchRequest(
     string? Name,
     string? Address,
     double? Latitude,
