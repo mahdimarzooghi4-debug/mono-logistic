@@ -32,7 +32,7 @@ public sealed class MonoPolicyDraftOperationsService(
         var scope = NormalizeChoice(input.Scope, Scopes, "Policy scope is invalid.");
         var scopeId = NormalizeScopeId(scope, input.ScopeId);
         var version = NormalizeVersion(input.EnforcementType, input.Priority,
-            input.EffectiveFrom, input.EffectiveTo, input.Definition, input.Reason);
+            input.EffectiveFrom, input.EffectiveTo, input.Definition, input.Reason, policyType);
         var now = DateTimeOffset.UtcNow;
         var policyId = "pol_" + Guid.NewGuid().ToString("N");
 
@@ -67,8 +67,6 @@ public sealed class MonoPolicyDraftOperationsService(
     {
         var actorId = RequireAdministrator();
         policyId = NormalizePolicyId(policyId);
-        var version = NormalizeVersion(input.EnforcementType, input.Priority,
-            input.EffectiveFrom, input.EffectiveTo, input.Definition, input.Reason);
         var now = DateTimeOffset.UtcNow;
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -90,6 +88,9 @@ public sealed class MonoPolicyDraftOperationsService(
             scope = reader.GetString(1);
             scopeId = reader.IsDBNull(2) ? null : reader.GetString(2);
         }
+
+        var version = NormalizeVersion(input.EnforcementType, input.Priority,
+            input.EffectiveFrom, input.EffectiveTo, input.Definition, input.Reason, policyType);
 
         int versionNumber;
         await using (var latest = new NpgsqlCommand("""
@@ -466,12 +467,14 @@ public sealed class MonoPolicyDraftOperationsService(
 
     private static NormalizedPolicyDraft NormalizeVersion(
         string enforcementType, int priority, DateTimeOffset? effectiveFrom,
-        DateTimeOffset? effectiveTo, JsonElement definition, string reason)
+        DateTimeOffset? effectiveTo, JsonElement definition, string reason, string policyType)
     {
         var normalizedEnforcement = NormalizeChoice(enforcementType, EnforcementTypes,
             "Policy enforcement type is invalid.");
         if (normalizedEnforcement == "OPTIMIZATION")
             OptimizationPolicyConfigurationValidator.Validate(definition);
+        if (policyType == "MODE_CAPABILITY")
+            ModeCapabilityPolicyConfigurationValidator.Validate(definition);
         if (effectiveFrom is not null && effectiveTo is not null && effectiveTo <= effectiveFrom)
             throw new ArgumentException("Effective end must be later than effective start.");
         if (definition.ValueKind != JsonValueKind.Object)

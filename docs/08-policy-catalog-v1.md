@@ -78,6 +78,15 @@ May define:
 
 Typical enforcement: HARD
 
+Current `MODE_CAPABILITY` draft definition:
+
+```json
+{
+  "modes": ["WALK", "BIKE", "CAR"]
+}
+```
+
+The authoring validator accepts 1–32 unique uppercase mode identifiers, including future identifiers such as `VAN`, `PICKUP`, and `TRUCK`. Draft data records the catalog only; it does not enable a mode or establish live vehicle/courier availability.
 ## 5. Vehicle Policy
 
 Controls:

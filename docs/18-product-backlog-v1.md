@@ -158,6 +158,7 @@ Epic
 - temperature class
 
 ### E4.2 Mode Capability Matrix
+- Sprint 038 adds an administrator-authored MODE_CAPABILITY policy definition containing unique, canonical mode identifiers. Initial identifiers are WALK, BIKE, and CAR; adding VAN, PICKUP, TRUCK, or another valid identifier needs no Mission-core change. Draft validation does not activate modes or imply network availability.
 Initial:
 - Walk
 - Bike
