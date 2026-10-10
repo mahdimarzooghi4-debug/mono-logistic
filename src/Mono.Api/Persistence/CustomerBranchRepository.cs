@@ -94,9 +94,9 @@ public sealed class CustomerBranchRepository(NpgsqlDataSource dataSource)
         };
     }
 
-    private static void AddNullable<T>(NpgsqlCommand command, string name, NpgsqlDbType type, T? value)
+    private static void AddNullable(NpgsqlCommand command, string name, NpgsqlDbType type, object? value)
     {
-        command.Parameters.AddWithValue(name, type, value is null ? DBNull.Value : value);
+        command.Parameters.AddWithValue(name, type, value ?? DBNull.Value);
     }
 
     private static string? GetNullableString(NpgsqlDataReader reader, int ordinal) =>

@@ -9,6 +9,17 @@ namespace Mono.Api.Tests;
 public sealed class CustomerBranchRepositoryTests(ITestOutputHelper output)
 {
     [Fact]
+    public void Branch_rejects_invalid_or_partial_coordinates()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            Branch.Create("cus_00000000000000000000000000000000", "Test", "ACTIVE", latitude: 35.7));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Branch.Create("cus_00000000000000000000000000000000", "Test", "ACTIVE", latitude: 91, longitude: 51));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            Branch.Create("cus_00000000000000000000000000000000", "Test", "ACTIVE", latitude: 35, longitude: 181));
+    }
+
+    [Fact]
     public async Task Branch_lookup_is_scoped_to_its_customer_and_foreign_key_is_enforced()
     {
         var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
