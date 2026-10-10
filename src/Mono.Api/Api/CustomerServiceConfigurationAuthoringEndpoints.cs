@@ -35,7 +35,8 @@ public static class CustomerServiceConfigurationAuthoringEndpoints
                         request.Configuration,
                         request.Reason,
                         cancellationToken);
-                    return Results.Created(route, CustomerServiceConfigurationDraftSummary.From(draft));
+                    return Results.Created($"/operations/v1/customers/{customerId}/services/{serviceCode}/configurations",
+                        CustomerServiceConfigurationDraftSummary.From(draft));
                 }
                 catch (ArgumentException)
                 {
@@ -46,9 +47,8 @@ public static class CustomerServiceConfigurationAuthoringEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
-        endpoints.MapPost(route + "/{serviceConfigurationId}/activate", async (
+        endpoints.MapPost("/operations/v1/customers/{customerId}/service-configurations/{serviceConfigurationId}/activate", async (
                 string customerId,
-                string serviceCode,
                 string serviceConfigurationId,
                 ActivateCustomerServiceConfigurationDraftRequest request,
                 CustomerServiceConfigurationAuthoringService authoring,
