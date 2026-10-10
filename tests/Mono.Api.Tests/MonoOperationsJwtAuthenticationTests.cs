@@ -88,6 +88,9 @@ public sealed class MonoOperationsJwtAuthenticationTests
             {
                 options.ConfigurationManager =
                     new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
+                options.TokenValidationParameters.ValidIssuer = authority;
+                options.TokenValidationParameters.ValidAudience = audience;
+                options.TokenValidationParameters.IssuerSigningKey = trustedKey;
             });
         }
 
