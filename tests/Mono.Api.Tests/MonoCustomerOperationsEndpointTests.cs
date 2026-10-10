@@ -45,6 +45,7 @@ public sealed class MonoCustomerOperationsEndpointTests
             builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
             builder.Services.AddSingleton(dataSource);
             builder.Services.AddScoped<MonoCustomerOperationsService>();
+            builder.Services.AddScoped<MonoBranchOperationsService>();
             var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
             oidcConfiguration.SigningKeys.Add(signingKey);
             builder.Services.PostConfigure<JwtBearerOptions>(MonoOperationsDefaults.Scheme, options =>
@@ -60,6 +61,7 @@ public sealed class MonoCustomerOperationsEndpointTests
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapMonoCustomerOperationsEndpoints();
+            app.MapMonoBranchOperationsEndpoints();
             await app.StartAsync();
             await using (app)
             using (var client = app.GetTestClient())
@@ -131,6 +133,69 @@ public sealed class MonoCustomerOperationsEndpointTests
                     "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
                 Assert.Equal(System.Net.HttpStatusCode.NoContent,
                     (await client.SendAsync(activate)).StatusCode);
+                var branchPath = $"/operations/v1/customers/{customerId}/branches";
+                using var unauthorizedBranch = new HttpRequestMessage(HttpMethod.Post, branchPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Test branch",
+                        reason = "onboarding test"
+                    })
+                };
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthorizedBranch)).StatusCode);
+
+                using var nonAdminBranch = new HttpRequestMessage(HttpMethod.Post, branchPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Test branch",
+                        reason = "onboarding test"
+                    })
+                };
+                nonAdminBranch.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminBranch)).StatusCode);
+
+                using var createBranch = new HttpRequestMessage(HttpMethod.Post, branchPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "  Central Branch  ",
+                        address = "Main street",
+                        latitude = 35.7,
+                        longitude = 51.4,
+                        zoneId = "zone-central",
+                        operatingHours = new { note = "structure is retained; schema is not inferred" },
+                        reason = "branch verified for onboarding"
+                    })
+                };
+                createBranch.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var createdBranch = await client.SendAsync(createBranch);
+                Assert.Equal(System.Net.HttpStatusCode.Created, createdBranch.StatusCode);
+                using var branchBody = System.Text.Json.JsonDocument.Parse(
+                    await createdBranch.Content.ReadAsStringAsync());
+                var branchId = branchBody.RootElement.GetProperty("branchId").GetString()!;
+                Assert.StartsWith("br_", branchId);
+                Assert.Equal("ACTIVE", branchBody.RootElement.GetProperty("status").GetString());
+
+                using var invalidCoordinates = new HttpRequestMessage(HttpMethod.Post, branchPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Invalid branch",
+                        latitude = 91,
+                        longitude = 51,
+                        reason = "coordinates validation"
+                    })
+                };
+                invalidCoordinates.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest,
+                    (await client.SendAsync(invalidCoordinates)).StatusCode);
+
                 using var repeatedActivate = new HttpRequestMessage(HttpMethod.Post, activatePath)
                 {
                     Content = JsonContent.Create(new { reason = "duplicate activation" })
@@ -197,7 +262,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.005_customer_service_configurations.sql",
             "Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql",
             "Mono.Api.Tests.Migrations.007_customer_service_configuration_retirement.sql",
-            "Mono.Api.Tests.Migrations.008_customer_operations_audit.sql"
+            "Mono.Api.Tests.Migrations.008_customer_operations_audit.sql",
+            "Mono.Api.Tests.Migrations.009_branch_operations_audit.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)

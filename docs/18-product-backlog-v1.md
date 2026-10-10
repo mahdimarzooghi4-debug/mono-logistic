@@ -28,6 +28,7 @@ Epic
 - Customer external identifiers
 
 ### E1.2 Branch
+- Sprint 019 adds Mono-administrator onboarding for branches owned by active customers, with paired coordinate validation and branch audit history.
 - Create/update Branch
 - Store pickup coordinates
 - Operating hours
@@ -51,6 +52,7 @@ Epic
 - Sprint 016 exposes internal Mono-administrator routes to create Draft customer service configurations and activate them with the existing overlap checks and append-only audit trail.
 - Sprint 017 adds audited retirement of active customer service configurations through the Mono administrator boundary.
 - Sprint 018 adds an internal Mono-operations API to create a customer in PENDING status and activate it with an append-only audit trail.
+- Sprint 019 adds an admin-only route to register an active branch for an already-active customer with append-only audit history.
 - enabled modes
 - coverage
 - policy set binding

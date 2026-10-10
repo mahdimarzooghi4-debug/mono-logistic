@@ -12,6 +12,7 @@ builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
 builder.Services.AddScoped<CustomerServiceConfigurationAuthoringService>();
 builder.Services.AddScoped<CustomerServiceConfigurationInspectionService>();
 builder.Services.AddScoped<MonoCustomerOperationsService>();
+builder.Services.AddScoped<MonoBranchOperationsService>();
 builder.Services.AddScoped<CustomerBranchRepository>();
 builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
@@ -32,6 +33,7 @@ app.MapDeliveryRequestEndpoints();
 app.MapCustomerServiceConfigurationInspectionEndpoints();
 app.MapCustomerServiceConfigurationAuthoringEndpoints();
 app.MapMonoCustomerOperationsEndpoints();
+app.MapMonoBranchOperationsEndpoints();
 
 app.Run();
 
