@@ -160,8 +160,34 @@ public sealed class CustomerServiceConfigurationInspectionEndpointTests
                 var createdDraftId = createdDraftDocument.RootElement
                     .GetProperty("serviceConfigurationId").GetString()!;
 
+                using var nonAdminCreate = new HttpRequestMessage(HttpMethod.Post, authoringPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        effectiveFrom = DateTimeOffset.UtcNow.AddHours(2),
+                        effectiveTo = (DateTimeOffset?)null,
+                        configuration = new { modes = new[] { "BIKE" } },
+                        reason = "not allowed"
+                    })
+                };
+                nonAdminCreate.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminCreate)).StatusCode);
+
                 var activatePath =
                     $"/operations/v1/customers/{customerId}/service-configurations/{createdDraftId}/activate";
+                using var nonAdminActivate = new HttpRequestMessage(HttpMethod.Post, activatePath)
+                {
+                    Content = JsonContent.Create(new { reason = "not allowed" })
+                };
+                nonAdminActivate.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminActivate)).StatusCode);
+
                 using var activateDraft = new HttpRequestMessage(HttpMethod.Post, activatePath)
                 {
                     Content = JsonContent.Create(new { reason = "authorized activation" })
