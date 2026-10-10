@@ -117,6 +117,79 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.DoesNotContain("HANA", body.RootElement.GetProperty("customerId").GetString()!,
                     StringComparison.OrdinalIgnoreCase);
 
+                const string customerListPath = "/operations/v1/customers";
+                using var unauthenticatedCustomerList = new HttpRequestMessage(HttpMethod.Get, customerListPath);
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthenticatedCustomerList)).StatusCode);
+                using var nonAdminCustomerList = new HttpRequestMessage(HttpMethod.Get, customerListPath);
+                nonAdminCustomerList.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminCustomerList)).StatusCode);
+
+                using var invalidPageSize = new HttpRequestMessage(HttpMethod.Get, customerListPath + "?page_size=0");
+                invalidPageSize.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var invalidPageSizeResponse = await client.SendAsync(invalidPageSize);
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidPageSizeResponse.StatusCode);
+
+                using var invalidCursor = new HttpRequestMessage(HttpMethod.Get, customerListPath + "?cursor=invalid");
+                invalidCursor.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var invalidCursorResponse = await client.SendAsync(invalidCursor);
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidCursorResponse.StatusCode);
+                using var unknownCursor = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    customerListPath + "?cursor=cus_00000000000000000000000000000000");
+                unknownCursor.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var unknownCursorResponse = await client.SendAsync(unknownCursor);
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest, unknownCursorResponse.StatusCode);
+
+                using var secondCreate = new HttpRequestMessage(HttpMethod.Post, createPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        legalName = "Second Mono Test Merchant",
+                        reason = "registry pagination test"
+                    })
+                };
+                secondCreate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var secondCreated = await client.SendAsync(secondCreate);
+                Assert.Equal(System.Net.HttpStatusCode.Created, secondCreated.StatusCode);
+                using var secondCreatedBody = System.Text.Json.JsonDocument.Parse(
+                    await secondCreated.Content.ReadAsStringAsync());
+                var secondCustomerId = secondCreatedBody.RootElement.GetProperty("customerId").GetString()!;
+
+                using var firstCustomerPageRequest = new HttpRequestMessage(
+                    HttpMethod.Get, customerListPath + "?page_size=1");
+                firstCustomerPageRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var firstCustomerPageResponse = await client.SendAsync(firstCustomerPageRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, firstCustomerPageResponse.StatusCode);
+                using var firstCustomerPage = System.Text.Json.JsonDocument.Parse(
+                    await firstCustomerPageResponse.Content.ReadAsStringAsync());
+                var firstPageCustomer = Assert.Single(
+                    firstCustomerPage.RootElement.GetProperty("customers").EnumerateArray());
+                Assert.Equal(secondCustomerId, firstPageCustomer.GetProperty("customerId").GetString());
+                var nextCursor = firstCustomerPage.RootElement.GetProperty("nextCursor").GetString();
+                Assert.Equal(secondCustomerId, nextCursor);
+
+                using var nextCustomerPageRequest = new HttpRequestMessage(
+                    HttpMethod.Get, customerListPath + "?page_size=1&cursor=" + nextCursor);
+                nextCustomerPageRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var nextCustomerPageResponse = await client.SendAsync(nextCustomerPageRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, nextCustomerPageResponse.StatusCode);
+                using var nextCustomerPage = System.Text.Json.JsonDocument.Parse(
+                    await nextCustomerPageResponse.Content.ReadAsStringAsync());
+                var secondPageCustomer = Assert.Single(
+                    nextCustomerPage.RootElement.GetProperty("customers").EnumerateArray());
+                Assert.Equal(customerId, secondPageCustomer.GetProperty("customerId").GetString());
+                Assert.Equal(System.Text.Json.JsonValueKind.Null,
+                    nextCustomerPage.RootElement.GetProperty("nextCursor").ValueKind);
+
                 var customerPath = $"/operations/v1/customers/{customerId}";
                 using var unauthorizedCustomerRead = new HttpRequestMessage(HttpMethod.Get, customerPath);
                 Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
@@ -658,7 +731,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.008_customer_operations_audit.sql",
             "Mono.Api.Tests.Migrations.009_branch_operations_audit.sql",
             "Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql",
-            "Mono.Api.Tests.Migrations.011_customer_api_key_operations_audit.sql"
+            "Mono.Api.Tests.Migrations.011_customer_api_key_operations_audit.sql",
+            "Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)
