@@ -13,6 +13,7 @@ public static class MonoCustomerOperationsEndpoints
                 [FromQuery(Name = "page_size")] int? pageSize,
                 string? cursor,
                 string? status,
+                string? search,
                 MonoCustomerOperationsService customers,
                 CancellationToken cancellationToken) =>
             {
@@ -30,9 +31,17 @@ public static class MonoCustomerOperationsEndpoints
                         new ApiError("INVALID_REQUEST", "status must be PENDING or ACTIVE.")));
                 }
 
+                if (search is not null &&
+                    (string.IsNullOrWhiteSpace(search) || search.Trim().Length > 128))
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "search must contain 1 to 128 characters.")));
+                }
+
                 try
                 {
-                    var page = await customers.ListAsync(size, cursor, normalizedStatus, cancellationToken);
+                    var page = await customers.ListAsync(
+                        size, cursor, normalizedStatus, search, cancellationToken);
                     return page is null
                         ? Results.BadRequest(new ApiErrorResponse(
                             new ApiError("INVALID_CURSOR", "The cursor is invalid.")))
