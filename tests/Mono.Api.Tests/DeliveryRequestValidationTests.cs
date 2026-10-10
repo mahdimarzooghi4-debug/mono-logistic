@@ -1,10 +1,17 @@
 using Mono.Api.Domain;
+using Mono.Api.Security;
 using Xunit;
 
 namespace Mono.Api.Tests;
 
 public sealed class DeliveryRequestValidationTests
 {
+    [Fact]
+    public void Delivery_write_scope_is_available_for_internal_key_provisioning()
+    {
+        Assert.True(MonoApiKeyScopeCatalog.IsSupported("delivery-requests.write"));
+    }
+
     [Fact]
     public void Valid_request_normalizes_supported_fields()
     {
