@@ -8,6 +8,31 @@ public static class MonoApiKeyOperationsEndpoints
     public static IEndpointRouteBuilder MapMonoApiKeyOperationsEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet(
+            "/operations/v1/customers/{customerId}/api-keys",
+            async (
+                string customerId,
+                MonoApiKeyOperationsService apiKeys,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var result = await apiKeys.ListForCustomerAsync(customerId, cancellationToken);
+                    return Results.Ok(new MonoApiKeyListResponse(result));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Customer ID is invalid.")));
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("CUSTOMER_NOT_FOUND", "Customer was not found.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapPost(
             "/operations/v1/customers/{customerId}/api-keys/{keyId}/revoke",
             async (
@@ -45,4 +70,4 @@ public static class MonoApiKeyOperationsEndpoints
     }
 }
 
-public sealed record RevokeMonoApiKeyRequest(string? Reason);
+public sealed record MonoApiKeyListResponse(IReadOnlyList<ApiKeyInspectionSummary> ApiKeys);\n\npublic sealed record RevokeMonoApiKeyRequest(string? Reason);
