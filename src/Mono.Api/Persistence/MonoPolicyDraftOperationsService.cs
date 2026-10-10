@@ -213,6 +213,13 @@ public sealed class MonoPolicyDraftOperationsService(
         RequireAdministrator();
         policyId = NormalizePolicyId(policyId);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using (var exists = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM policies WHERE policy_id = @policy_id);", connection))
+        {
+            exists.Parameters.AddWithValue("policy_id", NpgsqlDbType.Text, policyId);
+            if (!Equals(await exists.ExecuteScalarAsync(cancellationToken), true))
+                return null;
+        }
         await using var command = new NpgsqlCommand("""
             SELECT audit_id, version_number, action, actor_id, reason,
                    policy_snapshot::text, occurred_at
@@ -227,7 +234,7 @@ public sealed class MonoPolicyDraftOperationsService(
             entries.Add(new PolicyAuditSummary(
                 reader.GetString(0), reader.GetInt32(1), reader.GetString(2),
                 reader.GetString(3), reader.GetString(4),
-                JsonDocument.Parse(reader.GetString(5)).RootElement.Clone(),
+                ParseJsonElement(reader.GetString(5)),
                 reader.GetFieldValue<DateTimeOffset>(6)));
         return entries;
     }
@@ -289,11 +296,17 @@ public sealed class MonoPolicyDraftOperationsService(
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static JsonElement ParseJsonElement(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+
     private static PolicyVersionSummary ReadVersion(string policyId, NpgsqlDataReader reader) =>
         new(policyId, reader.GetInt32(0), reader.GetString(1), reader.GetInt32(2), reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetFieldValue<DateTimeOffset>(4),
             reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5),
-            JsonDocument.Parse(reader.GetString(6)).RootElement.Clone(),
+            ParseJsonElement(reader.GetString(6)),
             reader.GetFieldValue<DateTimeOffset>(7), reader.GetString(8));
 
     private static PolicyVersionSummary ToSummary(
