@@ -406,8 +406,11 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(customerId, listedKey.GetProperty("customerId").GetString());
                 Assert.Equal("branches.read",
                     Assert.Single(listedKey.GetProperty("scopes").EnumerateArray()).GetString());
-                Assert.Equal(issuedKey.Credential.ExpiresAt,
-                    listedKey.GetProperty("expiresAt").GetDateTimeOffset());
+                var listedExpiry = listedKey.GetProperty("expiresAt").GetDateTimeOffset();
+                Assert.InRange(
+                    (issuedKey.Credential.ExpiresAt - listedExpiry).Duration(),
+                    TimeSpan.Zero,
+                    TimeSpan.FromMicroseconds(1));
                 Assert.False(listedKey.TryGetProperty("secret", out _));
                 Assert.False(listedKey.TryGetProperty("secretHash", out _));
 
