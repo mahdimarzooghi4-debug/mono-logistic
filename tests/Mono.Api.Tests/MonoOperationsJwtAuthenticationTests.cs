@@ -1,11 +1,9 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,13 +29,8 @@ public sealed class MonoOperationsJwtAuthenticationTests
         await using var app = await CreateAppAsync(Authority, Audience, trustedKey);
         using var client = app.GetTestClient();
 
-        var validToken = CreateToken(trustedKey, Authority, Audience);
-        var valid = await SendTokenAsync(client, validToken);
-        if (valid.StatusCode != System.Net.HttpStatusCode.OK)
-        {
-            var diagnostic = await SendTokenAsync(client, validToken, "/auth-diagnostics");
-            Assert.True(false, $"Authentication failed: {await diagnostic.Content.ReadAsStringAsync()}");
-        }
+        var valid = await client.GetAsync("/operations");
+        Assert.Equal(System.Net.HttpStatusCode.OK, valid.StatusCode);
         Assert.Equal("staff-1", await valid.Content.ReadAsStringAsync());
 
         var missingMfa = CreateToken(trustedKey, Authority, Audience, includeMfa: false);
@@ -106,12 +99,6 @@ public sealed class MonoOperationsJwtAuthenticationTests
         app.UseAuthorization();
         app.MapGet("/operations", (IMonoOperationsContext context) => context.ActorId)
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
-        app.MapGet("/auth-diagnostics", async (HttpContext context) =>
-        {
-            var result = await context.AuthenticateAsync(MonoOperationsDefaults.Scheme);
-            return result.Failure?.ToString() ??
-                $"Succeeded={result.Succeeded}; Claims={string.Join(",", result.Principal?.Claims.Select(claim => $"{claim.Type}={claim.Value}") ?? [])}";
-        });
         await app.StartAsync();
         return app;
     }
@@ -135,7 +122,7 @@ public sealed class MonoOperationsJwtAuthenticationTests
             issuer,
             audience,
             claims,
-            now.AddMinutes(-1),
+            now.AddMinutes(Math.Min(-1, expiresInMinutes - 1)),
             now.AddMinutes(expiresInMinutes),
             new SigningCredentials(key, SecurityAlgorithms.RsaSha256));
         return new JwtSecurityTokenHandler().WriteToken(token);
@@ -143,10 +130,9 @@ public sealed class MonoOperationsJwtAuthenticationTests
 
     private static Task<System.Net.Http.HttpResponseMessage> SendTokenAsync(
         HttpClient client,
-        string token,
-        string path = "/operations")
+        string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/operations");
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         return client.SendAsync(request);
     }
