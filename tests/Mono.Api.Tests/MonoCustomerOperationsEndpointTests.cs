@@ -257,6 +257,145 @@ public sealed class MonoCustomerOperationsEndpointTests
     }
 
     [Fact]
+    public async Task Policy_drafts_are_admin_only_versioned_and_audited()
+    {
+        var dataSource = await CreateDataSourceAsync();
+        if (dataSource is null) return;
+        await using (dataSource)
+        using (var rsa = RSA.Create(2048))
+        {
+            var signingKey = new RsaSecurityKey(rsa) { KeyId = "policy-draft-test-key" };
+            var builder = WebApplication.CreateBuilder();
+            builder.WebHost.UseTestServer();
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MonoOperations:Authority"] = Authority,
+                ["MonoOperations:Audience"] = Audience
+            });
+            builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
+            builder.Services.AddSingleton(dataSource);
+            builder.Services.AddScoped<MonoPolicyDraftOperationsService>();
+            var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
+            oidcConfiguration.SigningKeys.Add(signingKey);
+            builder.Services.PostConfigure<JwtBearerOptions>(MonoOperationsDefaults.Scheme, options =>
+            {
+                options.ConfigurationManager =
+                    new StaticConfigurationManager<OpenIdConnectConfiguration>(oidcConfiguration);
+                options.TokenValidationParameters.ValidIssuer = Authority;
+                options.TokenValidationParameters.ValidAudience = Audience;
+                options.TokenValidationParameters.IssuerSigningKey = signingKey;
+            });
+
+            var app = builder.Build();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.MapMonoPolicyDraftOperationsEndpoints();
+            await app.StartAsync();
+            await using (app)
+            using (var client = app.GetTestClient())
+            {
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.GetAsync("/operations/v1/policies")).StatusCode);
+                using var forbidden = new HttpRequestMessage(HttpMethod.Get, "/operations/v1/policies");
+                forbidden.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await client.SendAsync(forbidden)).StatusCode);
+
+                using var create = new HttpRequestMessage(HttpMethod.Post, "/operations/v1/policies")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        policyType = "coverage_zone",
+                        scope = "customer",
+                        scopeId = "cus_00000000000000000000000000000001",
+                        enforcementType = "hard",
+                        priority = 10,
+                        definition = new { maxDistanceKm = 5 },
+                        reason = "Create initial policy draft"
+                    })
+                };
+                create.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var created = await client.SendAsync(create);
+                Assert.Equal(System.Net.HttpStatusCode.Created, created.StatusCode);
+                using var createdBody = System.Text.Json.JsonDocument.Parse(
+                    await created.Content.ReadAsStringAsync());
+                var policyId = createdBody.RootElement.GetProperty("policyId").GetString()!;
+                Assert.Equal(1, createdBody.RootElement.GetProperty("versionNumber").GetInt32());
+                Assert.Equal("DRAFT", createdBody.RootElement.GetProperty("status").GetString());
+                Assert.Equal(5, createdBody.RootElement.GetProperty("definition")
+                    .GetProperty("maxDistanceKm").GetInt32());
+
+                using var createVersion = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        enforcementType = "HARD",
+                        priority = 20,
+                        definition = new { maxDistanceKm = 4 },
+                        reason = "Refine coverage draft"
+                    })
+                };
+                createVersion.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var secondVersion = await client.SendAsync(createVersion);
+                Assert.Equal(System.Net.HttpStatusCode.Created, secondVersion.StatusCode);
+                using var secondVersionBody = System.Text.Json.JsonDocument.Parse(
+                    await secondVersion.Content.ReadAsStringAsync());
+                Assert.Equal(2, secondVersionBody.RootElement.GetProperty("versionNumber").GetInt32());
+                Assert.Equal("DRAFT", secondVersionBody.RootElement.GetProperty("status").GetString());
+
+                using var detail = new HttpRequestMessage(HttpMethod.Get, $"/operations/v1/policies/{policyId}");
+                detail.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var detailResponse = await client.SendAsync(detail);
+                Assert.Equal(System.Net.HttpStatusCode.OK, detailResponse.StatusCode);
+                using var detailBody = System.Text.Json.JsonDocument.Parse(
+                    await detailResponse.Content.ReadAsStringAsync());
+                Assert.Equal("COVERAGE_ZONE", detailBody.RootElement.GetProperty("policyType").GetString());
+                Assert.Equal(2, detailBody.RootElement.GetProperty("versions").GetArrayLength());
+
+                using var audit = new HttpRequestMessage(HttpMethod.Get, $"/operations/v1/policies/{policyId}/audit");
+                audit.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var auditResponse = await client.SendAsync(audit);
+                Assert.Equal(System.Net.HttpStatusCode.OK, auditResponse.StatusCode);
+                using var auditBody = System.Text.Json.JsonDocument.Parse(
+                    await auditResponse.Content.ReadAsStringAsync());
+                var auditEntries = auditBody.RootElement.GetProperty("entries").EnumerateArray().ToArray();
+                Assert.Equal(2, auditEntries.Length);
+                Assert.Equal("POLICY_CREATED", auditEntries[0].GetProperty("action").GetString());
+                Assert.Equal("VERSION_DRAFTED", auditEntries[1].GetProperty("action").GetString());
+                Assert.Equal("admin-test", auditEntries[1].GetProperty("actorId").GetString());
+
+                using var invalid = new HttpRequestMessage(HttpMethod.Post, "/operations/v1/policies")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        policyType = "COVERAGE_ZONE",
+                        scope = "PLATFORM",
+                        scopeId = "unexpected",
+                        enforcementType = "HARD",
+                        priority = 1,
+                        definition = Array.Empty<string>(),
+                        reason = "Invalid scope test"
+                    })
+                };
+                invalid.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest, (await client.SendAsync(invalid)).StatusCode);
+
+                using var missing = new HttpRequestMessage(
+                    HttpMethod.Get, "/operations/v1/policies/pol_00000000000000000000000000000000");
+                missing.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound, (await client.SendAsync(missing)).StatusCode);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Branch_detail_and_audit_are_admin_only_customer_scoped_and_paginated()
     {
         var dataSource = await CreateDataSourceAsync();
@@ -1412,7 +1551,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql",
             "Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql",
             "Mono.Api.Tests.Migrations.014_customer_external_identifiers.sql",
-            "Mono.Api.Tests.Migrations.015_branch_external_identifiers.sql"
+            "Mono.Api.Tests.Migrations.015_branch_external_identifiers.sql",
+            "Mono.Api.Tests.Migrations.016_policy_draft_registry.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)
