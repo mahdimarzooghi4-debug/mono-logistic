@@ -109,11 +109,45 @@ public static class MonoCustomerOperationsEndpoints
                     return Results.NotFound(new ApiErrorResponse(
                         new ApiError("CUSTOMER_NOT_FOUND", "Customer was not found.")));
                 }
-                catch (DuplicateCustomerExternalIdentifierException)
+                catch (CustomerExternalIdentifierConflictException)
                 {
                     return Results.Conflict(new ApiErrorResponse(
                         new ApiError("EXTERNAL_IDENTIFIER_CONFLICT",
                             "The external identifier is already assigned in this namespace.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost(
+            "/operations/v1/customers/{customerId}/external-identifiers/{identifierId}/retire",
+            async (
+                string customerId,
+                string identifierId,
+                RetireCustomerExternalIdentifierRequest request,
+                MonoCustomerExternalIdentifierOperationsService identifiers,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var retired = await identifiers.RetireAsync(
+                        customerId, identifierId, request.Reason ?? string.Empty, cancellationToken);
+                    return retired
+                        ? Results.NoContent()
+                        : Results.NotFound(new ApiErrorResponse(
+                            new ApiError("EXTERNAL_IDENTIFIER_NOT_FOUND",
+                                "External identifier was not found for this customer.")));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST",
+                            "Customer ID, external identifier ID, or reason is invalid.")));
+                }
+                catch (CustomerExternalIdentifierConflictException)
+                {
+                    return Results.Conflict(new ApiErrorResponse(
+                        new ApiError("EXTERNAL_IDENTIFIER_CONFLICT",
+                            "External identifier is already retired or conflicts with another assignment.")));
                 }
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
@@ -251,6 +285,8 @@ public sealed record CustomerExternalIdentifierListResponse(
 
 public sealed record CustomerExternalIdentifierAuditListResponse(
     IReadOnlyList<CustomerExternalIdentifierAuditSummary> Entries);
+
+public sealed record RetireCustomerExternalIdentifierRequest(string? Reason);
 
 public sealed record AddCustomerExternalIdentifierRequest(
     string? Namespace,
