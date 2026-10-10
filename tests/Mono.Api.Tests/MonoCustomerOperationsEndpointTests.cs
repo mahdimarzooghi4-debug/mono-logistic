@@ -27,6 +27,186 @@ public sealed class MonoCustomerOperationsEndpointTests
     private const string Audience = "mono-api-test";
 
     [Fact]
+    public async Task Branch_detail_and_audit_are_admin_only_customer_scoped_and_paginated()
+    {
+        var dataSource = await CreateDataSourceAsync();
+        if (dataSource is null) return;
+        await using (dataSource)
+        using (var rsa = RSA.Create(2048))
+        {
+            var signingKey = new RsaSecurityKey(rsa) { KeyId = "branch-inspection-test-key" };
+            var builder = WebApplication.CreateBuilder();
+            builder.WebHost.UseTestServer();
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MonoOperations:Authority"] = Authority,
+                ["MonoOperations:Audience"] = Audience
+            });
+            builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
+            builder.Services.AddSingleton(dataSource);
+            builder.Services.AddScoped<MonoCustomerOperationsService>();
+            builder.Services.AddScoped<MonoCustomerExternalIdentifierOperationsService>();
+            builder.Services.AddScoped<MonoBranchOperationsService>();
+            builder.Services.AddScoped<MonoBranchInspectionService>();
+            var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
+            oidcConfiguration.SigningKeys.Add(signingKey);
+            builder.Services.PostConfigure<JwtBearerOptions>(MonoOperationsDefaults.Scheme, options =>
+            {
+                options.ConfigurationManager =
+                    new StaticConfigurationManager<OpenIdConnectConfiguration>(oidcConfiguration);
+                options.TokenValidationParameters.ValidIssuer = Authority;
+                options.TokenValidationParameters.ValidAudience = Audience;
+                options.TokenValidationParameters.IssuerSigningKey = signingKey;
+            });
+
+            var app = builder.Build();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.MapMonoCustomerOperationsEndpoints();
+            app.MapMonoBranchOperationsEndpoints();
+            await app.StartAsync();
+            await using (app)
+            using (var client = app.GetTestClient())
+            {
+                using var create = new HttpRequestMessage(HttpMethod.Post, "/operations/v1/customers")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        legalName = "Branch Inspection Merchant",
+                        reason = "branch inspection test"
+                    })
+                };
+                create.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var createResponse = await client.SendAsync(create);
+                Assert.Equal(System.Net.HttpStatusCode.Created, createResponse.StatusCode);
+                using var customerBody = System.Text.Json.JsonDocument.Parse(
+                    await createResponse.Content.ReadAsStringAsync());
+                var customerId = customerBody.RootElement.GetProperty("customerId").GetString()!;
+
+                using var activate = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/customers/{customerId}/activate")
+                {
+                    Content = JsonContent.Create(new { reason = "branch inspection test activation" })
+                };
+                activate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NoContent,
+                    (await client.SendAsync(activate)).StatusCode);
+
+                using var createBranch = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/customers/{customerId}/branches")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Inspection Branch",
+                        address = "Initial address",
+                        latitude = 35.7,
+                        longitude = 51.4,
+                        zoneId = "zone-test",
+                        operatingHours = new { monday = "09:00-17:00" },
+                        reason = "branch inspection test creation"
+                    })
+                };
+                createBranch.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var createBranchResponse = await client.SendAsync(createBranch);
+                Assert.Equal(System.Net.HttpStatusCode.Created, createBranchResponse.StatusCode);
+                using var branchBody = System.Text.Json.JsonDocument.Parse(
+                    await createBranchResponse.Content.ReadAsStringAsync());
+                var branchId = branchBody.RootElement.GetProperty("branchId").GetString()!;
+                var detailPath = $"/operations/v1/customers/{customerId}/branches/{branchId}";
+
+                using var updateBranch = new HttpRequestMessage(HttpMethod.Put, detailPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Inspection Branch Updated",
+                        address = "Updated address",
+                        latitude = 35.7,
+                        longitude = 51.4,
+                        zoneId = "zone-test",
+                        operatingHours = new { monday = "10:00-18:00" },
+                        reason = "branch inspection test update"
+                    })
+                };
+                updateBranch.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.OK, (await client.SendAsync(updateBranch)).StatusCode);
+
+                using var unauthenticatedDetail = new HttpRequestMessage(HttpMethod.Get, detailPath);
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthenticatedDetail)).StatusCode);
+                using var nonAdminDetail = new HttpRequestMessage(HttpMethod.Get, detailPath);
+                nonAdminDetail.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminDetail)).StatusCode);
+
+                using var detail = new HttpRequestMessage(HttpMethod.Get, detailPath);
+                detail.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var detailResponse = await client.SendAsync(detail);
+                Assert.Equal(System.Net.HttpStatusCode.OK, detailResponse.StatusCode);
+                using var detailBody = System.Text.Json.JsonDocument.Parse(
+                    await detailResponse.Content.ReadAsStringAsync());
+                Assert.Equal("Inspection Branch Updated",
+                    detailBody.RootElement.GetProperty("name").GetString());
+                Assert.Equal("Updated address", detailBody.RootElement.GetProperty("address").GetString());
+                Assert.Equal("10:00-18:00",
+                    detailBody.RootElement.GetProperty("operatingHours").GetProperty("monday").GetString());
+
+                using var crossCustomerDetail = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"/operations/v1/customers/cus_00000000000000000000000000000000/branches/{branchId}");
+                crossCustomerDetail.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(crossCustomerDetail)).StatusCode);
+
+                var auditPath = detailPath + "/audit?page_size=1";
+                using var auditPageOne = new HttpRequestMessage(HttpMethod.Get, auditPath);
+                auditPageOne.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var auditPageOneResponse = await client.SendAsync(auditPageOne);
+                Assert.Equal(System.Net.HttpStatusCode.OK, auditPageOneResponse.StatusCode);
+                using var auditPageOneBody = System.Text.Json.JsonDocument.Parse(
+                    await auditPageOneResponse.Content.ReadAsStringAsync());
+                var firstAudit = Assert.Single(
+                    auditPageOneBody.RootElement.GetProperty("entries").EnumerateArray());
+                Assert.Equal("CREATED", firstAudit.GetProperty("action").GetString());
+                Assert.Equal("admin-test", firstAudit.GetProperty("actorId").GetString());
+                var cursor = auditPageOneBody.RootElement.GetProperty("nextCursor").GetString();
+                Assert.NotNull(cursor);
+
+                using var auditPageTwo = new HttpRequestMessage(
+                    HttpMethod.Get, detailPath + "/audit?page_size=1&cursor=" + cursor);
+                auditPageTwo.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var auditPageTwoResponse = await client.SendAsync(auditPageTwo);
+                Assert.Equal(System.Net.HttpStatusCode.OK, auditPageTwoResponse.StatusCode);
+                using var auditPageTwoBody = System.Text.Json.JsonDocument.Parse(
+                    await auditPageTwoResponse.Content.ReadAsStringAsync());
+                var secondAudit = Assert.Single(
+                    auditPageTwoBody.RootElement.GetProperty("entries").EnumerateArray());
+                Assert.Equal("UPDATED", secondAudit.GetProperty("action").GetString());
+                Assert.Null(secondAudit.GetProperty("nextCursor").ValueKind == System.Text.Json.JsonValueKind.Null
+                    ? null
+                    : secondAudit.GetProperty("nextCursor").GetString());
+
+                using var invalidAuditCursor = new HttpRequestMessage(
+                    HttpMethod.Get, detailPath + "/audit?cursor=invalid");
+                invalidAuditCursor.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest,
+                    (await client.SendAsync(invalidAuditCursor)).StatusCode);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Customer_onboarding_requires_admin_and_audits_activation()
     {
         var dataSource = await CreateDataSourceAsync();
