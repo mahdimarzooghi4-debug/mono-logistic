@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Mono.Api.Domain;
+using Mono.Api.Persistence;
 using Mono.Api.Security;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
