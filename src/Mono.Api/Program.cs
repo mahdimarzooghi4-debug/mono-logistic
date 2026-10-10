@@ -4,8 +4,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
 builder.Services.AddMonoCustomerTenantAuthorization();
+builder.Services.AddMonoApiKeyAuthentication(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 // These endpoints report process readiness only. Dependency checks will be added
 // alongside the corresponding infrastructure integration.
