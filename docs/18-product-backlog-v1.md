@@ -23,6 +23,7 @@ Epic
 ### E1.1 Customer
 - Sprint 018 adds Mono-administrator onboarding for new customers in PENDING status and audited activation to ACTIVE.
 - Sprint 024 adds administrator-only customer status and append-only onboarding/activation audit inspection.
+- Sprint 026 adds an MFA-gated Mono operations customer directory with keyset pagination and summary-only fields.
 - Create Customer
 - Customer status
 - Customer tenant context
