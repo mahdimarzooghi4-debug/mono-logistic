@@ -33,6 +33,18 @@ Hana
 - Primary cyan: `#00A8C6`; tagline gray: `#4A4F57`; reverse dark: `#090E1C`; white: `#FFFFFF`.
 - Typography: Inter for English/Latin and Vazirmatn for Persian.
 
+## Product UI Designs
+
+The same Figma file also contains product screen designs:
+
+- [Operations Console](https://www.figma.com/design/TsYT48l66ee34uvOoS9XI2/mono-lgestic?node-id=66-2)
+- [Onboarding Console](https://www.figma.com/design/TsYT48l66ee34uvOoS9XI2/mono-lgestic?node-id=130-2)
+- [Courier App](https://www.figma.com/design/TsYT48l66ee34uvOoS9XI2/mono-lgestic?node-id=169-2)
+- [Merchant Dashboard](https://www.figma.com/design/TsYT48l66ee34uvOoS9XI2/mono-lgestic?node-id=207-2)
+- [Merchant Mobile](https://www.figma.com/design/TsYT48l66ee34uvOoS9XI2/mono-lgestic?node-id=358-2), including critical/supporting flows, account and settings, system states, and a QA summary.
+
+These are design artifacts; displayed sample values are not operational data. Product behavior and release scope remain governed by the approved product decisions and roadmap.
+
 ## Business Foundation
 
 - [Business Architecture](docs/01-business-architecture.md)
