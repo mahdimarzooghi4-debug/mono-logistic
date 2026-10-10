@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
 
@@ -13,7 +14,7 @@ public static class MonoBranchExternalIdentifierOperationsEndpoints
             async (
                 string customerId,
                 string branchId,
-                MonoBranchExternalIdentifierOperationsService identifiers,
+                [FromServices] MonoBranchExternalIdentifierOperationsService identifiers,
                 CancellationToken cancellationToken) =>
             {
                 try
@@ -38,7 +39,7 @@ public static class MonoBranchExternalIdentifierOperationsEndpoints
                 string customerId,
                 string branchId,
                 AddBranchExternalIdentifierRequest request,
-                MonoBranchExternalIdentifierOperationsService identifiers,
+                [FromServices] MonoBranchExternalIdentifierOperationsService identifiers,
                 CancellationToken cancellationToken) =>
             {
                 try
@@ -87,7 +88,7 @@ public static class MonoBranchExternalIdentifierOperationsEndpoints
                 string branchId,
                 string identifierId,
                 RetireBranchExternalIdentifierRequest request,
-                MonoBranchExternalIdentifierOperationsService identifiers,
+                [FromServices] MonoBranchExternalIdentifierOperationsService identifiers,
                 CancellationToken cancellationToken) =>
             {
                 try
@@ -120,7 +121,7 @@ public static class MonoBranchExternalIdentifierOperationsEndpoints
             async (
                 string customerId,
                 string branchId,
-                MonoBranchExternalIdentifierOperationsService identifiers,
+                [FromServices] MonoBranchExternalIdentifierOperationsService identifiers,
                 CancellationToken cancellationToken) =>
             {
                 try
