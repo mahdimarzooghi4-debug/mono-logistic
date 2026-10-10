@@ -18,4 +18,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Mono.Api/Mono.Api.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../db/migrations/001_customer_branch.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.001_customer_branch.sql" />
+  </ItemGroup>
 </Project>
