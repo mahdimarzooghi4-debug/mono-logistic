@@ -186,4 +186,4 @@ public sealed record ManagedBranchAuditPage(
     IReadOnlyList<MonoBranchAuditSummary> Entries,
     string? NextCursor);
 
-public sealed class BranchAuditCursorException : Exception;
+public sealed class BranchAuditCursorException : Exception { }
