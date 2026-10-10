@@ -27,6 +27,234 @@ public sealed class MonoCustomerOperationsEndpointTests
     private const string Audience = "mono-api-test";
 
     [Fact]
+    public async Task Branch_external_identifiers_are_admin_only_customer_scoped_and_audited()
+    {
+        var dataSource = await CreateDataSourceAsync();
+        if (dataSource is null) return;
+        await using (dataSource)
+        using (var rsa = RSA.Create(2048))
+        {
+            var signingKey = new RsaSecurityKey(rsa) { KeyId = "branch-external-identifiers-test-key" };
+            var builder = WebApplication.CreateBuilder();
+            builder.WebHost.UseTestServer();
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["MonoOperations:Authority"] = Authority,
+                ["MonoOperations:Audience"] = Audience
+            });
+            builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
+            builder.Services.AddSingleton(dataSource);
+            builder.Services.AddScoped<MonoCustomerOperationsService>();
+            builder.Services.AddScoped<MonoBranchOperationsService>();
+            builder.Services.AddScoped<MonoBranchExternalIdentifierOperationsService>();
+            var oidcConfiguration = new OpenIdConnectConfiguration { Issuer = Authority };
+            oidcConfiguration.SigningKeys.Add(signingKey);
+            builder.Services.PostConfigure<JwtBearerOptions>(MonoOperationsDefaults.Scheme, options =>
+            {
+                options.ConfigurationManager =
+                    new StaticConfigurationManager<OpenIdConnectConfiguration>(oidcConfiguration);
+                options.TokenValidationParameters.ValidIssuer = Authority;
+                options.TokenValidationParameters.ValidAudience = Audience;
+                options.TokenValidationParameters.IssuerSigningKey = signingKey;
+            });
+
+            var app = builder.Build();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.MapMonoCustomerOperationsEndpoints();
+            app.MapMonoBranchOperationsEndpoints();
+            app.MapMonoBranchExternalIdentifierOperationsEndpoints();
+            await app.StartAsync();
+            await using (app)
+            using (var client = app.GetTestClient())
+            {
+                using var createCustomer = new HttpRequestMessage(
+                    HttpMethod.Post, "/operations/v1/customers")
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        legalName = "External Branch ID Test",
+                        reason = "branch identifier integration test"
+                    })
+                };
+                createCustomer.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var customerResponse = await client.SendAsync(createCustomer);
+                Assert.Equal(System.Net.HttpStatusCode.Created, customerResponse.StatusCode);
+                using var customerBody = System.Text.Json.JsonDocument.Parse(
+                    await customerResponse.Content.ReadAsStringAsync());
+                var customerId = customerBody.RootElement.GetProperty("customerId").GetString()!;
+
+                using var activate = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/customers/{customerId}/activate")
+                {
+                    Content = JsonContent.Create(new { reason = "branch identifier integration test" })
+                };
+                activate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NoContent,
+                    (await client.SendAsync(activate)).StatusCode);
+
+                async Task<string> CreateBranchAsync(string name)
+                {
+                    using var request = new HttpRequestMessage(
+                        HttpMethod.Post, $"/operations/v1/customers/{customerId}/branches")
+                    {
+                        Content = JsonContent.Create(new
+                        {
+                            name,
+                            reason = "external branch identifier test"
+                        })
+                    };
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                    using var response = await client.SendAsync(request);
+                    Assert.Equal(System.Net.HttpStatusCode.Created, response.StatusCode);
+                    using var body = System.Text.Json.JsonDocument.Parse(
+                        await response.Content.ReadAsStringAsync());
+                    return body.RootElement.GetProperty("branchId").GetString()!;
+                }
+
+                var firstBranchId = await CreateBranchAsync("External ID Branch One");
+                var secondBranchId = await CreateBranchAsync("External ID Branch Two");
+                var firstPath =
+                    $"/operations/v1/customers/{customerId}/branches/{firstBranchId}/external-identifiers";
+                var secondPath =
+                    $"/operations/v1/customers/{customerId}/branches/{secondBranchId}/external-identifiers";
+
+                using var unauthenticatedList = new HttpRequestMessage(HttpMethod.Get, firstPath);
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthenticatedList)).StatusCode);
+                using var nonAdminList = new HttpRequestMessage(HttpMethod.Get, firstPath);
+                nonAdminList.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminList)).StatusCode);
+
+                using var emptyList = new HttpRequestMessage(HttpMethod.Get, firstPath);
+                emptyList.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var emptyResponse = await client.SendAsync(emptyList);
+                Assert.Equal(System.Net.HttpStatusCode.OK, emptyResponse.StatusCode);
+                using var emptyBody = System.Text.Json.JsonDocument.Parse(
+                    await emptyResponse.Content.ReadAsStringAsync());
+                Assert.Empty(emptyBody.RootElement.GetProperty("identifiers").EnumerateArray());
+
+                using var add = new HttpRequestMessage(HttpMethod.Post, firstPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = " ERP.Branch ",
+                        externalId = " store-001 ",
+                        reason = "Verified branch mapping"
+                    })
+                };
+                add.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var addResponse = await client.SendAsync(add);
+                Assert.Equal(System.Net.HttpStatusCode.Created, addResponse.StatusCode);
+                using var addBody = System.Text.Json.JsonDocument.Parse(
+                    await addResponse.Content.ReadAsStringAsync());
+                var identifierId = addBody.RootElement.GetProperty("identifierId").GetString()!;
+                Assert.Equal("erp.branch", addBody.RootElement.GetProperty("namespace").GetString());
+                Assert.Equal("store-001", addBody.RootElement.GetProperty("externalId").GetString());
+                Assert.Equal(firstBranchId, addBody.RootElement.GetProperty("branchId").GetString());
+
+                using var duplicate = new HttpRequestMessage(HttpMethod.Post, secondPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = "erp.branch",
+                        externalId = "store-001",
+                        reason = "duplicate branch mapping"
+                    })
+                };
+                duplicate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.Conflict,
+                    (await client.SendAsync(duplicate)).StatusCode);
+
+                using var invalidNamespace = new HttpRequestMessage(HttpMethod.Post, secondPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = "not a namespace",
+                        externalId = "store-002",
+                        reason = "invalid namespace test"
+                    })
+                };
+                invalidNamespace.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest,
+                    (await client.SendAsync(invalidNamespace)).StatusCode);
+
+                var retirePath = firstPath + "/" + identifierId + "/retire";
+                using var unauthenticatedRetire = new HttpRequestMessage(HttpMethod.Post, retirePath)
+                {
+                    Content = JsonContent.Create(new { reason = "authorization check" })
+                };
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthenticatedRetire)).StatusCode);
+
+                using var retire = new HttpRequestMessage(HttpMethod.Post, retirePath)
+                {
+                    Content = JsonContent.Create(new { reason = "branch moved to another account" })
+                };
+                retire.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NoContent, (await client.SendAsync(retire)).StatusCode);
+
+                using var activeAfterRetirement = new HttpRequestMessage(HttpMethod.Get, firstPath);
+                activeAfterRetirement.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var activeAfterRetirementResponse = await client.SendAsync(activeAfterRetirement);
+                using var activeAfterRetirementBody = System.Text.Json.JsonDocument.Parse(
+                    await activeAfterRetirementResponse.Content.ReadAsStringAsync());
+                Assert.Empty(activeAfterRetirementBody.RootElement.GetProperty("identifiers").EnumerateArray());
+
+                using var audit = new HttpRequestMessage(HttpMethod.Get, firstPath + "/audit");
+                audit.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var auditResponse = await client.SendAsync(audit);
+                Assert.Equal(System.Net.HttpStatusCode.OK, auditResponse.StatusCode);
+                using var auditBody = System.Text.Json.JsonDocument.Parse(
+                    await auditResponse.Content.ReadAsStringAsync());
+                var auditEntries = auditBody.RootElement.GetProperty("entries").EnumerateArray().ToArray();
+                Assert.Equal(2, auditEntries.Length);
+                Assert.Equal("ADDED", auditEntries[0].GetProperty("action").GetString());
+                Assert.Equal("RETIRED", auditEntries[1].GetProperty("action").GetString());
+                Assert.Equal("admin-test", auditEntries[1].GetProperty("actorId").GetString());
+                Assert.Equal("branch moved to another account",
+                    auditEntries[1].GetProperty("reason").GetString());
+
+                using var reassign = new HttpRequestMessage(HttpMethod.Post, secondPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        @namespace = "erp.branch",
+                        externalId = "store-001",
+                        reason = "verified branch account transfer"
+                    })
+                };
+                reassign.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.Created, (await client.SendAsync(reassign)).StatusCode);
+
+                using var crossCustomer = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"/operations/v1/customers/cus_00000000000000000000000000000000/branches/{firstBranchId}/external-identifiers");
+                crossCustomer.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(crossCustomer)).StatusCode);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Branch_detail_and_audit_are_admin_only_customer_scoped_and_paginated()
     {
         var dataSource = await CreateDataSourceAsync();
@@ -1181,7 +1409,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.011_customer_api_key_operations_audit.sql",
             "Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql",
             "Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql",
-            "Mono.Api.Tests.Migrations.014_customer_external_identifiers.sql"
+            "Mono.Api.Tests.Migrations.014_customer_external_identifiers.sql",
+            "Mono.Api.Tests.Migrations.015_branch_external_identifiers.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)
