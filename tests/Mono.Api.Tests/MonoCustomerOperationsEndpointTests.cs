@@ -158,6 +158,16 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(System.Net.HttpStatusCode.Forbidden,
                     (await client.SendAsync(nonAdminBranch)).StatusCode);
 
+                using var emptyBranchListRequest = new HttpRequestMessage(HttpMethod.Get, branchPath);
+                emptyBranchListRequest.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var emptyBranchListResponse = await client.SendAsync(emptyBranchListRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, emptyBranchListResponse.StatusCode);
+                using var emptyBranchListBody = System.Text.Json.JsonDocument.Parse(
+                    await emptyBranchListResponse.Content.ReadAsStringAsync());
+                Assert.Empty(emptyBranchListBody.RootElement.GetProperty("branches").EnumerateArray());
+
                 using var createBranch = new HttpRequestMessage(HttpMethod.Post, branchPath)
                 {
                     Content = JsonContent.Create(new
@@ -201,6 +211,7 @@ public sealed class MonoCustomerOperationsEndpointTests
                 var listedBranches = branchListBody.RootElement.GetProperty("branches");
                 var listedBranch = Assert.Single(listedBranches.EnumerateArray());
                 Assert.Equal(branchId, listedBranch.GetProperty("branchId").GetString());
+                Assert.Equal(customerId, listedBranch.GetProperty("customerId").GetString());
                 Assert.Equal("Central Branch", listedBranch.GetProperty("name").GetString());
                 Assert.Equal("ACTIVE", listedBranch.GetProperty("status").GetString());
 
