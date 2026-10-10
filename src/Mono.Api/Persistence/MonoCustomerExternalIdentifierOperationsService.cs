@@ -29,7 +29,7 @@ public sealed class MonoCustomerExternalIdentifierOperationsService(
         await using var command = new NpgsqlCommand("""
             SELECT external_identifier_id, customer_id, namespace, external_id, created_at
             FROM customer_external_identifiers
-            WHERE customer_id = @customer_id
+            WHERE customer_id = @customer_id AND status = 'ACTIVE'
             ORDER BY namespace, external_id, external_identifier_id;
             """, connection);
         command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
@@ -89,7 +89,7 @@ public sealed class MonoCustomerExternalIdentifierOperationsService(
         }
         catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
         {
-            throw new DuplicateCustomerExternalIdentifierException();
+            throw new CustomerExternalIdentifierConflictException();
         }
 
         await using (var audit = new NpgsqlCommand("""
@@ -113,6 +113,81 @@ public sealed class MonoCustomerExternalIdentifierOperationsService(
 
         await transaction.CommitAsync(cancellationToken);
         return identifier;
+    }
+
+    public async Task<bool> RetireAsync(
+        string customerId,
+        string identifierId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        customerId = NormalizeCustomerId(customerId);
+        identifierId = NormalizeIdentifierId(identifierId);
+        reason = NormalizeReason(reason);
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        string @namespace;
+        string externalId;
+        string status;
+        await using (var select = new NpgsqlCommand("""
+            SELECT namespace, external_id, status
+            FROM customer_external_identifiers
+            WHERE customer_id = @customer_id AND external_identifier_id = @identifier_id
+            FOR UPDATE;
+            """, connection, transaction))
+        {
+            select.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            select.Parameters.AddWithValue("identifier_id", NpgsqlDbType.Text, identifierId);
+            await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+                return false;
+            @namespace = reader.GetString(0);
+            externalId = reader.GetString(1);
+            status = reader.GetString(2);
+        }
+
+        if (!string.Equals(status, "ACTIVE", StringComparison.Ordinal))
+            throw new CustomerExternalIdentifierConflictException();
+
+        var retiredAt = DateTimeOffset.UtcNow;
+        await using (var update = new NpgsqlCommand("""
+            UPDATE customer_external_identifiers
+            SET status = 'RETIRED', retired_at = @retired_at
+            WHERE customer_id = @customer_id AND external_identifier_id = @identifier_id
+              AND status = 'ACTIVE';
+            """, connection, transaction))
+        {
+            update.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            update.Parameters.AddWithValue("identifier_id", NpgsqlDbType.Text, identifierId);
+            update.Parameters.AddWithValue("retired_at", NpgsqlDbType.TimestampTz, retiredAt);
+            if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
+                throw new CustomerExternalIdentifierConflictException();
+        }
+
+        await using (var audit = new NpgsqlCommand("""
+            INSERT INTO customer_external_identifier_audit (
+                audit_id, external_identifier_id, customer_id, namespace, external_id,
+                action, actor_id, reason, occurred_at)
+            VALUES (@audit_id, @identifier_id, @customer_id, @namespace, @external_id,
+                    'RETIRED', @actor_id, @reason, @occurred_at);
+            """, connection, transaction))
+        {
+            audit.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, "ceia_" + Guid.NewGuid().ToString("N"));
+            audit.Parameters.AddWithValue("identifier_id", NpgsqlDbType.Text, identifierId);
+            audit.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            audit.Parameters.AddWithValue("namespace", NpgsqlDbType.Text, @namespace);
+            audit.Parameters.AddWithValue("external_id", NpgsqlDbType.Text, externalId);
+            audit.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            audit.Parameters.AddWithValue("reason", NpgsqlDbType.Text, reason);
+            audit.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, retiredAt);
+            await audit.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task<IReadOnlyList<CustomerExternalIdentifierAuditSummary>?> ListAuditAsync(
@@ -172,6 +247,15 @@ public sealed class MonoCustomerExternalIdentifierOperationsService(
         return await command.ExecuteScalarAsync(cancellationToken) is not null;
     }
 
+    private static string NormalizeIdentifierId(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        var normalized = value.Trim();
+        if (!Regex.IsMatch(normalized, @"\\Acei_[0-9a-f]{32}\\z", RegexOptions.CultureInvariant))
+            throw new ArgumentException("External identifier ID is invalid.", nameof(value));
+        return normalized;
+    }
+
     private static string NormalizeCustomerId(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
@@ -225,4 +309,4 @@ public sealed record CustomerExternalIdentifierAuditSummary(
     string Reason,
     DateTimeOffset OccurredAt);
 
-public sealed class DuplicateCustomerExternalIdentifierException : Exception { }
+public sealed class CustomerExternalIdentifierConflictException : Exception { }
