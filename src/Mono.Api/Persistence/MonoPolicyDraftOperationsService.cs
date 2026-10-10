@@ -110,6 +110,148 @@ public sealed class MonoPolicyDraftOperationsService(
         return ToSummary(policyId, versionNumber, version, actorId, now);
     }
 
+
+    public async Task<PolicyVersionSummary> ActivateAsync(
+        string policyId, int versionNumber, string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        policyId = NormalizePolicyId(policyId);
+        if (versionNumber < 1) throw new ArgumentOutOfRangeException(nameof(versionNumber));
+        reason = NormalizeLifecycleReason(reason);
+        var now = DateTimeOffset.UtcNow;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var identity = await LockPolicyAsync(connection, transaction, policyId, cancellationToken);
+        var requested = await ReadVersionForUpdateAsync(connection, transaction, policyId, versionNumber, cancellationToken)
+            ?? throw new PolicyVersionNotFoundException();
+        if (requested.Status != "DRAFT")
+            throw new PolicyVersionStateConflictException("Only a Draft policy version can be activated.");
+        if (requested.EffectiveTo is not null && requested.EffectiveTo <= now)
+            throw new PolicyVersionStateConflictException("An expired policy version cannot be activated.");
+
+        var active = await ReadActiveVersionForUpdateAsync(connection, transaction, policyId, cancellationToken);
+        if (active is not null)
+        {
+            await UpdateVersionStatusAsync(connection, transaction, policyId, active.VersionNumber, "INACTIVE", cancellationToken);
+            await InsertLifecycleAuditAsync(connection, transaction, identity, active with { Status = "INACTIVE" },
+                "VERSION_DEACTIVATED", actorId, reason, now, cancellationToken);
+        }
+        await UpdateVersionStatusAsync(connection, transaction, policyId, versionNumber, "ACTIVE", cancellationToken);
+        var activated = requested with { Status = "ACTIVE" };
+        await InsertLifecycleAuditAsync(connection, transaction, identity, activated,
+            "VERSION_ACTIVATED", actorId, reason, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return activated;
+    }
+
+    public async Task<PolicyVersionSummary> RetireAsync(
+        string policyId, int versionNumber, string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        policyId = NormalizePolicyId(policyId);
+        if (versionNumber < 1) throw new ArgumentOutOfRangeException(nameof(versionNumber));
+        reason = NormalizeLifecycleReason(reason);
+        var now = DateTimeOffset.UtcNow;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var identity = await LockPolicyAsync(connection, transaction, policyId, cancellationToken);
+        var version = await ReadVersionForUpdateAsync(connection, transaction, policyId, versionNumber, cancellationToken)
+            ?? throw new PolicyVersionNotFoundException();
+        if (version.Status is not ("ACTIVE" or "INACTIVE"))
+            throw new PolicyVersionStateConflictException("Only an Active or Inactive policy version can be retired.");
+
+        await UpdateVersionStatusAsync(connection, transaction, policyId, versionNumber, "RETIRED", cancellationToken);
+        var retired = version with { Status = "RETIRED" };
+        await InsertLifecycleAuditAsync(connection, transaction, identity, retired,
+            "VERSION_RETIRED", actorId, reason, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return retired;
+    }
+
+    private static async Task<PolicyIdentity> LockPolicyAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, string policyId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            SELECT policy_type, scope, scope_id FROM policies WHERE policy_id = @policy_id FOR UPDATE;
+            """, connection, transaction);
+        command.Parameters.AddWithValue("policy_id", NpgsqlDbType.Text, policyId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) throw new KeyNotFoundException("Policy was not found.");
+        return new PolicyIdentity(policyId, reader.GetString(0), reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetString(2));
+    }
+
+    private static async Task<PolicyVersionSummary?> ReadVersionForUpdateAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, string policyId, int versionNumber,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            SELECT version_number, enforcement_type, priority, status, effective_from, effective_to,
+                   definition::text, created_at, created_by
+            FROM policy_versions WHERE policy_id = @policy_id AND version_number = @version_number FOR UPDATE;
+            """, connection, transaction);
+        command.Parameters.AddWithValue("policy_id", NpgsqlDbType.Text, policyId);
+        command.Parameters.AddWithValue("version_number", NpgsqlDbType.Integer, versionNumber);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadVersion(policyId, reader) : null;
+    }
+
+    private static async Task<PolicyVersionSummary?> ReadActiveVersionForUpdateAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, string policyId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            SELECT version_number, enforcement_type, priority, status, effective_from, effective_to,
+                   definition::text, created_at, created_by
+            FROM policy_versions WHERE policy_id = @policy_id AND status = 'ACTIVE' FOR UPDATE;
+            """, connection, transaction);
+        command.Parameters.AddWithValue("policy_id", NpgsqlDbType.Text, policyId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadVersion(policyId, reader) : null;
+    }
+
+    private static async Task UpdateVersionStatusAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, string policyId, int versionNumber,
+        string status, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            UPDATE policy_versions SET status = @status WHERE policy_id = @policy_id AND version_number = @version_number;
+            """, connection, transaction);
+        command.Parameters.AddWithValue("policy_id", NpgsqlDbType.Text, policyId);
+        command.Parameters.AddWithValue("version_number", NpgsqlDbType.Integer, versionNumber);
+        command.Parameters.AddWithValue("status", NpgsqlDbType.Text, status);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task InsertLifecycleAuditAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, PolicyIdentity identity,
+        PolicyVersionSummary version, string action, string actorId, string reason, DateTimeOffset occurredAt,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = JsonSerializer.Serialize(new
+        {
+            policyId = identity.PolicyId, policyType = identity.PolicyType, scope = identity.Scope,
+            scopeId = identity.ScopeId, versionNumber = version.VersionNumber,
+            enforcementType = version.EnforcementType, version.Priority, status = version.Status,
+            version.EffectiveFrom, version.EffectiveTo, version.Definition
+        });
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO policy_audit (
+                audit_id, policy_id, version_number, action, actor_id, reason, policy_snapshot, occurred_at)
+            VALUES (@audit_id, @policy_id, @version_number, @action, @actor_id, @reason, @snapshot, @occurred_at);
+            """, connection, transaction);
+        command.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, "pa_" + Guid.NewGuid().ToString("N"));
+        command.Parameters.AddWithValue("policy_id", NpgsqlDbType.Text, identity.PolicyId);
+        command.Parameters.AddWithValue("version_number", NpgsqlDbType.Integer, version.VersionNumber);
+        command.Parameters.AddWithValue("action", NpgsqlDbType.Text, action);
+        command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+        command.Parameters.AddWithValue("reason", NpgsqlDbType.Text, reason);
+        command.Parameters.AddWithValue("snapshot", NpgsqlDbType.Jsonb, snapshot);
+        command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, occurredAt);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<PolicyListPageResponse> ListAsync(
         int pageSize,
         string? cursor,
@@ -362,6 +504,14 @@ public sealed class MonoPolicyDraftOperationsService(
         return normalized;
     }
 
+    private static string NormalizeLifecycleReason(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        var normalized = value.Trim();
+        if (normalized.Length > 1000) throw new ArgumentException("Reason must be at most 1000 characters.");
+        return normalized;
+    }
+
     private static string NormalizePolicyId(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
@@ -380,6 +530,10 @@ public sealed class MonoPolicyDraftOperationsService(
         return normalized;
     }
 }
+
+public sealed record PolicyIdentity(string PolicyId, string PolicyType, string Scope, string? ScopeId);
+public sealed class PolicyVersionNotFoundException : Exception { }
+public sealed class PolicyVersionStateConflictException(string message) : Exception(message);
 
 public sealed record CreatePolicyDraftInput(
     string PolicyType, string Scope, string? ScopeId, string EnforcementType, int Priority,

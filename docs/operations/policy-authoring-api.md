@@ -2,7 +2,7 @@
 
 All routes are internal Mono operations endpoints. They require the Mono administrator role and issuer-asserted MFA. Customer API keys cannot authorize them.
 
-This sprint creates and inspects policy drafts only. It does not activate, retire, evaluate, resolve, or apply policies to delivery requests or Missions. A policy definition is stored as a JSON object; its family-specific business semantics are not interpreted here.
+Policy authoring stores JSON definitions without interpreting family-specific business semantics. Lifecycle changes require an MFA-gated Mono administrator. Activation and retirement only change registry status and append audit history; they do not resolve or apply policies to delivery requests or Missions.
 
 ## List policy drafts
 
@@ -46,11 +46,28 @@ Returns the policy metadata and its versions in ascending version order, includi
 
 The request supplies a complete new version definition, enforcement type, priority, optional effective dates, and a reason. The server locks the policy identity, assigns the next version number, and creates the version in `DRAFT`. Existing versions are preserved. Unknown IDs return `404 POLICY_NOT_FOUND`.
 
+## Activate a Draft version
+
+`POST /operations/v1/policies/{policyId}/versions/{versionNumber}/activate`
+
+```json
+{ "reason": "Approved after operations review" }
+```
+
+Only a `DRAFT` version can be activated. If another version is active under the same policy identity, it becomes `INACTIVE` in the same database transaction. A version whose `effectiveTo` is in the past cannot be activated. PostgreSQL enforces at most one `ACTIVE` version per policy. Activation appends `VERSION_DEACTIVATED` for the prior version when present and `VERSION_ACTIVATED` for the new version.
+
+## Retire a version
+
+`POST /operations/v1/policies/{policyId}/versions/{versionNumber}/retire`
+
+Only an `ACTIVE` or `INACTIVE` version can be retired. Retirement is permanent; definitions and audit entries are preserved. Drafts cannot be retired directly.
+
+Both operations require a non-empty reason of at most 1000 characters. Status changes and audit entries commit atomically. A disallowed transition returns `409 POLICY_VERSION_STATE_CONFLICT`; an unknown policy or version returns `404`.
 ## Inspect audit history
 
 `GET /operations/v1/policies/{policyId}/audit`
 
-Returns append-only records for policy creation and Draft version creation, including the policy snapshot, actor, reason, and timestamp. Unknown IDs return `404 POLICY_NOT_FOUND`.
+Returns append-only records for policy creation, Draft version creation, activation, deactivation, and retirement, including the policy snapshot, actor, reason, and timestamp. Unknown IDs return `404 POLICY_NOT_FOUND`.
 
 ## Errors
 

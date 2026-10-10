@@ -139,6 +139,67 @@ public static class MonoPolicyDraftOperationsEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+
+        endpoints.MapPost(
+            "/operations/v1/policies/{policyId}/versions/{versionNumber:int}/activate",
+            async (string policyId, int versionNumber, PolicyLifecycleRequest request,
+                [FromServices] MonoPolicyDraftOperationsService policies, CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    return Results.Ok(await policies.ActivateAsync(
+                        policyId, versionNumber, request.Reason ?? string.Empty, cancellationToken));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                        "INVALID_REQUEST", "Policy ID, version number, or reason is invalid.")));
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse(new ApiError("POLICY_NOT_FOUND", "Policy was not found.")));
+                }
+                catch (PolicyVersionNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse(new ApiError("POLICY_VERSION_NOT_FOUND", "Policy version was not found.")));
+                }
+                catch (PolicyVersionStateConflictException ex)
+                {
+                    return Results.Conflict(new ApiErrorResponse(new ApiError("POLICY_VERSION_STATE_CONFLICT", ex.Message)));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost(
+            "/operations/v1/policies/{policyId}/versions/{versionNumber:int}/retire",
+            async (string policyId, int versionNumber, PolicyLifecycleRequest request,
+                [FromServices] MonoPolicyDraftOperationsService policies, CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    return Results.Ok(await policies.RetireAsync(
+                        policyId, versionNumber, request.Reason ?? string.Empty, cancellationToken));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                        "INVALID_REQUEST", "Policy ID, version number, or reason is invalid.")));
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse(new ApiError("POLICY_NOT_FOUND", "Policy was not found.")));
+                }
+                catch (PolicyVersionNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse(new ApiError("POLICY_VERSION_NOT_FOUND", "Policy version was not found.")));
+                }
+                catch (PolicyVersionStateConflictException ex)
+                {
+                    return Results.Conflict(new ApiErrorResponse(new ApiError("POLICY_VERSION_STATE_CONFLICT", ex.Message)));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         return endpoints;
     }
 }
@@ -161,5 +222,7 @@ public sealed record CreatePolicyVersionRequest(
     DateTimeOffset? EffectiveTo,
     System.Text.Json.JsonElement Definition,
     string? Reason);
+
+public sealed record PolicyLifecycleRequest(string? Reason);
 
 public sealed record PolicyAuditListResponse(IReadOnlyList<PolicyAuditSummary> Entries);

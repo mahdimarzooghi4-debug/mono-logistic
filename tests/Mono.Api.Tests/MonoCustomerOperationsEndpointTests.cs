@@ -416,6 +416,77 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal("VERSION_DRAFTED", auditEntries[1].GetProperty("action").GetString());
                 Assert.Equal("admin-test", auditEntries[1].GetProperty("actorId").GetString());
 
+
+                using var forbiddenActivate = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/1/activate")
+                { Content = JsonContent.Create(new { reason = "missing MFA" }) };
+                forbiddenActivate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden, (await client.SendAsync(forbiddenActivate)).StatusCode);
+
+                using var activateFirst = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/1/activate")
+                { Content = JsonContent.Create(new { reason = "Approve first policy version" }) };
+                activateFirst.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var activatedFirst = await client.SendAsync(activateFirst);
+                Assert.Equal(System.Net.HttpStatusCode.OK, activatedFirst.StatusCode);
+
+                using var activateSecond = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/2/activate")
+                { Content = JsonContent.Create(new { reason = "Replace first policy version" }) };
+                activateSecond.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.OK, (await client.SendAsync(activateSecond)).StatusCode);
+
+                using var draftRetire = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/1/retire")
+                { Content = JsonContent.Create(new { reason = "Invalid draft retirement" }) };
+                draftRetire.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.Conflict, (await client.SendAsync(draftRetire)).StatusCode);
+
+                using var retireSecond = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/2/retire")
+                { Content = JsonContent.Create(new { reason = "End version two" }) };
+                retireSecond.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.OK, (await client.SendAsync(retireSecond)).StatusCode);
+
+                using var repeatedRetire = new HttpRequestMessage(
+                    HttpMethod.Post, $"/operations/v1/policies/{policyId}/versions/2/retire")
+                { Content = JsonContent.Create(new { reason = "Repeat retirement" }) };
+                repeatedRetire.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.Conflict, (await client.SendAsync(repeatedRetire)).StatusCode);
+
+                using var lifecycleDetail = new HttpRequestMessage(HttpMethod.Get, $"/operations/v1/policies/{policyId}");
+                lifecycleDetail.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var lifecycleDetailResponse = await client.SendAsync(lifecycleDetail);
+                using var lifecycleDetailBody = System.Text.Json.JsonDocument.Parse(
+                    await lifecycleDetailResponse.Content.ReadAsStringAsync());
+                var lifecycleVersions = lifecycleDetailBody.RootElement.GetProperty("versions").EnumerateArray().ToArray();
+                Assert.Equal("INACTIVE", lifecycleVersions[0].GetProperty("status").GetString());
+                Assert.Equal("RETIRED", lifecycleVersions[1].GetProperty("status").GetString());
+
+                using var lifecycleAudit = new HttpRequestMessage(HttpMethod.Get, $"/operations/v1/policies/{policyId}/audit");
+                lifecycleAudit.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var lifecycleAuditResponse = await client.SendAsync(lifecycleAudit);
+                using var lifecycleAuditBody = System.Text.Json.JsonDocument.Parse(
+                    await lifecycleAuditResponse.Content.ReadAsStringAsync());
+                var lifecycleEntries = lifecycleAuditBody.RootElement.GetProperty("entries").EnumerateArray().ToArray();
+                var lifecycleActions = lifecycleEntries.Select(entry => entry.GetProperty("action").GetString()).ToArray();
+                Assert.Contains("VERSION_ACTIVATED", lifecycleActions);
+                Assert.Contains("VERSION_DEACTIVATED", lifecycleActions);
+                Assert.Contains("VERSION_RETIRED", lifecycleActions);
+                var retireAudit = lifecycleEntries.Single(entry =>
+                    entry.GetProperty("action").GetString() == "VERSION_RETIRED");
+                Assert.Equal("admin-test", retireAudit.GetProperty("actorId").GetString());
+                Assert.Equal("End version two", retireAudit.GetProperty("reason").GetString());
+                Assert.Equal("RETIRED", retireAudit.GetProperty("policySnapshot").GetProperty("status").GetString());
+
                 using var invalid = new HttpRequestMessage(HttpMethod.Post, "/operations/v1/policies")
                 {
                     Content = JsonContent.Create(new
@@ -1614,7 +1685,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql",
             "Mono.Api.Tests.Migrations.014_customer_external_identifiers.sql",
             "Mono.Api.Tests.Migrations.015_branch_external_identifiers.sql",
-            "Mono.Api.Tests.Migrations.016_policy_draft_registry.sql"
+            "Mono.Api.Tests.Migrations.016_policy_draft_registry.sql",
+            "Mono.Api.Tests.Migrations.017_policy_lifecycle.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)
