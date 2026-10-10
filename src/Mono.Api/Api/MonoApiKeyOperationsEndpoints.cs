@@ -70,4 +70,6 @@ public static class MonoApiKeyOperationsEndpoints
     }
 }
 
-public sealed record MonoApiKeyListResponse(IReadOnlyList<ApiKeyInspectionSummary> ApiKeys);\n\npublic sealed record RevokeMonoApiKeyRequest(string? Reason);
+public sealed record MonoApiKeyListResponse(IReadOnlyList<ApiKeyInspectionSummary> ApiKeys);
+
+public sealed record RevokeMonoApiKeyRequest(string? Reason);
