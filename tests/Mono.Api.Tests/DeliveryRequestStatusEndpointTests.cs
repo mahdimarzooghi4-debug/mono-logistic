@@ -1,9 +1,7 @@
-using System.Net.Http.Json;
 using System.Text.Json;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
-using Mono.Api.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
