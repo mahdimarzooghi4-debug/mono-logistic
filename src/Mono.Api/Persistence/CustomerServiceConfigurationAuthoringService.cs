@@ -165,6 +165,62 @@ public sealed class CustomerServiceConfigurationAuthoringService(
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public async Task RetireActiveAsync(
+        string customerId,
+        string serviceConfigurationId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        customerId = NormalizeCustomerId(customerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceConfigurationId);
+        ValidateReason(reason);
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        string serviceCode;
+        int version;
+        string status;
+        await using (var select = new NpgsqlCommand("""
+            SELECT service_code, version, status
+            FROM customer_service_configurations
+            WHERE customer_id = @customer_id AND service_configuration_id = @configuration_id
+            FOR UPDATE;
+            """, connection, transaction))
+        {
+            select.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            select.Parameters.AddWithValue("configuration_id", NpgsqlDbType.Text, serviceConfigurationId);
+            await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+                throw new KeyNotFoundException("Service configuration was not found for this customer.");
+            serviceCode = reader.GetString(0);
+            version = reader.GetInt32(1);
+            status = reader.GetString(2);
+        }
+
+        if (!string.Equals(status, "ACTIVE", StringComparison.Ordinal))
+            throw new InvalidOperationException("Only an active service configuration can be retired.");
+
+        await LockServiceAsync(connection, transaction, customerId, serviceCode, cancellationToken);
+        await using (var update = new NpgsqlCommand("""
+            UPDATE customer_service_configurations SET status = 'RETIRED'
+            WHERE customer_id = @customer_id
+              AND service_configuration_id = @configuration_id
+              AND status = 'ACTIVE';
+            """, connection, transaction))
+        {
+            update.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            update.Parameters.AddWithValue("configuration_id", NpgsqlDbType.Text, serviceConfigurationId);
+            if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
+                throw new InvalidOperationException("Active service configuration changed before retirement.");
+        }
+
+        await InsertAuditAsync(connection, transaction, serviceConfigurationId, customerId, serviceCode,
+            version, "RETIRED", actorId, reason, DateTimeOffset.UtcNow, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private string RequireAdministrator()
     {
         if (string.IsNullOrWhiteSpace(operationsContext.ActorId) ||

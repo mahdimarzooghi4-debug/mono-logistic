@@ -33,6 +33,20 @@ Request body:
 
 Activation uses the existing transactional overlap check and appends an `ACTIVATED` audit entry. It returns `204 No Content` on success.
 
+## Retire an active configuration
+
+`POST /operations/v1/customers/{customerId}/service-configurations/{serviceConfigurationId}/retire`
+
+Request body:
+
+```json
+{
+  "reason": "Service discontinued by operations"
+}
+```
+
+Only an `ACTIVE` version can be retired. Retirement changes its status to `RETIRED` and appends a `RETIRED` audit entry in the same transaction. It takes effect immediately; Mono will fail closed if no other active version is effective. The endpoint returns `204 No Content`.
+
 ## Errors and boundaries
 
 - `400 INVALID_REQUEST`: malformed/invalid identifiers, dates, JSON object, reason, or request binding.
