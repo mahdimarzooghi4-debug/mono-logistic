@@ -22,7 +22,7 @@ public sealed record PromiseCommitWriteResult(
     int Version,
     string? EventId);
 
-public sealed class PostgresPromiseCommitRepository
+public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
 {
     private readonly NpgsqlDataSource _dataSource;
     private readonly ICustomerContext _customerContext;
