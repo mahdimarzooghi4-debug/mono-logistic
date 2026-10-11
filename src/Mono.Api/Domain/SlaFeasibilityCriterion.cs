@@ -40,8 +40,8 @@ public static class SlaFeasibilityCriterion
             evidence.EvaluatedAt == default ||
             !Enum.IsDefined(evidence.Completeness) ||
             evidence.ReasonCodes is null ||
-            evidence.EstimatedDeliveryAt == default ||
-            evidence.LatestAllowedDeliveryAt == default)
+            (evidence.EstimatedDeliveryAt.HasValue && evidence.EstimatedDeliveryAt.Value == default) ||
+            (evidence.LatestAllowedDeliveryAt.HasValue && evidence.LatestAllowedDeliveryAt.Value == default))
         {
             throw new ArgumentException("SLA feasibility evidence is malformed.", nameof(evidence));
         }
