@@ -270,6 +270,7 @@ Evaluate:
 ## 10. Epic E8 — Pricing
 
 ### E8.1 Pricing Engine
+- Sprint 064 implements a pure Hana Phase-1 distance-band calculator with the approved fare values and 50/50 buyer/seller split. Its distance intervals are lower-inclusive; the final interval includes the 5 km maximum. Quote expiry, persistence, other pricing dimensions, and contract-specific pricing remain future work.
 - distance bands
 - flat
 - base + per-km
