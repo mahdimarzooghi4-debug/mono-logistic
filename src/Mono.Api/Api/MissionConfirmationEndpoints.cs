@@ -73,6 +73,19 @@ public static class MissionConfirmationEndpoints
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsWrite);
 
+        endpoints.MapGet("/v1/missions/{missionId}", async (
+                string missionId,
+                PostgresMissionConfirmationRepository confirmations,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await confirmations.FindByIdAsync(missionId, cancellationToken);
+                return result is null
+                    ? Results.NotFound(new ApiErrorResponse(
+                        new ApiError("MISSION_NOT_FOUND", "The Mission was not found for this customer.")))
+                    : Results.Ok(result);
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
         return endpoints;
     }
 }
