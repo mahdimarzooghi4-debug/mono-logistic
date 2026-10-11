@@ -62,5 +62,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql" />
     <EmbeddedResource Include="../../db/migrations/021_mission_confirmation.sql"
                       LogicalName="Mono.Api.Tests.Migrations.021_mission_confirmation.sql" />
+    <EmbeddedResource Include="../../db/migrations/022_mission_operations_read_indexes.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.022_mission_operations_read_indexes.sql" />
   </ItemGroup>
 </Project>
