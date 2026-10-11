@@ -254,24 +254,13 @@ Automatic Mission creation by customer contract is not implemented.
 
 ## 9. Get Mission
 
-Future capability; not implemented by the current request intake.
+The current customer-scoped Mission summary is implemented:
 
 ```
 GET /v1/missions/{mission_id}
 ```
 
-Response may include:
-
-- current status
-- pickup/dropoff
-- promise
-- selected mode
-- courier public status
-- route progress summary
-- current ETA
-- exception state
-
-Sensitive courier data must not be exposed unless contractually required.
+Requires `delivery-requests.read`. The response includes Mission status, linked Quote and Promise versions, committed delivery time, and creation time. Unknown or foreign-customer Mission IDs return `404 MISSION_NOT_FOUND`. The response does not expose pickup/dropoff contact details or internal evidence. Courier, route, and exception details will be added with their operational capabilities.
 
 ## 10. Mission Status Model
 
