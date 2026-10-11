@@ -70,21 +70,6 @@ public sealed class MissionConfirmationEndpointTests
         otherClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
         readOnlyClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
 
-        var secondRequestInput = requestInput with { ExternalReference = "CONFIRM-ORDER-2" };
-        var secondRequest = await deliveryRequests.CreateOrReplayAsync(
-            branch.BranchId, secondRequestInput.ExternalReference, "confirm-intake-2", secondRequestInput.ToCanonicalJson());
-        var secondQuoteId = "qte_22222222222222222222222222222222";
-        var secondPromiseId = "prm_22222222222222222222222222222222";
-        await InsertQuoteAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId, secondQuoteId);
-        await InsertPromiseAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId,
-            secondPromiseId, committedAt.AddHours(1), "decision-confirm-2");
-        var secondMissionResponse = await PostAsync(
-            ownerClient,
-            $"/v1/delivery-requests/{secondRequest.DeliveryRequestId}/confirm",
-            "confirm-mission-2",
-            new MissionConfirmationInput(secondQuoteId, 1));
-        Assert.Equal(HttpStatusCode.OK, secondMissionResponse.StatusCode);
-
         var path = $"/v1/delivery-requests/{created.DeliveryRequestId}/confirm";
         var body = new MissionConfirmationInput(quoteId, 1);
         var first = await PostAsync(ownerClient, path, "confirm-mission-1", body);
@@ -107,8 +92,6 @@ public sealed class MissionConfirmationEndpointTests
         var foreignMissionResponse = await otherClient.GetAsync($"/v1/missions/{missionId}");
         var timelineResponse = await ownerClient.GetAsync($"/v1/missions/{missionId}/timeline");
         var foreignTimelineResponse = await otherClient.GetAsync($"/v1/missions/{missionId}/timeline");
-        var historyResponse = await ownerClient.GetAsync("/v1/missions?page_size=1");
-        var invalidHistoryPage = await ownerClient.GetAsync("/v1/missions?page_size=101");
         Assert.Equal(created.DeliveryRequestId, mission.GetProperty("delivery_request_id").GetString());
         Assert.Equal(quoteId, mission.GetProperty("quote_id").GetString());
         Assert.Equal(promiseId, mission.GetProperty("promise_id").GetString());
@@ -154,6 +137,23 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Single(timeline.GetProperty("events").EnumerateArray());
         Assert.Equal("mission.created", timeline.GetProperty("events")[0].GetProperty("event_type").GetString());
         Assert.Equal(1, timeline.GetProperty("events")[0].GetProperty("sequence").GetInt64());
+        var secondRequestInput = requestInput with { ExternalReference = "CONFIRM-ORDER-2" };
+        var secondRequest = await deliveryRequests.CreateOrReplayAsync(
+            branch.BranchId, secondRequestInput.ExternalReference, "confirm-intake-2", secondRequestInput.ToCanonicalJson());
+        var secondQuoteId = "qte_22222222222222222222222222222222";
+        var secondPromiseId = "prm_22222222222222222222222222222222";
+        await InsertQuoteAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId, secondQuoteId);
+        await InsertPromiseAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId,
+            secondPromiseId, committedAt.AddHours(1), "decision-confirm-2");
+        var secondMissionResponse = await PostAsync(
+            ownerClient,
+            $"/v1/delivery-requests/{secondRequest.DeliveryRequestId}/confirm",
+            "confirm-mission-2",
+            new MissionConfirmationInput(secondQuoteId, 1));
+        Assert.Equal(HttpStatusCode.OK, secondMissionResponse.StatusCode);
+
+        var historyResponse = await ownerClient.GetAsync("/v1/missions?page_size=1");
+        var invalidHistoryPage = await ownerClient.GetAsync("/v1/missions?page_size=101");
         Assert.DoesNotContain("Pickup", timelineJson, StringComparison.Ordinal);
         Assert.DoesNotContain("Dropoff", timelineJson, StringComparison.Ordinal);
         var missionJson = await missionResponse.Content.ReadAsStringAsync();
