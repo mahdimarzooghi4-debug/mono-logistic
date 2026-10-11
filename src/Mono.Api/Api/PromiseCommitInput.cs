@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Mono.Api.Domain;
 
@@ -9,6 +12,60 @@ public sealed record PromiseCommitInput(
     [property: JsonPropertyName("alternative_search")] PromiseAlternativeSearchInput? AlternativeSearch,
     [property: JsonPropertyName("proposal")] PromiseCommitProposalInput? Proposal)
 {
+    public string ComputeRequestHash(string deliveryRequestId, string decisionId)
+    {
+        var canonical = JsonSerializer.Serialize(new
+        {
+            delivery_request_id = deliveryRequestId,
+            decision_id = decisionId,
+            requested_criteria = CanonicalCriteria(RequestedCriteria),
+            requested_delivery_at = RequestedDeliveryAt?.ToUniversalTime().ToString("O"),
+            alternative_search = AlternativeSearch is null ? null : new
+            {
+                search_id = AlternativeSearch.SearchId,
+                searched_at = AlternativeSearch.SearchedAt?.ToUniversalTime().ToString("O"),
+                status = AlternativeSearch.Status,
+                proposed_delivery_at = AlternativeSearch.ProposedDeliveryAt?.ToUniversalTime().ToString("O"),
+                criteria = CanonicalCriteria(AlternativeSearch.Criteria),
+                reason_codes = AlternativeSearch.ReasonCodes?.OrderBy(code => code, StringComparer.Ordinal).ToArray()
+            },
+            proposal = Proposal is null ? null : new
+            {
+                promise_id = Proposal.PromiseId,
+                version = Proposal.Version,
+                evaluated_at = Proposal.EvaluatedAt?.ToUniversalTime().ToString("O"),
+                committed_delivery_at = Proposal.CommittedDeliveryAt?.ToUniversalTime().ToString("O"),
+                outcome = Proposal.Outcome,
+                safety_buffer_ticks = Proposal.SafetyBuffer.Ticks,
+                safety_buffer_policy_version = Proposal.SafetyBufferPolicyVersion,
+                policy_versions = Proposal.PolicyVersions?.OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                    .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal),
+                reason_codes = Proposal.ReasonCodes?.OrderBy(code => code, StringComparer.Ordinal).ToArray()
+            }
+        });
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+    }
+
+    private static object?[]? CanonicalCriteria(IReadOnlyList<PromiseCriterionInput>? criteria) =>
+        criteria?
+            .OrderBy(item => item.Criterion, StringComparer.Ordinal)
+            .ThenBy(item => item.Status, StringComparer.Ordinal)
+            .Select(item => (object?)new
+            {
+                criterion = item.Criterion,
+                status = item.Status,
+                reason_codes = item.ReasonCodes?.OrderBy(code => code, StringComparer.Ordinal).ToArray(),
+                integrity = item.Integrity is null ? null : new
+                {
+                    evidence_id = item.Integrity.EvidenceId,
+                    observed_at = item.Integrity.ObservedAt?.ToUniversalTime().ToString("O"),
+                    payload_sha256 = item.Integrity.PayloadSha256,
+                    source_id = item.Integrity.SourceId,
+                    source_attestation = item.Integrity.SourceAttestation
+                }
+            })
+            .ToArray();
+
     public IReadOnlyList<FeasibilityCriterionResult>? ToRequestedCriteria() =>
         RequestedCriteria?.Select(criteria => criteria.ToDomain()).ToArray();
 
