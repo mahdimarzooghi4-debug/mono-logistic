@@ -70,6 +70,21 @@ public sealed class MissionConfirmationEndpointTests
         otherClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
         readOnlyClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
 
+        var secondRequestInput = requestInput with { ExternalReference = "CONFIRM-ORDER-2" };
+        var secondRequest = await deliveryRequests.CreateOrReplayAsync(
+            branch.BranchId, secondRequestInput.ExternalReference, "confirm-intake-2", secondRequestInput.ToCanonicalJson());
+        var secondQuoteId = "qte_22222222222222222222222222222222";
+        var secondPromiseId = "prm_22222222222222222222222222222222";
+        await InsertQuoteAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId, secondQuoteId);
+        await InsertPromiseAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId,
+            secondPromiseId, committedAt.AddHours(1), "decision-confirm-2");
+        var secondMissionResponse = await PostAsync(
+            ownerClient,
+            $"/v1/delivery-requests/{secondRequest.DeliveryRequestId}/confirm",
+            "confirm-mission-2",
+            new MissionConfirmationInput(secondQuoteId, 1));
+        Assert.Equal(HttpStatusCode.OK, secondMissionResponse.StatusCode);
+
         var path = $"/v1/delivery-requests/{created.DeliveryRequestId}/confirm";
         var body = new MissionConfirmationInput(quoteId, 1);
         var first = await PostAsync(ownerClient, path, "confirm-mission-1", body);
