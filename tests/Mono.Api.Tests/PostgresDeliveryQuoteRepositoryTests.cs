@@ -52,12 +52,25 @@ public sealed class PostgresDeliveryQuoteRepositoryTests(ITestOutputHelper outpu
             customer.CustomerId, request.DeliveryRequestId, 3, 2_500m));
         var nextVersion = await repository.PersistAsync(Quote(
             customer.CustomerId, request.DeliveryRequestId, 2, 2_500m));
+        var concurrentA = Quote(customer.CustomerId, request.DeliveryRequestId, 3, 3_500m) with
+        {
+            QuoteId = "quote_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        };
+        var concurrentB = Quote(customer.CustomerId, request.DeliveryRequestId, 3, 4_500m) with
+        {
+            QuoteId = "quote_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        };
+        var concurrentResults = await Task.WhenAll(
+            repository.PersistAsync(concurrentA),
+            repository.PersistAsync(concurrentB));
 
         Assert.Equal(DeliveryQuoteWriteOutcome.Persisted, persisted.Outcome);
         Assert.Equal(DeliveryQuoteWriteOutcome.Replayed, replayed.Outcome);
         Assert.Equal(DeliveryQuoteWriteOutcome.Conflict, alteredReplay.Outcome);
         Assert.Equal(DeliveryQuoteWriteOutcome.Conflict, skippedVersion.Outcome);
         Assert.Equal(DeliveryQuoteWriteOutcome.Persisted, nextVersion.Outcome);
+        Assert.Single(concurrentResults.Where(result => result.Outcome == DeliveryQuoteWriteOutcome.Persisted));
+        Assert.Single(concurrentResults.Where(result => result.Outcome == DeliveryQuoteWriteOutcome.Conflict));
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var count = new NpgsqlCommand("""
@@ -69,8 +82,8 @@ public sealed class PostgresDeliveryQuoteRepositoryTests(ITestOutputHelper outpu
         count.Parameters.AddWithValue("request_id", request.DeliveryRequestId);
         await using var reader = await count.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
-        Assert.Equal(2L, reader.GetInt64(0));
-        Assert.Equal(2, reader.GetInt32(1));
+        Assert.Equal(3L, reader.GetInt64(0));
+        Assert.Equal(3, reader.GetInt32(1));
 
         var otherTenantId = Customer.Create("Other Quote Tenant", "ACTIVE").CustomerId;
         var otherTenant = new PostgresDeliveryQuoteRepository(
