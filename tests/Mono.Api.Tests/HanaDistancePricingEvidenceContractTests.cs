@@ -43,15 +43,15 @@ public sealed class HanaDistancePricingEvidenceContractTests
     }
 
     [Theory]
-    [InlineData(-1)]
-    [InlineData(5_001)]
-    public void Distance_outside_approved_tariff_range_is_rejected(decimal distanceMeters)
+    [InlineData(-1.0)]
+    [InlineData(5_001.0)]
+    public void Distance_outside_approved_tariff_range_is_rejected(double distanceMeters)
     {
         Assert.Throws<ArgumentException>(() =>
             HanaDistancePricingEvidenceContract.Attach(
                 "route-distance-1",
                 DateTimeOffset.UnixEpoch.AddHours(1),
-                distanceMeters,
+                (decimal)distanceMeters,
                 "maps-source",
                 "attestation-1"));
     }
