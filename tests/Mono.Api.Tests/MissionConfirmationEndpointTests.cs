@@ -168,8 +168,14 @@ public sealed class MissionConfirmationEndpointTests
         await using var countCommand = new NpgsqlCommand("""
             SELECT
               (SELECT count(*) FROM missions WHERE customer_id = @customer_id AND delivery_request_id = @request_id),
-              (SELECT count(*) FROM mission_confirmation_idempotency WHERE customer_id = @customer_id),
-              (SELECT count(*) FROM outbox_events WHERE customer_id = @customer_id AND event_type = 'mission.created');
+              (SELECT count(*) FROM mission_confirmation_idempotency
+               WHERE customer_id = @customer_id AND delivery_request_id = @request_id),
+              (SELECT count(*) FROM outbox_events
+               WHERE customer_id = @customer_id AND aggregate_type = 'mission'
+                 AND aggregate_id = (
+                   SELECT mission_id FROM missions
+                   WHERE customer_id = @customer_id AND delivery_request_id = @request_id)
+                 AND event_type = 'mission.created');
             """, connection);
         countCommand.Parameters.AddWithValue("customer_id", customer.CustomerId);
         countCommand.Parameters.AddWithValue("request_id", created.DeliveryRequestId);
