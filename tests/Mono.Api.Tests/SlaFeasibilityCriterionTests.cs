@@ -141,7 +141,7 @@ public sealed class SlaFeasibilityCriterionTests
             with { EvaluationId = " " };
         var invalidEvaluatedAt = Evidence(DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch)
             with { EvaluatedAt = default };
-        var invalidEstimate = Evidence(default, DateTimeOffset.UnixEpoch);
+        var invalidEstimate = Evidence(DateTimeOffset.MinValue, DateTimeOffset.UnixEpoch);
         var invalidReason = Evidence(null, null) with
         {
             Completeness = SlaEvidenceCompleteness.Incomplete,
