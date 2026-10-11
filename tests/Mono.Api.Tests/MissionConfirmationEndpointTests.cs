@@ -289,7 +289,7 @@ public sealed class MissionConfirmationEndpointTests
         version.Parameters.AddWithValue("customer_id", customerId);
         version.Parameters.AddWithValue("request_id", requestId);
         version.Parameters.AddWithValue("hash", new string('b', 64));
-        version.Parameters.AddWithValue("event_id", "evt_0123456789abcdef0123456789abcdef");
+        version.Parameters.AddWithValue("event_id", $"evt_{Guid.NewGuid():N}");
         version.Parameters.AddWithValue("created_at", committedAt);
         version.Parameters.AddWithValue("decision_id", decisionId);
         await version.ExecuteNonQueryAsync();
