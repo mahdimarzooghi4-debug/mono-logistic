@@ -258,6 +258,7 @@ Evaluate:
 - Sprint 057 adds a validated Promise commit proposal contract with delivery time, positive version, accepted outcome, explicit safety-buffer value and policy version, decision reasons, and policy-version evidence. It is validation-only; persistence, atomic commit, version sequencing, and buffer calculation remain future work.
 - Sprint 058 atomically stores a tenant-scoped Promise version and its `promise.committed` / `promise.revised` outbox event. It enforces version sequence and idempotent replay by decision ID; delivery feasibility and buffer calculation remain upstream responsibilities.
 - Sprint 059 adds an application service that runs the E7.2 evaluator and only persists a matching ACCEPTED or ALTERNATIVE_PROMISE with the exact evaluated delivery time. REJECTED, UNRESOLVED, and mismatched proposals never reach persistence.
+- Sprint 060 adds an authenticated, tenant-scoped read endpoint for the current committed Promise of a delivery request. It returns the current version and committed time, while internal safety-buffer and decision-reason evidence remain private.
 
 ### Acceptance
 - Mono never commits a Mission before proving feasibility.
@@ -460,6 +461,7 @@ Courier Net = 89% of Mission Fare
 - `GET /v1/branches` (`branches.read`)
 - `POST /v1/delivery-requests` (`delivery-requests.write`, request intake only)
 - `GET /v1/delivery-requests/{id}` (`delivery-requests.read`, customer-scoped request summary)
+- `GET /v1/delivery-requests/{id}/promise` (`delivery-requests.read`, customer-scoped current committed Promise)
 - `GET /v1/delivery-requests` (`delivery-requests.read`, paginated history)
 - confirm
 - Mission status
