@@ -547,6 +547,7 @@ Dashboard must use the same application/core rules as API customers.
 
 ### MVP
 - Sprint 079 adds an MFA-gated, read-only Mono operations Mission search, summary, and timeline across customer tenants, with keyset pagination and allowlisted event fields.
+- Sprint 080 extends operations search with case-insensitive prefix lookup by Mission ID, Delivery Request ID, or external reference, inclusive creation-time filters, and cursor/filter consistency.
 - Mission search
 - Mission timeline
 - Route inspection
