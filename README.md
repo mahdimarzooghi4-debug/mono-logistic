@@ -73,6 +73,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Feasibility Evidence Source Verification v1](docs/49-feasibility-evidence-source-verification-v1.md)
 - [Hana Distance Pricing v1](docs/50-hana-distance-pricing-v1.md)
 - [Versioned Quote Contract v1](docs/51-versioned-quote-contract-v1.md)
+- [Quote Persistence v1](docs/52-quote-persistence-v1.md)
 - [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 - [Hana Urban Delivery Configuration](docs/customers/hana/urban-delivery-configuration.md)
 - [Unified B2B Policy & Capability Model](docs/06-b2b-policy-capability-model.md)
