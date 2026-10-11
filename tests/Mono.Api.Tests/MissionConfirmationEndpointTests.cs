@@ -59,8 +59,8 @@ public sealed class MissionConfirmationEndpointTests
             2, DateTimeOffset.UtcNow.AddMinutes(-1));
         await InsertPromiseAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, promiseId, committedAt);
 
-        await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.write"]);
-        await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.write"]);
+        await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.write", "delivery-requests.read"]);
+        await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.write", "delivery-requests.read"]);
         await using var readOnlyFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.read"]);
         using var ownerClient = ownerFactory.CreateClient();
         using var otherClient = otherFactory.CreateClient();
@@ -78,6 +78,8 @@ public sealed class MissionConfirmationEndpointTests
         var changedReplay = await PostAsync(ownerClient, path, "confirm-mission-1", body with { PromiseVersion = 2 });
         var foreignTenant = await PostAsync(otherClient, path, "foreign-confirm", body);
         var readOnly = await PostAsync(readOnlyClient, path, "read-only-confirm", body);
+        var missionResponse = await ownerClient.GetAsync($"/v1/missions/{missionId}");
+        var foreignMissionResponse = await otherClient.GetAsync($"/v1/missions/{missionId}");
         var invalidPromise = await PostAsync(ownerClient, path, "invalid-promise", body with { PromiseVersion = 3 });
         var invalidQuote = await PostAsync(ownerClient, path, "invalid-quote", body with { QuoteId = "qte_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
         var expiredQuote = await PostAsync(ownerClient, path, "expired-quote", body with { QuoteId = expiredQuoteId });
@@ -96,6 +98,11 @@ public sealed class MissionConfirmationEndpointTests
         using var replayDocument = JsonDocument.Parse(replayJson);
         Assert.Equal(missionId, replayDocument.RootElement.GetProperty("mission_id").GetString());
         Assert.Equal(HttpStatusCode.Conflict, changedReplay.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, missionResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, foreignMissionResponse.StatusCode);
+        var missionJson = await missionResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Pickup", missionJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Dropoff", missionJson, StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.NotFound, foreignTenant.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, readOnly.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, invalidPromise.StatusCode);
