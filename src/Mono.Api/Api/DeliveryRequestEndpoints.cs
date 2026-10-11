@@ -74,8 +74,7 @@ public static class DeliveryRequestEndpoints
 
                 var quote = await quotes.FindLatestByDeliveryRequestAsync(deliveryRequestId, cancellationToken);
                 var promise = await promises.FindByDeliveryRequestAsync(deliveryRequestId, cancellationToken);
-                return Results.Ok(new
-                {
+                return Results.Ok(new DeliveryRequestDetailResponse(
                     result.DeliveryRequestId,
                     result.ExternalReference,
                     result.Status,
@@ -84,8 +83,7 @@ public static class DeliveryRequestEndpoints
                     result.MissionStatus,
                     result.CommittedDeliveryAt,
                     quote,
-                    promise
-                });
+                    promise));
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
