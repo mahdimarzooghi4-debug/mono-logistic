@@ -109,7 +109,11 @@ public sealed class PostgresDeliveryRequestRepositoryTests(ITestOutputHelper out
                      "Mono.Api.Tests.Migrations.002_customer_api_keys.sql",
                      "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql",
                      "Mono.Api.Tests.Migrations.004_delivery_request_list_index.sql",
-            "Mono.Api.Tests.Migrations.005_customer_service_configurations.sql"
+            "Mono.Api.Tests.Migrations.005_customer_service_configurations.sql",
+                     "Mono.Api.Tests.Migrations.018_promise_commit.sql",
+                     "Mono.Api.Tests.Migrations.019_delivery_quote_versions.sql",
+                     "Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql",
+                     "Mono.Api.Tests.Migrations.021_mission_confirmation.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
