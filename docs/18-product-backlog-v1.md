@@ -485,7 +485,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 075 verifies the Promise endpoint's stable failure mapping and rejects callers that have read scope without write scope.
 - Sprint 070 adds `POST /v1/delivery-requests/{id}/quote` (`delivery-requests.write`, tenant-scoped, idempotent first Quote issuance)
 - `GET /v1/delivery-requests` (`delivery-requests.read`, paginated history)
-- confirm
+- Sprint 076 adds authenticated `POST /v1/delivery-requests/{id}/confirm` with idempotent Mission creation and `GET /v1/missions/{id}` for the customer-scoped Mission summary.
 - Mission status
 - cancel
 - tracking
