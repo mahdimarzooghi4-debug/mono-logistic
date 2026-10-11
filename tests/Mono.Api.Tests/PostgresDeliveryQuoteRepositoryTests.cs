@@ -91,10 +91,11 @@ public sealed class PostgresDeliveryQuoteRepositoryTests(ITestOutputHelper outpu
             SELECT count(*), min(sequence), max(sequence),
                    bool_and(event_type = 'quote.issued' AND aggregate_type = 'quote')
             FROM outbox_events
-            WHERE customer_id = @customer_id AND aggregate_id = @quote_id;
+            WHERE customer_id = @customer_id AND aggregate_type = 'quote'
+              AND data->>'delivery_request_id' = @request_id;
             """, connection);
         outboxCount.Parameters.AddWithValue("customer_id", customer.CustomerId);
-        outboxCount.Parameters.AddWithValue("quote_id", "quote_11111111111111111111111111111111");
+        outboxCount.Parameters.AddWithValue("request_id", request.DeliveryRequestId);
         await using (var outboxReader = await outboxCount.ExecuteReaderAsync())
         {
             Assert.True(await outboxReader.ReadAsync());
