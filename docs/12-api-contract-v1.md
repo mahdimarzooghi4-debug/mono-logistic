@@ -232,7 +232,7 @@ Requires `delivery-requests.write` and an `Idempotency-Key`. The body supplies t
 }
 ```
 
-Mono verifies that the authenticated customer's delivery request, Quote, and current Promise version match. A request can produce at most one Mission. The first successful confirmation creates a Mission in `PROMISED` state and writes `mission.created` to the transactional outbox in the same database transaction. Retrying the same key and body returns the original Mission; reusing the key with different content returns `409 IDEMPOTENCY_CONFLICT`. Confirming an already-confirmed request with another key returns `409 MISSION_ALREADY_CONFIRMED`. Missing or foreign customer resources return not found without disclosing tenant data.
+Mono verifies that the authenticated customer's delivery request, unexpired Quote, and current Promise version match. A request can produce at most one Mission. The first successful confirmation creates a Mission in `PROMISED` state and writes `mission.created` to the transactional outbox in the same database transaction. Retrying the same key and body returns the original Mission; reusing the key with different content returns `409 IDEMPOTENCY_CONFLICT`. Confirming an already-confirmed request with another key returns `409 MISSION_ALREADY_CONFIRMED`. An expired Quote returns `422 QUOTE_EXPIRED`. Missing or foreign customer resources return not found without disclosing tenant data.
 
 Response:
 
