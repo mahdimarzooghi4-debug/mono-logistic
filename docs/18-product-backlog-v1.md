@@ -143,6 +143,7 @@ Epic
 - timeline
 - customer-scoped access
 - Sprint 079 adds MFA-gated, read-only operations search, summary, and timeline across customers; customer-facing Mission access remains tenant-scoped.
+- Sprint 081 records append-only staff attribution for operations Mission searches, detail reads, and timeline reads without retaining search terms or event payloads.
 
 ## 6. Epic E4 — Shipment & Capability Model
 

@@ -688,3 +688,6 @@ GET /operations/v1/missions/{mission_id}/timeline
 Mission search uses keyset pagination ordered by `created_at DESC, mission_id DESC`. `page_size` defaults to 50 and must be between 1 and 100. Optional filters include canonical uppercase status, a 2–128 character case-insensitive prefix query over Mission ID, Delivery Request ID, or the stored external reference, and inclusive `created_after` / `created_before` timestamps. A cursor must identify a Mission matching every supplied filter.
 
 Operations Mission summaries contain only Mission ID, customer ID, Delivery Request ID, status, committed delivery time, and creation time. Timeline responses expose the event ID, event type, sequence, and occurrence time; event payloads and personal/contact/location data are not returned. These endpoints are read-only.
+
+
+Operations search, detail, and timeline reads create append-only accountability records containing the authenticated staff actor, action, Mission ID where applicable, result count, and timestamp. Search terms, external references, customer identifiers, and event payloads are not copied into this audit record. If the audit write fails, the read response fails closed.
