@@ -1,4 +1,5 @@
 using Mono.Api.Domain;
+using System.Collections.Immutable;
 using Xunit;
 
 namespace Mono.Api.Tests;
@@ -41,7 +42,7 @@ public sealed class DeliveryQuoteContractTests
     {
         var quote = Quote() with
         {
-            PolicyVersions = new Dictionary<string, string> { ["pricing"] = "different-policy" }
+            PolicyVersions = ImmutableDictionary<string, string>.Empty.Add("pricing", "different-policy")
         };
 
         Assert.Throws<ArgumentException>(() => DeliveryQuoteContract.Validate(quote));
@@ -61,7 +62,7 @@ public sealed class DeliveryQuoteContractTests
     [Fact]
     public void Requires_unique_audit_evidence_identifiers()
     {
-        var quote = Quote() with { AuditEvidenceIds = ["evidence-1", "evidence-1"] };
+        var quote = Quote() with { AuditEvidenceIds = ImmutableArray.Create("evidence-1", "evidence-1") };
 
         Assert.Throws<ArgumentException>(() => DeliveryQuoteContract.Validate(quote));
     }
@@ -94,7 +95,7 @@ public sealed class DeliveryQuoteContractTests
             issuedAt,
             issuedAt.AddMinutes(15),
             fare,
-            new Dictionary<string, string> { ["pricing"] = HanaDistancePricingV1.PolicyVersion },
-            ["feasibility-1"]);
+            ImmutableDictionary<string, string>.Empty.Add("pricing", HanaDistancePricingV1.PolicyVersion),
+            ImmutableArray.Create("feasibility-1"));
     }
 }
