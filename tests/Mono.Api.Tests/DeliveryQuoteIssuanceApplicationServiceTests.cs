@@ -73,6 +73,32 @@ public sealed class DeliveryQuoteIssuanceApplicationServiceTests
         Assert.Null(store.Quote);
     }
 
+    [Fact]
+    public async Task Existing_idempotent_quote_replays_before_expiry_check_and_source_verification()
+    {
+        var original = new DeliveryQuoteWriteResult(
+            DeliveryQuoteWriteOutcome.Replayed,
+            "quote_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            1);
+        var store = new RecordingQuoteStore { ExistingIdempotentResult = original };
+        var verifier = new FixedDistanceVerifier(new HanaDistanceEvidenceVerification(
+            HanaDistanceEvidenceVerificationStatus.VerifierNotConfigured,
+            "DISTANCE_SOURCE_VERIFIER_NOT_CONFIGURED"));
+        var service = CreateService(store, verifier);
+
+        var result = await service.IssueInitialIdempotentlyAsync(
+            RequestId,
+            Now,
+            Evidence(),
+            "quote-issue-key",
+            new string('a', 64));
+
+        Assert.Equal(DeliveryQuoteIssuanceStatus.Replayed, result.Status);
+        Assert.Equal(original, result.Persistence);
+        Assert.Equal(0, verifier.CallCount);
+        Assert.Null(store.Quote);
+    }
+
     private static DeliveryQuoteIssuanceApplicationService CreateService(
         RecordingQuoteStore store,
         IHanaDistanceEvidenceSourceVerifier verifier) =>
@@ -108,6 +134,14 @@ public sealed class DeliveryQuoteIssuanceApplicationServiceTests
     private sealed class RecordingQuoteStore : IDeliveryQuoteStore
     {
         public DeliveryQuote? Quote { get; private set; }
+        public DeliveryQuoteWriteResult? ExistingIdempotentResult { get; init; }
+
+        public Task<DeliveryQuoteWriteResult?> FindIdempotentInitialAsync(
+            string deliveryRequestId,
+            string idempotencyKey,
+            string requestHash,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(ExistingIdempotentResult);
 
         public Task<DeliveryQuoteWriteResult> PersistAsync(
             DeliveryQuote quote,
