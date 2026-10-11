@@ -39,13 +39,29 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public async Task<PromiseCommitWriteResult> CommitAsync(
+    public Task<PromiseCommitWriteResult> CommitAsync(
         PromiseCommitProposal proposal,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        CommitCoreAsync(proposal, null, cancellationToken);
+
+    public Task<PromiseCommitWriteResult> CommitIdempotentlyAsync(
+        PromiseCommitProposal proposal,
+        string requestHash,
+        CancellationToken cancellationToken = default) =>
+        CommitCoreAsync(proposal, requestHash, cancellationToken);
+
+    private async Task<PromiseCommitWriteResult> CommitCoreAsync(
+        PromiseCommitProposal proposal,
+        string? requestHash,
+        CancellationToken cancellationToken)
     {
         PromiseCommitProposalValidator.Validate(proposal);
+        if (requestHash is not null && !IsValidRequestHash(requestHash))
+            throw new ArgumentException("A lowercase SHA-256 request hash is required.", nameof(requestHash));
+
         var customerId = _customerContext.CustomerId;
         var canonicalProposal = CanonicalProposal(proposal);
+        var storedProposal = CanonicalProposal(proposal, requestHash);
         var proposalHash = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(canonicalProposal))).ToLowerInvariant();
         var policyVersionsJson = JsonSerializer.Serialize(
@@ -103,7 +119,8 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
         }
 
         const string replaySql = """
-            SELECT promise_id, version, proposal_hash, event_id
+            SELECT promise_id, version, proposal_hash, event_id,
+                   proposal->>'delivery_request_id', proposal->>'request_hash'
             FROM promise_versions
             WHERE customer_id = @customer_id AND decision_id = @decision_id;
             """;
@@ -118,9 +135,13 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
                 var existingVersion = reader.GetInt32(1);
                 var existingHash = reader.GetString(2);
                 var existingEventId = reader.GetString(3);
+                var existingRequestId = reader.GetString(4);
+                var existingRequestHash = reader.IsDBNull(5) ? null : reader.GetString(5);
                 await reader.DisposeAsync();
                 await transaction.CommitAsync(cancellationToken);
-                var result = string.Equals(existingHash, proposalHash, StringComparison.Ordinal)
+                var result = string.Equals(existingHash, proposalHash, StringComparison.Ordinal) &&
+                             string.Equals(existingRequestId, proposal.DeliveryRequestId, StringComparison.Ordinal) &&
+                             string.Equals(existingRequestHash, requestHash, StringComparison.Ordinal)
                     ? PromiseCommitWriteOutcome.Replayed
                     : PromiseCommitWriteOutcome.Conflict;
                 return new PromiseCommitWriteResult(result, existingPromiseId, existingVersion, existingEventId);
@@ -207,7 +228,7 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             insertVersion.Parameters.AddWithValue("version", NpgsqlDbType.Integer, proposal.Version);
             insertVersion.Parameters.AddWithValue("decision_id", NpgsqlDbType.Text, proposal.DecisionId);
             insertVersion.Parameters.AddWithValue("proposal_hash", NpgsqlDbType.Text, proposalHash);
-            insertVersion.Parameters.AddWithValue("proposal", NpgsqlDbType.Jsonb, canonicalProposal);
+            insertVersion.Parameters.AddWithValue("proposal", NpgsqlDbType.Jsonb, storedProposal);
             insertVersion.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, eventId);
             insertVersion.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, now);
             await insertVersion.ExecuteNonQueryAsync(cancellationToken);
@@ -243,6 +264,46 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             eventId);
     }
 
+
+    public async Task<PromiseCommitWriteResult?> FindIdempotentAsync(
+        string deliveryRequestId,
+        string decisionId,
+        string requestHash,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsValidRequestHash(requestHash))
+            throw new ArgumentException("A lowercase SHA-256 request hash is required.", nameof(requestHash));
+
+        const string sql = """
+            SELECT promise_id, version, event_id,
+                   proposal->>'delivery_request_id', proposal->>'request_hash'
+            FROM promise_versions
+            WHERE customer_id = @customer_id AND decision_id = @decision_id;
+            """;
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, _customerContext.CustomerId);
+        command.Parameters.AddWithValue("decision_id", NpgsqlDbType.Text, decisionId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            return null;
+
+        var promiseId = reader.GetString(0);
+        var version = reader.GetInt32(1);
+        var eventId = reader.GetString(2);
+        var existingRequestId = reader.GetString(3);
+        var existingRequestHash = reader.IsDBNull(4) ? null : reader.GetString(4);
+        var outcome = string.Equals(existingRequestId, deliveryRequestId, StringComparison.Ordinal) &&
+                      string.Equals(existingRequestHash, requestHash, StringComparison.Ordinal)
+            ? PromiseCommitWriteOutcome.Replayed
+            : PromiseCommitWriteOutcome.Conflict;
+        return new PromiseCommitWriteResult(outcome, promiseId, version, eventId);
+    }
+
+    private static bool IsValidRequestHash(string? requestHash) =>
+        requestHash is { Length: 64 } &&
+        requestHash.All(character =>
+            (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f'));
 
     public async Task<PromiseReadResponse?> FindByDeliveryRequestAsync(
         string deliveryRequestId,
@@ -344,7 +405,10 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), "Only committable Promise outcomes are supported.")
     };
 
-    private static string CanonicalProposal(PromiseCommitProposal proposal)
+    private static string CanonicalProposal(PromiseCommitProposal proposal) =>
+        CanonicalProposal(proposal, null);
+
+    private static string CanonicalProposal(PromiseCommitProposal proposal, string? requestHash)
     {
         var payload = new
         {
@@ -359,7 +423,8 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             safety_buffer_policy_version = proposal.SafetyBufferPolicyVersion,
             policy_versions = proposal.PolicyVersions.OrderBy(x => x.Key, StringComparer.Ordinal)
                 .ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal),
-            reason_codes = proposal.ReasonCodes.OrderBy(x => x, StringComparer.Ordinal).ToArray()
+            reason_codes = proposal.ReasonCodes.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+            request_hash = requestHash
         };
         return JsonSerializer.Serialize(payload);
     }
