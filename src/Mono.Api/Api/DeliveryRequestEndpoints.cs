@@ -117,6 +117,50 @@ public static class DeliveryRequestEndpoints
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
+
+        endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}/quote", async (
+                string deliveryRequestId,
+                PostgresDeliveryQuoteRepository quotes,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await quotes.FindLatestByDeliveryRequestAsync(deliveryRequestId, cancellationToken);
+                if (result is null)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("QUOTE_NOT_FOUND", "The quote was not found for this customer.")));
+                }
+
+                return Results.Ok(result);
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
+        endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}/quote/versions", async (
+                string deliveryRequestId,
+                [FromQuery(Name = "page_size")] int? pageSize,
+                [FromQuery(Name = "before_version")] int? beforeVersion,
+                PostgresDeliveryQuoteRepository quotes,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 20;
+                if (size is < 1 or > 100 || beforeVersion is < 1)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST",
+                            "page_size must be between 1 and 100 and before_version must be positive.")));
+                }
+
+                var page = await quotes.ListVersionsByDeliveryRequestAsync(
+                    deliveryRequestId, size, beforeVersion, cancellationToken);
+                if (page is null)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("QUOTE_NOT_FOUND", "The quote was not found for this customer.")));
+                }
+
+                return Results.Ok(page);
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
         endpoints.MapGet("/v1/delivery-requests", async (
                 [FromQuery(Name = "page_size")] int? pageSize,
                 string? cursor,
