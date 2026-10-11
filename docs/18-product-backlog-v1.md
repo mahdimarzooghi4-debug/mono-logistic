@@ -266,6 +266,7 @@ Evaluate:
 - Sprint 073 exposes the Promise commit service through an authenticated, tenant-scoped write endpoint. The server derives the decision ID from `Idempotency-Key`, evaluates E7.2, verifies evidence sources, and persists only a matching resolved proposal; the existing fail-closed verifier remains unchanged. PostgreSQL-backed HTTP coverage checks replay, changed-input conflict, a single persisted version, and the safe response shape.
 - Sprint 074 records the full canonical commit request fingerprint with the Promise version and checks the tenant-scoped decision mapping after evidence-integrity validation but before source verification. Exact retries remain available during verifier outages; changed inputs conflict and invalid/tampered evidence is still rejected.
 - Sprint 075 adds HTTP contract coverage for unresolved, rejected, proposal-mismatch, and unverified-evidence outcomes, plus write-scope enforcement. The endpoint behavior remains delegated to the existing evaluator, verifier, tenant context, and persistence service.
+- Sprint 076 implements explicit, idempotent Delivery Request confirmation: it requires the tenant's Quote and current committed Promise, atomically creates one `PROMISED` Mission plus `mission.created` outbox event, and tests replay, conflicts, tenant isolation, and authorization. Automatic confirmation and later Mission lifecycle transitions remain future work.
 
 ### Acceptance
 - Mono never commits a Mission before proving feasibility.
