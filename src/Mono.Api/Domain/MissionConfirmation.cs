@@ -23,6 +23,7 @@ public enum MissionConfirmationOutcome
     Replayed,
     Conflict,
     QuoteNotFound,
+    QuoteExpired,
     PromiseNotFound,
     DeliveryRequestNotFound,
     AlreadyConfirmed
