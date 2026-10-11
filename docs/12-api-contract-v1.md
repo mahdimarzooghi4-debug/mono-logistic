@@ -198,7 +198,7 @@ Example after Quote, Promise, and Mission confirmation:
 
 ### 7.1 Delivery Request Timeline
 
-`GET /v1/delivery-requests/{delivery_request_id}/timeline` requires `delivery-requests.read` and returns events for the authenticated customer's request in occurrence-time order. It includes only allowlisted, persisted outbox events currently linked to the request: `promise.committed`, `promise.revised`, and `mission.created`. Each item exposes event ID, type, aggregate type, aggregate-local sequence, and occurrence time. Event payloads, internal decision evidence, and personal/location data are omitted. A valid request with no recorded events returns an empty `events` array; unknown or foreign-customer requests return 404. The Quote's current state remains available in Delivery Request detail.
+`GET /v1/delivery-requests/{delivery_request_id}/timeline` requires `delivery-requests.read` and returns events for the authenticated customer's request in occurrence-time order. It includes only allowlisted, persisted outbox events currently linked to the request: `quote.issued`, `promise.committed`, `promise.revised`, and `mission.created`. A Quote version and its `quote.issued` event are committed atomically, and exact idempotent retries do not append another event. Each item exposes event ID, type, aggregate type, aggregate-local sequence, and occurrence time. Event payloads, internal decision evidence, and personal/location data are omitted. A valid request with no recorded events returns an empty `events` array; unknown or foreign-customer requests return 404. The Quote's current state remains available in Delivery Request detail.
 
 ## 8. Confirm / Create Mission
 

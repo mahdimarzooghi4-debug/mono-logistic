@@ -138,6 +138,9 @@ public sealed class PostgresDeliveryQuoteRepository : IDeliveryQuoteStore
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        await AppendQuoteIssuedEventAsync(
+            connection, transaction, customerId, quote.DeliveryRequestId, quote.QuoteId,
+            quote.Version, createdAt, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new DeliveryQuoteWriteResult(DeliveryQuoteWriteOutcome.Persisted, quote.QuoteId, quote.Version);
     }
@@ -323,6 +326,9 @@ public sealed class PostgresDeliveryQuoteRepository : IDeliveryQuoteStore
             await insertIdempotency.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        await AppendQuoteIssuedEventAsync(
+            connection, transaction, customerId, quote.DeliveryRequestId, quote.QuoteId,
+            quote.Version, createdAt, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new DeliveryQuoteWriteResult(DeliveryQuoteWriteOutcome.Persisted, quote.QuoteId, quote.Version);
     }
@@ -413,6 +419,43 @@ public sealed class PostgresDeliveryQuoteRepository : IDeliveryQuoteStore
         if (hasMore)
             items.RemoveAt(items.Count - 1);
         return new DeliveryQuoteVersionPageResponse(items, hasMore ? items[^1].Version : null);
+    }
+
+    private static async Task AppendQuoteIssuedEventAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string customerId,
+        string deliveryRequestId,
+        string quoteId,
+        int version,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            INSERT INTO outbox_events (
+                event_id, event_type, event_version, occurred_at, producer, correlation_id, causation_id,
+                customer_id, aggregate_type, aggregate_id, sequence, data, created_at)
+            VALUES (
+                @event_id, 'quote.issued', 1, @occurred_at, 'mono-api', @correlation_id, NULL,
+                @customer_id, 'quote', @aggregate_id, @sequence, @data, @created_at);
+            """;
+        var eventData = JsonSerializer.Serialize(new
+        {
+            quote_id = quoteId,
+            delivery_request_id = deliveryRequestId,
+            version
+        });
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, $"evt_{Guid.NewGuid():N}");
+        command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, occurredAt);
+        command.Parameters.AddWithValue("correlation_id", NpgsqlDbType.Text, deliveryRequestId);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+        command.Parameters.AddWithValue("aggregate_id", NpgsqlDbType.Text, quoteId);
+        command.Parameters.AddWithValue("sequence", NpgsqlDbType.Bigint, version);
+        command.Parameters.AddWithValue("data", NpgsqlDbType.Jsonb, eventData);
+        command.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, occurredAt);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static DeliveryQuoteReadResponse ReadQuote(NpgsqlDataReader reader) =>

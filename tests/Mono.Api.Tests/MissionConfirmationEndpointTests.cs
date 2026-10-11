@@ -55,9 +55,13 @@ public sealed class MissionConfirmationEndpointTests
         var promiseId = "prm_0123456789abcdef0123456789abcdef";
         var committedAt = DateTimeOffset.UtcNow.AddHours(2);
         await InsertQuoteAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, quoteId);
+        await InsertQuoteOutboxEventAsync(dataSource, customer.CustomerId, created.DeliveryRequestId,
+            quoteId, 1, DateTimeOffset.UtcNow.AddMinutes(-3));
         var expiredQuoteId = "qte_ffffffffffffffffffffffffffffffff";
         await InsertQuoteAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, expiredQuoteId,
             2, DateTimeOffset.UtcNow.AddMinutes(-1));
+        await InsertQuoteOutboxEventAsync(dataSource, customer.CustomerId, created.DeliveryRequestId,
+            expiredQuoteId, 2, DateTimeOffset.UtcNow.AddMinutes(-2));
         await InsertPromiseAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, promiseId, committedAt);
         await InsertPromiseOutboxEventAsync(dataSource, customer.CustomerId,
             created.DeliveryRequestId, promiseId, DateTimeOffset.UtcNow.AddMinutes(-1));
@@ -121,17 +125,28 @@ public sealed class MissionConfirmationEndpointTests
         using var requestTimelineDocument = JsonDocument.Parse(requestTimelineJson);
         var requestTimeline = requestTimelineDocument.RootElement;
         Assert.Equal(created.DeliveryRequestId, requestTimeline.GetProperty("delivery_request_id").GetString());
-        var requestEvents = requestTimeline.GetProperty("events");
-        Assert.Equal(2, requestEvents.GetArrayLength());
-        Assert.Equal("promise.committed", requestEvents[0].GetProperty("event_type").GetString());
-        Assert.Equal("promise", requestEvents[0].GetProperty("aggregate_type").GetString());
+        Assert.Equal(4, requestEvents.GetArrayLength());
+        Assert.Equal("quote.issued", requestEvents[0].GetProperty("event_type").GetString());
+        Assert.Equal("quote", requestEvents[0].GetProperty("aggregate_type").GetString());
         Assert.Equal(1, requestEvents[0].GetProperty("sequence").GetInt64());
-        Assert.Equal("mission.created", requestEvents[1].GetProperty("event_type").GetString());
-        Assert.Equal("mission", requestEvents[1].GetProperty("aggregate_type").GetString());
-        Assert.Equal(1, requestEvents[1].GetProperty("sequence").GetInt64());
+        Assert.Equal("quote.issued", requestEvents[1].GetProperty("event_type").GetString());
+        Assert.Equal("quote", requestEvents[1].GetProperty("aggregate_type").GetString());
+        Assert.Equal(2, requestEvents[1].GetProperty("sequence").GetInt64());
+        Assert.Equal("promise.committed", requestEvents[2].GetProperty("event_type").GetString());
+        Assert.Equal("promise", requestEvents[2].GetProperty("aggregate_type").GetString());
+        Assert.Equal(1, requestEvents[2].GetProperty("sequence").GetInt64());
+        Assert.Equal("mission.created", requestEvents[3].GetProperty("event_type").GetString());
+        Assert.Equal("mission", requestEvents[3].GetProperty("aggregate_type").GetString());
+        Assert.Equal(1, requestEvents[3].GetProperty("sequence").GetInt64());
         Assert.True(
             requestEvents[0].GetProperty("occurred_at").GetDateTimeOffset() <=
             requestEvents[1].GetProperty("occurred_at").GetDateTimeOffset());
+        Assert.True(
+            requestEvents[1].GetProperty("occurred_at").GetDateTimeOffset() <=
+            requestEvents[2].GetProperty("occurred_at").GetDateTimeOffset());
+        Assert.True(
+            requestEvents[2].GetProperty("occurred_at").GetDateTimeOffset() <=
+            requestEvents[3].GetProperty("occurred_at").GetDateTimeOffset());
         Assert.DoesNotContain("data", requestTimelineJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("reason_codes", requestTimelineJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Pickup", requestTimelineJson, StringComparison.Ordinal);
@@ -367,6 +382,38 @@ public sealed class MissionConfirmationEndpointTests
         await version.ExecuteNonQueryAsync();
     }
 
+    private static async Task InsertQuoteOutboxEventAsync(
+        NpgsqlDataSource dataSource,
+        string customerId,
+        string requestId,
+        string quoteId,
+        int version,
+        DateTimeOffset occurredAt)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO outbox_events (
+                event_id, event_type, event_version, occurred_at, producer, correlation_id,
+                causation_id, customer_id, aggregate_type, aggregate_id, sequence, data, created_at)
+            VALUES (
+                @event_id, 'quote.issued', 1, @occurred_at, 'test', @correlation_id,
+                NULL, @customer_id, 'quote', @quote_id, @sequence,
+                jsonb_build_object(
+                    'quote_id', @quote_id,
+                    'delivery_request_id', @request_id,
+                    'version', @sequence),
+                @occurred_at);
+            """, connection);
+        command.Parameters.AddWithValue("event_id", $"evt_{Guid.NewGuid():N}");
+        command.Parameters.AddWithValue("occurred_at", occurredAt);
+        command.Parameters.AddWithValue("correlation_id", requestId);
+        command.Parameters.AddWithValue("customer_id", customerId);
+        command.Parameters.AddWithValue("quote_id", quoteId);
+        command.Parameters.AddWithValue("sequence", version);
+        command.Parameters.AddWithValue("request_id", requestId);
+        await command.ExecuteNonQueryAsync();
+    }
+
     private static async Task InsertPromiseOutboxEventAsync(
         NpgsqlDataSource dataSource,
         string customerId,
@@ -409,6 +456,7 @@ public sealed class MissionConfirmationEndpointTests
                      "Mono.Api.Tests.Migrations.019_delivery_quote_versions.sql",
                      "Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql",
                      "Mono.Api.Tests.Migrations.021_mission_confirmation.sql"
+                     "Mono.Api.Tests.Migrations.028_quote_issued_event.sql",
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)

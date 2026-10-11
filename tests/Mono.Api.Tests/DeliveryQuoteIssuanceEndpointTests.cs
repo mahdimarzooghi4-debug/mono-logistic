@@ -78,9 +78,8 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
         Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
         using var firstDocument = JsonDocument.Parse(firstJson);
         using var retryDocument = JsonDocument.Parse(retryJson);
-        Assert.Equal(
-            firstDocument.RootElement.GetProperty("quote_id").GetString(),
-            retryDocument.RootElement.GetProperty("quote_id").GetString());
+        var quoteId = firstDocument.RootElement.GetProperty("quote_id").GetString();
+        Assert.Equal(quoteId, retryDocument.RootElement.GetProperty("quote_id").GetString());
         Assert.Equal(1, retryDocument.RootElement.GetProperty("version").GetInt32());
         Assert.Equal(35_000, retryDocument.RootElement.GetProperty("fare_toman").GetInt32());
         Assert.DoesNotContain("source_attestation", firstJson, StringComparison.OrdinalIgnoreCase);
@@ -102,6 +101,22 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
         count.Parameters.AddWithValue("customer_id", customer.CustomerId);
         count.Parameters.AddWithValue("request_id", request.DeliveryRequestId);
         Assert.Equal(1L, (long)(await count.ExecuteScalarAsync())!);
+
+        await using var outbox = new NpgsqlCommand("""
+            SELECT count(*), min(event_type), min(aggregate_type), min(sequence),
+                   min(data->>'delivery_request_id')
+            FROM outbox_events
+            WHERE customer_id = @customer_id AND aggregate_id = @quote_id;
+            """, connection);
+        outbox.Parameters.AddWithValue("customer_id", customer.CustomerId);
+        outbox.Parameters.AddWithValue("quote_id", quoteId!);
+        await using var eventReader = await outbox.ExecuteReaderAsync();
+        Assert.True(await eventReader.ReadAsync());
+        Assert.Equal(1L, eventReader.GetInt64(0));
+        Assert.Equal("quote.issued", eventReader.GetString(1));
+        Assert.Equal("quote", eventReader.GetString(2));
+        Assert.Equal(1L, eventReader.GetInt64(3));
+        Assert.Equal(request.DeliveryRequestId, eventReader.GetString(4));
     }
 
     private static async Task<HttpResponseMessage> SendIssueAsync(
@@ -196,6 +211,7 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
                      "Mono.Api.Tests.Migrations.018_promise_commit.sql",
                      "Mono.Api.Tests.Migrations.019_delivery_quote_versions.sql",
                      "Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql"
+                     "Mono.Api.Tests.Migrations.028_quote_issued_event.sql",
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
