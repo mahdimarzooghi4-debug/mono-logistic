@@ -99,6 +99,32 @@ public sealed class DeliveryQuoteIssuanceApplicationServiceTests
         Assert.Null(store.Quote);
     }
 
+    [Fact]
+    public async Task Invalid_evidence_cannot_use_an_existing_idempotency_mapping()
+    {
+        var store = new RecordingQuoteStore
+        {
+            ExistingIdempotentResult = new DeliveryQuoteWriteResult(
+                DeliveryQuoteWriteOutcome.Replayed,
+                "quote_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                1)
+        };
+        var verifier = new FixedDistanceVerifier(new HanaDistanceEvidenceVerification(
+            HanaDistanceEvidenceVerificationStatus.Verified, "VERIFIED"));
+        var service = CreateService(store, verifier);
+
+        var result = await service.IssueInitialIdempotentlyAsync(
+            RequestId,
+            Now.AddMinutes(15),
+            Evidence() with { DistanceMeters = 9_000m },
+            "quote-issue-key",
+            new string('a', 64));
+
+        Assert.Equal(DeliveryQuoteIssuanceStatus.EvidenceIntegrityInvalid, result.Status);
+        Assert.Equal(0, verifier.CallCount);
+        Assert.Null(store.Quote);
+    }
+
     private static DeliveryQuoteIssuanceApplicationService CreateService(
         RecordingQuoteStore store,
         IHanaDistanceEvidenceSourceVerifier verifier) =>
