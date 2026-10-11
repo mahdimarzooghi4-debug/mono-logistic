@@ -16,9 +16,8 @@ public sealed class MissionOperationsReadAuditTests
             return;
 
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
-        await using (var migration = await dataSource.OpenConnectionAsync())
-        await using (var command = new NpgsqlCommand(await ReadMigrationAsync(), migration))
-            await command.ExecuteNonQueryAsync();
+        await ExecuteMigrationAsync(dataSource, "024_mission_operations_read_audit.sql");
+        await ExecuteMigrationAsync(dataSource, "025_mission_operations_read_audit_inspection.sql");
 
         var actorId = "mission-read-audit-test-" + Guid.NewGuid().ToString("N");
         var missionId = "mis_0123456789abcdef0123456789abcdef";
@@ -29,6 +28,24 @@ public sealed class MissionOperationsReadAuditTests
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionSearch, null, 2);
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionDetail, missionId, 1);
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionTimeline, missionId, 0);
+
+        var firstPage = await service.ListAsync(2, null, actorId, null, null, null);
+        Assert.NotNull(firstPage);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.NotNull(firstPage.NextCursor);
+        Assert.All(firstPage.Items, item => Assert.Equal(actorId, item.ActorId));
+        var nextPage = await service.ListAsync(2, null, actorId, null, null, firstPage.NextCursor);
+        Assert.NotNull(nextPage);
+        Assert.Single(nextPage.Items);
+        Assert.Equal(PostgresMissionOperationsReadAuditService.MissionSearch, nextPage.Items[0].Action);
+        Assert.Null(await service.ListAsync(2, null, "other-staff", null, null, firstPage.NextCursor));
+
+        var missionHistory = await service.ListAsync(10, missionId, null, null, null, null);
+        Assert.NotNull(missionHistory);
+        Assert.Equal(2, missionHistory.Items.Count);
+        Assert.All(missionHistory.Items, item => Assert.Equal(missionId, item.MissionId));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.ListAsync(10, null, actorId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(-1), null));
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using (var select = new NpgsqlCommand("""
@@ -44,7 +61,8 @@ public sealed class MissionOperationsReadAuditTests
             while (await reader.ReadAsync())
                 rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetInt32(2)));
 
-            Assert.Equal(3, rows.Count);
+            Assert.Equal(6, rows.Count);
+            Assert.Equal(3, rows.Count(row => row.Action == "MISSION_AUDIT_INSPECTION"));
             Assert.Contains(rows, row => row == ("MISSION_SEARCH", null, 2));
             Assert.Contains(rows, row => row == ("MISSION_DETAIL", missionId, 1));
             Assert.Contains(rows, row => row == ("MISSION_TIMELINE", missionId, 0));
@@ -62,13 +80,17 @@ public sealed class MissionOperationsReadAuditTests
             nonAdmin.RecordAsync(PostgresMissionOperationsReadAuditService.MissionSearch, null, 0));
     }
 
-    private static async Task<string> ReadMigrationAsync()
+    private static async Task ExecuteMigrationAsync(NpgsqlDataSource dataSource, string migrationFile)
     {
+        var resourceName = "Mono.Api.Tests.Migrations." + migrationFile;
         await using var stream = typeof(MissionOperationsReadAuditTests).Assembly
-            .GetManifestResourceStream("Mono.Api.Tests.Migrations.024_mission_operations_read_audit.sql")
-            ?? throw new InvalidOperationException("Missing embedded Mission operations read audit migration.");
+            .GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
         using var reader = new StreamReader(stream);
-        return await reader.ReadToEndAsync();
+        var sql = await reader.ReadToEndAsync();
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync();
     }
 
     private sealed record FixedOperationsContext(string ActorId, IReadOnlyCollection<string> Roles)
