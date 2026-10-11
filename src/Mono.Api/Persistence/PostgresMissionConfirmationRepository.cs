@@ -230,6 +230,24 @@ public sealed class PostgresMissionConfirmationRepository(
                 "PROMISED", committedDeliveryAt, occurredAt));
     }
 
+    public async Task<MissionConfirmationResponse?> FindByIdAsync(
+        string missionId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT mission_id, delivery_request_id, quote_id, quote_version,
+                   promise_id, promise_version, status, committed_delivery_at, created_at
+            FROM missions
+            WHERE customer_id = @customer_id AND mission_id = @mission_id;
+            """;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerContext.CustomerId);
+        command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadMission(reader, 0) : null;
+    }
+
     private static MissionConfirmationResponse ReadMission(NpgsqlDataReader reader, int offset) =>
         new(
             reader.GetString(offset),
