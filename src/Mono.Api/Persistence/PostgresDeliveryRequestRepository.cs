@@ -91,9 +91,13 @@ public sealed class PostgresDeliveryRequestRepository(
         CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT delivery_request_id, external_reference, status, created_at
-            FROM delivery_requests
-            WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id;
+            SELECT d.delivery_request_id, d.external_reference, d.status, d.created_at,
+                   m.mission_id, m.status, m.committed_delivery_at
+            FROM delivery_requests d
+            LEFT JOIN missions m
+              ON m.customer_id = d.customer_id
+             AND m.delivery_request_id = d.delivery_request_id
+            WHERE d.customer_id = @customer_id AND d.delivery_request_id = @delivery_request_id;
             """;
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -104,11 +108,7 @@ public sealed class PostgresDeliveryRequestRepository(
         if (!await reader.ReadAsync(cancellationToken))
             return null;
 
-        return new DeliveryRequestStatusResponse(
-            reader.GetString(0),
-            reader.GetString(1),
-            reader.GetString(2),
-            reader.GetFieldValue<DateTimeOffset>(3));
+        return ReadStatus(reader);
     }
 
     public async Task<DeliveryRequestPageResponse?> ListStatusAsync(
@@ -140,19 +140,27 @@ public sealed class PostgresDeliveryRequestRepository(
         }
 
         const string firstPageSql = """
-            SELECT delivery_request_id, external_reference, status, created_at
-            FROM delivery_requests
-            WHERE customer_id = @customer_id
-            ORDER BY created_at DESC, delivery_request_id DESC
+            SELECT d.delivery_request_id, d.external_reference, d.status, d.created_at,
+                   m.mission_id, m.status, m.committed_delivery_at
+            FROM delivery_requests d
+            LEFT JOIN missions m
+              ON m.customer_id = d.customer_id
+             AND m.delivery_request_id = d.delivery_request_id
+            WHERE d.customer_id = @customer_id
+            ORDER BY d.created_at DESC, d.delivery_request_id DESC
             LIMIT @take;
             """;
         const string nextPageSql = """
-            SELECT delivery_request_id, external_reference, status, created_at
-            FROM delivery_requests
-            WHERE customer_id = @customer_id
-              AND (created_at < @cursor_created_at
-                   OR (created_at = @cursor_created_at AND delivery_request_id < @cursor_id))
-            ORDER BY created_at DESC, delivery_request_id DESC
+            SELECT d.delivery_request_id, d.external_reference, d.status, d.created_at,
+                   m.mission_id, m.status, m.committed_delivery_at
+            FROM delivery_requests d
+            LEFT JOIN missions m
+              ON m.customer_id = d.customer_id
+             AND m.delivery_request_id = d.delivery_request_id
+            WHERE d.customer_id = @customer_id
+              AND (d.created_at < @cursor_created_at
+                   OR (d.created_at = @cursor_created_at AND d.delivery_request_id < @cursor_id))
+            ORDER BY d.created_at DESC, d.delivery_request_id DESC
             LIMIT @take;
             """;
 
@@ -171,11 +179,7 @@ public sealed class PostgresDeliveryRequestRepository(
         {
             while (await reader.ReadAsync(cancellationToken))
             {
-                items.Add(new DeliveryRequestStatusResponse(
-                    reader.GetString(0),
-                    reader.GetString(1),
-                    reader.GetString(2),
-                    reader.GetFieldValue<DateTimeOffset>(3)));
+                items.Add(ReadStatus(reader));
             }
         }
 
@@ -188,6 +192,16 @@ public sealed class PostgresDeliveryRequestRepository(
 
         return new DeliveryRequestPageResponse(items, nextCursor);
     }
+
+    private static DeliveryRequestStatusResponse ReadStatus(NpgsqlDataReader reader) =>
+        new(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetFieldValue<DateTimeOffset>(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6));
 
     private static void AddParameters(
         NpgsqlCommand command,

@@ -492,6 +492,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 070 adds `POST /v1/delivery-requests/{id}/quote` (`delivery-requests.write`, tenant-scoped, idempotent first Quote issuance)
 - `GET /v1/delivery-requests` (`delivery-requests.read`, paginated history)
 - Sprint 076 adds authenticated `POST /v1/delivery-requests/{id}/confirm` with idempotent Mission creation and `GET /v1/missions/{id}` for the customer-scoped Mission summary.
+- Sprint 086 adds tenant-scoped Mission ID, status, and committed delivery time to Delivery Request detail and history responses; unconfirmed requests return null Mission context.
 - Sprint 077 adds `GET /v1/missions/{id}/timeline`, reading only allowlisted tenant-owned Mission event envelopes from the transactional outbox.
 - Sprint 078 adds `GET /v1/missions` with tenant-scoped keyset pagination and safe Mission summaries for customer history.
 - Mission status

@@ -243,7 +243,10 @@ public sealed record DeliveryRequestStatusResponse(
     [property: JsonPropertyName("delivery_request_id")] string DeliveryRequestId,
     [property: JsonPropertyName("external_reference")] string ExternalReference,
     [property: JsonPropertyName("status")] string Status,
-    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);
+    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
+    [property: JsonPropertyName("mission_id")] string? MissionId = null,
+    [property: JsonPropertyName("mission_status")] string? MissionStatus = null,
+    [property: JsonPropertyName("committed_delivery_at")] DateTimeOffset? CommittedDeliveryAt = null);
 
 
 public sealed record DeliveryRequestPageResponse(
