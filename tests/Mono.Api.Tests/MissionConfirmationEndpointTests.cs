@@ -54,6 +54,9 @@ public sealed class MissionConfirmationEndpointTests
         var promiseId = "prm_0123456789abcdef0123456789abcdef";
         var committedAt = DateTimeOffset.UtcNow.AddHours(2);
         await InsertQuoteAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, quoteId);
+        var expiredQuoteId = "qte_ffffffffffffffffffffffffffffffff";
+        await InsertQuoteAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, expiredQuoteId,
+            2, DateTimeOffset.UtcNow.AddMinutes(-1));
         await InsertPromiseAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, promiseId, committedAt);
 
         await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.write"]);
@@ -76,7 +79,8 @@ public sealed class MissionConfirmationEndpointTests
         var foreignTenant = await PostAsync(otherClient, path, "foreign-confirm", body);
         var readOnly = await PostAsync(readOnlyClient, path, "read-only-confirm", body);
         var invalidPromise = await PostAsync(ownerClient, path, "invalid-promise", body with { PromiseVersion = 3 });
-        var invalidQuote = await PostAsync(ownerClient, path, "invalid-quote", body with { QuoteId = "qte_ffffffffffffffffffffffffffffffff" });
+        var invalidQuote = await PostAsync(ownerClient, path, "invalid-quote", body with { QuoteId = "qte_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
+        var expiredQuote = await PostAsync(ownerClient, path, "expired-quote", body with { QuoteId = expiredQuoteId });
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         using var firstDocument = JsonDocument.Parse(firstJson);
@@ -96,6 +100,7 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, readOnly.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, invalidPromise.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, invalidQuote.StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, expiredQuote.StatusCode);
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var countCommand = new NpgsqlCommand("""
@@ -168,21 +173,23 @@ public sealed class MissionConfirmationEndpointTests
     }
 
     private static async Task InsertQuoteAsync(
-        NpgsqlDataSource dataSource, string customerId, string requestId, string quoteId)
+        NpgsqlDataSource dataSource, string customerId, string requestId, string quoteId,
+        int version = 1, DateTimeOffset? expiresAt = null)
     {
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var command = new NpgsqlCommand("""
             INSERT INTO delivery_quote_versions (
                 customer_id, delivery_request_id, quote_id, version, issued_at, expires_at,
                 snapshot_hash, snapshot, created_at)
-            VALUES (@customer_id, @request_id, @quote_id, 1, @issued_at, @expires_at,
+            VALUES (@customer_id, @request_id, @quote_id, @version, @issued_at, @expires_at,
                 @hash, '{}'::jsonb, @issued_at);
             """, connection);
         command.Parameters.AddWithValue("customer_id", customerId);
         command.Parameters.AddWithValue("request_id", requestId);
         command.Parameters.AddWithValue("quote_id", quoteId);
-        command.Parameters.AddWithValue("issued_at", DateTimeOffset.UtcNow.AddMinutes(-1));
-        command.Parameters.AddWithValue("expires_at", DateTimeOffset.UtcNow.AddMinutes(10));
+        command.Parameters.AddWithValue("version", version);
+        command.Parameters.AddWithValue("issued_at", DateTimeOffset.UtcNow.AddMinutes(-2));
+        command.Parameters.AddWithValue("expires_at", expiresAt ?? DateTimeOffset.UtcNow.AddMinutes(10));
         command.Parameters.AddWithValue("hash", new string('a', 64));
         await command.ExecuteNonQueryAsync();
     }
