@@ -1,5 +1,6 @@
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
+using Mono.Api.Security;
 
 namespace Mono.Api.Services;
 
@@ -12,7 +13,8 @@ public enum PromiseCommitApplicationStatus
     Rejected,
     Unresolved,
     ProposalMismatch,
-    EvidenceIntegrityInvalid
+    EvidenceIntegrityInvalid,
+    EvidenceSourceUnverified
 }
 
 public sealed record PromiseCommitApplicationResult(
@@ -31,7 +33,10 @@ public interface IPromiseCommitStore
 /// Connects the E7.2 outcome evaluator to Promise persistence.
 /// Only a resolved ACCEPTED or ALTERNATIVE_PROMISE matching the proposal may be stored.
 /// </summary>
-public sealed class PromiseCommitApplicationService(IPromiseCommitStore store)
+public sealed class PromiseCommitApplicationService(
+    IPromiseCommitStore store,
+    ICustomerContext customerContext,
+    IFeasibilityEvidenceSourceVerifier sourceVerifier)
 {
     public async Task<PromiseCommitApplicationResult> EvaluateAndCommitAsync(
         IReadOnlyCollection<FeasibilityCriterionResult>? requestedCriteria,
@@ -81,6 +86,25 @@ public sealed class PromiseCommitApplicationService(IPromiseCommitStore store)
                 PromiseCommitApplicationStatus.EvidenceIntegrityInvalid,
                 evaluation,
                 null);
+        }
+
+        foreach (var criteria in evidenceSets)
+        {
+            foreach (var criterion in criteria!)
+            {
+                var verification = await sourceVerifier.VerifyAsync(
+                    customerContext.CustomerId,
+                    criterion.Criterion,
+                    criterion.Integrity!,
+                    cancellationToken);
+                if (verification.Status != FeasibilityEvidenceSourceVerificationStatus.Verified)
+                {
+                    return new PromiseCommitApplicationResult(
+                        PromiseCommitApplicationStatus.EvidenceSourceUnverified,
+                        evaluation,
+                        null);
+                }
+            }
         }
 
         PromiseCommitProposalValidator.Validate(proposal);
