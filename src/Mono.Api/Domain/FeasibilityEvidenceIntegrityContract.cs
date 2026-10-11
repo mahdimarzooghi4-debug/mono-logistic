@@ -9,7 +9,9 @@ namespace Mono.Api.Domain;
 public sealed record FeasibilityEvidenceIntegrity(
     string EvidenceId,
     DateTimeOffset ObservedAt,
-    string PayloadSha256);
+    string PayloadSha256,
+    string? SourceId = null,
+    string? SourceAttestation = null);
 
 /// <summary>
 /// Detects changes to a criterion result after its integrity envelope is created.
@@ -27,7 +29,9 @@ public static class FeasibilityEvidenceIntegrityContract
     public static FeasibilityCriterionResult Attach(
         FeasibilityCriterionResult result,
         string evidenceId,
-        DateTimeOffset observedAt)
+        DateTimeOffset observedAt,
+        string? sourceId = null,
+        string? sourceAttestation = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         ValidatePayload(result, nameof(result));
@@ -35,10 +39,11 @@ public static class FeasibilityEvidenceIntegrityContract
             throw new ArgumentException("Evidence ID and observation time are required.");
 
         var normalizedObservedAt = observedAt.ToUniversalTime();
-        var digest = ComputeDigest(result, evidenceId, normalizedObservedAt);
+        var digest = ComputeDigest(result, evidenceId, normalizedObservedAt, sourceId, sourceAttestation);
         return result with
         {
-            Integrity = new FeasibilityEvidenceIntegrity(evidenceId, normalizedObservedAt, digest)
+            Integrity = new FeasibilityEvidenceIntegrity(
+                evidenceId, normalizedObservedAt, digest, sourceId, sourceAttestation)
         };
     }
 
@@ -60,7 +65,12 @@ public static class FeasibilityEvidenceIntegrityContract
         {
             ValidatePayload(result, nameof(result));
             var expected = Convert.FromHexString(
-                ComputeDigest(result, integrity.EvidenceId, integrity.ObservedAt.ToUniversalTime()));
+                ComputeDigest(
+                    result,
+                    integrity.EvidenceId,
+                    integrity.ObservedAt.ToUniversalTime(),
+                    integrity.SourceId,
+                    integrity.SourceAttestation));
             var actual = Convert.FromHexString(suppliedDigest);
             return CryptographicOperations.FixedTimeEquals(expected, actual);
         }
@@ -92,7 +102,9 @@ public static class FeasibilityEvidenceIntegrityContract
     private static string ComputeDigest(
         FeasibilityCriterionResult result,
         string evidenceId,
-        DateTimeOffset observedAt)
+        DateTimeOffset observedAt,
+        string? sourceId,
+        string? sourceAttestation)
     {
         var canonicalPayload = JsonSerializer.Serialize(new
         {
@@ -100,7 +112,9 @@ public static class FeasibilityEvidenceIntegrityContract
             status = result.Status.ToString(),
             reason_codes = result.ReasonCodes.Order(StringComparer.Ordinal).ToArray(),
             evidence_id = evidenceId,
-            observed_at = observedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
+            observed_at = observedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            source_id = sourceId,
+            source_attestation = sourceAttestation
         });
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalPayload)))
             .ToLowerInvariant();
