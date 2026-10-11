@@ -1,6 +1,7 @@
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Services;
+using Mono.Api.Security;
 using Xunit;
 
 namespace Mono.Api.Tests;
@@ -11,7 +12,7 @@ public sealed class PromiseCommitApplicationServiceTests
     public async Task Persists_accepted_outcome_with_exact_requested_time()
     {
         var store = new RecordingStore();
-        var service = new PromiseCommitApplicationService(store);
+        var service = TestService(store);
         var requestedAt = DateTimeOffset.UnixEpoch.AddHours(2);
 
         var result = await service.EvaluateAndCommitAsync(
@@ -29,7 +30,7 @@ public sealed class PromiseCommitApplicationServiceTests
     public async Task Persists_alternative_only_when_it_matches_evaluated_time_and_outcome()
     {
         var store = new RecordingStore();
-        var service = new PromiseCommitApplicationService(store);
+        var service = TestService(store);
         var requestedAt = DateTimeOffset.UnixEpoch.AddHours(2);
         var alternativeAt = requestedAt.AddMinutes(30);
 
@@ -47,7 +48,7 @@ public sealed class PromiseCommitApplicationServiceTests
     public async Task Rejected_and_unresolved_evaluations_never_reach_persistence()
     {
         var store = new RecordingStore();
-        var service = new PromiseCommitApplicationService(store);
+        var service = TestService(store);
         var requestedAt = DateTimeOffset.UnixEpoch.AddHours(2);
 
         var rejected = await service.EvaluateAndCommitAsync(
@@ -74,7 +75,7 @@ public sealed class PromiseCommitApplicationServiceTests
     public async Task Mismatched_outcome_or_delivery_time_never_reaches_persistence()
     {
         var store = new RecordingStore();
-        var service = new PromiseCommitApplicationService(store);
+        var service = TestService(store);
         var requestedAt = DateTimeOffset.UnixEpoch.AddHours(2);
 
         var wrongOutcome = await service.EvaluateAndCommitAsync(
@@ -97,7 +98,7 @@ public sealed class PromiseCommitApplicationServiceTests
     public async Task Missing_criterion_evidence_never_reaches_persistence()
     {
         var store = new RecordingStore();
-        var service = new PromiseCommitApplicationService(store);
+        var service = TestService(store);
         var partial = PassingCriteria().Where(x => x.Criterion != FeasibilityCriterion.Coverage).ToArray();
 
         var result = await service.EvaluateAndCommitAsync(
@@ -116,7 +117,7 @@ public sealed class PromiseCommitApplicationServiceTests
         var requestedAt = DateTimeOffset.UnixEpoch.AddHours(2);
 
         var missingStore = new RecordingStore();
-        var missingService = new PromiseCommitApplicationService(missingStore);
+        var missingService = TestService(missingStore);
         var missingIntegrity = PassingCriteria()
             .Select(result => result with { Integrity = null })
             .ToArray();
@@ -127,7 +128,7 @@ public sealed class PromiseCommitApplicationServiceTests
             Proposal(FeasibilityOutcome.Accepted, requestedAt));
 
         var tamperedStore = new RecordingStore();
-        var tamperedService = new PromiseCommitApplicationService(tamperedStore);
+        var tamperedService = TestService(tamperedStore);
         var tampered = PassingCriteria()
             .Select((result, index) => index == 0
                 ? result with { ReasonCodes = ["TAMPERED_REASON"] }
@@ -145,6 +146,54 @@ public sealed class PromiseCommitApplicationServiceTests
         Assert.Empty(tamperedStore.Proposals);
     }
 
+    [Fact]
+    public async Task Unconfigured_source_verifier_blocks_persistence()
+    {
+        var store = new RecordingStore();
+        var service = new PromiseCommitApplicationService(
+            store,
+            new TestCustomerContext(),
+            new UnconfiguredFeasibilityEvidenceSourceVerifier());
+        var requestedAt = DateTimeOffset.UnixEpoch.AddHours(2);
+
+        var result = await service.EvaluateAndCommitAsync(
+            PassingCriteria(),
+            requestedAt,
+            null,
+            Proposal(FeasibilityOutcome.Accepted, requestedAt));
+
+        Assert.Equal(PromiseCommitApplicationStatus.EvidenceSourceUnverified, result.Status);
+        Assert.Empty(store.Proposals);
+    }
+
+    [Fact]
+    public async Task Unknown_source_is_rejected_before_persistence()
+    {
+        var store = new RecordingStore();
+        var service = TestService(store);
+        var requestedAt = DateTimeOffset.UnixEpoch.AddHours(2);
+        var untrusted = FeasibilityEvidenceGate.Required
+            .Select(criterion => FeasibilityEvidenceIntegrityContract.Attach(
+                new FeasibilityCriterionResult(criterion, FeasibilityCriterionStatus.Pass, []),
+                $"test-{criterion}",
+                DateTimeOffset.UnixEpoch.AddHours(1),
+                "unregistered-source",
+                "opaque-attestation"))
+            .ToArray();
+
+        var result = await service.EvaluateAndCommitAsync(
+            untrusted,
+            requestedAt,
+            null,
+            Proposal(FeasibilityOutcome.Accepted, requestedAt));
+
+        Assert.Equal(PromiseCommitApplicationStatus.EvidenceSourceUnverified, result.Status);
+        Assert.Empty(store.Proposals);
+    }
+
+    private static PromiseCommitApplicationService TestService(RecordingStore store) =>
+        new(store, new TestCustomerContext(), new TestSourceVerifier());
+
     private static IReadOnlyCollection<FeasibilityCriterionResult> PassingCriteria() =>
         FeasibilityEvidenceGate.Required
             .Select(criterion => FeasibilityEvidenceIntegrityContract.Attach(
@@ -153,7 +202,9 @@ public sealed class PromiseCommitApplicationServiceTests
                     FeasibilityCriterionStatus.Pass,
                     []),
                 $"test-{criterion}",
-                DateTimeOffset.UnixEpoch.AddHours(1)))
+                DateTimeOffset.UnixEpoch.AddHours(1),
+                "test-source",
+                "test-attestation"))
             .ToArray();
 
     private static IReadOnlyCollection<FeasibilityCriterionResult> FailingCriteria() =>
@@ -168,7 +219,9 @@ public sealed class PromiseCommitApplicationServiceTests
                         ? ["SLA_DEADLINE_MISSED"]
                         : []),
                 $"test-{criterion}",
-                DateTimeOffset.UnixEpoch.AddHours(1)))
+                DateTimeOffset.UnixEpoch.AddHours(1),
+                "test-source",
+                "test-attestation"))
             .ToArray();
 
     private static AlternativePromiseSearchEvidence Search(
@@ -191,6 +244,30 @@ public sealed class PromiseCommitApplicationServiceTests
             "buffer-v1",
             new Dictionary<string, string> { ["promise"] = "v1" },
             ["PROMISE_FEASIBLE"]);
+
+    private sealed class TestCustomerContext : ICustomerContext
+    {
+        public string CustomerId => "cus_11111111111111111111111111111111";
+    }
+
+    private sealed class TestSourceVerifier : IFeasibilityEvidenceSourceVerifier
+    {
+        public Task<FeasibilityEvidenceSourceVerification> VerifyAsync(
+            string customerId,
+            FeasibilityCriterion criterion,
+            FeasibilityEvidenceIntegrity integrity,
+            CancellationToken cancellationToken = default)
+        {
+            var verified = customerId == "cus_11111111111111111111111111111111" &&
+                integrity.SourceId == "test-source" &&
+                integrity.SourceAttestation == "test-attestation";
+            return Task.FromResult(new FeasibilityEvidenceSourceVerification(
+                verified
+                    ? FeasibilityEvidenceSourceVerificationStatus.Verified
+                    : FeasibilityEvidenceSourceVerificationStatus.Unverified,
+                verified ? "TEST_SOURCE_VERIFIED" : "SOURCE_ATTESTATION_INVALID"));
+        }
+    }
 
     private sealed class RecordingStore : IPromiseCommitStore
     {
