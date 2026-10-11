@@ -40,7 +40,7 @@ public static class MissionConfirmationEndpoints
                     idempotencyValues[0]!,
                     cancellationToken);
 
-                return result.Outcome switch
+                IResult response = result.Outcome switch
                 {
                     MissionConfirmationOutcome.Created or MissionConfirmationOutcome.Replayed =>
                         Results.Ok(result.Mission),
@@ -60,12 +60,16 @@ public static class MissionConfirmationEndpoints
                         Results.NotFound(new ApiErrorResponse(
                             new ApiError("QUOTE_NOT_FOUND",
                                 "The requested Quote version was not found for this delivery request."))),
+                    MissionConfirmationOutcome.QuoteExpired =>
+                        Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("QUOTE_EXPIRED", "The selected Quote has expired."))),
                     MissionConfirmationOutcome.PromiseNotFound =>
                         Results.NotFound(new ApiErrorResponse(
                             new ApiError("PROMISE_NOT_FOUND",
                                 "The requested current Promise version was not found for this delivery request."))),
                     _ => throw new ArgumentOutOfRangeException(nameof(result.Outcome))
                 };
+                return response;
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsWrite);
 
