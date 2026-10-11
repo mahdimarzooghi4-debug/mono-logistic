@@ -231,6 +231,49 @@ public sealed class PostgresMissionConfirmationRepository(
                 "PROMISED", committedDeliveryAt, occurredAt));
     }
 
+    public async Task<MissionTimelineResponse?> FindTimelineAsync(
+        string missionId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT m.mission_id, e.event_id, e.event_type, e.sequence, e.occurred_at
+            FROM missions m
+            LEFT JOIN outbox_events e
+              ON e.customer_id = m.customer_id
+             AND e.aggregate_type = 'MISSION'
+             AND e.aggregate_id = m.mission_id
+             AND e.event_type IN (
+                 'mission.created', 'mission.promised', 'mission.searching_courier',
+                 'mission.courier_assigned', 'mission.arrived_pickup', 'mission.handed_to_courier',
+                 'mission.picked_up', 'mission.in_transit', 'mission.arrived_dropoff',
+                 'mission.delivered', 'mission.failed', 'mission.cancelled')
+            WHERE m.customer_id = @customer_id AND m.mission_id = @mission_id
+            ORDER BY e.sequence ASC;
+            """;
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerContext.CustomerId);
+        command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        string? foundMissionId = null;
+        var events = new List<MissionTimelineEvent>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            foundMissionId ??= reader.GetString(0);
+            if (reader.IsDBNull(1))
+                continue;
+            events.Add(new MissionTimelineEvent(
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetInt64(3),
+                reader.GetFieldValue<DateTimeOffset>(4)));
+        }
+
+        return foundMissionId is null ? null : new MissionTimelineResponse(foundMissionId, events);
+    }
+
     public async Task<MissionConfirmationResponse?> FindByIdAsync(
         string missionId,
         CancellationToken cancellationToken = default)
