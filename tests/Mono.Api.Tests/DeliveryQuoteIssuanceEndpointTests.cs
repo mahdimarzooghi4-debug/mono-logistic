@@ -92,7 +92,7 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
         Assert.Equal("IDEMPOTENCY_CONFLICT",
             conflictDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
 
-        Assert.Equal(3, verifier.CallCount);
+        Assert.Equal(1, verifier.CallCount);
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var count = new NpgsqlCommand("""
             SELECT count(*)
@@ -227,7 +227,10 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
         {
             CallCount++;
             return Task.FromResult(new HanaDistanceEvidenceVerification(
-                HanaDistanceEvidenceVerificationStatus.Verified, "TEST_VERIFIED"));
+                CallCount == 1
+                    ? HanaDistanceEvidenceVerificationStatus.Verified
+                    : HanaDistanceEvidenceVerificationStatus.Unverified,
+                CallCount == 1 ? "TEST_VERIFIED" : "SOURCE_UNAVAILABLE"));
         }
     }
 }
