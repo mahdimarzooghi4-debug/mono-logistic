@@ -119,6 +119,27 @@ public sealed class MissionConfirmationEndpointTests
             "confirm-mission-2",
             new MissionConfirmationInput(secondQuoteId, 1));
         Assert.Equal(HttpStatusCode.OK, secondMissionResponse.StatusCode);
+
+        var operations = new PostgresMissionOperationsService(dataSource);
+        var operationsFirstPage = await operations.ListAsync(1, "PROMISED", null);
+        Assert.NotNull(operationsFirstPage);
+        Assert.Single(operationsFirstPage.Items);
+        Assert.NotNull(operationsFirstPage.NextCursor);
+        var operationsSecondPage = await operations.ListAsync(
+            1, "PROMISED", operationsFirstPage.NextCursor);
+        Assert.NotNull(operationsSecondPage);
+        Assert.Single(operationsSecondPage.Items);
+        Assert.NotEqual(operationsFirstPage.Items[0].MissionId, operationsSecondPage.Items[0].MissionId);
+        Assert.Null(await operations.ListAsync(1, "SETTLED", operationsFirstPage.NextCursor));
+
+        var operationsMission = await operations.FindByIdAsync(missionId!);
+        Assert.NotNull(operationsMission);
+        Assert.Equal(customer.CustomerId, operationsMission.CustomerId);
+        var operationsTimeline = await operations.FindTimelineAsync(missionId!);
+        Assert.NotNull(operationsTimeline);
+        Assert.Single(operationsTimeline.Events);
+        Assert.Equal("mission.created", operationsTimeline.Events[0].EventType);
+
         var historyResponse = await ownerClient.GetAsync("/v1/missions?page_size=1");
         var invalidHistoryPage = await ownerClient.GetAsync("/v1/missions?page_size=101");
         Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
