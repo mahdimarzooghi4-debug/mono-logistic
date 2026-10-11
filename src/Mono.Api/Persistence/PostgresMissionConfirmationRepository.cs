@@ -208,7 +208,7 @@ public sealed class PostgresMissionConfirmationRepository(
                 causation_id, customer_id, aggregate_type, aggregate_id, sequence, data, created_at)
             VALUES (
                 @event_id, 'mission.created', 1, @occurred_at, 'mono-api', @correlation_id,
-                @causation_id, @customer_id, 'mission', @aggregate_id, 1, @data, @created_at);
+                @causation_id, @customer_id, 'MISSION', @aggregate_id, 1, @data, @created_at);
             """;
         await using (var outbox = new NpgsqlCommand(outboxSql, connection, transaction))
         {

@@ -92,8 +92,6 @@ public sealed class MissionConfirmationEndpointTests
         var foreignMissionResponse = await otherClient.GetAsync($"/v1/missions/{missionId}");
         var timelineResponse = await ownerClient.GetAsync($"/v1/missions/{missionId}/timeline");
         var foreignTimelineResponse = await otherClient.GetAsync($"/v1/missions/{missionId}/timeline");
-        var historyResponse = await ownerClient.GetAsync("/v1/missions?page_size=1");
-        var invalidHistoryPage = await ownerClient.GetAsync("/v1/missions?page_size=101");
         Assert.Equal(created.DeliveryRequestId, mission.GetProperty("delivery_request_id").GetString());
         Assert.Equal(quoteId, mission.GetProperty("quote_id").GetString());
         Assert.Equal(promiseId, mission.GetProperty("promise_id").GetString());
@@ -107,6 +105,22 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, foreignMissionResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, timelineResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, foreignTimelineResponse.StatusCode);
+        var secondRequestInput = requestInput with { ExternalReference = "CONFIRM-ORDER-2" };
+        var secondRequest = await deliveryRequests.CreateOrReplayAsync(
+            branch.BranchId, secondRequestInput.ExternalReference, "confirm-intake-2", secondRequestInput.ToCanonicalJson());
+        var secondQuoteId = "qte_22222222222222222222222222222222";
+        var secondPromiseId = "prm_22222222222222222222222222222222";
+        await InsertQuoteAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId, secondQuoteId);
+        await InsertPromiseAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId,
+            secondPromiseId, committedAt.AddHours(1), "decision-confirm-2");
+        var secondMissionResponse = await PostAsync(
+            ownerClient,
+            $"/v1/delivery-requests/{secondRequest.DeliveryRequestId}/confirm",
+            "confirm-mission-2",
+            new MissionConfirmationInput(secondQuoteId, 1));
+        Assert.Equal(HttpStatusCode.OK, secondMissionResponse.StatusCode);
+        var historyResponse = await ownerClient.GetAsync("/v1/missions?page_size=1");
+        var invalidHistoryPage = await ownerClient.GetAsync("/v1/missions?page_size=101");
         Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, invalidHistoryPage.StatusCode);
         var historyJson = await historyResponse.Content.ReadAsStringAsync();
