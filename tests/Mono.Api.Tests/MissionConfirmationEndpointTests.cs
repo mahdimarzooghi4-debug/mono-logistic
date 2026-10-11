@@ -124,6 +124,7 @@ public sealed class MissionConfirmationEndpointTests
         var requestTimelineJson = await requestTimelineResponse.Content.ReadAsStringAsync();
         using var requestTimelineDocument = JsonDocument.Parse(requestTimelineJson);
         var requestTimeline = requestTimelineDocument.RootElement;
+        var requestEvents = requestTimeline.GetProperty("events");
         Assert.Equal(created.DeliveryRequestId, requestTimeline.GetProperty("delivery_request_id").GetString());
         Assert.Equal(4, requestEvents.GetArrayLength());
         Assert.Equal("quote.issued", requestEvents[0].GetProperty("event_type").GetString());
