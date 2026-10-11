@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
 namespace Mono.Api.Domain;
@@ -57,7 +58,7 @@ public static class DeliveryQuoteContract
     }
 
     private static void ValidatePolicyVersions(
-        IReadOnlyDictionary<string, string>? policyVersions,
+        ImmutableDictionary<string, string>? policyVersions,
         string pricingPolicyVersion,
         string parameterName)
     {
@@ -73,10 +74,9 @@ public static class DeliveryQuoteContract
         }
     }
 
-    private static void ValidateAuditEvidence(IReadOnlyList<string>? evidenceIds, string parameterName)
+    private static void ValidateAuditEvidence(ImmutableArray<string> evidenceIds, string parameterName)
     {
-        if (evidenceIds is null ||
-            evidenceIds.Count == 0 ||
+        if (evidenceIds.IsDefaultOrEmpty ||
             evidenceIds.Any(id => !HasText(id, 128)) ||
             evidenceIds.Distinct(StringComparer.Ordinal).Count() != evidenceIds.Count)
         {
