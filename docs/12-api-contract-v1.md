@@ -262,6 +262,10 @@ GET /v1/missions/{mission_id}
 
 Requires `delivery-requests.read`. The response includes Mission status, linked Quote and Promise versions, committed delivery time, and creation time. Unknown or foreign-customer Mission IDs return `404 MISSION_NOT_FOUND`. The response does not expose pickup/dropoff contact details or internal evidence. Courier, route, and exception details will be added with their operational capabilities.
 
+### 9.1 Mission Timeline
+
+`GET /v1/missions/{mission_id}/timeline` requires `delivery-requests.read` and returns the customer's Mission lifecycle event envelope in sequence order. The timeline reads only the tenant-owned Mission aggregate and allowlisted public Mission event types. It returns event ID, type, sequence, and occurrence time; internal event payloads and pickup/dropoff details are omitted. A missing or foreign-customer Mission returns `404 MISSION_NOT_FOUND`. The initial implementation exposes `mission.created`; later lifecycle events appear as those operations are implemented.
+
 ## 10. Mission Status Model
 
 External normalized statuses:
