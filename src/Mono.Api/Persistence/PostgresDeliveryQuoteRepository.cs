@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Mono.Api.Domain;
 using Mono.Api.Security;
+using Mono.Api.Services;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -21,7 +22,7 @@ public sealed record DeliveryQuoteWriteResult(
     string QuoteId,
     int Version);
 
-public sealed class PostgresDeliveryQuoteRepository
+public sealed class PostgresDeliveryQuoteRepository : IDeliveryQuoteStore
 {
     private readonly NpgsqlDataSource _dataSource;
     private readonly ICustomerContext _customerContext;
