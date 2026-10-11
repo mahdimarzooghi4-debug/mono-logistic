@@ -235,6 +235,7 @@ Evaluate:
 - active routes
 - route insertion
 - SLA feasibility
+- Sprint 048 adds an isolated route-distance criterion: compare a supplied route distance in metres against a caller-supplied configured maximum. Missing route distance remains unresolved; this criterion does not produce a final feasibility outcome.
 
 ### E7.2 Results
 - ACCEPTED
