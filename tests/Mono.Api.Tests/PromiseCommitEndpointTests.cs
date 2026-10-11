@@ -71,7 +71,8 @@ public sealed class PromiseCommitEndpointTests
         Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
         using var initialDocument = JsonDocument.Parse(initialJson);
         using var replayDocument = JsonDocument.Parse(replayJson);
-        var promiseId = initialDocument.RootElement.GetProperty("promise_id").GetString();
+        var promiseId = initialDocument.RootElement.GetProperty("promise_id").GetString()
+            ?? throw new InvalidOperationException("The Promise response did not contain a promise_id.");
         Assert.Equal(promiseId, replayDocument.RootElement.GetProperty("promise_id").GetString());
         Assert.Equal(1, replayDocument.RootElement.GetProperty("version").GetInt32());
         Assert.Equal("ACCEPTED", replayDocument.RootElement.GetProperty("outcome").GetString());
