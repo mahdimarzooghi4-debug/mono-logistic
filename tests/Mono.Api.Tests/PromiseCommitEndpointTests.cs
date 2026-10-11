@@ -57,13 +57,13 @@ public sealed class PromiseCommitEndpointTests
         client.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
 
         var deliveryAt = DateTimeOffset.UtcNow.AddHours(2);
-        var input = BuildInput(request.DeliveryRequestId, deliveryAt);
+        var input = BuildInput(deliveryAt);
         var path = $"/v1/delivery-requests/{request.DeliveryRequestId}/promise";
         var initial = await SendAsync(client, path, "promise-decision-1", input);
         var initialJson = await initial.Content.ReadAsStringAsync();
         var replay = await SendAsync(client, path, "promise-decision-1", input);
         var replayJson = await replay.Content.ReadAsStringAsync();
-        var changedInput = BuildInput(request.DeliveryRequestId, deliveryAt.AddHours(1));
+        var changedInput = BuildInput(deliveryAt.AddHours(1));
         var conflict = await SendAsync(client, path, "promise-decision-1", changedInput);
         var conflictJson = await conflict.Content.ReadAsStringAsync();
 
@@ -84,7 +84,7 @@ public sealed class PromiseCommitEndpointTests
         using var conflictDocument = JsonDocument.Parse(conflictJson);
         Assert.Equal("PROMISE_CONFLICT",
             conflictDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
-        Assert.Equal(16, verifier.CallCount);
+        Assert.Equal(24, verifier.CallCount);
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var count = new NpgsqlCommand("""
@@ -97,9 +97,7 @@ public sealed class PromiseCommitEndpointTests
         Assert.Equal(1L, (long)(await count.ExecuteScalarAsync())!);
     }
 
-    private static PromiseCommitInput BuildInput(
-        string deliveryRequestId,
-        DateTimeOffset committedDeliveryAt)
+    private static PromiseCommitInput BuildInput(DateTimeOffset committedDeliveryAt)
     {
         var evaluatedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
         var requestedAt = committedDeliveryAt;
