@@ -88,7 +88,13 @@ public sealed class DeliveryQuoteIssuanceApplicationService
             HanaDistancePricingV1.Calculate(evidence!.DistanceMeters),
             ImmutableDictionary<string, string>.Empty.Add(
                 "pricing", HanaDistancePricingV1.PolicyVersion),
-            ImmutableArray.Create(evidence.EvidenceId));
+            ImmutableArray.Create(evidence.EvidenceId),
+            new HanaDistancePricingEvidenceReference(
+                evidence.EvidenceId,
+                evidence.ObservedAt,
+                evidence.DistanceMeters,
+                evidence.SourceId,
+                evidence.PayloadSha256));
 
         var persistence = await _store.PersistAsync(quote, cancellationToken);
         var status = persistence.Outcome switch
