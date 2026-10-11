@@ -76,20 +76,32 @@ public sealed class PostgresMissionConfirmationRepository(
         }
 
         const string quoteSql = """
-            SELECT quote_id
+            SELECT version, expires_at
             FROM delivery_quote_versions
             WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id
-              AND quote_id = @quote_id AND version = 1;
+              AND quote_id = @quote_id;
             """;
+        int quoteVersion;
         await using (var quote = new NpgsqlCommand(quoteSql, connection, transaction))
         {
             quote.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
             quote.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
             quote.Parameters.AddWithValue("quote_id", NpgsqlDbType.Text, quoteId);
-            if (await quote.ExecuteScalarAsync(cancellationToken) is null)
+            await using var reader = await quote.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
             {
+                await reader.DisposeAsync();
                 await transaction.CommitAsync(cancellationToken);
                 return new MissionConfirmationResult(MissionConfirmationOutcome.QuoteNotFound, null);
+            }
+
+            quoteVersion = reader.GetInt32(0);
+            var expiresAt = reader.GetFieldValue<DateTimeOffset>(1);
+            await reader.DisposeAsync();
+            if (expiresAt <= _timeProvider.GetUtcNow())
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return new MissionConfirmationResult(MissionConfirmationOutcome.QuoteExpired, null);
             }
         }
 
@@ -156,7 +168,7 @@ public sealed class PostgresMissionConfirmationRepository(
                 mission_id, customer_id, delivery_request_id, quote_id, quote_version,
                 promise_id, promise_version, status, committed_delivery_at, created_at)
             VALUES (
-                @mission_id, @customer_id, @delivery_request_id, @quote_id, 1,
+                @mission_id, @customer_id, @delivery_request_id, @quote_id, @quote_version,
                 @promise_id, @promise_version, 'PROMISED', @committed_delivery_at, @created_at);
             """;
         await using (var insertMission = new NpgsqlCommand(insertMissionSql, connection, transaction))
@@ -165,6 +177,7 @@ public sealed class PostgresMissionConfirmationRepository(
             insertMission.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
             insertMission.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
             insertMission.Parameters.AddWithValue("quote_id", NpgsqlDbType.Text, quoteId);
+            insertMission.Parameters.AddWithValue("quote_version", NpgsqlDbType.Integer, quoteVersion);
             insertMission.Parameters.AddWithValue("promise_id", NpgsqlDbType.Text, promiseId);
             insertMission.Parameters.AddWithValue("promise_version", NpgsqlDbType.Integer, promiseVersion);
             insertMission.Parameters.AddWithValue("committed_delivery_at", NpgsqlDbType.TimestampTz, committedDeliveryAt);
@@ -213,7 +226,7 @@ public sealed class PostgresMissionConfirmationRepository(
         return new MissionConfirmationResult(
             MissionConfirmationOutcome.Created,
             new MissionConfirmationResponse(
-                missionId, deliveryRequestId, quoteId, 1, promiseId, promiseVersion,
+                missionId, deliveryRequestId, quoteId, quoteVersion, promiseId, promiseVersion,
                 "PROMISED", committedDeliveryAt, occurredAt));
     }
 
