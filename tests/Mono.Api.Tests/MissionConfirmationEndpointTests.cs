@@ -455,7 +455,7 @@ public sealed class MissionConfirmationEndpointTests
                      "Mono.Api.Tests.Migrations.018_promise_commit.sql",
                      "Mono.Api.Tests.Migrations.019_delivery_quote_versions.sql",
                      "Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql",
-                     "Mono.Api.Tests.Migrations.021_mission_confirmation.sql"
+                     "Mono.Api.Tests.Migrations.021_mission_confirmation.sql",
                      "Mono.Api.Tests.Migrations.028_quote_issued_event.sql",
                  })
         {
