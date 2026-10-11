@@ -44,10 +44,14 @@ public static class FeasibilityEvidenceIntegrityContract
 
     public static bool IsValid(FeasibilityCriterionResult? result)
     {
-        if (result is null || result.Integrity is not { } integrity ||
-            !HasText(integrity.EvidenceId, 128) ||
+        if (result is null || result.Integrity is not { } integrity)
+            return false;
+
+        var suppliedDigest = integrity.PayloadSha256;
+        if (!HasText(integrity.EvidenceId, 128) ||
             integrity.ObservedAt == default ||
-            !DigestPattern.IsMatch(integrity.PayloadSha256 ?? string.Empty))
+            suppliedDigest is null ||
+            !DigestPattern.IsMatch(suppliedDigest))
         {
             return false;
         }
@@ -57,7 +61,7 @@ public static class FeasibilityEvidenceIntegrityContract
             ValidatePayload(result, nameof(result));
             var expected = Convert.FromHexString(
                 ComputeDigest(result, integrity.EvidenceId, integrity.ObservedAt.ToUniversalTime()));
-            var actual = Convert.FromHexString(integrity.PayloadSha256);
+            var actual = Convert.FromHexString(suppliedDigest);
             return CryptographicOperations.FixedTimeEquals(expected, actual);
         }
         catch (ArgumentException)
