@@ -71,9 +71,8 @@ public sealed class PromiseCommitEndpointTests
         Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
         using var initialDocument = JsonDocument.Parse(initialJson);
         using var replayDocument = JsonDocument.Parse(replayJson);
-        Assert.Equal(
-            initialDocument.RootElement.GetProperty("promise_id").GetString(),
-            replayDocument.RootElement.GetProperty("promise_id").GetString());
+        var promiseId = initialDocument.RootElement.GetProperty("promise_id").GetString();
+        Assert.Equal(promiseId, replayDocument.RootElement.GetProperty("promise_id").GetString());
         Assert.Equal(1, replayDocument.RootElement.GetProperty("version").GetInt32());
         Assert.Equal("ACCEPTED", replayDocument.RootElement.GetProperty("outcome").GetString());
         Assert.DoesNotContain("safety_buffer", initialJson, StringComparison.OrdinalIgnoreCase);
@@ -90,10 +89,9 @@ public sealed class PromiseCommitEndpointTests
         await using var count = new NpgsqlCommand("""
             SELECT count(*)
             FROM promise_versions
-            WHERE customer_id = @customer_id AND delivery_request_id = @request_id;
+            WHERE promise_id = @promise_id;
             """, connection);
-        count.Parameters.AddWithValue("customer_id", customer.CustomerId);
-        count.Parameters.AddWithValue("request_id", request.DeliveryRequestId);
+        count.Parameters.AddWithValue("promise_id", promiseId);
         Assert.Equal(1L, (long)(await count.ExecuteScalarAsync())!);
     }
 
