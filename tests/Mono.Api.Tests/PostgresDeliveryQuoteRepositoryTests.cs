@@ -72,9 +72,11 @@ public sealed class PostgresDeliveryQuoteRepositoryTests(ITestOutputHelper outpu
         Assert.Equal(2L, reader.GetInt64(0));
         Assert.Equal(2, reader.GetInt32(1));
 
+        var otherTenantId = Customer.Create("Other Quote Tenant", "ACTIVE").CustomerId;
         var otherTenant = new PostgresDeliveryQuoteRepository(
-            dataSource, new FixedCustomerContext(Customer.Create("Other Quote Tenant", "ACTIVE").CustomerId));
-        var hiddenRequest = await otherTenant.PersistAsync(first);
+            dataSource, new FixedCustomerContext(otherTenantId));
+        var hiddenRequest = await otherTenant.PersistAsync(
+            Quote(otherTenantId, request.DeliveryRequestId, 1, 1_500m));
         Assert.Equal(DeliveryQuoteWriteOutcome.DeliveryRequestNotFound, hiddenRequest.Outcome);
     }
 
