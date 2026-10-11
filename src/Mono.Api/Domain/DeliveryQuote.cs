@@ -11,4 +11,12 @@ public sealed record DeliveryQuote(
     DateTimeOffset ExpiresAt,
     HanaDistanceFare Fare,
     ImmutableDictionary<string, string> PolicyVersions,
-    ImmutableArray<string> AuditEvidenceIds);
+    ImmutableArray<string> AuditEvidenceIds,
+    HanaDistancePricingEvidenceReference? PricingEvidence = null);
+
+public sealed record HanaDistancePricingEvidenceReference(
+    string EvidenceId,
+    DateTimeOffset ObservedAt,
+    decimal DistanceMeters,
+    string SourceId,
+    string PayloadSha256);
