@@ -217,17 +217,13 @@ Rejected:
 
 ## 8. Confirm / Create Mission
 
-Future capability; not implemented by the current request intake.
-
-Depending on contract, Mission may be auto-created or require customer confirmation.
-
-Explicit confirmation:
+Explicit customer confirmation is implemented:
 
 ```
 POST /v1/delivery-requests/{delivery_request_id}/confirm
 ```
 
-Request:
+Requires `delivery-requests.write` and an `Idempotency-Key`. The body supplies the Quote ID and current Promise version to confirm:
 
 ```json
 {
@@ -236,15 +232,25 @@ Request:
 }
 ```
 
+Mono verifies that the authenticated customer's delivery request, Quote, and current Promise version match. A request can produce at most one Mission. The first successful confirmation creates a Mission in `PROMISED` state and writes `mission.created` to the transactional outbox in the same database transaction. Retrying the same key and body returns the original Mission; reusing the key with different content returns `409 IDEMPOTENCY_CONFLICT`. Confirming an already-confirmed request with another key returns `409 MISSION_ALREADY_CONFIRMED`. Missing or foreign customer resources return not found without disclosing tenant data.
+
 Response:
 
 ```json
 {
   "mission_id": "mis_...",
+  "delivery_request_id": "drq_...",
+  "quote_id": "qte_...",
+  "quote_version": 1,
+  "promise_id": "prm_...",
+  "promise_version": 1,
   "status": "PROMISED",
-  "committed_delivery_at": "2026-09-27T12:40:00Z"
+  "committed_delivery_at": "2026-09-27T12:40:00Z",
+  "created_at": "2026-09-27T12:00:00Z"
 }
 ```
+
+Automatic Mission creation by customer contract is not implemented.
 
 ## 9. Get Mission
 
