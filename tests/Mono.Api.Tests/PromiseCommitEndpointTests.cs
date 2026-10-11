@@ -64,6 +64,16 @@ public sealed class PromiseCommitEndpointTests
         verifier.IsAvailable = false;
         var replay = await SendAsync(client, path, "promise-decision-1", input);
         var replayJson = await replay.Content.ReadAsStringAsync();
+        var tamperedInput = input with
+        {
+            RequestedCriteria = input.RequestedCriteria!
+                .Select((criterion, index) => index == 0
+                    ? criterion with { ReasonCodes = ["TAMPERED_REASON"] }
+                    : criterion)
+                .ToArray()
+        };
+        var invalidReplay = await SendAsync(client, path, "promise-decision-1", tamperedInput);
+        var invalidReplayJson = await invalidReplay.Content.ReadAsStringAsync();
         var changedInput = BuildInput(deliveryAt.AddHours(1));
         var conflict = await SendAsync(client, path, "promise-decision-1", changedInput);
         var conflictJson = await conflict.Content.ReadAsStringAsync();
@@ -80,6 +90,11 @@ public sealed class PromiseCommitEndpointTests
         Assert.DoesNotContain("safety_buffer", initialJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("reason_codes", initialJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("policy_versions", initialJson, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, invalidReplay.StatusCode);
+        using var invalidReplayDocument = JsonDocument.Parse(invalidReplayJson);
+        Assert.Equal("PROMISE_EVIDENCE_INVALID",
+            invalidReplayDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
 
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
         using var conflictDocument = JsonDocument.Parse(conflictJson);
