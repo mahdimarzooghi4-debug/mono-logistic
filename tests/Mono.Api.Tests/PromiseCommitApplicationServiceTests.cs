@@ -110,24 +110,65 @@ public sealed class PromiseCommitApplicationServiceTests
         Assert.Empty(store.Proposals);
     }
 
+    [Fact]
+    public async Task Missing_or_tampered_integrity_envelopes_never_reach_persistence()
+    {
+        var requestedAt = DateTimeOffset.UnixEpoch.AddHours(2);
+
+        var missingStore = new RecordingStore();
+        var missingService = new PromiseCommitApplicationService(missingStore);
+        var missingIntegrity = PassingCriteria()
+            .Select(result => result with { Integrity = null })
+            .ToArray();
+        var missing = await missingService.EvaluateAndCommitAsync(
+            missingIntegrity,
+            requestedAt,
+            null,
+            Proposal(FeasibilityOutcome.Accepted, requestedAt));
+
+        var tamperedStore = new RecordingStore();
+        var tamperedService = new PromiseCommitApplicationService(tamperedStore);
+        var tampered = PassingCriteria()
+            .Select((result, index) => index == 0
+                ? result with { ReasonCodes = ["TAMPERED_REASON"] }
+                : result)
+            .ToArray();
+        var invalid = await tamperedService.EvaluateAndCommitAsync(
+            tampered,
+            requestedAt,
+            null,
+            Proposal(FeasibilityOutcome.Accepted, requestedAt));
+
+        Assert.Equal(PromiseCommitApplicationStatus.EvidenceIntegrityInvalid, missing.Status);
+        Assert.Equal(PromiseCommitApplicationStatus.EvidenceIntegrityInvalid, invalid.Status);
+        Assert.Empty(missingStore.Proposals);
+        Assert.Empty(tamperedStore.Proposals);
+    }
+
     private static IReadOnlyCollection<FeasibilityCriterionResult> PassingCriteria() =>
         FeasibilityEvidenceGate.Required
-            .Select(criterion => new FeasibilityCriterionResult(
-                criterion,
-                FeasibilityCriterionStatus.Pass,
-                []))
+            .Select(criterion => FeasibilityEvidenceIntegrityContract.Attach(
+                new FeasibilityCriterionResult(
+                    criterion,
+                    FeasibilityCriterionStatus.Pass,
+                    []),
+                $"test-{criterion}",
+                DateTimeOffset.UnixEpoch.AddHours(1)))
             .ToArray();
 
     private static IReadOnlyCollection<FeasibilityCriterionResult> FailingCriteria() =>
         FeasibilityEvidenceGate.Required
-            .Select(criterion => new FeasibilityCriterionResult(
-                criterion,
-                criterion == FeasibilityCriterion.SlaFeasibility
-                    ? FeasibilityCriterionStatus.Fail
-                    : FeasibilityCriterionStatus.Pass,
-                criterion == FeasibilityCriterion.SlaFeasibility
-                    ? ["SLA_DEADLINE_MISSED"]
-                    : []))
+            .Select(criterion => FeasibilityEvidenceIntegrityContract.Attach(
+                new FeasibilityCriterionResult(
+                    criterion,
+                    criterion == FeasibilityCriterion.SlaFeasibility
+                        ? FeasibilityCriterionStatus.Fail
+                        : FeasibilityCriterionStatus.Pass,
+                    criterion == FeasibilityCriterion.SlaFeasibility
+                        ? ["SLA_DEADLINE_MISSED"]
+                        : []),
+                $"test-{criterion}",
+                DateTimeOffset.UnixEpoch.AddHours(1)))
             .ToArray();
 
     private static AlternativePromiseSearchEvidence Search(

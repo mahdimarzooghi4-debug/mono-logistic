@@ -243,6 +243,7 @@ Evaluate:
 - Sprint 053 adds complete per-Zone active-route inventory evidence. Empty complete inventories are valid; missing or unresolved route states remain unresolved.
 - Sprint 054 adds a validated Route Insertion criterion evidence envelope. Only complete, explicit evidence can pass or fail; simulation mechanics and operational outcomes remain future work.
 - Sprint 055 compares a caller-supplied estimated delivery time with an explicit SLA deadline; missing or incomplete evidence remains unresolved and no SLA threshold is invented.
+- Sprint 062 adds a canonical SHA-256 integrity envelope for criterion results and blocks Promise persistence when the required result digests are absent or invalid. This detects post-envelope mutation; it does not authenticate evidence sources or prove their assertions.
 
 ### E7.2 Results
 - ACCEPTED

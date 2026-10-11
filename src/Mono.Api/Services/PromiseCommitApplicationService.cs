@@ -11,7 +11,8 @@ public enum PromiseCommitApplicationStatus
     DeliveryRequestNotFound,
     Rejected,
     Unresolved,
-    ProposalMismatch
+    ProposalMismatch,
+    EvidenceIntegrityInvalid
 }
 
 public sealed record PromiseCommitApplicationResult(
@@ -67,6 +68,17 @@ public sealed class PromiseCommitApplicationService(IPromiseCommitStore store)
         {
             return new PromiseCommitApplicationResult(
                 PromiseCommitApplicationStatus.ProposalMismatch,
+                evaluation,
+                null);
+        }
+
+        var evidenceSets = evaluation.Outcome == FeasibilityOutcome.Accepted
+            ? new[] { requestedCriteria }
+            : new[] { requestedCriteria, alternativeSearch?.Criteria };
+        if (evidenceSets.Any(criteria => !FeasibilityEvidenceIntegrityContract.AreAllValid(criteria)))
+        {
+            return new PromiseCommitApplicationResult(
+                PromiseCommitApplicationStatus.EvidenceIntegrityInvalid,
                 evaluation,
                 null);
         }
