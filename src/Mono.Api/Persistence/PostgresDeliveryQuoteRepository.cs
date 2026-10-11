@@ -140,6 +140,108 @@ public sealed class PostgresDeliveryQuoteRepository
         return new DeliveryQuoteWriteResult(DeliveryQuoteWriteOutcome.Persisted, quote.QuoteId, quote.Version);
     }
 
+
+    public async Task<DeliveryQuoteReadResponse?> FindLatestByDeliveryRequestAsync(
+        string deliveryRequestId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT quote_id, delivery_request_id, version, issued_at, expires_at,
+                   expires_at <= @evaluated_at,
+                   (snapshot->'fare'->>'distance_meters')::numeric,
+                   (snapshot->'fare'->>'fare_toman')::integer,
+                   (snapshot->'fare'->>'buyer_share_toman')::integer,
+                   (snapshot->'fare'->>'seller_share_toman')::integer,
+                   created_at
+            FROM delivery_quote_versions
+            WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id
+            ORDER BY version DESC
+            LIMIT 1;
+            """;
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, _customerContext.CustomerId);
+        command.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
+        command.Parameters.AddWithValue("evaluated_at", NpgsqlDbType.TimestampTz, _timeProvider.GetUtcNow());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadQuote(reader) : null;
+    }
+
+    public async Task<DeliveryQuoteVersionPageResponse?> ListVersionsByDeliveryRequestAsync(
+        string deliveryRequestId,
+        int pageSize,
+        int? beforeVersion = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (pageSize is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(pageSize), "Page size must be between 1 and 100.");
+        if (beforeVersion is < 1)
+            throw new ArgumentOutOfRangeException(nameof(beforeVersion), "Version cursor must be positive.");
+
+        const string existsSql = """
+            SELECT 1
+            FROM delivery_quote_versions
+            WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id
+            LIMIT 1;
+            """;
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using (var exists = new NpgsqlCommand(existsSql, connection))
+        {
+            exists.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, _customerContext.CustomerId);
+            exists.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
+            if (await exists.ExecuteScalarAsync(cancellationToken) is null)
+                return null;
+        }
+
+        const string sql = """
+            SELECT quote_id, delivery_request_id, version, issued_at, expires_at,
+                   expires_at <= @evaluated_at,
+                   (snapshot->'fare'->>'distance_meters')::numeric,
+                   (snapshot->'fare'->>'fare_toman')::integer,
+                   (snapshot->'fare'->>'buyer_share_toman')::integer,
+                   (snapshot->'fare'->>'seller_share_toman')::integer,
+                   created_at
+            FROM delivery_quote_versions
+            WHERE customer_id = @customer_id
+              AND delivery_request_id = @delivery_request_id
+              AND (@before_version IS NULL OR version < @before_version)
+            ORDER BY version DESC
+            LIMIT @take;
+            """;
+        var items = new List<DeliveryQuoteReadResponse>(pageSize + 1);
+        await using (var command = new NpgsqlCommand(sql, connection))
+        {
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, _customerContext.CustomerId);
+            command.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
+            command.Parameters.AddWithValue("before_version", NpgsqlDbType.Integer, (object?)beforeVersion ?? DBNull.Value);
+            command.Parameters.AddWithValue("evaluated_at", NpgsqlDbType.TimestampTz, _timeProvider.GetUtcNow());
+            command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                items.Add(ReadQuote(reader));
+        }
+
+        var hasMore = items.Count > pageSize;
+        if (hasMore)
+            items.RemoveAt(items.Count - 1);
+        return new DeliveryQuoteVersionPageResponse(items, hasMore ? items[^1].Version : null);
+    }
+
+    private static DeliveryQuoteReadResponse ReadQuote(NpgsqlDataReader reader) =>
+        new(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetInt32(2),
+            reader.GetFieldValue<DateTimeOffset>(3),
+            reader.GetFieldValue<DateTimeOffset>(4),
+            reader.GetBoolean(5),
+            reader.GetDecimal(6),
+            reader.GetInt32(7),
+            reader.GetInt32(8),
+            reader.GetInt32(9),
+            reader.GetFieldValue<DateTimeOffset>(10));
+
     private static string CanonicalSnapshot(DeliveryQuote quote)
     {
         var payload = new
