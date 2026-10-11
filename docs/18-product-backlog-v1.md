@@ -237,6 +237,7 @@ Evaluate:
 - SLA feasibility
 - Sprint 048 adds an isolated route-distance criterion: compare a supplied route distance in metres against a caller-supplied configured maximum. Missing route distance remains unresolved; this criterion does not produce a final feasibility outcome.
 - Sprint 049 adds a fail-closed gate requiring explicit results for all eight E7.1 criteria before outcome evaluation. Missing or unresolved evidence blocks readiness; this does not produce an outcome or Promise.
+- Sprint 050 adapts the existing policy-based mode preview into the E7.1 eligible-modes criterion; incomplete evidence remains unresolved and this does not select a mode or create an outcome.
 
 ### E7.2 Results
 - ACCEPTED
