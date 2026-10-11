@@ -65,12 +65,13 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
 
         var path = $"/v1/delivery-requests/{request.DeliveryRequestId}/quote";
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(15);
-        var firstResponse = await SendIssueAsync(client, path, "quote-issue-key", expiresAt, 2_500m);
+        var observedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var firstResponse = await SendIssueAsync(client, path, "quote-issue-key", expiresAt, observedAt, 2_500m);
         var firstJson = await firstResponse.Content.ReadAsStringAsync();
-        var retryResponse = await SendIssueAsync(client, path, "quote-issue-key", expiresAt, 2_500m);
+        var retryResponse = await SendIssueAsync(client, path, "quote-issue-key", expiresAt, observedAt, 2_500m);
         var retryJson = await retryResponse.Content.ReadAsStringAsync();
         var changedInputResponse = await SendIssueAsync(
-            client, path, "quote-issue-key", expiresAt, 3_000m);
+            client, path, "quote-issue-key", expiresAt, observedAt, 3_000m);
         var changedInputJson = await changedInputResponse.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
@@ -108,6 +109,7 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
         string path,
         string idempotencyKey,
         DateTimeOffset expiresAt,
+        DateTimeOffset observedAt,
         decimal distanceMeters)
     {
         var body = new
@@ -116,7 +118,7 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
             distance_evidence = new
             {
                 evidence_id = "quote-api-distance-1",
-                observed_at = DateTimeOffset.UtcNow.AddMinutes(-1).ToString("O"),
+                observed_at = observedAt.ToString("O"),
                 distance_meters = distanceMeters,
                 source_id = "test-maps-source",
                 source_attestation = "test-attestation"
@@ -150,7 +152,7 @@ public sealed class DeliveryQuoteIssuanceEndpointTests
                         true,
                         ["delivery-requests.write", "delivery-requests.read"])));
                 services.RemoveAll<IHanaDistanceEvidenceSourceVerifier>();
-                services.AddSingleton(verifier);
+                services.AddSingleton<IHanaDistanceEvidenceSourceVerifier>(verifier);
             }));
 
     private static async Task InsertCustomerAsync(NpgsqlDataSource dataSource, Customer customer)
