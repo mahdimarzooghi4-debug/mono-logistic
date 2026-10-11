@@ -26,6 +26,9 @@ builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
 builder.Services.AddScoped<PostgresPromiseCommitRepository>();
 builder.Services.AddScoped<PostgresDeliveryQuoteRepository>();
+builder.Services.AddScoped<IDeliveryQuoteStore>(services =>
+    services.GetRequiredService<PostgresDeliveryQuoteRepository>());
+builder.Services.AddScoped<DeliveryQuoteIssuanceApplicationService>();
 builder.Services.AddScoped<IPromiseCommitStore>(services =>
     services.GetRequiredService<PostgresPromiseCommitRepository>());
 builder.Services.AddScoped<IFeasibilityEvidenceSourceVerifier, UnconfiguredFeasibilityEvidenceSourceVerifier>();
