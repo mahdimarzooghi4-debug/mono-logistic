@@ -59,6 +59,8 @@ public sealed class MissionConfirmationEndpointTests
         await InsertQuoteAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, expiredQuoteId,
             2, DateTimeOffset.UtcNow.AddMinutes(-1));
         await InsertPromiseAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, promiseId, committedAt);
+        await InsertPromiseOutboxEventAsync(dataSource, customer.CustomerId,
+            created.DeliveryRequestId, promiseId, DateTimeOffset.UtcNow.AddMinutes(-1));
 
         await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.write", "delivery-requests.read"]);
         await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.write", "delivery-requests.read"]);
@@ -92,6 +94,12 @@ public sealed class MissionConfirmationEndpointTests
         var foreignMissionResponse = await otherClient.GetAsync($"/v1/missions/{missionId}");
         var timelineResponse = await ownerClient.GetAsync($"/v1/missions/{missionId}/timeline");
         var foreignTimelineResponse = await otherClient.GetAsync($"/v1/missions/{missionId}/timeline");
+        var requestTimelinePath = $"/v1/delivery-requests/{created.DeliveryRequestId}/timeline";
+        var requestTimelineResponse = await ownerClient.GetAsync(requestTimelinePath);
+        var foreignRequestTimelineResponse = await otherClient.GetAsync(requestTimelinePath);
+        var readOnlyRequestTimelineResponse = await readOnlyClient.GetAsync(requestTimelinePath);
+        var unknownRequestTimelineResponse = await ownerClient.GetAsync(
+            "/v1/delivery-requests/drq_00000000000000000000000000000000/timeline");
         Assert.Equal(created.DeliveryRequestId, mission.GetProperty("delivery_request_id").GetString());
         Assert.Equal(quoteId, mission.GetProperty("quote_id").GetString());
         Assert.Equal(promiseId, mission.GetProperty("promise_id").GetString());
@@ -105,9 +113,39 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, foreignMissionResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, timelineResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, foreignTimelineResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, requestTimelineResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, foreignRequestTimelineResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, readOnlyRequestTimelineResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownRequestTimelineResponse.StatusCode);
+        var requestTimelineJson = await requestTimelineResponse.Content.ReadAsStringAsync();
+        using var requestTimelineDocument = JsonDocument.Parse(requestTimelineJson);
+        var requestTimeline = requestTimelineDocument.RootElement;
+        Assert.Equal(created.DeliveryRequestId, requestTimeline.GetProperty("delivery_request_id").GetString());
+        var requestEvents = requestTimeline.GetProperty("events");
+        Assert.Equal(2, requestEvents.GetArrayLength());
+        Assert.Equal("promise.committed", requestEvents[0].GetProperty("event_type").GetString());
+        Assert.Equal("promise", requestEvents[0].GetProperty("aggregate_type").GetString());
+        Assert.Equal(1, requestEvents[0].GetProperty("sequence").GetInt64());
+        Assert.Equal("mission.created", requestEvents[1].GetProperty("event_type").GetString());
+        Assert.Equal("mission", requestEvents[1].GetProperty("aggregate_type").GetString());
+        Assert.Equal(1, requestEvents[1].GetProperty("sequence").GetInt64());
+        Assert.True(
+            requestEvents[0].GetProperty("occurred_at").GetDateTimeOffset() <=
+            requestEvents[1].GetProperty("occurred_at").GetDateTimeOffset());
+        Assert.DoesNotContain("data", requestTimelineJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("reason_codes", requestTimelineJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Pickup", requestTimelineJson, StringComparison.Ordinal);
         var secondRequestInput = requestInput with { ExternalReference = "CONFIRM-ORDER-2" };
         var secondRequest = await deliveryRequests.CreateOrReplayAsync(
             branch.BranchId, secondRequestInput.ExternalReference, "confirm-intake-2", secondRequestInput.ToCanonicalJson());
+        var noEventTimelineResponse = await ownerClient.GetAsync(
+            $"/v1/delivery-requests/{secondRequest.DeliveryRequestId}/timeline");
+        Assert.Equal(HttpStatusCode.OK, noEventTimelineResponse.StatusCode);
+        using (var noEventTimeline = JsonDocument.Parse(await noEventTimelineResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Empty(noEventTimeline.RootElement.GetProperty("events").EnumerateArray());
+        }
+
         var secondQuoteId = "qte_22222222222222222222222222222222";
         var secondPromiseId = "prm_22222222222222222222222222222222";
         await InsertQuoteAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId, secondQuoteId);
@@ -327,6 +365,37 @@ public sealed class MissionConfirmationEndpointTests
         version.Parameters.AddWithValue("created_at", committedAt);
         version.Parameters.AddWithValue("decision_id", decisionId);
         await version.ExecuteNonQueryAsync();
+    }
+
+    private static async Task InsertPromiseOutboxEventAsync(
+        NpgsqlDataSource dataSource,
+        string customerId,
+        string requestId,
+        string promiseId,
+        DateTimeOffset occurredAt)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO outbox_events (
+                event_id, event_type, event_version, occurred_at, producer, correlation_id,
+                causation_id, customer_id, aggregate_type, aggregate_id, sequence, data, created_at)
+            VALUES (
+                @event_id, 'promise.committed', 1, @occurred_at, 'test', @correlation_id,
+                NULL, @customer_id, 'promise', @promise_id, 1,
+                jsonb_build_object(
+                    'promise_id', @promise_id,
+                    'delivery_request_id', @request_id,
+                    'version', 1,
+                    'outcome', 'ACCEPTED'),
+                @occurred_at);
+            """, connection);
+        command.Parameters.AddWithValue("event_id", $"evt_{Guid.NewGuid():N}");
+        command.Parameters.AddWithValue("occurred_at", occurredAt);
+        command.Parameters.AddWithValue("correlation_id", $"decision-{Guid.NewGuid():N}");
+        command.Parameters.AddWithValue("customer_id", customerId);
+        command.Parameters.AddWithValue("promise_id", promiseId);
+        command.Parameters.AddWithValue("request_id", requestId);
+        await command.ExecuteNonQueryAsync();
     }
 
     private static async Task ApplyMigrationsAsync(NpgsqlDataSource dataSource)
