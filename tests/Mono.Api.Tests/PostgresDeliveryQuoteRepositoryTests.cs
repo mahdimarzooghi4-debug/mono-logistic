@@ -69,8 +69,8 @@ public sealed class PostgresDeliveryQuoteRepositoryTests(ITestOutputHelper outpu
         Assert.Equal(DeliveryQuoteWriteOutcome.Conflict, alteredReplay.Outcome);
         Assert.Equal(DeliveryQuoteWriteOutcome.Conflict, skippedVersion.Outcome);
         Assert.Equal(DeliveryQuoteWriteOutcome.Persisted, nextVersion.Outcome);
-        Assert.Single(concurrentResults.Where(result => result.Outcome == DeliveryQuoteWriteOutcome.Persisted));
-        Assert.Single(concurrentResults.Where(result => result.Outcome == DeliveryQuoteWriteOutcome.Conflict));
+        Assert.Single(concurrentResults, result => result.Outcome == DeliveryQuoteWriteOutcome.Persisted);
+        Assert.Single(concurrentResults, result => result.Outcome == DeliveryQuoteWriteOutcome.Conflict);
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var count = new NpgsqlCommand("""
