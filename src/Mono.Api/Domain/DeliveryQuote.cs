@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Mono.Api.Domain;
 
 public sealed record DeliveryQuote(
@@ -8,5 +10,5 @@ public sealed record DeliveryQuote(
     DateTimeOffset IssuedAt,
     DateTimeOffset ExpiresAt,
     HanaDistanceFare Fare,
-    IReadOnlyDictionary<string, string> PolicyVersions,
-    IReadOnlyList<string> AuditEvidenceIds);
+    ImmutableDictionary<string, string> PolicyVersions,
+    ImmutableArray<string> AuditEvidenceIds);
