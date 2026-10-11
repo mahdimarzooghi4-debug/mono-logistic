@@ -143,6 +143,47 @@ public sealed class PostgresDeliveryQuoteRepository : IDeliveryQuoteStore
     }
 
 
+    public async Task<DeliveryQuoteWriteResult?> FindIdempotentInitialAsync(
+        string deliveryRequestId,
+        string idempotencyKey,
+        string requestHash,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey) ||
+            idempotencyKey.Length > 200 ||
+            idempotencyKey.Any(char.IsControl) ||
+            requestHash.Length != 64 ||
+            requestHash.Any(character => !((character >= '0' && character <= '9') ||
+                                            (character >= 'a' && character <= 'f'))))
+        {
+            throw new ArgumentException("A valid idempotency key and lowercase SHA-256 request hash are required.");
+        }
+
+        const string sql = """
+            SELECT delivery_request_id, request_hash, quote_id, version
+            FROM delivery_quote_issuance_idempotency
+            WHERE customer_id = @customer_id AND idempotency_key = @idempotency_key;
+            """;
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, _customerContext.CustomerId);
+        command.Parameters.AddWithValue("idempotency_key", NpgsqlDbType.Text, idempotencyKey);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            return null;
+
+        var existingRequestId = reader.GetString(0);
+        var existingRequestHash = reader.GetString(1);
+        var existingQuoteId = reader.GetString(2);
+        var existingVersion = reader.GetInt32(3);
+        var outcome = string.Equals(existingRequestId, deliveryRequestId, StringComparison.Ordinal) &&
+                      string.Equals(existingRequestHash, requestHash, StringComparison.Ordinal)
+            ? DeliveryQuoteWriteOutcome.Replayed
+            : DeliveryQuoteWriteOutcome.IdempotencyConflict;
+        return new DeliveryQuoteWriteResult(outcome, existingQuoteId, existingVersion);
+    }
+
+
     public async Task<DeliveryQuoteWriteResult> IssueInitialIdempotentlyAsync(
         DeliveryQuote quote,
         string idempotencyKey,
