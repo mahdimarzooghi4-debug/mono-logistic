@@ -57,7 +57,7 @@ public sealed class PromiseReadEndpointTests
         var promiseRepository = new PostgresPromiseCommitRepository(
             dataSource, new FixedCustomerContext(customer.CustomerId));
         var proposal = new PromiseCommitProposal(
-            "prm_33333333333333333333333333333333",
+            $"prm_{Guid.NewGuid():N}",
             committedRequest.DeliveryRequestId,
             "promise-read-decision",
             1,
