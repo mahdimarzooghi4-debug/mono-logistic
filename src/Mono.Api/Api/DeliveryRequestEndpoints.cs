@@ -75,6 +75,92 @@ public static class DeliveryRequestEndpoints
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
 
+        endpoints.MapPost("/v1/delivery-requests/{deliveryRequestId}/promise", async (
+                string deliveryRequestId,
+                PromiseCommitInput input,
+                HttpRequest request,
+                PromiseCommitApplicationService promiseCommit,
+                PostgresPromiseCommitRepository promises,
+                CancellationToken cancellationToken) =>
+            {
+                var idempotencyValues = request.Headers["Idempotency-Key"];
+                if (idempotencyValues.Count != 1 ||
+                    !DeliveryRequestInputValidator.IsValidIdempotencyKey(idempotencyValues[0]))
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "A valid Idempotency-Key header is required.")));
+                }
+
+                if (!DeliveryRequestInputValidator.IsValidDeliveryRequestId(deliveryRequestId))
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "The delivery request ID is invalid.")));
+                }
+
+                PromiseCommitApplicationResult result;
+                try
+                {
+                    var criteria = input.ToRequestedCriteria();
+                    var alternativeSearch = input.ToAlternativeSearch();
+                    var proposal = input.ToProposal(deliveryRequestId, idempotencyValues[0]!);
+                    PromiseCommitProposalValidator.Validate(proposal);
+                    result = await promiseCommit.EvaluateAndCommitAsync(
+                        criteria,
+                        input.RequestedDeliveryAt,
+                        alternativeSearch,
+                        proposal,
+                        cancellationToken);
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "The Promise proposal or feasibility evidence is invalid.")));
+                }
+
+                switch (result.Status)
+                {
+                    case PromiseCommitApplicationStatus.Committed:
+                    case PromiseCommitApplicationStatus.Replayed:
+                        var response = await promises.FindByDeliveryRequestAsync(
+                            deliveryRequestId, cancellationToken);
+                        return response is null
+                            ? Results.NotFound(new ApiErrorResponse(
+                                new ApiError("PROMISE_NOT_FOUND", "The Promise was not found for this customer.")))
+                            : Results.Ok(response);
+                    case PromiseCommitApplicationStatus.Conflict:
+                        return Results.Conflict(new ApiErrorResponse(
+                            new ApiError("PROMISE_CONFLICT",
+                                "The Promise version or Idempotency-Key conflicts with an existing commitment.")));
+                    case PromiseCommitApplicationStatus.DeliveryRequestNotFound:
+                        return Results.NotFound(new ApiErrorResponse(
+                            new ApiError("DELIVERY_REQUEST_NOT_FOUND",
+                                "The delivery request was not found for this customer.")));
+                    case PromiseCommitApplicationStatus.Rejected:
+                        return Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("PROMISE_REJECTED",
+                                "The feasibility evaluation rejected the requested and alternative promises.")));
+                    case PromiseCommitApplicationStatus.Unresolved:
+                        return Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("PROMISE_UNRESOLVED",
+                                "Complete feasibility evidence is required before a Promise can be committed.")));
+                    case PromiseCommitApplicationStatus.ProposalMismatch:
+                        return Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("PROMISE_PROPOSAL_MISMATCH",
+                                "The proposal must match the resolved feasibility outcome and delivery time.")));
+                    case PromiseCommitApplicationStatus.EvidenceIntegrityInvalid:
+                        return Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("PROMISE_EVIDENCE_INVALID",
+                                "The feasibility evidence integrity envelope is invalid.")));
+                    case PromiseCommitApplicationStatus.EvidenceSourceUnverified:
+                        return Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("PROMISE_EVIDENCE_UNVERIFIED",
+                                "The feasibility evidence source could not be verified.")));
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(result.Status));
+                }
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsWrite);
+
         endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}/promise", async (
                 string deliveryRequestId,
                 PostgresPromiseCommitRepository promises,
