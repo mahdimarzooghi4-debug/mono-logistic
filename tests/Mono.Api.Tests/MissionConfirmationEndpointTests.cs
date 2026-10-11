@@ -78,8 +78,6 @@ public sealed class MissionConfirmationEndpointTests
         var changedReplay = await PostAsync(ownerClient, path, "confirm-mission-1", body with { PromiseVersion = 2 });
         var foreignTenant = await PostAsync(otherClient, path, "foreign-confirm", body);
         var readOnly = await PostAsync(readOnlyClient, path, "read-only-confirm", body);
-        var missionResponse = await ownerClient.GetAsync($"/v1/missions/{missionId}");
-        var foreignMissionResponse = await otherClient.GetAsync($"/v1/missions/{missionId}");
         var invalidPromise = await PostAsync(ownerClient, path, "invalid-promise", body with { PromiseVersion = 3 });
         var invalidQuote = await PostAsync(ownerClient, path, "invalid-quote", body with { QuoteId = "qte_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" });
         var expiredQuote = await PostAsync(ownerClient, path, "expired-quote", body with { QuoteId = expiredQuoteId });
@@ -89,6 +87,8 @@ public sealed class MissionConfirmationEndpointTests
         var mission = firstDocument.RootElement;
         var missionId = mission.GetProperty("mission_id").GetString();
         Assert.StartsWith("mis_", missionId, StringComparison.Ordinal);
+        var missionResponse = await ownerClient.GetAsync($"/v1/missions/{missionId}");
+        var foreignMissionResponse = await otherClient.GetAsync($"/v1/missions/{missionId}");
         Assert.Equal(created.DeliveryRequestId, mission.GetProperty("delivery_request_id").GetString());
         Assert.Equal(quoteId, mission.GetProperty("quote_id").GetString());
         Assert.Equal(promiseId, mission.GetProperty("promise_id").GetString());
