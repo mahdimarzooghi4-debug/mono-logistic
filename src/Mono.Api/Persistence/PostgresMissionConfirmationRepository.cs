@@ -240,7 +240,7 @@ public sealed class PostgresMissionConfirmationRepository(
             FROM missions m
             LEFT JOIN outbox_events e
               ON e.customer_id = m.customer_id
-             AND e.aggregate_type = 'MISSION'
+             AND e.aggregate_type = 'mission'
              AND e.aggregate_id = m.mission_id
              AND e.event_type IN (
                  'mission.created', 'mission.promised', 'mission.searching_courier',
