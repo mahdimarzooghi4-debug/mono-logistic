@@ -2,6 +2,7 @@ using Mono.Api.Api;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
+using Mono.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,10 @@ builder.Services.AddScoped<CustomerBranchRepository>();
 builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
 builder.Services.AddScoped<PostgresPromiseCommitRepository>();
+builder.Services.AddScoped<IPromiseCommitStore>(services =>
+    services.GetRequiredService<PostgresPromiseCommitRepository>());
+builder.Services.AddScoped<IFeasibilityEvidenceSourceVerifier, UnconfiguredFeasibilityEvidenceSourceVerifier>();
+builder.Services.AddScoped<PromiseCommitApplicationService>();
 
 var app = builder.Build();
 
