@@ -248,6 +248,7 @@ Evaluate:
 - ACCEPTED
 - ALTERNATIVE_PROMISE
 - REJECTED
+- Sprint 056 applies the approved order: accept only when the requested promise passes the complete E7.1 gate; otherwise evaluate an explicit alternative, and reject only after a complete search proves no feasible alternative. Missing or incomplete evidence remains unresolved.
 
 ### E7.3 Promise
 - committed_delivery_at
