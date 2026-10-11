@@ -24,6 +24,7 @@ builder.Services.AddScoped<MonoHardPolicyEvaluationService>();
 builder.Services.AddScoped<CustomerBranchRepository>();
 builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
+builder.Services.AddScoped<PostgresMissionConfirmationRepository>();
 builder.Services.AddScoped<PostgresPromiseCommitRepository>();
 builder.Services.AddScoped<PostgresDeliveryQuoteRepository>();
 builder.Services.AddScoped<IDeliveryQuoteStore>(services =>
