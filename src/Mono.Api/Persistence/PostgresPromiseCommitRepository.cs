@@ -55,7 +55,7 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             proposal.ReasonCodes.OrderBy(x => x, StringComparer.Ordinal).ToArray());
         var now = _timeProvider.GetUtcNow();
         var eventId = $"evt_{Guid.NewGuid():N}";
-        var outcome = proposal.Outcome.ToString().ToUpperInvariant();
+        var outcome = OutcomeName(proposal.Outcome);
         var eventType = proposal.Version == 1 ? "promise.committed" : "promise.revised";
         var eventData = JsonSerializer.Serialize(new
         {
@@ -337,6 +337,13 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             hasMore ? versions[^1].Version : null);
     }
 
+    private static string OutcomeName(FeasibilityOutcome outcome) => outcome switch
+    {
+        FeasibilityOutcome.Accepted => "ACCEPTED",
+        FeasibilityOutcome.AlternativePromise => "ALTERNATIVE_PROMISE",
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome), "Only committable Promise outcomes are supported.")
+    };
+
     private static string CanonicalProposal(PromiseCommitProposal proposal)
     {
         var payload = new
@@ -347,7 +354,7 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             version = proposal.Version,
             evaluated_at = proposal.EvaluatedAt.ToUniversalTime(),
             committed_delivery_at = proposal.CommittedDeliveryAt.ToUniversalTime(),
-            outcome = proposal.Outcome.ToString().ToUpperInvariant(),
+            outcome = OutcomeName(proposal.Outcome),
             safety_buffer_ticks = proposal.SafetyBuffer.Ticks,
             safety_buffer_policy_version = proposal.SafetyBufferPolicyVersion,
             policy_versions = proposal.PolicyVersions.OrderBy(x => x.Key, StringComparer.Ordinal)

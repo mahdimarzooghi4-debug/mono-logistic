@@ -78,6 +78,21 @@ public sealed class PromiseReadEndpointTests
         };
         await promiseRepository.CommitAsync(revision);
 
+        await using (var connection = await dataSource.OpenConnectionAsync())
+        await using (var verify = new NpgsqlCommand("""
+            SELECT p.outcome, e.data->>'outcome'
+            FROM promises p
+            JOIN outbox_events e ON e.aggregate_id = p.promise_id AND e.sequence = 2
+            WHERE p.promise_id = @promise_id;
+            """, connection))
+        {
+            verify.Parameters.AddWithValue("promise_id", proposal.PromiseId);
+            await using var reader = await verify.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("ALTERNATIVE_PROMISE", reader.GetString(0));
+            Assert.Equal("ALTERNATIVE_PROMISE", reader.GetString(1));
+        }
+
         await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.read"]);
         await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.read"]);
         await using var writeOnlyFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.write"]);
