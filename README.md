@@ -61,6 +61,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Eligible Courier Feasibility Criterion v1](docs/37-eligible-courier-feasibility-criterion-v1.md)
 - [Effective Zone Capacity Criterion v1](docs/38-effective-zone-capacity-criterion-v1.md)
 - [Active Route Inventory Evidence v1](docs/39-active-route-inventory-evidence-v1.md)
+- [Route Insertion Feasibility Evidence v1](docs/40-route-insertion-feasibility-evidence-v1.md)
 - [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 - [Hana Urban Delivery Configuration](docs/customers/hana/urban-delivery-configuration.md)
 - [Unified B2B Policy & Capability Model](docs/06-b2b-policy-capability-model.md)
