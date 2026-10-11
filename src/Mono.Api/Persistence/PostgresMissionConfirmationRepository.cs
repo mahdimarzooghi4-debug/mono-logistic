@@ -29,7 +29,6 @@ public sealed class PostgresMissionConfirmationRepository(
         var requestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
             JsonSerializer.Serialize(new { delivery_request_id = deliveryRequestId, quote_id = quoteId, promise_version = promiseVersion }))))
             .ToLowerInvariant();
-        var now = _timeProvider.GetUtcNow();
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
