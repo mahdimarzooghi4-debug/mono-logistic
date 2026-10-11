@@ -264,7 +264,17 @@ public sealed class PostgresDeliveryQuoteRepository : IDeliveryQuoteStore
             },
             policy_versions = quote.PolicyVersions.OrderBy(entry => entry.Key, StringComparer.Ordinal)
                 .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal),
-            audit_evidence_ids = quote.AuditEvidenceIds.ToArray()
+            audit_evidence_ids = quote.AuditEvidenceIds.ToArray(),
+            pricing_evidence = quote.PricingEvidence is null
+                ? null
+                : new
+                {
+                    evidence_id = quote.PricingEvidence.EvidenceId,
+                    observed_at = quote.PricingEvidence.ObservedAt.ToUniversalTime(),
+                    distance_meters = quote.PricingEvidence.DistanceMeters,
+                    source_id = quote.PricingEvidence.SourceId,
+                    payload_sha256 = quote.PricingEvidence.PayloadSha256
+                }
         };
         return JsonSerializer.Serialize(payload);
     }
