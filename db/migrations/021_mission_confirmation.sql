@@ -1,4 +1,8 @@
 -- A customer can explicitly confirm one request once; Mission creation and its event commit together.
+CREATE UNIQUE INDEX IF NOT EXISTS delivery_quote_versions_request_quote_version_idx
+    ON delivery_quote_versions (customer_id, delivery_request_id, quote_id, version);
+CREATE UNIQUE INDEX IF NOT EXISTS promise_versions_promise_version_customer_idx
+    ON promise_versions (promise_id, version, customer_id);
 ALTER TABLE outbox_events
     DROP CONSTRAINT IF EXISTS outbox_events_event_type_check;
 ALTER TABLE outbox_events
@@ -17,15 +21,16 @@ CREATE TABLE IF NOT EXISTS missions (
     committed_delivery_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone NOT NULL,
     CONSTRAINT missions_customer_request_unique UNIQUE (customer_id, delivery_request_id),
+    CONSTRAINT missions_customer_request_mission_unique UNIQUE (customer_id, delivery_request_id, mission_id),
     CONSTRAINT missions_request_fk
         FOREIGN KEY (customer_id, delivery_request_id)
         REFERENCES delivery_requests (customer_id, delivery_request_id),
     CONSTRAINT missions_quote_fk
-        FOREIGN KEY (customer_id, delivery_request_id, quote_version)
-        REFERENCES delivery_quote_versions (customer_id, delivery_request_id, version),
+        FOREIGN KEY (customer_id, delivery_request_id, quote_id, quote_version)
+        REFERENCES delivery_quote_versions (customer_id, delivery_request_id, quote_id, version),
     CONSTRAINT missions_promise_fk
-        FOREIGN KEY (promise_id, promise_version)
-        REFERENCES promise_versions (promise_id, version)
+        FOREIGN KEY (promise_id, promise_version, customer_id)
+        REFERENCES promise_versions (promise_id, version, customer_id)
 );
 
 CREATE TABLE IF NOT EXISTS mission_confirmation_idempotency (
@@ -40,8 +45,8 @@ CREATE TABLE IF NOT EXISTS mission_confirmation_idempotency (
         FOREIGN KEY (customer_id, delivery_request_id)
         REFERENCES delivery_requests (customer_id, delivery_request_id),
     CONSTRAINT mission_confirmation_mission_fk
-        FOREIGN KEY (customer_id, delivery_request_id)
-        REFERENCES missions (customer_id, delivery_request_id)
+        FOREIGN KEY (customer_id, delivery_request_id, mission_id)
+        REFERENCES missions (customer_id, delivery_request_id, mission_id)
 );
 
 CREATE INDEX IF NOT EXISTS missions_customer_created_idx
