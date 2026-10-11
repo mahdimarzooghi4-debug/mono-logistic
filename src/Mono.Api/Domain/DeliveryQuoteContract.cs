@@ -9,7 +9,7 @@ public static class DeliveryQuoteContract
         @"\Acus_[0-9a-f]{32}\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex EvidenceDigestPattern = new(
-        @"\\A[0-9a-f]{64}\\z",
+        @"\A[0-9a-f]{64}\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex DeliveryRequestIdPattern = new(
         @"\Adrq_[0-9a-f]{32}\z",
