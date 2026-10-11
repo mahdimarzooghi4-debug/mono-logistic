@@ -104,11 +104,14 @@ public static class DeliveryRequestEndpoints
                     var alternativeSearch = input.ToAlternativeSearch();
                     var proposal = input.ToProposal(deliveryRequestId, idempotencyValues[0]!);
                     PromiseCommitProposalValidator.Validate(proposal);
-                    result = await promiseCommit.EvaluateAndCommitAsync(
+                    var requestHash = input.ComputeRequestHash(
+                        deliveryRequestId, idempotencyValues[0]!);
+                    result = await promiseCommit.EvaluateAndCommitIdempotentlyAsync(
                         criteria,
                         input.RequestedDeliveryAt,
                         alternativeSearch,
                         proposal,
+                        requestHash,
                         cancellationToken);
                 }
                 catch (ArgumentException)
