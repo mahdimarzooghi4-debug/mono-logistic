@@ -90,6 +90,8 @@ public sealed class MissionConfirmationEndpointTests
         Assert.StartsWith("mis_", missionId, StringComparison.Ordinal);
         var missionResponse = await ownerClient.GetAsync($"/v1/missions/{missionId}");
         var foreignMissionResponse = await otherClient.GetAsync($"/v1/missions/{missionId}");
+        var timelineResponse = await ownerClient.GetAsync($"/v1/missions/{missionId}/timeline");
+        var foreignTimelineResponse = await otherClient.GetAsync($"/v1/missions/{missionId}/timeline");
         Assert.Equal(created.DeliveryRequestId, mission.GetProperty("delivery_request_id").GetString());
         Assert.Equal(quoteId, mission.GetProperty("quote_id").GetString());
         Assert.Equal(promiseId, mission.GetProperty("promise_id").GetString());
@@ -101,6 +103,17 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, changedReplay.StatusCode);
         Assert.Equal(HttpStatusCode.OK, missionResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, foreignMissionResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, timelineResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, foreignTimelineResponse.StatusCode);
+        var timelineJson = await timelineResponse.Content.ReadAsStringAsync();
+        using var timelineDocument = JsonDocument.Parse(timelineJson);
+        var timeline = timelineDocument.RootElement;
+        Assert.Equal(missionId, timeline.GetProperty("mission_id").GetString());
+        Assert.Single(timeline.GetProperty("events").EnumerateArray());
+        Assert.Equal("mission.created", timeline.GetProperty("events")[0].GetProperty("event_type").GetString());
+        Assert.Equal(1, timeline.GetProperty("events")[0].GetProperty("sequence").GetInt64());
+        Assert.DoesNotContain("Pickup", timelineJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Dropoff", timelineJson, StringComparison.Ordinal);
         var missionJson = await missionResponse.Content.ReadAsStringAsync();
         Assert.DoesNotContain("Pickup", missionJson, StringComparison.Ordinal);
         Assert.DoesNotContain("Dropoff", missionJson, StringComparison.Ordinal);
