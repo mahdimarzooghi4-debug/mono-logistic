@@ -61,6 +61,7 @@ public sealed class PromiseCommitEndpointTests
         var path = $"/v1/delivery-requests/{request.DeliveryRequestId}/promise";
         var initial = await SendAsync(client, path, "promise-decision-1", input);
         var initialJson = await initial.Content.ReadAsStringAsync();
+        verifier.IsAvailable = false;
         var replay = await SendAsync(client, path, "promise-decision-1", input);
         var replayJson = await replay.Content.ReadAsStringAsync();
         var changedInput = BuildInput(deliveryAt.AddHours(1));
@@ -84,7 +85,7 @@ public sealed class PromiseCommitEndpointTests
         using var conflictDocument = JsonDocument.Parse(conflictJson);
         Assert.Equal("PROMISE_CONFLICT",
             conflictDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
-        Assert.Equal(24, verifier.CallCount);
+        Assert.Equal(8, verifier.CallCount);
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var count = new NpgsqlCommand("""
@@ -242,6 +243,7 @@ public sealed class PromiseCommitEndpointTests
     private sealed class VerifiedFeasibilitySource : IFeasibilityEvidenceSourceVerifier
     {
         public int CallCount { get; private set; }
+        public bool IsAvailable { get; set; } = true;
 
         public Task<FeasibilityEvidenceSourceVerification> VerifyAsync(
             string customerId,
@@ -251,7 +253,10 @@ public sealed class PromiseCommitEndpointTests
         {
             CallCount++;
             return Task.FromResult(new FeasibilityEvidenceSourceVerification(
-                FeasibilityEvidenceSourceVerificationStatus.Verified, "TEST_VERIFIED"));
+                IsAvailable
+                    ? FeasibilityEvidenceSourceVerificationStatus.Verified
+                    : FeasibilityEvidenceSourceVerificationStatus.Unverified,
+                IsAvailable ? "TEST_VERIFIED" : "TEST_SOURCE_UNAVAILABLE"));
         }
     }
 }
