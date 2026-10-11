@@ -36,6 +36,8 @@ public sealed class DeliveryQuoteIssuanceApplicationServiceTests
         Assert.Equal(17_500, store.Quote.Fare.BuyerShareToman);
         Assert.Equal(17_500, store.Quote.Fare.SellerShareToman);
         Assert.Equal("distance-proof-1", Assert.Single(store.Quote.AuditEvidenceIds));
+        Assert.Equal(evidence.PayloadSha256, store.Quote.PricingEvidence!.PayloadSha256);
+        Assert.Equal("maps-source", store.Quote.PricingEvidence.SourceId);
         Assert.Equal(CustomerId, verifier.CustomerId);
     }
 
