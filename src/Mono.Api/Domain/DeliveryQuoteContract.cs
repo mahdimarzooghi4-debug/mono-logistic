@@ -78,7 +78,7 @@ public static class DeliveryQuoteContract
     {
         if (evidenceIds.IsDefaultOrEmpty ||
             evidenceIds.Any(id => !HasText(id, 128)) ||
-            evidenceIds.Distinct(StringComparer.Ordinal).Count() != evidenceIds.Count)
+            evidenceIds.Distinct(StringComparer.Ordinal).Count() != evidenceIds.Length)
         {
             throw new ArgumentException(
                 "Quote requires unique audit evidence identifiers.",
