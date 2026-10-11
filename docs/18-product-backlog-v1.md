@@ -291,6 +291,7 @@ Evaluate:
 - Sprint 065 adds a tenant-scoped immutable Quote contract with positive version, explicit issue/expiry timestamps, policy-version evidence tied to the Hana tariff, and required audit-evidence IDs. Expiry is evaluated at the supplied instant; no default TTL is invented.
 - Sprint 066 persists canonical Quote snapshots in PostgreSQL with tenant/request scoping, immutable version history, consecutive version checks, and replay detection. Expiry remains caller-supplied.
 - Sprint 067 adds tenant-scoped current Quote and paginated version-history read APIs using delivery-requests.read. Responses omit policy-version and audit-evidence identifiers; expiry is reported at read time without extending the Quote.
+- Sprint 068 adds an integrity envelope binding Hana pricing distance, evidence ID, observation time, source ID, and opaque source attestation. Source authenticity remains unverified until Mono selects a provider and configures the fail-closed verifier.
 - quote version
 - expiration
 - policy versions
