@@ -78,7 +78,9 @@ public sealed class PostgresMissionConfirmationRepository(
             SELECT version, expires_at
             FROM delivery_quote_versions
             WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id
-              AND quote_id = @quote_id;
+              AND quote_id = @quote_id
+            ORDER BY version DESC
+            LIMIT 1;
             """;
         int quoteVersion;
         await using (var quote = new NpgsqlCommand(quoteSql, connection, transaction))
