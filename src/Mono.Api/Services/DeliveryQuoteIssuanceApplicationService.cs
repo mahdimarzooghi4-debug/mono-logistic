@@ -87,6 +87,12 @@ public sealed class DeliveryQuoteIssuanceApplicationService
         string? requestHash,
         CancellationToken cancellationToken)
     {
+        if (!HanaDistancePricingEvidenceContract.IsValid(evidence))
+        {
+            return new DeliveryQuoteIssuanceResult(
+                DeliveryQuoteIssuanceStatus.EvidenceIntegrityInvalid, null);
+        }
+
         if (idempotencyKey is not null && requestHash is not null)
         {
             var existing = await _store.FindIdempotentInitialAsync(
@@ -102,12 +108,6 @@ public sealed class DeliveryQuoteIssuanceApplicationService
                 };
                 return new DeliveryQuoteIssuanceResult(replayStatus, existing);
             }
-        }
-
-        if (!HanaDistancePricingEvidenceContract.IsValid(evidence))
-        {
-            return new DeliveryQuoteIssuanceResult(
-                DeliveryQuoteIssuanceStatus.EvidenceIntegrityInvalid, null);
         }
 
         var issuedAt = _timeProvider.GetUtcNow();
