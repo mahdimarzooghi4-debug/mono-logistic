@@ -70,5 +70,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.025_mission_operations_read_audit_inspection.sql" />
     <EmbeddedResource Include="../../db/migrations/026_delivery_request_operations_read_audit.sql"
                       LogicalName="Mono.Api.Tests.Migrations.026_delivery_request_operations_read_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/027_delivery_request_operations_read_audit_inspection.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.027_delivery_request_operations_read_audit_inspection.sql" />
   </ItemGroup>
 </Project>
