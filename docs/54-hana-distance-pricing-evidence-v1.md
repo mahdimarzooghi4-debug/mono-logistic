@@ -8,9 +8,9 @@ Distance must be between 0 and 5,000 metres, inclusive, matching the approved Ha
 
 ## Trust boundary
 
-The digest detects post-envelope mutation. It is not a signature and does not authenticate the source or prove that the distance is correct. Before pricing evidence can authorize a Quote, an implementation of `IHanaDistanceEvidenceSourceVerifier` must validate the source identity and source-specific attestation for the authenticated customer.
+The final digest detects post-envelope mutation. It is not a signature and does not authenticate the source or prove that the distance is correct. `ComputeSourcePayloadSha256` hashes the canonical evidence ID, UTC observation time, distance, and source ID without the attestation. A source can then create a `mono-hmac-sha256.v1` attestation over that digest; the final digest binds the attestation into the evidence envelope.
 
-The default verifier returns `DISTANCE_SOURCE_VERIFIER_NOT_CONFIGURED`. This keeps Quote issuance blocked until Mono chooses a trusted provider and its attestation verification method. No provider, key management scheme, or external API is selected here.
+`ConfiguredEvidenceSourceVerifier` checks an enabled tenant/source/key entry, the `hana-distance-pricing` scope, the HMAC signature, and explicitly configured freshness limits. Missing configuration remains fail-closed. No provider or credential is approved or configured by this change.
 
 ## Scope
 

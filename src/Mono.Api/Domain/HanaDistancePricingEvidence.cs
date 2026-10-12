@@ -39,6 +39,24 @@ public static class HanaDistancePricingEvidenceContract
             evidenceId, normalizedObservedAt, distanceMeters, sourceId, sourceAttestation, digest);
     }
 
+    public static string ComputeSourcePayloadSha256(
+        string evidenceId,
+        DateTimeOffset observedAt,
+        decimal distanceMeters,
+        string sourceId)
+    {
+        ValidateFields(evidenceId, observedAt, distanceMeters, sourceId, null, nameof(evidenceId));
+        var canonicalPayload = JsonSerializer.Serialize(new
+        {
+            evidence_id = evidenceId,
+            observed_at = observedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            distance_meters = distanceMeters.ToString("G29", CultureInfo.InvariantCulture),
+            source_id = sourceId
+        });
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalPayload)))
+            .ToLowerInvariant();
+    }
+
     public static bool IsValid(HanaDistancePricingEvidence? evidence)
     {
         if (evidence is null ||
@@ -104,7 +122,7 @@ public static class HanaDistancePricingEvidenceContract
             distanceMeters < 0 ||
             distanceMeters > HanaDistancePricingV1.MaximumDistanceMeters ||
             !HasText(sourceId, 128) ||
-            !HasText(sourceAttestation, 4_096))
+            (sourceAttestation is not null && !HasText(sourceAttestation, 4_096)))
         {
             throw new ArgumentException(
                 "Distance evidence requires a valid ID, observation time, in-range distance, source ID, and attestation.",
