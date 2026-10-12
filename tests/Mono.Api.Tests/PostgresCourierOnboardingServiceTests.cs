@@ -315,6 +315,67 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         await Assert.ThrowsAsync<PostgresException>(() => mutation.ExecuteNonQueryAsync());
     }
 
+    [Fact]
+    public async Task Capacity_projection_counts_planned_couriers_per_zone_time_bucket_and_audits_read()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var utcNow = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(
+            utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, (utcNow.Minute / 15) * 15, 0, TimeSpan.Zero);
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var registration = await onboarding.RegisterAsync("BIKE", ["zone-central"], "capacity-register");
+        var courierId = registration.Snapshot!.CourierId;
+        var transitions = new[]
+        {
+            "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+            "MONO_APPROVED", "ACTIVE"
+        };
+        for (var index = 0; index < transitions.Length; index++)
+        {
+            var status = transitions[index];
+            var result = await onboarding.AdvanceTrustAsync(
+                courierId, status, status == "ACTIVE" ? ["zone-central"] : null,
+                status == "ACTIVE" ? "zone-central" : null, "REVIEW_COMPLETED",
+                $"review:{status}", $"capacity-transition-{index}");
+            Assert.Equal(CourierOperationsWriteOutcome.Applied, result.Outcome);
+        }
+
+        var readAudit = new PostgresCourierOperationsReadAuditService(database.DataSource, context);
+        var availability = new PostgresCourierAvailabilityService(
+            database.DataSource, context, readAudit, new FixedTimeProvider(now));
+        var created = await availability.CreateAsync(
+            courierId, "zone-central", now, now.AddMinutes(45), "capacity-window");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, created.Outcome);
+
+        var projectionService = new PostgresCourierCapacityProjectionService(
+            database.DataSource, context, readAudit);
+        var projection = await projectionService.ProjectAsync(
+            "zone-central", now, now.AddHours(1), 15);
+
+        Assert.Equal("zone-central", projection.ZoneId);
+        Assert.Equal(4, projection.Buckets.Count);
+        Assert.Equal(new[] { 1, 1, 1, 0 },
+            projection.Buckets.Select(bucket => bucket.PlannedCourierCount));
+        Assert.Equal(now, projection.Buckets[0].From);
+        Assert.Equal(now.AddMinutes(15), projection.Buckets[0].To);
+
+        var auditPage = await readAudit.ListAsync(10, null);
+        Assert.NotNull(auditPage);
+        Assert.Contains(auditPage.Items, item =>
+            item.Action == PostgresCourierOperationsReadAuditService.CourierCapacityProjection &&
+            item.ResultCount == 4 && item.CourierId is null);
+    }
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string _adminConnectionString;
