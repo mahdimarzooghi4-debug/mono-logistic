@@ -50,8 +50,7 @@ public sealed class ZoneGeometryBoundaryTests
             "bowtie",
             "POLYGON ((0 0, 2 2, 0 2, 2 0, 0 0))"));
 
-        var wrongSrid = new WKTReader(new GeometryFactory(new PrecisionModel(), 3857))
-            .Read("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))");
+        var wrongSrid = ReadWkt("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))", 3857);
         Assert.Throws<ArgumentException>(() => ZoneGeometryBoundary.Create(
             "zone-a", ZoneKind.OperatingZone, "v1", "osm", "r1", "© OpenStreetMap contributors", wrongSrid));
 
@@ -72,8 +71,7 @@ public sealed class ZoneGeometryBoundaryTests
     [Fact]
     public void Rejects_antimeridian_crossing_boundaries()
     {
-        var geometry = new WKTReader(Factory)
-            .Read("POLYGON ((170 0, -170 0, -170 10, 170 10, 170 0))");
+        var geometry = ReadWkt("POLYGON ((170 0, -170 0, -170 10, 170 10, 170 0))");
 
         Assert.Throws<ArgumentException>(() => ZoneGeometryBoundary.Create(
             "zone-a", ZoneKind.OperatingZone, "v1", "osm", "r1", "© OpenStreetMap contributors", geometry));
@@ -197,9 +195,14 @@ public sealed class ZoneGeometryBoundaryTests
             "© OpenStreetMap contributors",
             PolygonOrMultiPolygon(wkt));
 
-    private static Geometry PolygonOrMultiPolygon(string wkt) =>
-        new WKTReader(Factory).Read(wkt);
+    private static Geometry PolygonOrMultiPolygon(string wkt) => ReadWkt(wkt);
 
-    private static Polygon Polygon(string wkt) =>
-        (Polygon)new WKTReader(Factory).Read(wkt);
+    private static Polygon Polygon(string wkt) => (Polygon)ReadWkt(wkt);
+
+    private static Geometry ReadWkt(string wkt, int srid = 4326)
+    {
+        var geometry = new WKTReader(Factory).Read(wkt);
+        geometry.SRID = srid;
+        return geometry;
+    }
 }
