@@ -216,6 +216,9 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         await service.RecordAsync(PostgresCourierOperationsReadAuditService.CourierSearch, null, 1);
         await service.RecordAsync(
             PostgresCourierOperationsReadAuditService.CourierDetail, courier.Snapshot!.CourierId, 1);
+        await service.RecordAsync(
+            PostgresCourierOperationsReadAuditService.CourierDetail,
+            "crr_00000000000000000000000000000000", 0);
         var page = await service.ListAsync(10, null);
 
         Assert.NotNull(page);
@@ -224,7 +227,10 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             item.ResultCount == 1 && item.CourierId is null);
         Assert.Contains(page.Items, item =>
             item.Action == PostgresCourierOperationsReadAuditService.CourierDetail &&
-            item.CourierId == courier.Snapshot.CourierId);
+            item.CourierId == courier.Snapshot.CourierId && item.ResultCount == 1);
+        Assert.Contains(page.Items, item =>
+            item.Action == PostgresCourierOperationsReadAuditService.CourierDetail &&
+            item.CourierId == "crr_00000000000000000000000000000000" && item.ResultCount == 0);
 
         await using var connection = await database.DataSource.OpenConnectionAsync();
         await Assert.ThrowsAsync<PostgresException>(async () =>
