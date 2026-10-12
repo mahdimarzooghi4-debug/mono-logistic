@@ -28,6 +28,7 @@ builder.Services.AddScoped<PostgresMissionConfirmationRepository>();
 builder.Services.AddScoped<PostgresMissionLifecycleRepository>();
 builder.Services.AddScoped<PostgresCourierOnboardingService>();
 builder.Services.AddScoped<PostgresCourierOperationsReadAuditService>();
+builder.Services.AddScoped<PostgresCourierAvailabilityService>();
 builder.Services.AddScoped<PostgresMissionHistoryRepository>();
 builder.Services.AddScoped<PostgresMissionOperationsService>();
 builder.Services.AddScoped<PostgresMissionOperationsReadAuditService>();
