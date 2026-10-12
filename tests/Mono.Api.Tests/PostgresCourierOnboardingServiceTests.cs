@@ -144,6 +144,22 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var service = new PostgresCourierOnboardingService(database.DataSource, new TestOperationsContext());
         var created = await service.RegisterAsync("CAR", ["zone-central"], "register-immutability");
         var courierId = created.Snapshot!.CourierId;
+        await using (var connection = await database.DataSource.OpenConnectionAsync())
+        {
+            await using var skippedStatus = new NpgsqlCommand(
+                "UPDATE couriers SET status = 'ACTIVE' WHERE courier_id = @courier_id;", connection);
+            skippedStatus.Parameters.AddWithValue("courier_id", courierId);
+            await Assert.ThrowsAsync<PostgresException>(() => skippedStatus.ExecuteNonQueryAsync());
+        }
+
+        await using (var connection = await database.DataSource.OpenConnectionAsync())
+        {
+            await using var unauditedStatus = new NpgsqlCommand(
+                "UPDATE couriers SET status = 'IDENTITY_VERIFIED' WHERE courier_id = @courier_id;", connection);
+            unauditedStatus.Parameters.AddWithValue("courier_id", courierId);
+            await Assert.ThrowsAsync<PostgresException>(() => unauditedStatus.ExecuteNonQueryAsync());
+        }
+
         var result = await service.AdvanceTrustAsync(
             courierId, "IDENTITY_VERIFIED", null, null,
             "IDENTITY_REVIEWED", "review:immutable", "transition-immutable");
