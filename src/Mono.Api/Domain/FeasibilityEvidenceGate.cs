@@ -31,7 +31,8 @@ public enum FeasibilityGateStatus
 public sealed record FeasibilityCriterionResult(
     FeasibilityCriterion Criterion,
     FeasibilityCriterionStatus Status,
-    IReadOnlyList<string> ReasonCodes);
+    IReadOnlyList<string> ReasonCodes,
+    FeasibilityEvidenceIntegrity? Integrity = null);
 
 public sealed record FeasibilityGateResult(
     FeasibilityGateStatus Status,
