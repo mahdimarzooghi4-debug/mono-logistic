@@ -82,6 +82,7 @@ app.MapMonoZoneCoveragePreviewEndpoints();
 app.MapMonoZoneGeometryCatalogEndpoints();
 app.MapMonoZoneGeometryHistoryEndpoints();
 app.MapMonoZoneGeometryQualityEndpoints();
+app.MapMonoZoneContainmentEndpoints();
 
 app.Run();
 
