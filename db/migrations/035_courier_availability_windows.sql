@@ -1,3 +1,11 @@
+ALTER TABLE courier_operations_read_audit
+    DROP CONSTRAINT IF EXISTS courier_operations_read_audit_action_check;
+ALTER TABLE courier_operations_read_audit
+    ADD CONSTRAINT courier_operations_read_audit_action_check
+    CHECK (action IN (
+        'COURIER_SEARCH', 'COURIER_DETAIL', 'COURIER_AUDIT_INSPECTION',
+        'COURIER_AVAILABILITY_SEARCH'));
+
 -- Planned courier operating windows for future capacity planning. These are not live location or dispatch eligibility signals.
 CREATE TABLE IF NOT EXISTS courier_availability_windows (
     window_id text PRIMARY KEY CHECK (
