@@ -2,33 +2,49 @@
 
 ## Purpose
 
-Bind each E7.1 criterion result to a claimed source and require a source verifier before a Promise may be persisted.
+Authenticate the source and scope of evidence before a Promise is persisted. Source verification is independent from the SHA-256 integrity check: an integrity digest alone does not prove who supplied a criterion result.
 
-## Envelope
+## Attestation and payload hashes
 
-The integrity envelope carries:
+`FeasibilityEvidenceIntegrity` carries the evidence ID, observation time, source ID, opaque attestation, `SourcePayloadSha256`, and final `PayloadSha256`.
 
-- evidence ID and observation timestamp;
-- source ID;
-- opaque source attestation; and
-- SHA-256 digest over the criterion result and all envelope fields.
+`SourcePayloadSha256` is the canonical SHA-256 of the criterion, status, sorted reason codes, evidence ID, UTC observation time, and source ID. It excludes the attestation so a source can sign it without a circular hash. The final `PayloadSha256` binds that digest and the attestation together with the rest of the envelope.
 
-Including source fields in the digest detects later changes to those fields. The digest does not prove that a source created the attestation.
+The v1 attestation format is:
 
-## Verification boundary
+```text
+mono-hmac-sha256.v1.<key-id>.<base64url-hmac-sha256>
+```
 
-`IFeasibilityEvidenceSourceVerifier` receives the authenticated customer ID, criterion, and integrity envelope. It must return `Verified` before commit continues. Any other result blocks persistence. The customer ID lets an eventual implementation scope trusted source registration to the requesting tenant.
+The HMAC input is the UTF-8 encoding of these newline-separated values:
 
-The registered default, `UnconfiguredFeasibilityEvidenceSourceVerifier`, returns `VerifierNotConfigured` for every criterion. Therefore, Promise commits through this application service remain blocked until an approved verifier is configured. This is intentional fail-closed behavior.
+```text
+mono-evidence-source-attestation-v1
+<customer-id>
+<source-id>
+<scope>
+<evidence-id>
+<observed-at-utc-round-trip>
+<source-payload-sha256>
+```
 
-## Decisions still required
+Feasibility scopes are criterion-specific: `feasibility:Distance`, `feasibility:Coverage`, and the exact enum names for the other criteria. Hana distance pricing uses `hana-distance-pricing`. HMAC keys must contain at least 256 bits. The verifier compares signatures in constant time.
 
-Mono has not selected:
+## Runtime trust registry
 
-- which systems or operators may provide each criterion;
-- how sources are registered and scoped to a customer;
-- the attestation format or cryptographic verification method;
-- key storage, rotation, or revocation rules; or
-- evidence freshness and retention rules.
+`ConfiguredEvidenceSourceVerifier` implements both Promise feasibility and Hana distance verification. It reads `Mono:EvidenceSources` runtime configuration. The global `Enabled` switch defaults to off. Each trusted source entry binds an exact customer ID, source ID, key ID, enabled state, allowed scopes, and freshness limits (`MaxEvidenceAgeSeconds` and `AllowedFutureClockSkewSeconds`). Missing, ambiguous, malformed, disabled, or out-of-scope configuration fails closed; stale or future-dated evidence is rejected.
 
-No source ID or opaque attestation is trusted merely because it is present. No external provider or signature algorithm is assumed.
+Keys are Base64-encoded runtime secrets and are never stored in the repository or returned by an API. Supply them through the deployment secret mechanism when infrastructure is approved. Key IDs permit rotation; only an explicitly enabled matching key and scope can verify an attestation. No environment variables or credentials are configured by this change.
+
+## Trust and rollout boundary
+
+This implementation selects a provider-neutral cryptographic format. It does not approve a maps provider, courier feed, customer, source ID, or trust relationship. No source is trusted by default; without explicit runtime configuration, Quote and Promise writes remain blocked as before. Before enabling a source, Mono must approve the exact source/customer/scope and its evidence freshness policy, then provision a shared secret securely.
+
+The following remain operational or business decisions:
+
+- provider/operator approval for each criterion;
+- source registration and key custody/rotation/revocation process;
+- evidence retention and audit requirements; and
+- appropriate freshness and clock-skew values for each source.
+
+No external API is required for this verifier.

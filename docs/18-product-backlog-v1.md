@@ -496,6 +496,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 087 composes customer Delivery Request detail with its latest safe Quote and current safe Promise; absent Quote or Promise values are null, and internal evidence remains private.
 - Sprint 088 adds a tenant-scoped Delivery Request timeline for recorded Promise and Mission outbox events, with an allowlist and payload exclusion.
 - Sprint 089 emits `quote.issued` transactionally for each newly persisted Quote version, backfills historical Quote versions into the outbox, and includes Quote events in the Delivery Request timeline.
+- Sprint 090 defines a provider-neutral HMAC-SHA256 source attestation and a fail-closed, configuration-backed verifier for Quote and Promise evidence; no real source, key, or provider is enabled.
 - Sprint 077 adds `GET /v1/missions/{id}/timeline`, reading only allowlisted tenant-owned Mission event envelopes from the transactional outbox.
 - Sprint 078 adds `GET /v1/missions` with tenant-scoped keyset pagination and safe Mission summaries for customer history.
 - Mission status

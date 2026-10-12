@@ -37,8 +37,12 @@ builder.Services.AddScoped<IDeliveryQuoteStore>(services =>
 builder.Services.AddScoped<DeliveryQuoteIssuanceApplicationService>();
 builder.Services.AddScoped<IPromiseCommitStore>(services =>
     services.GetRequiredService<PostgresPromiseCommitRepository>());
-builder.Services.AddScoped<IFeasibilityEvidenceSourceVerifier, UnconfiguredFeasibilityEvidenceSourceVerifier>();
-builder.Services.AddScoped<IHanaDistanceEvidenceSourceVerifier, UnconfiguredHanaDistanceEvidenceSourceVerifier>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<ConfiguredEvidenceSourceVerifier>();
+builder.Services.AddScoped<IFeasibilityEvidenceSourceVerifier>(services =>
+    services.GetRequiredService<ConfiguredEvidenceSourceVerifier>());
+builder.Services.AddScoped<IHanaDistanceEvidenceSourceVerifier>(services =>
+    services.GetRequiredService<ConfiguredEvidenceSourceVerifier>());
 builder.Services.AddScoped<PromiseCommitApplicationService>();
 
 var app = builder.Build();
