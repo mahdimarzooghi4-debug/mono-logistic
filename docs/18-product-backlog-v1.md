@@ -183,7 +183,8 @@ Extensible:
 ## 7. Epic E5 — Maps, Geocoding & Location
 
 ### E5.1 Maps Gateway
-- Sprint 041 defines a provider-neutral in-process contract for geocode, reverse geocode, route estimates, and route matrices with WGS84 coordinate and provider-response validation; no provider or network integration is selected.
+- Sprint 041 defines a provider-neutral in-process contract for geocode, reverse geocode, route estimates, and route matrices with WGS84 coordinate and provider-response validation; provider/network integration was not selected at that time.
+- Sprint 091 records OpenStreetMap as Mono's selected map-data source for future map/location capabilities. GPS fixes come from the user's device geolocation capability; OSM supplies geographic map data. A specific tile host, geocoding/routing operator, hosting model, and production integration remain future decisions.
 - provider abstraction
 - geocode
 - reverse geocode
