@@ -417,11 +417,16 @@ public sealed class PostgresCourierOnboardingService(
         if (zoneIds.Count == 0)
             return false;
         await using var command = new NpgsqlCommand("""
-            SELECT count(*) FROM zone_geometry_active
-            WHERE zone_id = ANY(@zone_ids);
+            SELECT zone_id FROM zone_geometry_active
+            WHERE zone_id = ANY(@zone_ids)
+            FOR SHARE;
             """, connection, transaction);
         command.Parameters.AddWithValue("zone_ids", NpgsqlDbType.Array | NpgsqlDbType.Text, zoneIds.ToArray());
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) == zoneIds.Count;
+        var activeCount = 0;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            activeCount++;
+        return activeCount == zoneIds.Count;
     }
 
     private async Task<CourierOperationsWriteResult?> ReadReplayAsync(
