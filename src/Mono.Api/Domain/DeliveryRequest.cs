@@ -209,3 +209,10 @@ public static class DeliveryRequestInputValidator
 public sealed record DeliveryRequestResponse(
     [property: JsonPropertyName("delivery_request_id")] string DeliveryRequestId,
     [property: JsonPropertyName("status")] string Status);
+
+
+public sealed record DeliveryRequestStatusResponse(
+    [property: JsonPropertyName("delivery_request_id")] string DeliveryRequestId,
+    [property: JsonPropertyName("external_reference")] string ExternalReference,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt);

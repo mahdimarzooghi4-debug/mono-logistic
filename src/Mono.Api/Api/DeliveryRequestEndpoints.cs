@@ -56,6 +56,22 @@ public static class DeliveryRequestEndpoints
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsWrite);
 
+        endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}", async (
+                string deliveryRequestId,
+                PostgresDeliveryRequestRepository deliveryRequests,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await deliveryRequests.FindStatusAsync(deliveryRequestId, cancellationToken);
+                if (result is null)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("DELIVERY_REQUEST_NOT_FOUND", "The delivery request was not found for this customer.")));
+                }
+
+                return Results.Ok(result);
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
         return endpoints;
     }
 }

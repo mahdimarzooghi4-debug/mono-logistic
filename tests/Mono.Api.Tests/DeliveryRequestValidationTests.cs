@@ -10,6 +10,7 @@ public sealed class DeliveryRequestValidationTests
     public void Delivery_write_scope_is_available_for_internal_key_provisioning()
     {
         Assert.True(MonoApiKeyScopeCatalog.IsSupported("delivery-requests.write"));
+        Assert.True(MonoApiKeyScopeCatalog.IsSupported("delivery-requests.read"));
     }
 
     [Fact]

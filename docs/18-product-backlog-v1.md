@@ -103,7 +103,12 @@ Epic
 - external order reference preserved
 - Mission lifecycle initialized
 
-### E3.4 Mission Query
+### E3.4 Delivery Request Query
+- read request status with customer-scoped access
+- external reference and creation timestamp
+- Sprint 008 implements status lookup for received requests only
+
+### E3.5 Mission Query
 - status
 - promise
 - assignment
@@ -401,6 +406,7 @@ Courier Net = 89% of Mission Fare
 ### E16.2 Endpoints
 - `GET /v1/branches` (`branches.read`)
 - `POST /v1/delivery-requests` (`delivery-requests.write`, request intake only)
+- `GET /v1/delivery-requests/{id}` (`delivery-requests.read`, customer-scoped request summary)
 - confirm
 - Mission status
 - cancel

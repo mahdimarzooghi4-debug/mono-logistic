@@ -37,6 +37,19 @@ public sealed class BranchEndpointAuthorizationTests
     }
 
     [Fact]
+    public async Task Delivery_request_status_requires_its_read_scope()
+    {
+        await using var factory = CreateFactory(["delivery-requests.write"]);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
+
+        var response = await client.GetAsync(
+            "/v1/delivery-requests/drq_0123456789abcdef0123456789abcdef");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Delivery_request_creation_requires_its_write_scope()
     {
         await using var factory = CreateFactory(["branches.read"]);

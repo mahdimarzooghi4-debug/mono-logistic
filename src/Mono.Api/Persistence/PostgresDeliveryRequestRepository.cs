@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Mono.Api.Domain;
 using Mono.Api.Security;
 using Npgsql;
 using NpgsqlTypes;
@@ -83,6 +84,31 @@ public sealed class PostgresDeliveryRequestRepository(
             : DeliveryRequestWriteOutcome.Conflict;
 
         return new DeliveryRequestWriteResult(existingId, existingStatus, outcome);
+    }
+
+    public async Task<DeliveryRequestStatusResponse?> FindStatusAsync(
+        string deliveryRequestId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT delivery_request_id, external_reference, status, created_at
+            FROM delivery_requests
+            WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id;
+            """;
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerContext.CustomerId);
+        command.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            return null;
+
+        return new DeliveryRequestStatusResponse(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetFieldValue<DateTimeOffset>(3));
     }
 
     private static void AddParameters(
