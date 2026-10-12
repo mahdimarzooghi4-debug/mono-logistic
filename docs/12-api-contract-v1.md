@@ -723,6 +723,7 @@ POST /operations/v1/couriers/{courier_id}/trust-transitions
 POST /operations/v1/couriers/{courier_id}/availability-windows
 GET /operations/v1/courier-availability-windows?from=...&to=...&page_size=50&zone_id=...
 POST /operations/v1/courier-availability-windows/{window_id}/cancel
+GET /operations/v1/courier-capacity-projection?zone_id=...&from=...&to=...&bucket_minutes=30
 Idempotency-Key: <operations-generated key>
 ```
 
@@ -750,3 +751,10 @@ Courier roster and detail reads are recorded in an append-only Mono audit ledger
 Mono operators can create scheduled availability windows for ACTIVE couriers in an approved zone. Each window is limited to 16 hours and must start within the next 30 days. Windows for the same courier may not overlap. Creation and cancellation require an Idempotency-Key; a window can only be cancelled once, and database guards prevent editing or deleting its schedule. Search requires a bounded UTC time range of at most 31 days, supports optional zone filtering, and uses keyset pagination.
 
 These windows are staff-entered planning data. They are not courier-reported live availability, location, GPS freshness, or dispatch eligibility. A future dispatch decision must apply separate real-time and operational checks.
+
+
+### 34.3 Planned zone capacity projection
+
+Mono administrators can request a projection for one active zone over a UTC range up to 24 hours, using 15, 30, or 60 minute buckets aligned to the selected interval. Each bucket counts distinct ACTIVE couriers whose scheduled window overlaps that period. Reads are appended to the courier operations audit ledger, and the API fails closed if the audit write fails.
+
+The projection represents staff-entered planned capacity only. It does not incorporate live courier reports, GPS freshness, route capacity, or Mission assignment decisions.
