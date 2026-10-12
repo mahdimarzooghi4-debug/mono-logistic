@@ -55,7 +55,7 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             proposal.ReasonCodes.OrderBy(x => x, StringComparer.Ordinal).ToArray());
         var now = _timeProvider.GetUtcNow();
         var eventId = $"evt_{Guid.NewGuid():N}";
-        var outcome = proposal.Outcome.ToString().ToUpperInvariant();
+        var outcome = OutcomeName(proposal.Outcome);
         var eventType = proposal.Version == 1 ? "promise.committed" : "promise.revised";
         var eventData = JsonSerializer.Serialize(new
         {
@@ -270,6 +270,80 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             reader.GetString(4));
     }
 
+    public async Task<PromiseVersionPageResponse?> ListVersionsByDeliveryRequestAsync(
+        string deliveryRequestId,
+        int pageSize,
+        int? beforeVersion = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (pageSize is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(pageSize), "Page size must be between 1 and 100.");
+        if (beforeVersion is < 1)
+            throw new ArgumentOutOfRangeException(nameof(beforeVersion), "Version cursor must be positive.");
+
+        const string existsSql = """
+            SELECT promise_id
+            FROM promises
+            WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id;
+            """;
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using (var exists = new NpgsqlCommand(existsSql, connection))
+        {
+            exists.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, _customerContext.CustomerId);
+            exists.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
+            if (await exists.ExecuteScalarAsync(cancellationToken) is null)
+                return null;
+        }
+
+        const string sql = """
+            SELECT p.promise_id, p.delivery_request_id, v.version,
+                   (v.proposal->>'committed_delivery_at')::timestamp with time zone,
+                   v.proposal->>'outcome', v.created_at
+            FROM promises p
+            JOIN promise_versions v
+              ON v.promise_id = p.promise_id AND v.customer_id = p.customer_id
+            WHERE p.customer_id = @customer_id
+              AND p.delivery_request_id = @delivery_request_id
+              AND (@before_version IS NULL OR v.version < @before_version)
+            ORDER BY v.version DESC
+            LIMIT @take;
+            """;
+        var versions = new List<PromiseVersionReadResponse>(pageSize + 1);
+        await using (var command = new NpgsqlCommand(sql, connection))
+        {
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, _customerContext.CustomerId);
+            command.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
+            command.Parameters.AddWithValue("before_version", NpgsqlDbType.Integer, (object?)beforeVersion ?? DBNull.Value);
+            command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                versions.Add(new PromiseVersionReadResponse(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.GetInt32(2),
+                    reader.GetFieldValue<DateTimeOffset>(3),
+                    reader.GetString(4),
+                    reader.GetFieldValue<DateTimeOffset>(5)));
+            }
+        }
+
+        var hasMore = versions.Count > pageSize;
+        if (hasMore)
+            versions.RemoveAt(versions.Count - 1);
+
+        return new PromiseVersionPageResponse(
+            versions,
+            hasMore ? versions[^1].Version : null);
+    }
+
+    private static string OutcomeName(FeasibilityOutcome outcome) => outcome switch
+    {
+        FeasibilityOutcome.Accepted => "ACCEPTED",
+        FeasibilityOutcome.AlternativePromise => "ALTERNATIVE_PROMISE",
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome), "Only committable Promise outcomes are supported.")
+    };
+
     private static string CanonicalProposal(PromiseCommitProposal proposal)
     {
         var payload = new
@@ -280,7 +354,7 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             version = proposal.Version,
             evaluated_at = proposal.EvaluatedAt.ToUniversalTime(),
             committed_delivery_at = proposal.CommittedDeliveryAt.ToUniversalTime(),
-            outcome = proposal.Outcome.ToString().ToUpperInvariant(),
+            outcome = OutcomeName(proposal.Outcome),
             safety_buffer_ticks = proposal.SafetyBuffer.Ticks,
             safety_buffer_policy_version = proposal.SafetyBufferPolicyVersion,
             policy_versions = proposal.PolicyVersions.OrderBy(x => x.Key, StringComparer.Ordinal)

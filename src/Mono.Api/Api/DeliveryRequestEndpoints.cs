@@ -90,6 +90,33 @@ public static class DeliveryRequestEndpoints
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
+        endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}/promise/versions", async (
+                string deliveryRequestId,
+                [FromQuery(Name = "page_size")] int? pageSize,
+                [FromQuery(Name = "before_version")] int? beforeVersion,
+                PostgresPromiseCommitRepository promises,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 20;
+                if (size is < 1 or > 100 || beforeVersion is < 1)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST",
+                            "page_size must be between 1 and 100 and before_version must be positive.")));
+                }
+
+                var page = await promises.ListVersionsByDeliveryRequestAsync(
+                    deliveryRequestId, size, beforeVersion, cancellationToken);
+                if (page is null)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("PROMISE_NOT_FOUND", "The committed promise was not found for this customer.")));
+                }
+
+                return Results.Ok(page);
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
         endpoints.MapGet("/v1/delivery-requests", async (
                 [FromQuery(Name = "page_size")] int? pageSize,
                 string? cursor,

@@ -69,6 +69,29 @@ public sealed class PromiseReadEndpointTests
             new Dictionary<string, string> { ["promise"] = "v1" },
             ["PROMISE_FEASIBLE"]);
         await promiseRepository.CommitAsync(proposal);
+        var revision = proposal with
+        {
+            DecisionId = "promise-read-decision-2",
+            Version = 2,
+            CommittedDeliveryAt = proposal.CommittedDeliveryAt.AddHours(1),
+            Outcome = FeasibilityOutcome.AlternativePromise
+        };
+        await promiseRepository.CommitAsync(revision);
+
+        await using (var connection = await dataSource.OpenConnectionAsync())
+        await using (var verify = new NpgsqlCommand("""
+            SELECT p.outcome, e.data->>'outcome'
+            FROM promises p
+            JOIN outbox_events e ON e.aggregate_id = p.promise_id AND e.sequence = 2
+            WHERE p.promise_id = @promise_id;
+            """, connection))
+        {
+            verify.Parameters.AddWithValue("promise_id", proposal.PromiseId);
+            await using var reader = await verify.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("ALTERNATIVE_PROMISE", reader.GetString(0));
+            Assert.Equal("ALTERNATIVE_PROMISE", reader.GetString(1));
+        }
 
         await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.read"]);
         await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.read"]);
@@ -86,6 +109,20 @@ public sealed class PromiseReadEndpointTests
         var missingResponse = await ownerClient.GetAsync(
             $"/v1/delivery-requests/{emptyRequest.DeliveryRequestId}/promise");
         var unauthorizedResponse = await writeOnlyClient.GetAsync(path);
+        var firstHistoryPage = await ownerClient.GetAsync(
+            $"/v1/delivery-requests/{committedRequest.DeliveryRequestId}/promise/versions?page_size=1");
+        var firstHistoryJson = await firstHistoryPage.Content.ReadAsStringAsync();
+        using var firstHistoryDocument = JsonDocument.Parse(firstHistoryJson);
+        var firstHistory = firstHistoryDocument.RootElement;
+        var beforeVersion = firstHistory.GetProperty("next_before_version").GetInt32();
+        var secondHistoryPage = await ownerClient.GetAsync(
+            $"/v1/delivery-requests/{committedRequest.DeliveryRequestId}/promise/versions?page_size=1&before_version={beforeVersion}");
+        var foreignHistoryPage = await otherClient.GetAsync(
+            $"/v1/delivery-requests/{committedRequest.DeliveryRequestId}/promise/versions");
+        var missingHistoryPage = await ownerClient.GetAsync(
+            $"/v1/delivery-requests/{emptyRequest.DeliveryRequestId}/promise/versions");
+        var invalidHistoryPage = await ownerClient.GetAsync(
+            $"/v1/delivery-requests/{committedRequest.DeliveryRequestId}/promise/versions?before_version=0");
 
         Assert.Equal(HttpStatusCode.OK, ownerResponse.StatusCode);
         var json = await ownerResponse.Content.ReadAsStringAsync();
@@ -93,15 +130,27 @@ public sealed class PromiseReadEndpointTests
         var body = document.RootElement;
         Assert.Equal(proposal.PromiseId, body.GetProperty("promise_id").GetString());
         Assert.Equal(committedRequest.DeliveryRequestId, body.GetProperty("delivery_request_id").GetString());
-        Assert.Equal(1, body.GetProperty("version").GetInt32());
-        Assert.Equal("ACCEPTED", body.GetProperty("outcome").GetString());
-        Assert.Equal(proposal.CommittedDeliveryAt, body.GetProperty("committed_delivery_at").GetDateTimeOffset());
+        Assert.Equal(2, body.GetProperty("version").GetInt32());
+        Assert.Equal("ALTERNATIVE_PROMISE", body.GetProperty("outcome").GetString());
+        Assert.Equal(revision.CommittedDeliveryAt, body.GetProperty("committed_delivery_at").GetDateTimeOffset());
         Assert.DoesNotContain("safety_buffer", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("reason_codes", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("policy_versions", json, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(HttpStatusCode.NotFound, otherResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, missingResponse.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, unauthorizedResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, firstHistoryPage.StatusCode);
+        var firstItem = firstHistory.GetProperty("items")[0];
+        Assert.Equal(2, firstItem.GetProperty("version").GetInt32());
+        Assert.Equal("ALTERNATIVE_PROMISE", firstItem.GetProperty("outcome").GetString());
+        Assert.DoesNotContain("safety_buffer", firstHistoryJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("reason_codes", firstHistoryJson, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.OK, secondHistoryPage.StatusCode);
+        using var secondHistoryDocument = JsonDocument.Parse(await secondHistoryPage.Content.ReadAsStringAsync());
+        Assert.Equal(1, secondHistoryDocument.RootElement.GetProperty("items")[0].GetProperty("version").GetInt32());
+        Assert.Equal(HttpStatusCode.NotFound, foreignHistoryPage.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missingHistoryPage.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidHistoryPage.StatusCode);
     }
 
     private static WebApplicationFactory<Program> CreateFactory(
