@@ -309,6 +309,35 @@ public static class MonoCourierOperationsEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/courier-planning-eligibility", async (
+                [FromQuery(Name = "zone_id")] string? zoneId,
+                [FromQuery(Name = "from")] DateTimeOffset? from,
+                [FromQuery(Name = "to")] DateTimeOffset? to,
+                [FromQuery(Name = "page_size")] int? pageSize,
+                string? cursor,
+                PostgresCourierPlanningEligibilityService eligibility,
+                CancellationToken cancellationToken) =>
+            {
+                if (zoneId is null || from is null || to is null)
+                    return InvalidRequest("Planning eligibility requires zone_id, from, and to timestamps.");
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100)
+                    return InvalidRequest("Planning eligibility page_size must be between 1 and 100.");
+                try
+                {
+                    var page = await eligibility.SearchAsync(
+                        zoneId, from.Value, to.Value, size, cursor, cancellationToken);
+                    return page is null
+                        ? Results.BadRequest(Error("INVALID_CURSOR", "The courier cursor is not valid for this search."))
+                        : Results.Ok(page);
+                }
+                catch (ArgumentException)
+                {
+                    return InvalidRequest("Planning eligibility filters are invalid.");
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         return endpoints;
     }
 
