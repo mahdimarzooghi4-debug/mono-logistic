@@ -112,7 +112,8 @@ public sealed class PostgresZoneGeometryReviewServiceTests(ITestOutputHelper out
         foreach (var migration in new[]
         {
             "Mono.Api.Tests.Migrations.029_zone_geometry_versions.sql",
-            "Mono.Api.Tests.Migrations.030_zone_geometry_reviews.sql"
+            "Mono.Api.Tests.Migrations.030_zone_geometry_reviews.sql",
+            "Mono.Api.Tests.Migrations.031_zone_geometry_activation.sql"
         })
         {
             await using var stream = typeof(PostgresZoneGeometryReviewServiceTests).Assembly
