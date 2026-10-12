@@ -462,10 +462,10 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         Assert.Equal(new[] { 1, 1, 1, 0 },
             activeCapacity.Buckets.Select(bucket => bucket.PlannedCourierCount));
 
-        var status = await suspension.FindAsync(courierId);
-        Assert.Equal("ACTIVE", status!.TrustStatus);
-        Assert.Equal("ACTIVE", status.OperationalStatus);
-        Assert.Equal(2, status.History.Count);
+        var operationalStatusSnapshot = await suspension.FindAsync(courierId);
+        Assert.Equal("ACTIVE", operationalStatusSnapshot!.TrustStatus);
+        Assert.Equal("ACTIVE", operationalStatusSnapshot.OperationalStatus);
+        Assert.Equal(2, operationalStatusSnapshot.History.Count);
 
         await using var connection = await database.DataSource.OpenConnectionAsync();
         await using var mutation = new NpgsqlCommand(
