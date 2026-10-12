@@ -210,13 +210,19 @@ public sealed class PostgresCourierAvailabilityService(
         {
             await using var cursorConnection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var cursorCommand = new NpgsqlCommand("""
-                SELECT starts_at FROM courier_availability_windows WHERE window_id = @window_id;
+                SELECT starts_at, ends_at, zone_id
+                FROM courier_availability_windows WHERE window_id = @window_id;
                 """, cursorConnection);
             cursorCommand.Parameters.AddWithValue("window_id", NpgsqlDbType.Text, cursor);
             await using var reader = await cursorCommand.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
                 return null;
             cursorStartsAt = reader.GetFieldValue<DateTimeOffset>(0);
+            var cursorEndsAt = reader.GetFieldValue<DateTimeOffset>(1);
+            var cursorZone = reader.GetString(2);
+            if (cursorStartsAt >= to || cursorEndsAt <= from ||
+                (zoneId is not null && !string.Equals(zoneId, cursorZone, StringComparison.Ordinal)))
+                return null;
         }
 
         const string firstPageSql = """
