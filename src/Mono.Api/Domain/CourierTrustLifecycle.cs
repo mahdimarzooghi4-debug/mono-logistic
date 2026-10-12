@@ -84,12 +84,10 @@ public static class CourierTrustLifecycle
                 $"Courier trust cannot move from {profile.Status} to {targetStatus}; expected {expected?.ToString() ?? "no further state"}.");
 
         var zoneApproval = profile.ZoneApproval.Normalize();
-        if (!string.Equals(zoneApproval.CourierId, profile.CourierId, StringComparison.Ordinal))
-            throw new ArgumentException("Zone approval must belong to this courier.", nameof(profile));
+        ValidateZoneApproval(profile.CourierId, zoneApproval);
         if (targetStatus == CourierTrustStatus.Active &&
             (zoneApproval.ApprovedZoneIds.Count == 0 ||
-             string.IsNullOrWhiteSpace(zoneApproval.PrimaryZoneId) ||
-             !zoneApproval.ApprovedZoneIds.Contains(zoneApproval.PrimaryZoneId, StringComparer.Ordinal)))
+             string.IsNullOrWhiteSpace(zoneApproval.PrimaryZoneId)))
         {
             throw new InvalidOperationException(
                 "A courier needs at least one approved operating zone and a primary approved zone before activation.");
@@ -107,6 +105,28 @@ public static class CourierTrustLifecycle
         return new CourierTrustTransitionResult(
             profile with { Status = targetStatus, ZoneApproval = zoneApproval },
             transition);
+    }
+
+    private static void ValidateZoneApproval(string courierId, CourierZoneApproval approval)
+    {
+        if (!string.Equals(approval.CourierId, courierId, StringComparison.Ordinal))
+            throw new ArgumentException("Zone approval must belong to this courier.", nameof(approval));
+
+        var preferred = approval.PreferredZoneIds.ToArray();
+        var approved = approval.ApprovedZoneIds.ToArray();
+        if (preferred.Any(string.IsNullOrWhiteSpace) ||
+            approved.Any(string.IsNullOrWhiteSpace) ||
+            preferred.Distinct(StringComparer.Ordinal).Count() != preferred.Length ||
+            approved.Distinct(StringComparer.Ordinal).Count() != approved.Length)
+            throw new ArgumentException("Courier zone IDs must be non-empty and unique.", nameof(approval));
+
+        var preferredSet = preferred.ToHashSet(StringComparer.Ordinal);
+        if (approved.Any(zoneId => !preferredSet.Contains(zoneId)))
+            throw new ArgumentException("Approved zones must be selected from preferred zones.", nameof(approval));
+
+        if (approval.PrimaryZoneId is not null &&
+            !approved.Contains(approval.PrimaryZoneId, StringComparer.Ordinal))
+            throw new ArgumentException("Primary zone must be approved.", nameof(approval));
     }
 
     private static CourierTrustStatus? Next(CourierTrustStatus status) => status switch
