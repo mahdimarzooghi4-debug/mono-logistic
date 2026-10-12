@@ -118,6 +118,36 @@ public sealed class MonoCustomerOperationsEndpointTests
                     StringComparison.OrdinalIgnoreCase);
 
                 const string customerListPath = "/operations/v1/customers";
+                using var customerNameSearch = new HttpRequestMessage(
+                    HttpMethod.Get, customerListPath + "?search=mono%20test%20merchant&page_size=1");
+                customerNameSearch.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var customerNameSearchResponse = await client.SendAsync(customerNameSearch);
+                Assert.Equal(System.Net.HttpStatusCode.OK, customerNameSearchResponse.StatusCode);
+                using var customerNameSearchBody = System.Text.Json.JsonDocument.Parse(
+                    await customerNameSearchResponse.Content.ReadAsStringAsync());
+                var searchedCustomer = Assert.Single(
+                    customerNameSearchBody.RootElement.GetProperty("customers").EnumerateArray());
+                Assert.Equal(customerId, searchedCustomer.GetProperty("customerId").GetString());
+
+                using var literalWildcardSearch = new HttpRequestMessage(
+                    HttpMethod.Get, customerListPath + "?search=%25&page_size=1");
+                literalWildcardSearch.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var literalWildcardResponse = await client.SendAsync(literalWildcardSearch);
+                Assert.Equal(System.Net.HttpStatusCode.OK, literalWildcardResponse.StatusCode);
+                using var literalWildcardBody = System.Text.Json.JsonDocument.Parse(
+                    await literalWildcardResponse.Content.ReadAsStringAsync());
+                Assert.Empty(literalWildcardBody.RootElement.GetProperty("customers").EnumerateArray());
+
+                using var invalidSearch = new HttpRequestMessage(
+                    HttpMethod.Get, customerListPath + "?search=" + new string('a', 129));
+                invalidSearch.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var invalidSearchResponse = await client.SendAsync(invalidSearch);
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalidSearchResponse.StatusCode);
+
                 using var unauthenticatedCustomerList = new HttpRequestMessage(HttpMethod.Get, customerListPath);
                 Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
                     (await client.SendAsync(unauthenticatedCustomerList)).StatusCode);
@@ -774,7 +804,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.009_branch_operations_audit.sql",
             "Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql",
             "Mono.Api.Tests.Migrations.011_customer_api_key_operations_audit.sql",
-            "Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql"
+            "Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql",
+            "Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)

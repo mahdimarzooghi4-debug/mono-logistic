@@ -69,12 +69,14 @@ public sealed class MonoCustomerOperationsService(
         int pageSize,
         string? cursor,
         string? status,
+        string? search,
         CancellationToken cancellationToken = default)
     {
         RequireAdministrator();
         if (pageSize is < 1 or > 100)
             throw new ArgumentOutOfRangeException(nameof(pageSize));
         status = NormalizeCustomerStatus(status);
+        var searchPattern = NormalizeCustomerSearch(search);
 
         DateTimeOffset? cursorCreatedAt = null;
         if (cursor is not null)
@@ -96,6 +98,10 @@ public sealed class MonoCustomerOperationsService(
                    default_channel, default_currency, created_at
             FROM customers
             WHERE (@status IS NULL OR status = @status)
+              AND (@search_pattern IS NULL
+                   OR customer_id LIKE @search_pattern ESCAPE E'\\'
+                   OR lower(legal_name) LIKE @search_pattern ESCAPE E'\\'
+                   OR lower(display_name) LIKE @search_pattern ESCAPE E'\\')
             ORDER BY created_at DESC, customer_id DESC
             LIMIT @take;
             """;
@@ -104,6 +110,10 @@ public sealed class MonoCustomerOperationsService(
                    default_channel, default_currency, created_at
             FROM customers
             WHERE (@status IS NULL OR status = @status)
+              AND (@search_pattern IS NULL
+                   OR customer_id LIKE @search_pattern ESCAPE E'\\'
+                   OR lower(legal_name) LIKE @search_pattern ESCAPE E'\\'
+                   OR lower(display_name) LIKE @search_pattern ESCAPE E'\\')
               AND (created_at < @cursor_created_at
                    OR (created_at = @cursor_created_at AND customer_id < @cursor_id))
             ORDER BY created_at DESC, customer_id DESC
@@ -115,6 +125,9 @@ public sealed class MonoCustomerOperationsService(
         command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         command.Parameters.AddWithValue(
             "status", NpgsqlDbType.Text, status is null ? DBNull.Value : status);
+        command.Parameters.AddWithValue(
+            "search_pattern", NpgsqlDbType.Text,
+            searchPattern is null ? DBNull.Value : searchPattern);
         if (cursor is not null)
         {
             command.Parameters.AddWithValue("cursor_created_at", NpgsqlDbType.TimestampTz, cursorCreatedAt!.Value);
@@ -266,6 +279,24 @@ public sealed class MonoCustomerOperationsService(
             !operationsContext.Roles.Contains(MonoOperationsRoles.Administrator, StringComparer.Ordinal))
             throw new UnauthorizedAccessException("An authenticated Mono administrator is required.");
         return operationsContext.ActorId;
+    }
+
+    private static string? NormalizeCustomerSearch(string? search)
+    {
+        if (search is null)
+            return null;
+        if (string.IsNullOrWhiteSpace(search))
+            throw new ArgumentException("Customer search cannot be blank.", nameof(search));
+
+        var normalized = search.Trim();
+        if (normalized.Length > 128)
+            throw new ArgumentException("Customer search must be at most 128 characters.", nameof(search));
+
+        var escaped = normalized.ToLowerInvariant()
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
+        return escaped + "%";
     }
 
     private static string? NormalizeCustomerStatus(string? status)
