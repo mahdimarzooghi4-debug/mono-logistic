@@ -24,6 +24,15 @@ public static class MissionOperationsInputValidator
     public static bool IsValidStatus(string? status) =>
         status is null || StatusPattern.IsMatch(status);
 
+    public static bool IsValidQuery(string? query) =>
+        query is null ||
+        (query.Length is >= 2 and <= 128 &&
+         string.Equals(query, query.Trim(), StringComparison.Ordinal) &&
+         !query.Any(char.IsControl));
+
+    public static bool IsValidDateRange(DateTimeOffset? createdAfter, DateTimeOffset? createdBefore) =>
+        createdAfter is null || createdBefore is null || createdAfter <= createdBefore;
+
     public static bool IsValidCursor(string? cursor) =>
         cursor is null || MissionHistoryInputValidator.IsValidMissionId(cursor);
 }

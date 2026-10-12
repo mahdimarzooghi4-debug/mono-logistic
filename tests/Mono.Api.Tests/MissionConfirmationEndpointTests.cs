@@ -121,16 +121,24 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Equal(HttpStatusCode.OK, secondMissionResponse.StatusCode);
 
         var operations = new PostgresMissionOperationsService(dataSource);
-        var operationsFirstPage = await operations.ListAsync(1, "PROMISED", null);
+        var operationsFirstPage = await operations.ListAsync(1, "PROMISED", "confirm-order-", null, null, null);
         Assert.NotNull(operationsFirstPage);
         Assert.Single(operationsFirstPage.Items);
         Assert.NotNull(operationsFirstPage.NextCursor);
         var operationsSecondPage = await operations.ListAsync(
-            1, "PROMISED", operationsFirstPage.NextCursor);
+            1, "PROMISED", "confirm-order-", null, null, operationsFirstPage.NextCursor);
         Assert.NotNull(operationsSecondPage);
         Assert.Single(operationsSecondPage.Items);
         Assert.NotEqual(operationsFirstPage.Items[0].MissionId, operationsSecondPage.Items[0].MissionId);
-        Assert.Null(await operations.ListAsync(1, "SETTLED", operationsFirstPage.NextCursor));
+        Assert.Null(await operations.ListAsync(1, "SETTLED", "confirm-order-", null, null, operationsFirstPage.NextCursor));
+        var exactOrderSearch = await operations.ListAsync(50, null, "confirm-order-1", null, null, null);
+        Assert.NotNull(exactOrderSearch);
+        Assert.Single(exactOrderSearch.Items);
+        Assert.Equal(created.DeliveryRequestId, exactOrderSearch.Items[0].DeliveryRequestId);
+        var futureOnlySearch = await operations.ListAsync(
+            50, null, null, DateTimeOffset.UtcNow.AddDays(1), null, null);
+        Assert.NotNull(futureOnlySearch);
+        Assert.Empty(futureOnlySearch.Items);
 
         var operationsMission = await operations.FindByIdAsync(missionId!);
         Assert.NotNull(operationsMission);

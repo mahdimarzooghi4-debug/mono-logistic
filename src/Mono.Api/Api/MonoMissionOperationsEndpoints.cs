@@ -13,22 +13,29 @@ public static class MonoMissionOperationsEndpoints
         endpoints.MapGet("/operations/v1/missions", async (
                 [FromQuery(Name = "page_size")] int? pageSize,
                 string? status,
+                string? query,
+                [FromQuery(Name = "created_after")] DateTimeOffset? createdAfter,
+                [FromQuery(Name = "created_before")] DateTimeOffset? createdBefore,
                 string? cursor,
                 PostgresMissionOperationsService missions,
                 CancellationToken cancellationToken) =>
             {
                 var size = pageSize ?? 50;
-                if (size is < 1 or > 100 || !MissionOperationsInputValidator.IsValidStatus(status))
+                if (size is < 1 or > 100 ||
+                    !MissionOperationsInputValidator.IsValidStatus(status) ||
+                    !MissionOperationsInputValidator.IsValidQuery(query) ||
+                    !MissionOperationsInputValidator.IsValidDateRange(createdAfter, createdBefore))
                     return Results.BadRequest(new ApiErrorResponse(
-                        new ApiError("INVALID_REQUEST", "page_size must be 1–100 and status must be uppercase.")));
+                        new ApiError("INVALID_REQUEST", "Mission search filters are invalid.")));
                 if (!MissionOperationsInputValidator.IsValidCursor(cursor))
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The Mission cursor is invalid.")));
 
-                var page = await missions.ListAsync(size, status, cursor, cancellationToken);
+                var page = await missions.ListAsync(
+                    size, status, query, createdAfter, createdBefore, cursor, cancellationToken);
                 return page is null
                     ? Results.BadRequest(new ApiErrorResponse(
-                        new ApiError("INVALID_CURSOR", "The Mission cursor is invalid for this filter.")))
+                        new ApiError("INVALID_CURSOR", "The Mission cursor is invalid for these filters.")))
                     : Results.Ok(page);
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
