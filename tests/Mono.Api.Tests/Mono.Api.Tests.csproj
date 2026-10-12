@@ -52,5 +52,6 @@
     <EmbeddedResource Include="../../db/migrations/031_zone_geometry_activation.sql" LogicalName="Mono.Api.Tests.Migrations.031_zone_geometry_activation.sql" />
     <EmbeddedResource Include="../../db/migrations/032_mission_lifecycle.sql" LogicalName="Mono.Api.Tests.Migrations.032_mission_lifecycle.sql" />
     <EmbeddedResource Include="../../db/migrations/033_courier_onboarding.sql" LogicalName="Mono.Api.Tests.Migrations.033_courier_onboarding.sql" />
+    <EmbeddedResource Include="../../db/migrations/034_courier_operations_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.034_courier_operations_read_audit.sql" />
   </ItemGroup>
 </Project>

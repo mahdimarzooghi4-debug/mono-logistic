@@ -718,6 +718,7 @@ POST /operations/v1/couriers
 Idempotency-Key: <operations-generated key>
 GET /operations/v1/couriers?page_size=50&cursor=crr_...
 GET /operations/v1/couriers/{courier_id}
+GET /operations/v1/courier-read-audit?page_size=50&cursor=cra_...
 POST /operations/v1/couriers/{courier_id}/trust-transitions
 Idempotency-Key: <operations-generated key>
 ```
@@ -736,3 +737,6 @@ Mono generates the internal Courier ID and creates the courier in REGISTERED sta
 A trust transition accepts the exact next uppercase status, a canonical reason code, and an opaque evidence reference. The target ACTIVE transition also supplies approved zone IDs and a primary zone. Approved zones must be selected from the courier's preferences and refer to active Mono zone geometry. Each successful transition updates the courier, appends immutable transition history, and saves the idempotency response in one PostgreSQL transaction. Exact retries replay the saved response; changed request content using the same actor/action/key returns 409 IDEMPOTENCY_CONFLICT.
 
 The database enforces single-step lifecycle progression and requires a matching append-only history row for every status change. Evidence references point to externally reviewed material; this API does not store or verify personal identity documents. ACTIVE is an onboarding state and is not yet connected to Mission assignment or courier availability.
+
+
+Courier roster and detail reads are recorded in an append-only Mono audit ledger with staff actor, action, requested Courier ID when applicable, result count, and server timestamp. The audit ledger is available to administrators through `GET /operations/v1/courier-read-audit`, which uses bounded keyset pagination and records each inspection. If a read cannot be recorded, the API does not return the roster, detail, or audit page.

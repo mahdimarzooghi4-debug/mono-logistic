@@ -64,6 +64,7 @@ public static class MonoCourierOperationsEndpoints
                 [FromQuery(Name = "page_size")] int? pageSize,
                 string? cursor,
                 PostgresCourierOnboardingService couriers,
+                PostgresCourierOperationsReadAuditService readAudit,
                 CancellationToken cancellationToken) =>
             {
                 var size = pageSize ?? 50;
@@ -73,9 +74,12 @@ public static class MonoCourierOperationsEndpoints
                 try
                 {
                     var page = await couriers.ListAsync(size, cursor, cancellationToken);
-                    return page is null
-                        ? Results.BadRequest(Error("INVALID_CURSOR", "The courier cursor is not valid."))
-                        : Results.Ok(page);
+                    if (page is null)
+                        return Results.BadRequest(Error("INVALID_CURSOR", "The courier cursor is not valid."));
+                    await readAudit.RecordAsync(
+                        PostgresCourierOperationsReadAuditService.CourierSearch,
+                        null, page.Items.Count, cancellationToken);
+                    return Results.Ok(page);
                 }
                 catch (ArgumentException)
                 {
@@ -87,14 +91,41 @@ public static class MonoCourierOperationsEndpoints
         endpoints.MapGet("/operations/v1/couriers/{courierId}", async (
                 string courierId,
                 PostgresCourierOnboardingService couriers,
+                PostgresCourierOperationsReadAuditService readAudit,
                 CancellationToken cancellationToken) =>
             {
                 if (!IsValidCourierId(courierId))
                     return InvalidRequest("Courier ID is invalid.");
                 var courier = await couriers.FindAsync(courierId, cancellationToken);
+                await readAudit.RecordAsync(
+                    PostgresCourierOperationsReadAuditService.CourierDetail,
+                    courierId, courier is null ? 0 : 1, cancellationToken);
                 return courier is null
                     ? Results.NotFound(Error("COURIER_NOT_FOUND", "The courier was not found."))
                     : Results.Ok(courier);
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet("/operations/v1/courier-read-audit", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                string? cursor,
+                PostgresCourierOperationsReadAuditService readAudit,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100)
+                    return InvalidRequest("Courier audit page_size must be between 1 and 100.");
+                try
+                {
+                    var page = await readAudit.ListAsync(size, cursor, cancellationToken);
+                    return page is null
+                        ? Results.BadRequest(Error("INVALID_CURSOR", "The courier audit cursor is not valid."))
+                        : Results.Ok(page);
+                }
+                catch (ArgumentException)
+                {
+                    return InvalidRequest("Courier audit filters are invalid.");
+                }
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
