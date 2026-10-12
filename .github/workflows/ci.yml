@@ -14,6 +14,22 @@ jobs:
   dotnet:
     name: .NET build and tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: mono
+          POSTGRES_PASSWORD: mono
+          POSTGRES_DB: mono_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mono -d mono_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONO_TEST_DATABASE: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_test
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
