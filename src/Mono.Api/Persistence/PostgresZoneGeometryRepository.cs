@@ -1,4 +1,3 @@
-using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using Mono.Api.Domain;
@@ -69,7 +68,7 @@ public sealed class PostgresZoneGeometryRepository
         insert.Parameters.AddWithValue("source_revision", NpgsqlDbType.Text, boundary.SourceRevision);
         insert.Parameters.AddWithValue("attribution", NpgsqlDbType.Text, boundary.Attribution);
         insert.Parameters.AddWithValue("geometry_srid", NpgsqlDbType.Integer, Wgs84Srid);
-        insert.Parameters.AddWithValue("geometry_type", NpgsqlDbType.Text, boundaryGeometryType(boundary));
+        insert.Parameters.AddWithValue("geometry_type", NpgsqlDbType.Text, boundary.GeometryType);
         insert.Parameters.AddWithValue("geometry_wkb", NpgsqlDbType.Bytea, wkb);
         insert.Parameters.AddWithValue("geometry_sha256", NpgsqlDbType.Text, geometryHash);
         insert.Parameters.AddWithValue("snapshot_sha256", NpgsqlDbType.Text, snapshotHash);
@@ -171,12 +170,6 @@ public sealed class PostgresZoneGeometryRepository
         {
             throw new InvalidOperationException("Stored zone geometry snapshot is invalid.", exception);
         }
-    }
-
-    private static string boundaryGeometryType(ZoneGeometryBoundary boundary)
-    {
-        var geometry = new WKBReader().Read(boundary.ToWellKnownBinary());
-        return geometry.GeometryType;
     }
 
     private static string ComputeSnapshotHash(ZoneGeometryBoundary boundary, byte[] wkb)
