@@ -8,6 +8,8 @@ namespace Mono.Api.Services;
 /// </summary>
 public static class MonoGeoJsonCacheValidators
 {
+    private const string ActiveLayerRepresentationVersion = "active-layer-geojson-v2";
+
     public static string ForSnapshot(string snapshotHash) => $"\"{snapshotHash}\"";
 
     public static string ForActiveLayerPage(
@@ -17,6 +19,7 @@ public static class MonoGeoJsonCacheValidators
         string? nextCursor)
     {
         var canonical = new StringBuilder();
+        Append(canonical, ActiveLayerRepresentationVersion);
         Append(canonical, kind);
         Append(canonical, hasMore ? "1" : "0");
         Append(canonical, nextCursor ?? string.Empty);

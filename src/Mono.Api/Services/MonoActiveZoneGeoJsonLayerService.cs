@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
@@ -89,9 +90,10 @@ public sealed class MonoActiveZoneGeoJsonLayerService(
         }
 
         var nextCursor = hasMore && rows.Count > 0 ? EncodeCursor(rows[^1].ZoneId) : null;
+        var collection = new ZoneGeometryGeoJsonFeatureCollection(
+            "FeatureCollection", features, MonoGeoJsonBounds.FromFeatures(features));
         return new MonoActiveZoneGeoJsonLayerPage(
-            new ZoneGeometryGeoJsonFeatureCollection("FeatureCollection", features),
-            zoneKind.ToString(), features.Count, coordinateCount, hasMore, nextCursor);
+            collection, zoneKind.ToString(), features.Count, coordinateCount, hasMore, nextCursor);
     }
 
     private void RequireAdministrator()
@@ -137,7 +139,8 @@ public sealed class MonoActiveZoneGeoJsonLayerService(
 
 public sealed record ZoneGeometryGeoJsonFeatureCollection(
     string Type,
-    IReadOnlyList<ZoneGeometryGeoJsonFeature> Features);
+    IReadOnlyList<ZoneGeometryGeoJsonFeature> Features,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] double[]? Bbox = null);
 
 public sealed record MonoActiveZoneGeoJsonLayerPage(
     ZoneGeometryGeoJsonFeatureCollection GeoJson,
