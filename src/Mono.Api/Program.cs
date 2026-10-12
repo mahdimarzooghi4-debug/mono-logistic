@@ -38,6 +38,7 @@ builder.Services.AddScoped<PostgresZoneGeometryActivationService>();
 builder.Services.AddScoped<MonoZoneCoveragePreviewService>();
 builder.Services.AddScoped<MonoZoneGeometryCatalogService>();
 builder.Services.AddScoped<MonoZoneGeometryHistoryService>();
+builder.Services.AddScoped<MonoZoneGeometryQualityService>();
 builder.Services.AddScoped<IDeliveryQuoteStore>(services =>
     services.GetRequiredService<PostgresDeliveryQuoteRepository>());
 builder.Services.AddScoped<DeliveryQuoteIssuanceApplicationService>();
@@ -80,6 +81,7 @@ app.MapMonoZoneGeometryActivationEndpoints();
 app.MapMonoZoneCoveragePreviewEndpoints();
 app.MapMonoZoneGeometryCatalogEndpoints();
 app.MapMonoZoneGeometryHistoryEndpoints();
+app.MapMonoZoneGeometryQualityEndpoints();
 
 app.Run();
 
