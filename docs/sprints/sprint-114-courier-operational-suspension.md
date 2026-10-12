@@ -20,6 +20,7 @@ Give Mono administrators a safe, auditable control to suspend an ACTIVE courier 
 - Exact retries replay the original resulting status; changed input with the same key conflicts.
 - Status reads record a privileged courier detail audit entry before returning data.
 - Database constraints reject invalid event transitions and mutations to event/idempotency history.
+- Suspension atomically cancels every scheduled window that ends after the suspension timestamp; those windows stay cancelled after reinstatement.
 - Suspended couriers cannot receive new planned windows and are excluded from planned capacity counts.
 - API responses contain operational metadata only.
 
@@ -29,4 +30,4 @@ This sprint does not authenticate couriers, collect GPS, start dispatch, or depl
 
 ## Validation
 
-PostgreSQL-backed integration coverage validates transitions, idempotency, status history, immutable audit data, and availability/projection exclusion. Full CI builds, tests, and builds the container image.
+PostgreSQL-backed integration coverage validates transitions, idempotency, status history, immutable audit data, cancellation of scheduled windows during suspension, and creation of fresh availability after reinstatement. Full CI builds, tests, and builds the container image.
