@@ -486,6 +486,32 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.False(listedKey.TryGetProperty("secret", out _));
                 Assert.False(listedKey.TryGetProperty("secretHash", out _));
 
+                var keyAuditPath = $"/operations/v1/customers/{customerId}/api-keys/{issuedKey.Credential.KeyId}/audit";
+                using var unauthenticatedKeyAudit = new HttpRequestMessage(HttpMethod.Get, keyAuditPath);
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthenticatedKeyAudit)).StatusCode);
+                using var nonAdminKeyAudit = new HttpRequestMessage(HttpMethod.Get, keyAuditPath);
+                nonAdminKeyAudit.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminKeyAudit)).StatusCode);
+                using var emptyKeyAudit = new HttpRequestMessage(HttpMethod.Get, keyAuditPath);
+                emptyKeyAudit.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var emptyKeyAuditResponse = await client.SendAsync(emptyKeyAudit);
+                Assert.Equal(System.Net.HttpStatusCode.OK, emptyKeyAuditResponse.StatusCode);
+                using var emptyKeyAuditBody = System.Text.Json.JsonDocument.Parse(
+                    await emptyKeyAuditResponse.Content.ReadAsStringAsync());
+                Assert.Empty(emptyKeyAuditBody.RootElement.GetProperty("entries").EnumerateArray());
+
+                using var wrongCustomerKeyAudit = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"/operations/v1/customers/cus_00000000000000000000000000000000/api-keys/{issuedKey.Credential.KeyId}/audit");
+                wrongCustomerKeyAudit.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(wrongCustomerKeyAudit)).StatusCode);
+
                 var revokePath = $"/operations/v1/customers/{customerId}/api-keys/{issuedKey.Credential.KeyId}/revoke";
 
                 using var unauthenticatedRevoke = new HttpRequestMessage(HttpMethod.Post, revokePath)
@@ -549,6 +575,23 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(issuedKey.Credential.KeyId, revokedListedKey.GetProperty("keyId").GetString());
                 Assert.NotEqual(System.Text.Json.JsonValueKind.Null,
                     revokedListedKey.GetProperty("revokedAt").ValueKind);
+
+                using var revokedKeyAudit = new HttpRequestMessage(HttpMethod.Get, keyAuditPath);
+                revokedKeyAudit.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var revokedKeyAuditResponse = await client.SendAsync(revokedKeyAudit);
+                Assert.Equal(System.Net.HttpStatusCode.OK, revokedKeyAuditResponse.StatusCode);
+                using var revokedKeyAuditBody = System.Text.Json.JsonDocument.Parse(
+                    await revokedKeyAuditResponse.Content.ReadAsStringAsync());
+                var revokedKeyAuditEntry = Assert.Single(
+                    revokedKeyAuditBody.RootElement.GetProperty("entries").EnumerateArray());
+                Assert.Equal(issuedKey.Credential.KeyId, revokedKeyAuditEntry.GetProperty("keyId").GetString());
+                Assert.Equal(customerId, revokedKeyAuditEntry.GetProperty("customerId").GetString());
+                Assert.Equal("REVOKED", revokedKeyAuditEntry.GetProperty("action").GetString());
+                Assert.Equal("admin-test", revokedKeyAuditEntry.GetProperty("actorId").GetString());
+                Assert.Equal("customer credential rotation", revokedKeyAuditEntry.GetProperty("reason").GetString());
+                Assert.False(revokedKeyAuditEntry.TryGetProperty("secret", out _));
+                Assert.False(revokedKeyAuditEntry.TryGetProperty("secretHash", out _));
 
                 using var repeatedRevoke = new HttpRequestMessage(HttpMethod.Post, revokePath)
                 {
