@@ -68,7 +68,7 @@ public sealed class MonoZoneGeometryGeoJsonService(
             new ZoneGeometryGeoJsonProperties(
                 boundary.ZoneId, boundary.Kind.ToString(), boundary.GeometryVersion,
                 boundary.SourceId, boundary.SourceRevision, boundary.Attribution,
-                geometryHash, snapshotHash, geometry.SRID));
+                geometryHash, snapshotHash, geometry.SRID, geometry.NumPoints));
     }
 
     private void RequireAdministrator()
@@ -126,4 +126,5 @@ public sealed record ZoneGeometryGeoJsonProperties(
     string Attribution,
     string GeometryHash,
     string SnapshotHash,
-    int Srid);
+    int Srid,
+    int CoordinateCount);
