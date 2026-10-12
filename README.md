@@ -67,6 +67,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Promise Commit Contract v1](docs/43-promise-commit-contract-v1.md)
 - [Atomic Promise Commit v1](docs/44-atomic-promise-commit-v1.md)
 - [Promise Commit Orchestration v1](docs/45-promise-commit-orchestration-v1.md)
+- [Promise Read API v1](docs/46-promise-read-api-v1.md)
 - [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 - [Hana Urban Delivery Configuration](docs/customers/hana/urban-delivery-configuration.md)
 - [Unified B2B Policy & Capability Model](docs/06-b2b-policy-capability-model.md)

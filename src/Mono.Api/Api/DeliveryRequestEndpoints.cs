@@ -73,6 +73,23 @@ public static class DeliveryRequestEndpoints
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
+
+        endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}/promise", async (
+                string deliveryRequestId,
+                PostgresPromiseCommitRepository promises,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await promises.FindByDeliveryRequestAsync(deliveryRequestId, cancellationToken);
+                if (result is null)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("PROMISE_NOT_FOUND", "The committed promise was not found for this customer.")));
+                }
+
+                return Results.Ok(result);
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
         endpoints.MapGet("/v1/delivery-requests", async (
                 [FromQuery(Name = "page_size")] int? pageSize,
                 string? cursor,

@@ -243,6 +243,33 @@ public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
             eventId);
     }
 
+
+    public async Task<PromiseReadResponse?> FindByDeliveryRequestAsync(
+        string deliveryRequestId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT promise_id, delivery_request_id, current_version, committed_delivery_at, outcome
+            FROM promises
+            WHERE customer_id = @customer_id AND delivery_request_id = @delivery_request_id;
+            """;
+
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, _customerContext.CustomerId);
+        command.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            return null;
+
+        return new PromiseReadResponse(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetInt32(2),
+            reader.GetFieldValue<DateTimeOffset>(3),
+            reader.GetString(4));
+    }
+
     private static string CanonicalProposal(PromiseCommitProposal proposal)
     {
         var payload = new
