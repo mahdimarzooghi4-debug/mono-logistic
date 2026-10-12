@@ -123,6 +123,30 @@ Example:
 
 The response has `delivery_request_id` and `status: RECEIVED`. A retry with the same key and normalized body returns the same values. No quote, feasibility decision, promise, or Mission is implied by receipt.
 
+## 6.1 List Delivery Requests
+
+```
+GET /v1/delivery-requests?page_size=50&cursor=drq_...
+```
+
+Requires `delivery-requests.read`. The default page size is 50 and the maximum is 100. Results are ordered by creation time descending, then request ID descending. `next_cursor` is the last returned request ID and may be sent as `cursor` to fetch the next page. A cursor must belong to the authenticated customer; unknown and foreign-customer cursors return `400 INVALID_CURSOR`. The list contains request summaries only and excludes pickup/dropoff and contact data.
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "delivery_request_id": "drq_...",
+      "external_reference": "ORDER-123",
+      "status": "RECEIVED",
+      "created_at": "2026-10-10T12:00:00Z"
+    }
+  ],
+  "next_cursor": null
+}
+```
+
 ## 7. Evaluate / Quote
 
 The implemented `GET /v1/delivery-requests/{delivery_request_id}` requires `delivery-requests.read` and returns only the authenticated customer's request summary. An unknown or foreign-customer ID returns 404, without exposing another tenant's data.

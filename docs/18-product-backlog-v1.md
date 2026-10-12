@@ -107,6 +107,7 @@ Epic
 - read request status with customer-scoped access
 - external reference and creation timestamp
 - Sprint 008 implements status lookup for received requests only
+- Sprint 009 implements customer-scoped request history with keyset pagination and summary-only fields
 
 ### E3.5 Mission Query
 - status
@@ -407,6 +408,7 @@ Courier Net = 89% of Mission Fare
 - `GET /v1/branches` (`branches.read`)
 - `POST /v1/delivery-requests` (`delivery-requests.write`, request intake only)
 - `GET /v1/delivery-requests/{id}` (`delivery-requests.read`, customer-scoped request summary)
+- `GET /v1/delivery-requests` (`delivery-requests.read`, paginated history)
 - confirm
 - Mission status
 - cancel

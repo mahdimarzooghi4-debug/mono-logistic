@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
@@ -69,6 +70,36 @@ public static class DeliveryRequestEndpoints
                 }
 
                 return Results.Ok(result);
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
+        endpoints.MapGet("/v1/delivery-requests", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                string? cursor,
+                PostgresDeliveryRequestRepository deliveryRequests,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "page_size must be between 1 and 100.")));
+                }
+
+                if (cursor is not null && !DeliveryRequestInputValidator.IsValidDeliveryRequestId(cursor))
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The cursor is invalid for this customer.")));
+                }
+
+                var page = await deliveryRequests.ListStatusAsync(size, cursor, cancellationToken);
+                if (page is null)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The cursor is invalid for this customer.")));
+                }
+
+                return Results.Ok(page);
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
