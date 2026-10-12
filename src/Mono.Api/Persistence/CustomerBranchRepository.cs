@@ -1,38 +1,19 @@
 using Mono.Api.Domain;
 using Npgsql;
 using NpgsqlTypes;
+using Mono.Api.Security;
 
 namespace Mono.Api.Persistence;
 
-public sealed class CustomerBranchRepository(NpgsqlDataSource dataSource)
+public sealed class CustomerBranchRepository(NpgsqlDataSource dataSource, ICustomerContext customerContext)
 {
-    public async Task CreateCustomerAsync(Customer customer, CancellationToken cancellationToken = default)
-    {
-        const string sql = """
-            INSERT INTO customers (
-                customer_id, legal_name, display_name, status, customer_type,
-                default_channel, default_currency, created_at)
-            VALUES (
-                @customer_id, @legal_name, @display_name, @status, @customer_type,
-                @default_channel, @default_currency, @created_at);
-            """;
-
-        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customer.CustomerId);
-        command.Parameters.AddWithValue("legal_name", NpgsqlDbType.Text, customer.LegalName);
-        AddNullable(command, "display_name", NpgsqlDbType.Text, customer.DisplayName);
-        command.Parameters.AddWithValue("status", NpgsqlDbType.Text, customer.Status);
-        AddNullable(command, "customer_type", NpgsqlDbType.Text, customer.CustomerType);
-        AddNullable(command, "default_channel", NpgsqlDbType.Text, customer.DefaultChannel);
-        AddNullable(command, "default_currency", NpgsqlDbType.Text, customer.DefaultCurrency);
-        command.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, customer.CreatedAt);
-
-        await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
     public async Task CreateBranchAsync(Branch branch, CancellationToken cancellationToken = default)
     {
+        if (!string.Equals(branch.CustomerId, customerContext.CustomerId, StringComparison.Ordinal))
+        {
+            throw new CustomerContextUnavailableException("A branch can only be written inside the authenticated customer context.");
+        }
+
         const string sql = """
             INSERT INTO branches (
                 branch_id, customer_id, name, address, latitude, longitude,
@@ -58,7 +39,6 @@ public sealed class CustomerBranchRepository(NpgsqlDataSource dataSource)
     }
 
     public async Task<Branch?> FindBranchAsync(
-        string customerId,
         string branchId,
         CancellationToken cancellationToken = default)
     {
@@ -71,7 +51,7 @@ public sealed class CustomerBranchRepository(NpgsqlDataSource dataSource)
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerContext.CustomerId);
         command.Parameters.AddWithValue("branch_id", NpgsqlDbType.Text, branchId);
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);

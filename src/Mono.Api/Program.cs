@@ -1,6 +1,9 @@
+using Mono.Api.Security;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();
+builder.Services.AddMonoCustomerTenantAuthorization();
 
 var app = builder.Build();
 
