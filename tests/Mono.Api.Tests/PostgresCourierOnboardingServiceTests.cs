@@ -77,7 +77,7 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var detail = await service.FindAsync(courierId);
         Assert.NotNull(detail);
         Assert.Equal("ACTIVE", detail.Status);
-        Assert.Equal(["zone-central"], detail.ApprovedZoneIds);
+        Assert.Equal(new[] { "zone-central" }, detail.ApprovedZoneIds);
 
         var page = await service.ListAsync(1, null);
         Assert.NotNull(page);
