@@ -52,5 +52,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.015_branch_external_identifiers.sql" />
     <EmbeddedResource Include="../../db/migrations/016_policy_draft_registry.sql"
                       LogicalName="Mono.Api.Tests.Migrations.016_policy_draft_registry.sql" />
+    <EmbeddedResource Include="../../db/migrations/017_policy_lifecycle.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.017_policy_lifecycle.sql" />
   </ItemGroup>
 </Project>
