@@ -31,6 +31,7 @@ builder.Services.AddScoped<PostgresCourierOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresCourierAvailabilityService>();
 builder.Services.AddScoped<PostgresCourierCapacityProjectionService>();
 builder.Services.AddScoped<PostgresCourierSuspensionService>();
+builder.Services.AddScoped<PostgresCourierPlanningEligibilityService>();
 builder.Services.AddScoped<PostgresMissionHistoryRepository>();
 builder.Services.AddScoped<PostgresMissionOperationsService>();
 builder.Services.AddScoped<PostgresMissionOperationsReadAuditService>();
