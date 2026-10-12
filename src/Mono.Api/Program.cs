@@ -29,6 +29,7 @@ builder.Services.AddScoped<PostgresDeliveryQuoteRepository>();
 builder.Services.AddScoped<IPromiseCommitStore>(services =>
     services.GetRequiredService<PostgresPromiseCommitRepository>());
 builder.Services.AddScoped<IFeasibilityEvidenceSourceVerifier, UnconfiguredFeasibilityEvidenceSourceVerifier>();
+builder.Services.AddScoped<IHanaDistanceEvidenceSourceVerifier, UnconfiguredHanaDistanceEvidenceSourceVerifier>();
 builder.Services.AddScoped<PromiseCommitApplicationService>();
 
 var app = builder.Build();
