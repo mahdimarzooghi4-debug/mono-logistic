@@ -293,7 +293,7 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             courierId, "zone-central", now.AddHours(3), now.AddHours(5), "availability-overlap");
         Assert.Equal(CourierAvailabilityWriteOutcome.Overlap, overlap.Outcome);
 
-        var page = await availability.ListAsync(now.AddDays(1), now, 10, null, null);
+        var page = await availability.ListAsync(now, now.AddDays(1), 10, null, null);
         Assert.NotNull(page);
         Assert.Single(page.Items);
         Assert.Equal(created.Window.WindowId, page.Items[0].WindowId);
