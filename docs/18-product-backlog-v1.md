@@ -147,6 +147,7 @@ Epic
 - Sprint 082 adds an MFA-gated, filterable, keyset-paginated operations view of Mission read audits; audit-ledger reads are also recorded.
 - Sprint 083 adds MFA-gated Delivery Request search and safe summary inspection across tenants, with prefix/date/status filters, cursor consistency, and append-only access audit.
 - Sprint 084 joins operations Delivery Request reads to Mission summaries and adds customer, branch, and Mission-existence filters with cursor/filter consistency.
+- Sprint 085 adds MFA-gated, filterable Delivery Request read-audit inspection; reads of that audit ledger append their own entries to the same immutable ledger.
 
 ## 6. Epic E4 — Shipment & Capability Model
 

@@ -174,6 +174,37 @@ public static class MonoMissionOperationsEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/delivery-request-read-audit", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                [FromQuery(Name = "delivery_request_id")] string? deliveryRequestId,
+                [FromQuery(Name = "actor_id")] string? actorId,
+                [FromQuery(Name = "created_after")] DateTimeOffset? createdAfter,
+                [FromQuery(Name = "created_before")] DateTimeOffset? createdBefore,
+                string? cursor,
+                PostgresDeliveryRequestOperationsReadAuditService readAudit,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100 ||
+                    (deliveryRequestId is not null &&
+                     !DeliveryRequestInputValidator.IsValidDeliveryRequestId(deliveryRequestId)) ||
+                    !PostgresDeliveryRequestOperationsReadAuditService.IsValidActorId(actorId) ||
+                    !DeliveryRequestOperationsInputValidator.IsValidDateRange(createdAfter, createdBefore))
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Delivery Request audit filters are invalid.")));
+                if (!PostgresDeliveryRequestOperationsReadAuditService.IsValidAuditCursor(cursor))
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The Delivery Request audit cursor is invalid.")));
+
+                var page = await readAudit.ListAsync(
+                    size, deliveryRequestId, actorId, createdAfter, createdBefore, cursor, cancellationToken);
+                return page is null
+                    ? Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The Delivery Request audit cursor is invalid for these filters.")))
+                    : Results.Ok(page);
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         return endpoints;
     }
 }
