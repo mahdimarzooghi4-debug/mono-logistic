@@ -15,14 +15,18 @@ public sealed class FeasibilityEvidenceIntegrityContractTests
                 FeasibilityCriterionStatus.Fail,
                 ["ROUTE_DELAY", "SLA_MISSED"]),
             "route-evaluation-1",
-            observedAt);
+            observedAt,
+            "test-source",
+            "test-attestation");
         var second = FeasibilityEvidenceIntegrityContract.Attach(
             new FeasibilityCriterionResult(
                 FeasibilityCriterion.RouteInsertion,
                 FeasibilityCriterionStatus.Fail,
                 ["SLA_MISSED", "ROUTE_DELAY"]),
             "route-evaluation-1",
-            observedAt.ToOffset(TimeSpan.FromHours(3)));
+            observedAt.ToOffset(TimeSpan.FromHours(3)),
+            "test-source",
+            "test-attestation");
 
         Assert.Equal(first.Integrity!.PayloadSha256, second.Integrity!.PayloadSha256);
         Assert.True(FeasibilityEvidenceIntegrityContract.IsValid(first));
@@ -43,6 +47,8 @@ public sealed class FeasibilityEvidenceIntegrityContractTests
             result with { Status = FeasibilityCriterionStatus.Fail }));
         Assert.False(FeasibilityEvidenceIntegrityContract.IsValid(
             result with { Integrity = result.Integrity! with { EvidenceId = "different-evidence" } }));
+        Assert.False(FeasibilityEvidenceIntegrityContract.IsValid(
+            result with { Integrity = result.Integrity! with { SourceId = "another-source" } }));
         Assert.False(FeasibilityEvidenceIntegrityContract.IsValid(
             result with { Integrity = result.Integrity! with { PayloadSha256 = new string('0', 64) } }));
     }

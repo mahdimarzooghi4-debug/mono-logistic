@@ -244,6 +244,7 @@ Evaluate:
 - Sprint 054 adds a validated Route Insertion criterion evidence envelope. Only complete, explicit evidence can pass or fail; simulation mechanics and operational outcomes remain future work.
 - Sprint 055 compares a caller-supplied estimated delivery time with an explicit SLA deadline; missing or incomplete evidence remains unresolved and no SLA threshold is invented.
 - Sprint 062 adds a canonical SHA-256 integrity envelope for criterion results and blocks Promise persistence when the required result digests are absent or invalid. This detects post-envelope mutation; it does not authenticate evidence sources or prove their assertions.
+- Sprint 063 adds source ID and opaque attestation fields to the integrity envelope and a customer-bound verifier gate before persistence. The default verifier is intentionally unconfigured and blocks commits. Trusted source registration and a source-specific cryptographic verification method remain undecided.
 
 ### E7.2 Results
 - ACCEPTED
@@ -261,6 +262,7 @@ Evaluate:
 - Sprint 059 adds an application service that runs the E7.2 evaluator and only persists a matching ACCEPTED or ALTERNATIVE_PROMISE with the exact evaluated delivery time. REJECTED, UNRESOLVED, and mismatched proposals never reach persistence.
 - Sprint 060 adds an authenticated, tenant-scoped read endpoint for the current committed Promise of a delivery request. It returns the current version and committed time, while internal safety-buffer and decision-reason evidence remain private.
 - Sprint 061 adds a paginated, tenant-scoped Promise version history endpoint. It exposes version, committed time, outcome, and record timestamp without returning internal decision evidence.
+- Sprint 063 wires a fail-closed evidence-source verification boundary into the Promise commit service; no production source is trusted yet.
 
 ### Acceptance
 - Mono never commits a Mission before proving feasibility.
