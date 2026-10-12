@@ -341,6 +341,7 @@ REGISTERED
 -> MONO_APPROVED
 -> ACTIVE
 ```
+- Sprint 109 adds a unit-tested ordered trust lifecycle with staff attribution and bounded evidence references; ACTIVE also requires an approved primary zone. Persistence, courier authentication, evidence verification, operations APIs, and dispatch integration remain future work.
 
 ## 12. Epic E10 — Assignment
 
