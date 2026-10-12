@@ -58,5 +58,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.018_promise_commit.sql" />
     <EmbeddedResource Include="../../db/migrations/019_delivery_quote_versions.sql"
                       LogicalName="Mono.Api.Tests.Migrations.019_delivery_quote_versions.sql" />
+    <EmbeddedResource Include="../../db/migrations/020_delivery_quote_issuance_idempotency.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql" />
   </ItemGroup>
 </Project>

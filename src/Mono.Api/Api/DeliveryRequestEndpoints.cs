@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
+using Mono.Api.Services;
 
 namespace Mono.Api.Api;
 
@@ -117,6 +118,87 @@ public static class DeliveryRequestEndpoints
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
+
+        endpoints.MapPost("/v1/delivery-requests/{deliveryRequestId}/quote", async (
+                string deliveryRequestId,
+                DeliveryQuoteIssuanceInput input,
+                HttpRequest request,
+                DeliveryQuoteIssuanceApplicationService issuance,
+                PostgresDeliveryQuoteRepository quotes,
+                CancellationToken cancellationToken) =>
+            {
+                var idempotencyValues = request.Headers["Idempotency-Key"];
+                if (idempotencyValues.Count != 1 ||
+                    !DeliveryRequestInputValidator.IsValidIdempotencyKey(idempotencyValues[0]))
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "A valid Idempotency-Key header is required.")));
+                }
+
+                if (!DeliveryRequestInputValidator.IsValidDeliveryRequestId(deliveryRequestId) ||
+                    input.DistanceEvidence is null ||
+                    input.ExpiresAt == default)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST",
+                            "A valid delivery request ID, expires_at, and distance_evidence are required.")));
+                }
+
+                HanaDistancePricingEvidence evidence;
+                try
+                {
+                    evidence = input.DistanceEvidence.Attach();
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "The distance evidence fields are invalid.")));
+                }
+
+                var requestHash = input.ComputeRequestHash(deliveryRequestId, evidence);
+                var result = await issuance.IssueInitialIdempotentlyAsync(
+                    deliveryRequestId, input.ExpiresAt, evidence, idempotencyValues[0]!, requestHash,
+                    cancellationToken);
+
+                switch (result.Status)
+                {
+                    case DeliveryQuoteIssuanceStatus.Issued:
+                    case DeliveryQuoteIssuanceStatus.Replayed:
+                        var response = await quotes.FindLatestByDeliveryRequestAsync(
+                            deliveryRequestId, cancellationToken);
+                        return response is null
+                            ? Results.NotFound(new ApiErrorResponse(
+                                new ApiError("QUOTE_NOT_FOUND", "The quote was not found for this customer.")))
+                            : Results.Ok(response);
+                    case DeliveryQuoteIssuanceStatus.IdempotencyConflict:
+                        return Results.Conflict(new ApiErrorResponse(
+                            new ApiError("IDEMPOTENCY_CONFLICT",
+                                "The Idempotency-Key was already used with a different quote request.")));
+                    case DeliveryQuoteIssuanceStatus.Conflict:
+                        return Results.Conflict(new ApiErrorResponse(
+                            new ApiError("QUOTE_ALREADY_ISSUED",
+                                "An initial Quote has already been issued for this delivery request.")));
+                    case DeliveryQuoteIssuanceStatus.DeliveryRequestNotFound:
+                        return Results.NotFound(new ApiErrorResponse(
+                            new ApiError("DELIVERY_REQUEST_NOT_FOUND",
+                                "The delivery request was not found for this customer.")));
+                    case DeliveryQuoteIssuanceStatus.ExpiryInvalid:
+                        return Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("QUOTE_EXPIRY_INVALID",
+                                "expires_at must be later than the server issue time.")));
+                    case DeliveryQuoteIssuanceStatus.EvidenceIntegrityInvalid:
+                        return Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("QUOTE_EVIDENCE_INVALID",
+                                "The distance evidence integrity envelope is invalid.")));
+                    case DeliveryQuoteIssuanceStatus.EvidenceSourceUnverified:
+                        return Results.UnprocessableEntity(new ApiErrorResponse(
+                            new ApiError("QUOTE_EVIDENCE_UNVERIFIED",
+                                "The distance evidence source could not be verified.")));
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(result.Status));
+                }
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsWrite);
 
         endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}/quote", async (
                 string deliveryRequestId,

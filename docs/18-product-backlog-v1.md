@@ -293,6 +293,7 @@ Evaluate:
 - Sprint 067 adds tenant-scoped current Quote and paginated version-history read APIs using delivery-requests.read. Responses omit policy-version and audit-evidence identifiers; expiry is reported at read time without extending the Quote.
 - Sprint 068 adds an integrity envelope binding Hana pricing distance, evidence ID, observation time, source ID, and opaque source attestation. Source authenticity remains unverified until Mono selects a provider and configures the fail-closed verifier.
 - Sprint 069 adds a Quote issuance application service for the initial version: it validates explicit expiry, verifies tenant-bound distance evidence, computes fare from the approved tariff, and stores a safe evidence reference. No HTTP endpoint or retry/idempotency behavior is added yet.
+- Sprint 070 exposes initial Quote issuance through an authenticated endpoint. It computes evidence digests and fares server-side and atomically persists the Quote with a tenant-scoped Idempotency-Key mapping. Trusted source verification remains fail-closed until configured.
 - quote version
 - expiration
 - policy versions
@@ -473,6 +474,7 @@ Courier Net = 89% of Mission Fare
 - `GET /v1/delivery-requests/{id}` (`delivery-requests.read`, customer-scoped request summary)
 - `GET /v1/delivery-requests/{id}/promise` (`delivery-requests.read`, customer-scoped current committed Promise)
 - `GET /v1/delivery-requests/{id}/promise/versions` (`delivery-requests.read`, paginated customer-scoped Promise history)
+- Sprint 070 adds `POST /v1/delivery-requests/{id}/quote` (`delivery-requests.write`, tenant-scoped, idempotent first Quote issuance)
 - `GET /v1/delivery-requests` (`delivery-requests.read`, paginated history)
 - confirm
 - Mission status

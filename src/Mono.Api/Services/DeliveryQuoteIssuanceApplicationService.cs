@@ -13,7 +13,8 @@ public enum DeliveryQuoteIssuanceStatus
     DeliveryRequestNotFound,
     ExpiryInvalid,
     EvidenceIntegrityInvalid,
-    EvidenceSourceUnverified
+    EvidenceSourceUnverified,
+    IdempotencyConflict
 }
 
 public sealed record DeliveryQuoteIssuanceResult(
@@ -25,6 +26,12 @@ public interface IDeliveryQuoteStore
     Task<DeliveryQuoteWriteResult> PersistAsync(
         DeliveryQuote quote,
         CancellationToken cancellationToken = default);
+
+    Task<DeliveryQuoteWriteResult> IssueInitialIdempotentlyAsync(
+        DeliveryQuote quote,
+        string idempotencyKey,
+        string requestHash,
+        CancellationToken cancellationToken = default) => PersistAsync(quote, cancellationToken);
 }
 
 /// <summary>
@@ -50,11 +57,29 @@ public sealed class DeliveryQuoteIssuanceApplicationService
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public async Task<DeliveryQuoteIssuanceResult> IssueInitialAsync(
+    public Task<DeliveryQuoteIssuanceResult> IssueInitialAsync(
         string deliveryRequestId,
         DateTimeOffset expiresAt,
         HanaDistancePricingEvidence? evidence,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        IssueInitialCoreAsync(deliveryRequestId, expiresAt, evidence, null, null, cancellationToken);
+
+    public Task<DeliveryQuoteIssuanceResult> IssueInitialIdempotentlyAsync(
+        string deliveryRequestId,
+        DateTimeOffset expiresAt,
+        HanaDistancePricingEvidence? evidence,
+        string idempotencyKey,
+        string requestHash,
+        CancellationToken cancellationToken = default) =>
+        IssueInitialCoreAsync(deliveryRequestId, expiresAt, evidence, idempotencyKey, requestHash, cancellationToken);
+
+    private async Task<DeliveryQuoteIssuanceResult> IssueInitialCoreAsync(
+        string deliveryRequestId,
+        DateTimeOffset expiresAt,
+        HanaDistancePricingEvidence? evidence,
+        string? idempotencyKey,
+        string? requestHash,
+        CancellationToken cancellationToken)
     {
         if (!HanaDistancePricingEvidenceContract.IsValid(evidence))
         {
@@ -96,12 +121,16 @@ public sealed class DeliveryQuoteIssuanceApplicationService
                 evidence.SourceId,
                 evidence.PayloadSha256));
 
-        var persistence = await _store.PersistAsync(quote, cancellationToken);
+        var persistence = idempotencyKey is null || requestHash is null
+            ? await _store.PersistAsync(quote, cancellationToken)
+            : await _store.IssueInitialIdempotentlyAsync(
+                quote, idempotencyKey, requestHash, cancellationToken);
         var status = persistence.Outcome switch
         {
             DeliveryQuoteWriteOutcome.Persisted => DeliveryQuoteIssuanceStatus.Issued,
             DeliveryQuoteWriteOutcome.Replayed => DeliveryQuoteIssuanceStatus.Replayed,
             DeliveryQuoteWriteOutcome.Conflict => DeliveryQuoteIssuanceStatus.Conflict,
+            DeliveryQuoteWriteOutcome.IdempotencyConflict => DeliveryQuoteIssuanceStatus.IdempotencyConflict,
             DeliveryQuoteWriteOutcome.DeliveryRequestNotFound =>
                 DeliveryQuoteIssuanceStatus.DeliveryRequestNotFound,
             _ => throw new ArgumentOutOfRangeException(
