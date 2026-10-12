@@ -8,11 +8,13 @@ namespace Mono.Api.Security;
 public static class MonoClaimTypes
 {
     public const string CustomerId = "mono/customer_id";
+    public const string Scope = "mono/scope";
 }
 
 public static class MonoAuthorizationPolicies
 {
     public const string CustomerTenant = "mono.customer-tenant";
+    public const string BranchesRead = "mono.branches.read";
 }
 
 public interface ICustomerContext
@@ -79,6 +81,24 @@ public sealed class CustomerTenantAuthorizationHandler(ICustomerContext customer
     }
 }
 
+public sealed record MonoScopeRequirement(string RequiredScope) : IAuthorizationRequirement;
+
+public sealed class MonoScopeAuthorizationHandler : AuthorizationHandler<MonoScopeRequirement>
+{
+    protected override Task HandleRequirementAsync(
+        AuthorizationHandlerContext context,
+        MonoScopeRequirement requirement)
+    {
+        if (context.User.FindAll(MonoClaimTypes.Scope)
+            .Any(claim => string.Equals(claim.Value, requirement.RequiredScope, StringComparison.Ordinal)))
+        {
+            context.Succeed(requirement);
+        }
+
+        return Task.CompletedTask;
+    }
+}
+
 public static class CustomerTenantServiceCollectionExtensions
 {
     public static IServiceCollection AddMonoCustomerTenantAuthorization(this IServiceCollection services)
@@ -86,6 +106,7 @@ public static class CustomerTenantServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddScoped<ICustomerContext, HttpCustomerContext>();
         services.AddScoped<IAuthorizationHandler, CustomerTenantAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, MonoScopeAuthorizationHandler>();
         services.AddAuthorization(options =>
         {
             options.AddPolicy(MonoAuthorizationPolicies.CustomerTenant, policy =>
@@ -93,6 +114,13 @@ public static class CustomerTenantServiceCollectionExtensions
                 policy.AddAuthenticationSchemes(MonoApiKeyDefaults.Scheme);
                 policy.RequireAuthenticatedUser();
                 policy.AddRequirements(new CustomerTenantRequirement());
+            });
+            options.AddPolicy(MonoAuthorizationPolicies.BranchesRead, policy =>
+            {
+                policy.AddAuthenticationSchemes(MonoApiKeyDefaults.Scheme);
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new CustomerTenantRequirement());
+                policy.AddRequirements(new MonoScopeRequirement("branches.read"));
             });
         });
 

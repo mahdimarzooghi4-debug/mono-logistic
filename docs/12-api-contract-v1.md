@@ -52,6 +52,11 @@ Every request resolves:
 - service configuration
 - policy scope
 
+The first implemented customer operation is `GET /v1/branches`. It requires the
+`branches.read` API-key scope and returns only the authenticated customer's branch
+summaries. Customer identity is resolved from the credential and is never accepted
+from query parameters or request bodies.
+
 ## 5. Idempotency
 
 All create/command endpoints should accept:
@@ -442,6 +447,11 @@ GET /v1/branches
 POST /v1/branches
 PATCH /v1/branches/{branch_id}
 ```
+
+The read endpoint is available to API keys with the `branches.read` scope.
+Responses include `branch_id`, `name`, `address`, `latitude`, `longitude`,
+`zone_id`, and `status`; internal customer IDs and operating-hours storage are
+not exposed by this initial summary response.
 
 Useful for Dashboard-based customers with multiple stores.
 

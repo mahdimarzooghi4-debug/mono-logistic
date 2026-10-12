@@ -38,6 +38,41 @@ public sealed class CustomerBranchRepository(NpgsqlDataSource dataSource, ICusto
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Branch>> ListBranchesAsync(CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            SELECT branch_id, customer_id, name, address, latitude, longitude,
+                   zone_id, operating_hours::text, status
+            FROM branches
+            WHERE customer_id = @customer_id
+            ORDER BY name, branch_id;
+            """;
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerContext.CustomerId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var branches = new List<Branch>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            branches.Add(new Branch
+            {
+                BranchId = reader.GetString(0),
+                CustomerId = reader.GetString(1),
+                Name = reader.GetString(2),
+                Address = GetNullableString(reader, 3),
+                Latitude = reader.IsDBNull(4) ? null : reader.GetDouble(4),
+                Longitude = reader.IsDBNull(5) ? null : reader.GetDouble(5),
+                ZoneId = GetNullableString(reader, 6),
+                OperatingHoursJson = GetNullableString(reader, 7),
+                Status = reader.GetString(8)
+            });
+        }
+
+        return branches;
+    }
+
     public async Task<Branch?> FindBranchAsync(
         string branchId,
         CancellationToken cancellationToken = default)
