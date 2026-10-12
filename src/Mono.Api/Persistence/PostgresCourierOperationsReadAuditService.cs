@@ -32,7 +32,7 @@ public sealed class PostgresCourierOperationsReadAuditService(
     {
         if (action is not (CourierSearch or CourierDetail or CourierAuditInspection or CourierAvailabilitySearch or CourierCapacityProjection) ||
             resultCount is < 0 or > 101 ||
-            ((action is CourierSearch or CourierAuditInspection or CourierAvailabilitySearch) && courierId is not null) ||
+            ((action is CourierSearch or CourierAuditInspection or CourierAvailabilitySearch or CourierCapacityProjection) && courierId is not null) ||
             (action == CourierDetail &&
              (courierId is null || !CourierIdPattern.IsMatch(courierId))))
             throw new ArgumentException("Courier read audit scope is invalid.");
