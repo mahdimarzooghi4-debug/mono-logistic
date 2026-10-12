@@ -265,6 +265,75 @@ public sealed class PostgresCourierOnboardingService(
         return new CourierOperationsWriteResult(CourierOperationsWriteOutcome.Applied, snapshot);
     }
 
+
+    public async Task<CourierOperationsPage?> ListAsync(
+        int pageSize,
+        string? cursor,
+        CancellationToken cancellationToken = default)
+    {
+        RequireActor();
+        if (pageSize is < 1 or > 100 || (cursor is not null && !CourierIdPattern.IsMatch(cursor)))
+            throw new ArgumentException("Courier page filters are invalid.");
+
+        DateTimeOffset? cursorCreatedAt = null;
+        if (cursor is not null)
+        {
+            await using var cursorConnection = await dataSource.OpenConnectionAsync(cancellationToken);
+            await using var cursorCommand = new NpgsqlCommand(
+                "SELECT created_at FROM couriers WHERE courier_id = @courier_id;", cursorConnection);
+            cursorCommand.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, cursor);
+            var value = await cursorCommand.ExecuteScalarAsync(cancellationToken);
+            if (value is not DateTimeOffset createdAt)
+                return null;
+            cursorCreatedAt = createdAt;
+        }
+
+        const string firstPageSql = """
+            SELECT courier_id, mode, status, preferred_zone_ids::text, approved_zone_ids::text,
+                   primary_zone_id, created_at, updated_at
+            FROM couriers
+            ORDER BY created_at DESC, courier_id DESC
+            LIMIT @take;
+            """;
+        const string nextPageSql = """
+            SELECT courier_id, mode, status, preferred_zone_ids::text, approved_zone_ids::text,
+                   primary_zone_id, created_at, updated_at
+            FROM couriers
+            WHERE created_at < @cursor_created_at
+               OR (created_at = @cursor_created_at AND courier_id < @cursor_id)
+            ORDER BY created_at DESC, courier_id DESC
+            LIMIT @take;
+            """;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, connection);
+        command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
+        if (cursor is not null)
+        {
+            command.Parameters.AddWithValue("cursor_created_at", NpgsqlDbType.TimestampTz, cursorCreatedAt!.Value);
+            command.Parameters.AddWithValue("cursor_id", NpgsqlDbType.Text, cursor);
+        }
+
+        var summaries = new List<CourierOperationsSummary>();
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                summaries.Add(new CourierOperationsSummary(
+                    reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                    JsonSerializer.Deserialize<string[]>(reader.GetString(3)) ?? [],
+                    JsonSerializer.Deserialize<string[]>(reader.GetString(4)) ?? [],
+                    reader.IsDBNull(5) ? null : reader.GetString(5),
+                    reader.GetFieldValue<DateTimeOffset>(6),
+                    reader.GetFieldValue<DateTimeOffset>(7)));
+            }
+        }
+
+        var hasMore = summaries.Count > pageSize;
+        if (hasMore)
+            summaries.RemoveAt(summaries.Count - 1);
+        return new CourierOperationsPage(summaries, hasMore ? summaries[^1].CourierId : null);
+    }
+
     public async Task<CourierOperationsSnapshot?> FindAsync(
         string courierId,
         CancellationToken cancellationToken = default)
