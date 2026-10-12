@@ -79,7 +79,7 @@ public sealed class PostgresZoneGeometryActivationService(
         var target = await FindSnapshotAsync(connection, transaction, zoneId, geometryVersion, cancellationToken);
         if (target is null)
             throw new ZoneGeometryActivationSnapshotNotFoundException();
-        if (!string.Equals(target.Value, expectedHash, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(target, expectedHash, StringComparison.OrdinalIgnoreCase))
             throw new ZoneGeometryActivationHashConflictException();
         if (!await IsLatestReviewApprovedAsync(connection, transaction, zoneId, geometryVersion, cancellationToken))
             throw new ZoneGeometryActivationReviewRequiredException();
@@ -95,7 +95,7 @@ public sealed class PostgresZoneGeometryActivationService(
         }
 
         await InsertEventAsync(connection, transaction, zoneId, geometryVersion,
-            target.Value, "ACTIVATE", actorId, reason, now, cancellationToken);
+            target, "ACTIVATE", actorId, reason, now, cancellationToken);
         await using (var update = new NpgsqlCommand("""
             INSERT INTO zone_geometry_active (zone_id, geometry_version, snapshot_sha256, activated_at, activated_by)
             VALUES (@zone_id, @geometry_version, @snapshot_sha256, @activated_at, @activated_by)
@@ -108,13 +108,13 @@ public sealed class PostgresZoneGeometryActivationService(
         {
             update.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, zoneId);
             update.Parameters.AddWithValue("geometry_version", NpgsqlDbType.Text, geometryVersion);
-            update.Parameters.AddWithValue("snapshot_sha256", NpgsqlDbType.Text, target.Value);
+            update.Parameters.AddWithValue("snapshot_sha256", NpgsqlDbType.Text, target);
             update.Parameters.AddWithValue("activated_at", NpgsqlDbType.TimestampTz, now);
             update.Parameters.AddWithValue("activated_by", NpgsqlDbType.Text, actorId);
             await update.ExecuteNonQueryAsync(cancellationToken);
         }
         await transaction.CommitAsync(cancellationToken);
-        return new ZoneGeometryActivationState(zoneId, geometryVersion, target.Value, now, actorId);
+        return new ZoneGeometryActivationState(zoneId, geometryVersion, target, now, actorId);
     }
 
     public async Task<bool> DeactivateAsync(
