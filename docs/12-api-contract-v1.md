@@ -720,6 +720,9 @@ GET /operations/v1/couriers?page_size=50&cursor=crr_...
 GET /operations/v1/couriers/{courier_id}
 GET /operations/v1/courier-read-audit?page_size=50&cursor=cra_...
 POST /operations/v1/couriers/{courier_id}/trust-transitions
+POST /operations/v1/couriers/{courier_id}/availability-windows
+GET /operations/v1/courier-availability-windows?from=...&to=...&page_size=50&zone_id=...
+POST /operations/v1/courier-availability-windows/{window_id}/cancel
 Idempotency-Key: <operations-generated key>
 ```
 
@@ -740,3 +743,10 @@ The database enforces single-step lifecycle progression and requires a matching 
 
 
 Courier roster and detail reads are recorded in an append-only Mono audit ledger with staff actor, action, requested Courier ID when applicable, result count, and server timestamp. The audit ledger is available to administrators through `GET /operations/v1/courier-read-audit`, which uses bounded keyset pagination and records each inspection. If a read cannot be recorded, the API does not return the roster, detail, or audit page.
+
+
+### 34.2 Planned courier availability
+
+Mono operators can create scheduled availability windows for ACTIVE couriers in an approved zone. Each window is limited to 16 hours and must start within the next 30 days. Windows for the same courier may not overlap. Creation and cancellation require an Idempotency-Key; a window can only be cancelled once, and database guards prevent editing or deleting its schedule. Search requires a bounded UTC time range of at most 31 days, supports optional zone filtering, and uses keyset pagination.
+
+These windows are staff-entered planning data. They are not courier-reported live availability, location, GPS freshness, or dispatch eligibility. A future dispatch decision must apply separate real-time and operational checks.
