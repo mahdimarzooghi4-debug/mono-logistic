@@ -39,6 +39,8 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         Assert.Equal(CourierOperationsWriteOutcome.Conflict, conflict.Outcome);
 
         var courierId = created.Snapshot.CourierId;
+        var secondCourier = await service.RegisterAsync("WALK", ["zone-east"], "register-second");
+        Assert.Equal(CourierOperationsWriteOutcome.Applied, secondCourier.Outcome);
         var transitions = new[]
         {
             "IDENTITY_VERIFIED",
@@ -82,7 +84,12 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var page = await service.ListAsync(1, null);
         Assert.NotNull(page);
         Assert.Single(page.Items);
-        Assert.Equal(courierId, page.Items[0].CourierId);
+        Assert.NotNull(page.NextCursor);
+        var nextPage = await service.ListAsync(1, page.NextCursor);
+        Assert.NotNull(nextPage);
+        Assert.Single(nextPage.Items);
+        Assert.NotEqual(page.Items[0].CourierId, nextPage.Items[0].CourierId);
+        Assert.Null(nextPage.NextCursor);
     }
 
     [Fact]
