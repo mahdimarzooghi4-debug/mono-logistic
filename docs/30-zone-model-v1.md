@@ -18,6 +18,7 @@ The City node is the canonical city context for its descendant operating and mic
 
 - geometry_reference remains an optional opaque link from a zone definition to a separately versioned geometry snapshot.
 - Sprint 092 adds validated WGS84 Polygon/MultiPolygon snapshots, with GeoJSON coordinate order (longitude, latitude), source/revision/attribution metadata, and point classification as inside, outside, or boundary.
+- Sprint 093 stores these snapshots in PostgreSQL as append-only versions with geometry and full-snapshot SHA-256 checks. Identical same-version retries replay; changed content at the same version conflicts. Reads validate hashes, SRID, geometry type, and topology before returning a boundary.
 - A registry lookup only resolves within one requested hierarchy level. Overlap or shared-edge ambiguity is returned explicitly and never silently chooses a zone.
 - status is optional opaque metadata; this contract defines no status values or transitions.
 - capacity_policy_id is optional opaque metadata; this contract does not calculate or allocate capacity.
