@@ -55,7 +55,11 @@ public sealed class CourierTrustLifecycleTests
     [Fact]
     public void Cannot_activate_without_primary_approved_zone()
     {
-        var profile = NewProfile() with { Status = CourierTrustStatus.MonoApproved };
+        var profile = NewProfile() with
+        {
+            Status = CourierTrustStatus.MonoApproved,
+            ZoneApproval = new CourierZoneApproval { CourierId = CourierId }
+        };
 
         Assert.Throws<InvalidOperationException>(() => CourierTrustLifecycle.Advance(
             profile, CourierTrustStatus.Active, "staff-42", "APPROVED", "case:activation", OccurredAt));
