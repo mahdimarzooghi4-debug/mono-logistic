@@ -691,3 +691,11 @@ Operations Mission summaries contain only Mission ID, customer ID, Delivery Requ
 
 
 Operations search, detail, and timeline reads create append-only accountability records containing the authenticated staff actor, action, Mission ID where applicable, result count, and timestamp. Search terms, external references, customer identifiers, and event payloads are not copied into this audit record. If the audit write fails, the read response fails closed.
+
+### 33.1 Inspect Mission read audit
+
+```
+GET /operations/v1/mission-read-audit?page_size=50&mission_id=mis_...&actor_id=staff-1&created_after=2026-10-01T00:00:00Z&created_before=2026-10-31T23:59:59Z&cursor=mra_...
+```
+
+The endpoint is MFA-gated and returns audit ID, actor ID, action, Mission ID when applicable, result count, and occurrence time. Filters are optional and include Mission ID, staff actor, and inclusive occurrence-time bounds. Results use keyset pagination ordered by `occurred_at DESC, audit_id DESC`, with a page size of 1–100 (default 50). Cursors must identify a record that matches every active filter. Each audit-ledger inspection is itself recorded as `MISSION_AUDIT_INSPECTION`; its new entry is above the page cursor and will not shift subsequent pages.

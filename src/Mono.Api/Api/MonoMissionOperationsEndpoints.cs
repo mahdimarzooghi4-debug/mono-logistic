@@ -86,6 +86,34 @@ public static class MonoMissionOperationsEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/mission-read-audit", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                [FromQuery(Name = "mission_id")] string? missionId,
+                [FromQuery(Name = "actor_id")] string? actorId,
+                [FromQuery(Name = "created_after")] DateTimeOffset? createdAfter,
+                [FromQuery(Name = "created_before")] DateTimeOffset? createdBefore,
+                string? cursor,
+                PostgresMissionOperationsReadAuditService readAudit,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100 ||
+                    (missionId is not null && !MissionHistoryInputValidator.IsValidMissionId(missionId)) ||
+                    !PostgresMissionOperationsReadAuditService.IsValidActorId(actorId) ||
+                    !MissionOperationsInputValidator.IsValidDateRange(createdAfter, createdBefore) ||
+                    !PostgresMissionOperationsReadAuditService.IsValidAuditCursor(cursor))
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Mission read audit filters are invalid.")));
+
+                var page = await readAudit.ListAsync(
+                    size, missionId, actorId, createdAfter, createdBefore, cursor, cancellationToken);
+                return page is null
+                    ? Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The audit cursor is invalid for these filters.")))
+                    : Results.Ok(page);
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         return endpoints;
     }
 }
