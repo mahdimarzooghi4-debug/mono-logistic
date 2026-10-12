@@ -147,5 +147,10 @@ public sealed record ZoneGeometryReviewEntry(
     string Reason,
     DateTimeOffset OccurredAt);
 
-public sealed class ZoneGeometrySnapshotNotFoundException : Exception;
-public sealed class ZoneGeometrySnapshotHashConflictException : Exception;
+public sealed class ZoneGeometrySnapshotNotFoundException : Exception
+{
+}
+
+public sealed class ZoneGeometrySnapshotHashConflictException : Exception
+{
+}
