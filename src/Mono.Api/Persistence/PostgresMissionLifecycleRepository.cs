@@ -17,15 +17,24 @@ public sealed class PostgresMissionLifecycleRepository(
     private readonly ICustomerContext? _customerContext = customerContext;
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
-    public async Task<MissionLifecycleResult> ApplyAsync(
+    public Task<MissionLifecycleResult> ApplyAsync(
         string missionId,
         string eventType,
         string reason,
         string idempotencyKey,
-        CancellationToken cancellationToken = default,
-        string? customerScopeId = null,
-        string actorType = "operations",
-        string? externalReference = null)
+        CancellationToken cancellationToken = default) =>
+        ApplyCoreAsync(missionId, eventType, reason, idempotencyKey, cancellationToken,
+            customerScopeId: null, actorType: "operations", externalReference: null);
+
+    private async Task<MissionLifecycleResult> ApplyCoreAsync(
+        string missionId,
+        string eventType,
+        string reason,
+        string idempotencyKey,
+        CancellationToken cancellationToken,
+        string? customerScopeId,
+        string actorType,
+        string? externalReference)
     {
         missionId = Required(missionId, nameof(missionId), 128);
         eventType = Required(eventType, nameof(eventType), 64);
@@ -229,7 +238,7 @@ public sealed class PostgresMissionLifecycleRepository(
                 throw new ArgumentException("External reference is invalid.", nameof(externalReference));
         }
 
-        return ApplyAsync(
+        return ApplyCoreAsync(
             missionId,
             "mission.cancelled",
             reasonCode,
