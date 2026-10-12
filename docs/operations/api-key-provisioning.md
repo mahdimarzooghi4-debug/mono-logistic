@@ -24,6 +24,12 @@ Only scopes in the source-controlled scope catalog are accepted. The catalog con
 
 Do not run the command in CI, capture its output in build logs, or paste the key into source control, tickets, chat, or unapproved storage. Use HTTPS when sending the value to Hana.
 
+## Revoke a credential
+
+`POST /operations/v1/customers/{customerId}/api-keys/{keyId}/revoke`
+
+This internal route requires Mono administrator authentication with issuer-asserted MFA and a non-empty reason. Revocation is immediate: the credential's `revoked_at` value and an immutable audit entry are committed in one transaction. The raw key is never returned or stored by this operation. Unknown keys and keys belonging to another customer return the same `404 API_KEY_NOT_FOUND`; attempting to revoke an already-revoked key returns `409 API_KEY_CONFLICT`.
+
 ## Failure behavior
 
 Invalid arguments, unsupported scopes, missing/inactive customers, and database failures do not reveal the raw API key. The customer must exist and have status `ACTIVE` before a key can be issued.
