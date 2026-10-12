@@ -8,7 +8,7 @@ An administrator-only endpoint returns one immutable zone geometry snapshot as a
 
 The feature's geometry is a GeoJSON `Polygon` or `MultiPolygon` in WGS84 coordinates, with coordinate order `[longitude, latitude]). Polygon exterior and interior rings are preserved. Properties include zone identity and kind, geometry version, source and attribution, geometry and snapshot SHA-256 hashes, and SRID.
 
-The snapshot is loaded through the integrity-checking repository before serialization. Unknown versions return HTTP 404; invalid references return HTTP 400. Responses above 100,000 coordinates are rejected to keep a single request bounded.
+The snapshot is loaded through the integrity-checking repository before serialization. Unknown versions return HTTP 404; invalid references return HTTP 400. Responses above 100,000 coordinates are rejected to keep a single request bounded. The snapshot hash is returned as a strong ETag. Responses use `Cache-Control: private, no-cache`; a matching `If-None-Match` returns HTTP 304 only after the administrator authorization policy has run, so the browser can reuse immutable payloads while each request revalidates access.
 
 ## Scope
 
