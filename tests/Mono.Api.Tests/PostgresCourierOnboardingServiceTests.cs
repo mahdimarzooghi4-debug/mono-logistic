@@ -445,6 +445,20 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             courierId, "zone-central", now.AddHours(1), now.AddHours(2), "suspended-window");
         Assert.Equal(CourierAvailabilityWriteOutcome.InvalidCourierState, rejectedWindow.Outcome);
 
+        await using (var connection = await database.DataSource.OpenConnectionAsync())
+        {
+            await using var cancelledWindow = new NpgsqlCommand(
+                """
+                SELECT status, cancellation_reason FROM courier_availability_windows
+                WHERE window_id = @window_id;
+                """, connection);
+            cancelledWindow.Parameters.AddWithValue("window_id", planned.Window!.WindowId);
+            await using var reader = await cancelledWindow.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("CANCELLED", reader.GetString(0));
+            Assert.Equal("COURIER_SUSPENDED", reader.GetString(1));
+        }
+
         var projection = new PostgresCourierCapacityProjectionService(database.DataSource, context, readAudit);
         var suspendedCapacity = await projection.ProjectAsync(
             "zone-central", now, now.AddHours(1), 15);
@@ -459,8 +473,15 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
 
         var activeCapacity = await projection.ProjectAsync(
             "zone-central", now, now.AddHours(1), 15);
-        Assert.Equal(new[] { 1, 1, 1, 0 },
-            activeCapacity.Buckets.Select(bucket => bucket.PlannedCourierCount));
+        Assert.All(activeCapacity.Buckets, bucket => Assert.Equal(0, bucket.PlannedCourierCount));
+
+        var replacementWindow = await availability.CreateAsync(
+            courierId, "zone-central", now.AddMinutes(45), now.AddHours(1), "reinstated-window");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, replacementWindow.Outcome);
+        var replacementCapacity = await projection.ProjectAsync(
+            "zone-central", now, now.AddHours(1), 15);
+        Assert.Equal(new[] { 0, 0, 0, 1 },
+            replacementCapacity.Buckets.Select(bucket => bucket.PlannedCourierCount));
 
         var operationalStatusSnapshot = await suspension.FindAsync(courierId);
         Assert.Equal("ACTIVE", operationalStatusSnapshot!.TrustStatus);
