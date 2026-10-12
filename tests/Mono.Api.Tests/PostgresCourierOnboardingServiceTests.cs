@@ -313,6 +313,16 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var auditConnection = await DataSource.OpenConnectionAsync();
             await using var auditCommand = new NpgsqlCommand(auditSql, auditConnection);
             await auditCommand.ExecuteNonQueryAsync();
+
+            const string availabilityResourceName = "Mono.Api.Tests.Migrations.035_courier_availability_windows.sql";
+            await using var availabilityStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(availabilityResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {availabilityResourceName}.");
+            using var availabilityReader = new StreamReader(availabilityStream);
+            var availabilitySql = await availabilityReader.ReadToEndAsync();
+            await using var availabilityConnection = await DataSource.OpenConnectionAsync();
+            await using var availabilityCommand = new NpgsqlCommand(availabilitySql, availabilityConnection);
+            await availabilityCommand.ExecuteNonQueryAsync();
         }
 
         public async ValueTask DisposeAsync()
