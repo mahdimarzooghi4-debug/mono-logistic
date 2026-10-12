@@ -65,6 +65,8 @@ Recommended:
 - device/session binding
 - refresh token rotation
 - risk-based reauthentication
+- Mono API accepts courier bearer tokens only from a separately configured HTTPS OIDC authority/audience and validates current ACTIVE/unsuspended state.
+- The trusted issuer may assert Mono's courier identifier only after verified account binding; no issuer or account-binding provider is enabled by the current code.
 
 ## 5. Authorization
 
