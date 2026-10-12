@@ -241,6 +241,80 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         });
     }
 
+    [Fact]
+    public async Task Planned_availability_windows_are_idempotent_non_overlapping_and_cancellable()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var now = DateTimeOffset.UtcNow;
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var registration = await onboarding.RegisterAsync("BIKE", ["zone-central"], "availability-register");
+        var courierId = registration.Snapshot!.CourierId;
+        var transitions = new[]
+        {
+            "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+            "MONO_APPROVED", "ACTIVE"
+        };
+        for (var index = 0; index < transitions.Length; index++)
+        {
+            var status = transitions[index];
+            var result = await onboarding.AdvanceTrustAsync(
+                courierId, status, status == "ACTIVE" ? ["zone-central"] : null,
+                status == "ACTIVE" ? "zone-central" : null, "REVIEW_COMPLETED",
+                $"review:{status}", $"availability-transition-{index}");
+            Assert.Equal(CourierOperationsWriteOutcome.Applied, result.Outcome);
+        }
+
+        var readAudit = new PostgresCourierOperationsReadAuditService(database.DataSource, context);
+        var availability = new PostgresCourierAvailabilityService(
+            database.DataSource, context, readAudit, new FixedTimeProvider(now));
+        var startsAt = now.AddHours(1);
+        var endsAt = now.AddHours(4);
+        var created = await availability.CreateAsync(
+            courierId, "zone-central", startsAt, endsAt, "availability-create");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, created.Outcome);
+        Assert.Equal("SCHEDULED", created.Window!.Status);
+
+        var replay = await availability.CreateAsync(
+            courierId, "zone-central", startsAt, endsAt, "availability-create");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Replayed, replay.Outcome);
+        Assert.Equal(created.Window.WindowId, replay.Window!.WindowId);
+
+        var overlap = await availability.CreateAsync(
+            courierId, "zone-central", now.AddHours(3), now.AddHours(5), "availability-overlap");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Overlap, overlap.Outcome);
+
+        var page = await availability.ListAsync(now.AddDays(1), now, 10, null, null);
+        Assert.NotNull(page);
+        Assert.Single(page.Items);
+        Assert.Equal(created.Window.WindowId, page.Items[0].WindowId);
+
+        var cancelled = await availability.CancelAsync(
+            created.Window.WindowId, "SHIFT_CHANGED", "availability-cancel");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, cancelled.Outcome);
+        Assert.Equal("CANCELLED", cancelled.Window!.Status);
+        var cancelReplay = await availability.CancelAsync(
+            created.Window.WindowId, "SHIFT_CHANGED", "availability-cancel");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Replayed, cancelReplay.Outcome);
+        Assert.Equal("CANCELLED", cancelReplay.Window!.Status);
+
+        await using var connection = await database.DataSource.OpenConnectionAsync();
+        await using var mutation = new NpgsqlCommand(
+            "UPDATE courier_availability_windows SET starts_at = starts_at + interval '1 hour' WHERE window_id = @id;",
+            connection);
+        mutation.Parameters.AddWithValue("id", NpgsqlTypes.NpgsqlDbType.Text, created.Window.WindowId);
+        await Assert.ThrowsAsync<PostgresException>(() => mutation.ExecuteNonQueryAsync());
+    }
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string _adminConnectionString;
