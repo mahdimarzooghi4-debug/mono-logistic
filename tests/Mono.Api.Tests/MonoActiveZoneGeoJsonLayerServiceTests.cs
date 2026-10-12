@@ -23,7 +23,7 @@ public sealed class MonoActiveZoneGeoJsonLayerServiceTests(ITestOutputHelper out
 
         var schema = "active_geojson_" + Guid.NewGuid().ToString("N");
         var adminConnectionString = new NpgsqlConnectionStringBuilder(connectionString).ConnectionString;
-        await using (var admin = new NpgsqlConnection(adminString: adminConnectionString))
+        await using (var admin = new NpgsqlConnection(adminConnectionString))
         {
             await admin.OpenAsync();
             await using var create = new NpgsqlCommand($"CREATE SCHEMA {schema};", admin);
@@ -52,7 +52,7 @@ public sealed class MonoActiveZoneGeoJsonLayerServiceTests(ITestOutputHelper out
 
             Assert.Equal("FeatureCollection", first.GeoJson.Type);
             Assert.Equal(1, first.FeatureCount);
-            Assert.Equal(1, first.CoordinateCount / 5);
+            Assert.Equal(5, first.CoordinateCount);
             Assert.True(first.HasMore);
             Assert.NotNull(first.NextCursor);
             Assert.Equal("active-a", first.GeoJson.Features[0].Properties.ZoneId);
