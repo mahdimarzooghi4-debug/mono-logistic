@@ -15,6 +15,7 @@ public sealed class PostgresCourierOperationsReadAuditService(
     public const string CourierSearch = "COURIER_SEARCH";
     public const string CourierDetail = "COURIER_DETAIL";
     public const string CourierAuditInspection = "COURIER_AUDIT_INSPECTION";
+    public const string CourierAvailabilitySearch = "COURIER_AVAILABILITY_SEARCH";
 
     private static readonly Regex CourierIdPattern = new(
         @"\Acrr_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -28,9 +29,9 @@ public sealed class PostgresCourierOperationsReadAuditService(
         int resultCount,
         CancellationToken cancellationToken = default)
     {
-        if (action is not (CourierSearch or CourierDetail or CourierAuditInspection) ||
+        if (action is not (CourierSearch or CourierDetail or CourierAuditInspection or CourierAvailabilitySearch) ||
             resultCount is < 0 or > 101 ||
-            ((action is CourierSearch or CourierAuditInspection) && courierId is not null) ||
+            ((action is CourierSearch or CourierAuditInspection or CourierAvailabilitySearch) && courierId is not null) ||
             (action == CourierDetail &&
              (courierId is null || !CourierIdPattern.IsMatch(courierId))))
             throw new ArgumentException("Courier read audit scope is invalid.");
