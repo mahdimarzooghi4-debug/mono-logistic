@@ -24,7 +24,7 @@ public static class MonoActiveZoneGeoJsonLayerEndpoints
                     page.Kind, page.GeoJson.Features, page.HasMore, page.NextCursor);
                 httpContext.Response.Headers["ETag"] = etag;
                 httpContext.Response.Headers["Cache-Control"] = "private, no-cache";
-                if (MatchesIfNoneMatch(httpContext.Request.Headers["If-None-Match"], etag))
+                if (MonoIfNoneMatch.Matches(httpContext.Request.Headers["If-None-Match"], etag))
                     return Results.StatusCode(StatusCodes.Status304NotModified);
                 return Results.Ok(page);
             }
@@ -45,8 +45,4 @@ public static class MonoActiveZoneGeoJsonLayerEndpoints
 
         return endpoints;
     }
-
-    private static bool MatchesIfNoneMatch(string? header, string etag) =>
-        header?.Split(',').Select(value => value.Trim())
-            .Any(value => value == "*" || string.Equals(value, etag, StringComparison.Ordinal)) == true;
 }

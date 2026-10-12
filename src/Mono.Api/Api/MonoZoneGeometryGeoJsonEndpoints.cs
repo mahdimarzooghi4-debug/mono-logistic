@@ -25,7 +25,7 @@ public static class MonoZoneGeometryGeoJsonEndpoints
                     var etag = MonoGeoJsonCacheValidators.ForSnapshot(feature.Properties.SnapshotHash);
                     httpContext.Response.Headers["ETag"] = etag;
                     httpContext.Response.Headers["Cache-Control"] = "private, no-cache";
-                    if (MatchesIfNoneMatch(httpContext.Request.Headers["If-None-Match"], etag))
+                    if (MonoIfNoneMatch.Matches(httpContext.Request.Headers["If-None-Match"], etag))
                         return Results.StatusCode(StatusCodes.Status304NotModified);
                     return Results.Ok(feature);
                 }
@@ -45,8 +45,4 @@ public static class MonoZoneGeometryGeoJsonEndpoints
 
         return endpoints;
     }
-
-    private static bool MatchesIfNoneMatch(string? header, string etag) =>
-        header?.Split(',').Select(value => value.Trim())
-            .Any(value => value == "*" || string.Equals(value, etag, StringComparison.Ordinal)) == true;
 }
