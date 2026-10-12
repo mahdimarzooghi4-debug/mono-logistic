@@ -8,6 +8,9 @@ public static class DeliveryQuoteContract
     private static readonly Regex CustomerIdPattern = new(
         @"\Acus_[0-9a-f]{32}\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
+    private static readonly Regex EvidenceDigestPattern = new(
+        @"\A[0-9a-f]{64}\z",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex DeliveryRequestIdPattern = new(
         @"\Adrq_[0-9a-f]{32}\z",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -30,6 +33,7 @@ public static class DeliveryQuoteContract
         ValidateFare(quote.Fare, nameof(quote));
         ValidatePolicyVersions(quote.PolicyVersions, quote.Fare.PolicyVersion, nameof(quote));
         ValidateAuditEvidence(quote.AuditEvidenceIds, nameof(quote));
+        ValidatePricingEvidence(quote, nameof(quote));
     }
 
     public static bool IsExpired(DeliveryQuote quote, DateTimeOffset evaluatedAt)
@@ -82,6 +86,26 @@ public static class DeliveryQuoteContract
         {
             throw new ArgumentException(
                 "Quote requires unique audit evidence identifiers.",
+                parameterName);
+        }
+    }
+
+    private static void ValidatePricingEvidence(DeliveryQuote quote, string parameterName)
+    {
+        var evidence = quote.PricingEvidence;
+        if (evidence is null)
+            return;
+
+        if (!HasText(evidence.EvidenceId, 128) ||
+            evidence.ObservedAt == default ||
+            evidence.DistanceMeters != quote.Fare.DistanceMeters ||
+            !HasText(evidence.SourceId, 128) ||
+            evidence.PayloadSha256 is null ||
+            !EvidenceDigestPattern.IsMatch(evidence.PayloadSha256) ||
+            !quote.AuditEvidenceIds.Contains(evidence.EvidenceId, StringComparer.Ordinal))
+        {
+            throw new ArgumentException(
+                "Pricing evidence reference must match the fare distance and quote audit evidence.",
                 parameterName);
         }
     }

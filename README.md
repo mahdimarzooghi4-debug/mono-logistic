@@ -76,6 +76,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Quote Persistence v1](docs/52-quote-persistence-v1.md)
 - [Quote Read API v1](docs/53-quote-read-api-v1.md)
 - [Hana Distance Pricing Evidence v1](docs/54-hana-distance-pricing-evidence-v1.md)
+- [Quote Issuance Core v1](docs/55-quote-issuance-core-v1.md)
 - [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 - [Hana Urban Delivery Configuration](docs/customers/hana/urban-delivery-configuration.md)
 - [Unified B2B Policy & Capability Model](docs/06-b2b-policy-capability-model.md)
