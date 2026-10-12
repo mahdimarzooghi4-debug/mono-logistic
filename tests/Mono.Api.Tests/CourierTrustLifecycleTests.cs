@@ -130,6 +130,45 @@ public sealed class CourierTrustLifecycleTests
             "case:123", OccurredAt));
     }
 
+
+    [Fact]
+    public void Rejects_approved_zone_outside_courier_preferences()
+    {
+        var profile = NewProfile() with
+        {
+            ZoneApproval = new CourierZoneApproval
+            {
+                CourierId = CourierId,
+                PreferredZoneIds = ["zone-east"],
+                ApprovedZoneIds = ["zone-central"],
+                PrimaryZoneId = "zone-central"
+            }
+        };
+
+        Assert.Throws<ArgumentException>(() => CourierTrustLifecycle.Advance(
+            profile, CourierTrustStatus.IdentityVerified, "staff-42", "IDENTITY_REVIEWED",
+            "case:123", OccurredAt));
+    }
+
+    [Fact]
+    public void Rejects_duplicate_zone_approvals()
+    {
+        var profile = NewProfile() with
+        {
+            ZoneApproval = new CourierZoneApproval
+            {
+                CourierId = CourierId,
+                PreferredZoneIds = ["zone-central"],
+                ApprovedZoneIds = ["zone-central", "zone-central"],
+                PrimaryZoneId = "zone-central"
+            }
+        };
+
+        Assert.Throws<ArgumentException>(() => CourierTrustLifecycle.Advance(
+            profile, CourierTrustStatus.IdentityVerified, "staff-42", "IDENTITY_REVIEWED",
+            "case:123", OccurredAt));
+    }
+
     private static CourierTrustProfile NewProfile() => new(
         CourierId,
         "BIKE",
