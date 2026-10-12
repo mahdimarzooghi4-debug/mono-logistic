@@ -20,61 +20,34 @@
     <ProjectReference Include="../../src/Mono.Api/Mono.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="../../db/migrations/001_customer_branch.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.001_customer_branch.sql" />
-    <EmbeddedResource Include="../../db/migrations/002_customer_api_keys.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.002_customer_api_keys.sql" />
-    <EmbeddedResource Include="../../db/migrations/003_delivery_request_intake.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.003_delivery_request_intake.sql" />
-    <EmbeddedResource Include="../../db/migrations/004_delivery_request_list_index.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.004_delivery_request_list_index.sql" />
-    <EmbeddedResource Include="../../db/migrations/005_customer_service_configurations.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.005_customer_service_configurations.sql" />
-    <EmbeddedResource Include="../../db/migrations/006_customer_service_configuration_audit.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql" />
-    <EmbeddedResource Include="../../db/migrations/007_customer_service_configuration_retirement.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.007_customer_service_configuration_retirement.sql" />
-    <EmbeddedResource Include="../../db/migrations/008_customer_operations_audit.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.008_customer_operations_audit.sql" />
-    <EmbeddedResource Include="../../db/migrations/009_branch_operations_audit.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.009_branch_operations_audit.sql" />
-    <EmbeddedResource Include="../../db/migrations/010_branch_operations_audit_update.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql" />
-    <EmbeddedResource Include="../../db/migrations/011_customer_api_key_operations_audit.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.011_customer_api_key_operations_audit.sql" />
-    <EmbeddedResource Include="../../db/migrations/012_customer_registry_listing_index.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql" />
-    <EmbeddedResource Include="../../db/migrations/013_customer_registry_search_indexes.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql" />
-    <EmbeddedResource Include="../../db/migrations/014_customer_external_identifiers.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.014_customer_external_identifiers.sql" />
-    <EmbeddedResource Include="../../db/migrations/015_branch_external_identifiers.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.015_branch_external_identifiers.sql" />
-    <EmbeddedResource Include="../../db/migrations/016_policy_draft_registry.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.016_policy_draft_registry.sql" />
-    <EmbeddedResource Include="../../db/migrations/017_policy_lifecycle.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.017_policy_lifecycle.sql" />
-    <EmbeddedResource Include="../../db/migrations/018_promise_commit.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.018_promise_commit.sql" />
-    <EmbeddedResource Include="../../db/migrations/019_delivery_quote_versions.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.019_delivery_quote_versions.sql" />
-    <EmbeddedResource Include="../../db/migrations/020_delivery_quote_issuance_idempotency.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql" />
-    <EmbeddedResource Include="../../db/migrations/021_mission_confirmation.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.021_mission_confirmation.sql" />
-    <EmbeddedResource Include="../../db/migrations/022_mission_operations_read_indexes.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.022_mission_operations_read_indexes.sql" />
-    <EmbeddedResource Include="../../db/migrations/024_mission_operations_read_audit.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.024_mission_operations_read_audit.sql" />
-    <EmbeddedResource Include="../../db/migrations/025_mission_operations_read_audit_inspection.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.025_mission_operations_read_audit_inspection.sql" />
-    <EmbeddedResource Include="../../db/migrations/026_delivery_request_operations_read_audit.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.026_delivery_request_operations_read_audit.sql" />
-    <EmbeddedResource Include="../../db/migrations/027_delivery_request_operations_read_audit_inspection.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.027_delivery_request_operations_read_audit_inspection.sql" />
-    <EmbeddedResource Include="../../db/migrations/028_quote_issued_event.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.028_quote_issued_event.sql" />
-    <EmbeddedResource Include="../../db/migrations/029_zone_geometry_versions.sql"
-                      LogicalName="Mono.Api.Tests.Migrations.029_zone_geometry_versions.sql" />
+    <EmbeddedResource Include="../../db/migrations/001_customer_branch.sql" LogicalName="Mono.Api.Tests.Migrations.001_customer_branch.sql" />
+    <EmbeddedResource Include="../../db/migrations/002_customer_api_keys.sql" LogicalName="Mono.Api.Tests.Migrations.002_customer_api_keys.sql" />
+    <EmbeddedResource Include="../../db/migrations/003_delivery_request_intake.sql" LogicalName="Mono.Api.Tests.Migrations.003_delivery_request_intake.sql" />
+    <EmbeddedResource Include="../../db/migrations/004_delivery_request_list_index.sql" LogicalName="Mono.Api.Tests.Migrations.004_delivery_request_list_index.sql" />
+    <EmbeddedResource Include="../../db/migrations/005_customer_service_configurations.sql" LogicalName="Mono.Api.Tests.Migrations.005_customer_service_configurations.sql" />
+    <EmbeddedResource Include="../../db/migrations/006_customer_service_configuration_audit.sql" LogicalName="Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/007_customer_service_configuration_retirement.sql" LogicalName="Mono.Api.Tests.Migrations.007_customer_service_configuration_retirement.sql" />
+    <EmbeddedResource Include="../../db/migrations/008_customer_operations_audit.sql" LogicalName="Mono.Api.Tests.Migrations.008_customer_operations_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/009_branch_operations_audit.sql" LogicalName="Mono.Api.Tests.Migrations.009_branch_operations_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/010_branch_operations_audit_update.sql" LogicalName="Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql" />
+    <EmbeddedResource Include="../../db/migrations/011_customer_api_key_operations_audit.sql" LogicalName="Mono.Api.Tests.Migrations.011_customer_api_key_operations_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/012_customer_registry_listing_index.sql" LogicalName="Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql" />
+    <EmbeddedResource Include="../../db/migrations/013_customer_registry_search_indexes.sql" LogicalName="Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql" />
+    <EmbeddedResource Include="../../db/migrations/014_customer_external_identifiers.sql" LogicalName="Mono.Api.Tests.Migrations.014_customer_external_identifiers.sql" />
+    <EmbeddedResource Include="../../db/migrations/015_branch_external_identifiers.sql" LogicalName="Mono.Api.Tests.Migrations.015_branch_external_identifiers.sql" />
+    <EmbeddedResource Include="../../db/migrations/016_policy_draft_registry.sql" LogicalName="Mono.Api.Tests.Migrations.016_policy_draft_registry.sql" />
+    <EmbeddedResource Include="../../db/migrations/017_policy_lifecycle.sql" LogicalName="Mono.Api.Tests.Migrations.017_policy_lifecycle.sql" />
+    <EmbeddedResource Include="../../db/migrations/018_promise_commit.sql" LogicalName="Mono.Api.Tests.Migrations.018_promise_commit.sql" />
+    <EmbeddedResource Include="../../db/migrations/019_delivery_quote_versions.sql" LogicalName="Mono.Api.Tests.Migrations.019_delivery_quote_versions.sql" />
+    <EmbeddedResource Include="../../db/migrations/020_delivery_quote_issuance_idempotency.sql" LogicalName="Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql" />
+    <EmbeddedResource Include="../../db/migrations/021_mission_confirmation.sql" LogicalName="Mono.Api.Tests.Migrations.021_mission_confirmation.sql" />
+    <EmbeddedResource Include="../../db/migrations/022_mission_operations_read_indexes.sql" LogicalName="Mono.Api.Tests.Migrations.022_mission_operations_read_indexes.sql" />
+    <EmbeddedResource Include="../../db/migrations/024_mission_operations_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.024_mission_operations_read_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/025_mission_operations_read_audit_inspection.sql" LogicalName="Mono.Api.Tests.Migrations.025_mission_operations_read_audit_inspection.sql" />
+    <EmbeddedResource Include="../../db/migrations/026_delivery_request_operations_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.026_delivery_request_operations_read_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/027_delivery_request_operations_read_audit_inspection.sql" LogicalName="Mono.Api.Tests.Migrations.027_delivery_request_operations_read_audit_inspection.sql" />
+    <EmbeddedResource Include="../../db/migrations/028_quote_issued_event.sql" LogicalName="Mono.Api.Tests.Migrations.028_quote_issued_event.sql" />
+    <EmbeddedResource Include="../../db/migrations/029_zone_geometry_versions.sql" LogicalName="Mono.Api.Tests.Migrations.029_zone_geometry_versions.sql" />
+    <EmbeddedResource Include="../../db/migrations/030_zone_geometry_reviews.sql" LogicalName="Mono.Api.Tests.Migrations.030_zone_geometry_reviews.sql" />
   </ItemGroup>
 </Project>
