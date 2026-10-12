@@ -294,6 +294,7 @@ Evaluate:
 - Sprint 068 adds an integrity envelope binding Hana pricing distance, evidence ID, observation time, source ID, and opaque source attestation. Source authenticity remains unverified until Mono selects a provider and configures the fail-closed verifier.
 - Sprint 069 adds a Quote issuance application service for the initial version: it validates explicit expiry, verifies tenant-bound distance evidence, computes fare from the approved tariff, and stores a safe evidence reference. No HTTP endpoint or retry/idempotency behavior is added yet.
 - Sprint 070 exposes initial Quote issuance through an authenticated endpoint. It computes evidence digests and fares server-side and atomically persists the Quote with a tenant-scoped Idempotency-Key mapping. Trusted source verification remains fail-closed until configured.
+- Sprint 071 adds PostgreSQL-backed HTTP integration coverage for authorization, successful issue, identical retry, changed-input conflict, single-version persistence, and the public response boundary.
 - quote version
 - expiration
 - policy versions
