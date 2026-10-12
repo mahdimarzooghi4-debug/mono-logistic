@@ -265,6 +265,7 @@ Evaluate:
 - Sprint 063 wires a fail-closed evidence-source verification boundary into the Promise commit service; no production source is trusted yet.
 - Sprint 073 exposes the Promise commit service through an authenticated, tenant-scoped write endpoint. The server derives the decision ID from `Idempotency-Key`, evaluates E7.2, verifies evidence sources, and persists only a matching resolved proposal; the existing fail-closed verifier remains unchanged. PostgreSQL-backed HTTP coverage checks replay, changed-input conflict, a single persisted version, and the safe response shape.
 - Sprint 074 records the full canonical commit request fingerprint with the Promise version and checks the tenant-scoped decision mapping after evidence-integrity validation but before source verification. Exact retries remain available during verifier outages; changed inputs conflict and invalid/tampered evidence is still rejected.
+- Sprint 075 adds HTTP contract coverage for unresolved, rejected, proposal-mismatch, and unverified-evidence outcomes, plus write-scope enforcement. The endpoint behavior remains delegated to the existing evaluator, verifier, tenant context, and persistence service.
 
 ### Acceptance
 - Mono never commits a Mission before proving feasibility.
@@ -480,6 +481,7 @@ Courier Net = 89% of Mission Fare
 - `GET /v1/delivery-requests/{id}/promise/versions` (`delivery-requests.read`, paginated customer-scoped Promise history)
 - Sprint 073 adds `POST /v1/delivery-requests/{id}/promise` (`delivery-requests.write`, evaluator-backed, source-verified and idempotent Promise commit)
 - Sprint 074 makes Promise retries request-bound and replayable before source-verifier calls, while preserving evidence-integrity checks.
+- Sprint 075 verifies the Promise endpoint's stable failure mapping and rejects callers that have read scope without write scope.
 - Sprint 070 adds `POST /v1/delivery-requests/{id}/quote` (`delivery-requests.write`, tenant-scoped, idempotent first Quote issuance)
 - `GET /v1/delivery-requests` (`delivery-requests.read`, paginated history)
 - confirm

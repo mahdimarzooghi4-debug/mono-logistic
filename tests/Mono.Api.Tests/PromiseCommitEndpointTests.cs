@@ -77,6 +77,28 @@ public sealed class PromiseCommitEndpointTests
         var changedInput = BuildInput(deliveryAt.AddHours(1));
         var conflict = await SendAsync(client, path, "promise-decision-1", changedInput);
         var conflictJson = await conflict.Content.ReadAsStringAsync();
+        var unresolved = await SendAsync(
+            client, path, "promise-unresolved", input with { RequestedCriteria = null });
+        var unresolvedJson = await unresolved.Content.ReadAsStringAsync();
+        var mismatchedInput = input with
+        {
+            Proposal = input.Proposal! with
+            {
+                CommittedDeliveryAt = input.Proposal.CommittedDeliveryAt!.Value.AddMinutes(15)
+            }
+        };
+        var mismatch = await SendAsync(client, path, "promise-mismatch", mismatchedInput);
+        var mismatchJson = await mismatch.Content.ReadAsStringAsync();
+        var rejected = await SendAsync(client, path, "promise-rejected", BuildRejectedInput(input));
+        var rejectedJson = await rejected.Content.ReadAsStringAsync();
+        var unverified = await SendAsync(client, path, "promise-unverified", input);
+        var unverifiedJson = await unverified.Content.ReadAsStringAsync();
+
+        await using var readOnlyFactory = CreateFactory(
+            dataSource, customer.CustomerId, verifier, ["delivery-requests.read"]);
+        using var readOnlyClient = readOnlyFactory.CreateClient();
+        readOnlyClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
+        var forbidden = await SendAsync(readOnlyClient, path, "promise-read-only", input);
 
         Assert.Equal(HttpStatusCode.OK, initial.StatusCode);
         Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
@@ -100,7 +122,28 @@ public sealed class PromiseCommitEndpointTests
         using var conflictDocument = JsonDocument.Parse(conflictJson);
         Assert.Equal("PROMISE_CONFLICT",
             conflictDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
-        Assert.Equal(8, verifier.CallCount);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, unresolved.StatusCode);
+        using var unresolvedDocument = JsonDocument.Parse(unresolvedJson);
+        Assert.Equal("PROMISE_UNRESOLVED",
+            unresolvedDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, mismatch.StatusCode);
+        using var mismatchDocument = JsonDocument.Parse(mismatchJson);
+        Assert.Equal("PROMISE_PROPOSAL_MISMATCH",
+            mismatchDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, rejected.StatusCode);
+        using var rejectedDocument = JsonDocument.Parse(rejectedJson);
+        Assert.Equal("PROMISE_REJECTED",
+            rejectedDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, unverified.StatusCode);
+        using var unverifiedDocument = JsonDocument.Parse(unverifiedJson);
+        Assert.Equal("PROMISE_EVIDENCE_UNVERIFIED",
+            unverifiedDocument.RootElement.GetProperty("error").GetProperty("code").GetString());
+
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(9, verifier.CallCount);
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var count = new NpgsqlCommand("""
@@ -110,6 +153,51 @@ public sealed class PromiseCommitEndpointTests
             """, connection);
         count.Parameters.AddWithValue("promise_id", promiseId);
         Assert.Equal(1L, (long)(await count.ExecuteScalarAsync())!);
+    }
+
+    private static PromiseCommitInput BuildRejectedInput(PromiseCommitInput input)
+    {
+        var criteria = input.RequestedCriteria!
+            .Select((criterion, index) =>
+            {
+                if (index != 0)
+                    return criterion;
+
+                var integrity = criterion.Integrity!;
+                var failed = FeasibilityEvidenceIntegrityContract.Attach(
+                    new FeasibilityCriterionResult(
+                        FeasibilityCriterion.Coverage,
+                        FeasibilityCriterionStatus.Fail,
+                        ["CAPACITY_UNAVAILABLE"]),
+                    integrity.EvidenceId!,
+                    integrity.ObservedAt!.Value,
+                    integrity.SourceId!,
+                    integrity.SourceAttestation!);
+                var updatedIntegrity = failed.Integrity!;
+                return criterion with
+                {
+                    Status = failed.Status.ToString(),
+                    ReasonCodes = failed.ReasonCodes,
+                    Integrity = new PromiseEvidenceIntegrityInput(
+                        updatedIntegrity.EvidenceId,
+                        updatedIntegrity.ObservedAt,
+                        updatedIntegrity.PayloadSha256,
+                        updatedIntegrity.SourceId,
+                        updatedIntegrity.SourceAttestation)
+                };
+            })
+            .ToArray();
+        return input with
+        {
+            RequestedCriteria = criteria,
+            AlternativeSearch = new PromiseAlternativeSearchInput(
+                "search-no-feasible-alternative",
+                DateTimeOffset.UtcNow,
+                "CompleteNoFeasibleAlternative",
+                null,
+                null,
+                ["NO_FEASIBLE_ALTERNATIVE"])
+        };
     }
 
     private static PromiseCommitInput BuildInput(DateTimeOffset committedDeliveryAt)
@@ -176,7 +264,8 @@ public sealed class PromiseCommitEndpointTests
     private static WebApplicationFactory<Program> CreateFactory(
         NpgsqlDataSource dataSource,
         string customerId,
-        IFeasibilityEvidenceSourceVerifier verifier) =>
+        IFeasibilityEvidenceSourceVerifier verifier,
+        IReadOnlyList<string>? scopes = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
             {
@@ -191,7 +280,7 @@ public sealed class PromiseCommitEndpointTests
                         DateTimeOffset.UtcNow.AddHours(1),
                         null,
                         true,
-                        ["delivery-requests.write", "delivery-requests.read"])));
+                        scopes ?? ["delivery-requests.write", "delivery-requests.read"])));
                 services.RemoveAll<IFeasibilityEvidenceSourceVerifier>();
                 services.AddSingleton<IFeasibilityEvidenceSourceVerifier>(verifier);
             }));
