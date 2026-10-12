@@ -69,10 +69,10 @@ public sealed class PostgresCourierOperationsReadAuditService(
                 SELECT occurred_at FROM courier_operations_read_audit WHERE audit_id = @audit_id;
                 """, cursorConnection);
             cursorCommand.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, cursor);
-            var value = await cursorCommand.ExecuteScalarAsync(cancellationToken);
-            if (value is not DateTimeOffset timestamp)
+            await using var cursorReader = await cursorCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await cursorReader.ReadAsync(cancellationToken))
                 return null;
-            cursorOccurredAt = timestamp;
+            cursorOccurredAt = cursorReader.GetFieldValue<DateTimeOffset>(0);
         }
 
         const string firstPageSql = """
