@@ -29,8 +29,8 @@ public sealed class PostgresCourierCapacityProjectionService(
             from.Offset != TimeSpan.Zero || to.Offset != TimeSpan.Zero ||
             !SupportedBucketMinutes.Contains(bucketMinutes) || to <= from ||
             to - from > TimeSpan.FromHours(24) ||
-            from.Second != 0 || from.Millisecond != 0 ||
-            to.Second != 0 || to.Millisecond != 0 ||
+            from.Ticks % TimeSpan.TicksPerMinute != 0 ||
+            to.Ticks % TimeSpan.TicksPerMinute != 0 ||
             from.Minute % bucketMinutes != 0 || to.Minute % bucketMinutes != 0 ||
             (to - from).TotalMinutes % bucketMinutes != 0)
             throw new ArgumentException("Capacity projection requires an aligned UTC range up to 24 hours.");
