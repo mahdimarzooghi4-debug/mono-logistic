@@ -112,12 +112,13 @@ public sealed class MonoActiveZoneGeoJsonLayerService(
         {
             var padded = cursor.Replace('-', '+').Replace('_', '/');
             padded += new string('=', (4 - padded.Length % 4) % 4);
-            var zoneId = Encoding.UTF8.GetString(Convert.FromBase64String(padded));
-            if (string.IsNullOrWhiteSpace(zoneId) || zoneId.Contains('\n'))
+            var zoneId = new UTF8Encoding(false, true).GetString(Convert.FromBase64String(padded));
+            if (string.IsNullOrWhiteSpace(zoneId) || zoneId.Length > 128 ||
+                zoneId != zoneId.Trim() || zoneId.Any(char.IsControl))
                 throw new FormatException();
             return zoneId;
         }
-        catch (FormatException)
+        catch (Exception exception) when (exception is FormatException or DecoderFallbackException)
         {
             throw new ArgumentException("Layer cursor is invalid.", nameof(cursor));
         }
