@@ -70,7 +70,7 @@ app.MapHealthChecks("/health/ready");
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapMissionConfirmationEndpoints();
-app.MapMissionLifecycleEndpoints();
+app.MapMonoMissionLifecycleEndpoints();
 app.MapMissionHistoryEndpoints();
 app.MapMonoMissionOperationsEndpoints();
 app.MapCustomerServiceConfigurationInspectionEndpoints();
