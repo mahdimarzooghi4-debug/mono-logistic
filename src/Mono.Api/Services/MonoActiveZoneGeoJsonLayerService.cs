@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
@@ -139,7 +140,7 @@ public sealed class MonoActiveZoneGeoJsonLayerService(
 public sealed record ZoneGeometryGeoJsonFeatureCollection(
     string Type,
     IReadOnlyList<ZoneGeometryGeoJsonFeature> Features,
-    double[]? Bbox = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] double[]? Bbox = null);
 
 public sealed record MonoActiveZoneGeoJsonLayerPage(
     ZoneGeometryGeoJsonFeatureCollection GeoJson,
