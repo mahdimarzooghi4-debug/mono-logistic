@@ -160,6 +160,7 @@ Epic
 ### E4.2 Mode Capability Matrix
 - Sprint 038 adds an administrator-authored MODE_CAPABILITY policy definition containing unique, canonical mode identifiers. Initial identifiers are WALK, BIKE, and CAR; adding VAN, PICKUP, TRUCK, or another valid identifier needs no Mission-core change. Draft validation does not activate modes or imply network availability.
 - Sprint 039 extends HARD policy preview to evaluate a candidate `mode` fact against effective MODE_CAPABILITY policies, fail closed on missing/invalid inputs, and exclude unsupported candidates.
+- Sprint 040 adds an administrator preview that builds candidate mode identifiers from effective MODE_CAPABILITY policies and returns the modes that pass every applicable HARD policy.
 Initial:
 - Walk
 - Bike

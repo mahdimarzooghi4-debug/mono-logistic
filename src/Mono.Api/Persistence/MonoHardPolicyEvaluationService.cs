@@ -14,6 +14,15 @@ public sealed class MonoHardPolicyEvaluationService(MonoEffectivePolicyResolutio
         var resolution = await resolver.ResolveAsync(context, cancellationToken);
         return HardPolicyEvaluator.Evaluate(resolution, facts);
     }
+
+    public async Task<EligibleModeEvaluationResponse> EvaluateEligibleModesAsync(
+        EffectivePolicyContext context,
+        JsonElement facts,
+        CancellationToken cancellationToken = default)
+    {
+        var resolution = await resolver.ResolveAsync(context, cancellationToken);
+        return EligibleModeEvaluator.Evaluate(resolution, facts);
+    }
 }
 
 public static class HardPolicyEvaluator
@@ -215,6 +224,77 @@ public static class HardPolicyEvaluator
     private static HardPolicyResult Failed(ResolvedPolicyVersion policy, string reasonCode) =>
         new(policy.PolicyId, policy.VersionNumber, false, true, [reasonCode]);
 }
+
+public static class EligibleModeEvaluator
+{
+    public static EligibleModeEvaluationResponse Evaluate(
+        EffectivePolicyResolutionResponse resolution, JsonElement facts)
+    {
+        if (facts.ValueKind != JsonValueKind.Object || facts.EnumerateObject().Count() > 100)
+            throw new ArgumentException("Facts must be an object with at most 100 top-level fields.", nameof(facts));
+
+        var capabilityPolicies = resolution.Policies.Where(policy =>
+            policy.EnforcementType == "HARD" && policy.PolicyType == "MODE_CAPABILITY").ToArray();
+
+        if (capabilityPolicies.Length == 0)
+            return new EligibleModeEvaluationResponse(
+                resolution.RequestedAt, [], [], ["MODE_CAPABILITY_POLICY_MISSING"]);
+
+        var candidateModes = new List<string>();
+        var seenModes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var policy in capabilityPolicies)
+        {
+            try
+            {
+                ModeCapabilityPolicyConfigurationValidator.Validate(policy.Definition);
+            }
+            catch (ArgumentException)
+            {
+                return new EligibleModeEvaluationResponse(
+                    resolution.RequestedAt, [], [], ["POLICY_DEFINITION_UNSUPPORTED"]);
+            }
+
+            foreach (var mode in policy.Definition.GetProperty("modes").EnumerateArray())
+            {
+                var code = mode.GetString()!;
+                if (seenModes.Add(code))
+                    candidateModes.Add(code);
+            }
+        }
+
+        var candidates = new List<EligibleModeCandidateResult>();
+        foreach (var mode in candidateModes)
+        {
+            var modeFacts = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            foreach (var fact in facts.EnumerateObject())
+                modeFacts[fact.Name] = fact.Value.Clone();
+            modeFacts["mode"] = JsonSerializer.SerializeToElement(mode);
+
+            var evaluation = HardPolicyEvaluator.Evaluate(
+                resolution, JsonSerializer.SerializeToElement(modeFacts));
+            candidates.Add(new EligibleModeCandidateResult(
+                mode, evaluation.Passed, evaluation.ReasonCodes));
+        }
+
+        var eligibleModes = candidates.Where(candidate => candidate.Eligible)
+            .Select(candidate => candidate.Mode).ToArray();
+        var reasonCodes = candidates.SelectMany(candidate => candidate.ReasonCodes)
+            .Distinct(StringComparer.Ordinal).ToArray();
+        return new EligibleModeEvaluationResponse(
+            resolution.RequestedAt, eligibleModes, candidates, reasonCodes);
+    }
+}
+
+public sealed record EligibleModeEvaluationResponse(
+    DateTimeOffset RequestedAt,
+    IReadOnlyList<string> EligibleModes,
+    IReadOnlyList<EligibleModeCandidateResult> Candidates,
+    IReadOnlyList<string> ReasonCodes);
+
+public sealed record EligibleModeCandidateResult(
+    string Mode,
+    bool Eligible,
+    IReadOnlyList<string> ReasonCodes);
 
 public sealed record HardPolicyEvaluationResponse(
     DateTimeOffset RequestedAt,
