@@ -193,6 +193,71 @@ public sealed class PostgresDeliveryRequestRepository(
         return new DeliveryRequestPageResponse(items, nextCursor);
     }
 
+    public async Task<DeliveryRequestTimelineResponse?> FindTimelineAsync(
+        string deliveryRequestId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            WITH request_events AS (
+                SELECT p.customer_id, p.delivery_request_id,
+                       e.event_id, e.event_type, e.aggregate_type, e.sequence, e.occurred_at
+                FROM promises p
+                JOIN outbox_events e
+                  ON e.customer_id = p.customer_id
+                 AND e.aggregate_type = 'promise'
+                 AND e.aggregate_id = p.promise_id
+                 AND e.event_type IN ('promise.committed', 'promise.revised')
+                WHERE p.customer_id = @customer_id
+                  AND p.delivery_request_id = @delivery_request_id
+                UNION ALL
+                SELECT m.customer_id, m.delivery_request_id,
+                       e.event_id, e.event_type, e.aggregate_type, e.sequence, e.occurred_at
+                FROM missions m
+                JOIN outbox_events e
+                  ON e.customer_id = m.customer_id
+                 AND e.aggregate_type = 'mission'
+                 AND e.aggregate_id = m.mission_id
+                 AND e.event_type = 'mission.created'
+                WHERE m.customer_id = @customer_id
+                  AND m.delivery_request_id = @delivery_request_id
+            )
+            SELECT d.delivery_request_id, e.event_id, e.event_type, e.aggregate_type,
+                   e.sequence, e.occurred_at
+            FROM delivery_requests d
+            LEFT JOIN request_events e
+              ON e.customer_id = d.customer_id
+             AND e.delivery_request_id = d.delivery_request_id
+            WHERE d.customer_id = @customer_id AND d.delivery_request_id = @delivery_request_id
+            ORDER BY e.occurred_at ASC NULLS LAST, e.aggregate_type ASC, e.sequence ASC;
+            """;
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerContext.CustomerId);
+        command.Parameters.AddWithValue("delivery_request_id", NpgsqlDbType.Text, deliveryRequestId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        string? foundRequestId = null;
+        var events = new List<DeliveryRequestTimelineEvent>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            foundRequestId ??= reader.GetString(0);
+            if (reader.IsDBNull(1))
+                continue;
+
+            events.Add(new DeliveryRequestTimelineEvent(
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetInt64(4),
+                reader.GetFieldValue<DateTimeOffset>(5)));
+        }
+
+        return foundRequestId is null
+            ? null
+            : new DeliveryRequestTimelineResponse(foundRequestId, events);
+    }
+
     private static DeliveryRequestStatusResponse ReadStatus(NpgsqlDataReader reader) =>
         new(
             reader.GetString(0),

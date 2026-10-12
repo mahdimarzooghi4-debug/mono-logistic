@@ -88,6 +88,19 @@ public static class DeliveryRequestEndpoints
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
 
+        endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}/timeline", async (
+                string deliveryRequestId,
+                PostgresDeliveryRequestRepository deliveryRequests,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await deliveryRequests.FindTimelineAsync(deliveryRequestId, cancellationToken);
+                return result is null
+                    ? Results.NotFound(new ApiErrorResponse(
+                        new ApiError("DELIVERY_REQUEST_NOT_FOUND", "The delivery request was not found for this customer.")))
+                    : Results.Ok(result);
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
         endpoints.MapPost("/v1/delivery-requests/{deliveryRequestId}/promise", async (
                 string deliveryRequestId,
                 PromiseCommitInput input,
