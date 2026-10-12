@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Mono.Api.Domain;
 using Mono.Api.Security;
+using Mono.Api.Services;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -22,7 +23,7 @@ public sealed record PromiseCommitWriteResult(
     int Version,
     string? EventId);
 
-public sealed class PostgresPromiseCommitRepository
+public sealed class PostgresPromiseCommitRepository : IPromiseCommitStore
 {
     private readonly NpgsqlDataSource _dataSource;
     private readonly ICustomerContext _customerContext;
