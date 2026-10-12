@@ -7,6 +7,7 @@ using Xunit.Abstractions;
 
 namespace Mono.Api.Tests;
 
+[Collection("Mono PostgreSQL")]
 public sealed class CustomerBranchRepositoryTests(ITestOutputHelper output)
 {
     [Fact]

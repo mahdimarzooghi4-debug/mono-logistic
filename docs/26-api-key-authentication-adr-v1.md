@@ -33,4 +33,4 @@ This gives Hana a straightforward integration contract and keeps tenant identity
 
 ## Implementation boundary
 
-The authentication handler and credential persistence are included in this slice. No business endpoint, customer-facing provisioning flow, deployment, staging, or production change is included. The host must provide `ConnectionStrings:Mono` before a protected customer API route is enabled.
+The authentication handler, credential persistence, and internal command-line provisioning workflow are implemented across Sprints 004–006. The provisioner only issues keys for existing ACTIVE customers, accepts registered scopes, stores only a SHA-256 hash, requires an explicit expiry and interactive confirmation, and reveals the key once after successful storage. No public key-issuance endpoint, customer-facing provisioning flow, deployment, staging, or production change is included. The host must provide `ConnectionStrings:Mono` before a protected customer API route is enabled.
