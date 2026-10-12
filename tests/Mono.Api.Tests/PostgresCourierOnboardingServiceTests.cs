@@ -496,6 +496,105 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         await Assert.ThrowsAsync<PostgresException>(() => mutation.ExecuteNonQueryAsync());
     }
 
+    [Fact]
+    public async Task Planning_eligibility_explains_capacity_contributors_and_uses_bounded_keyset_pages()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var utcNow = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(
+            utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, utcNow.Minute, 0, TimeSpan.Zero);
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var readAudit = new PostgresCourierOperationsReadAuditService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var availability = new PostgresCourierAvailabilityService(
+            database.DataSource, context, readAudit, new FixedTimeProvider(now));
+
+        async Task<string> CreateActiveCourier(string key)
+        {
+            var registration = await onboarding.RegisterAsync("BIKE", ["zone-central"], key + "-register");
+            var courierId = registration.Snapshot!.CourierId;
+            var statuses = new[]
+            {
+                "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+                "MONO_APPROVED", "ACTIVE"
+            };
+            for (var index = 0; index < statuses.Length; index++)
+            {
+                var status = statuses[index];
+                var result = await onboarding.AdvanceTrustAsync(
+                    courierId, status, status == "ACTIVE" ? ["zone-central"] : null,
+                    status == "ACTIVE" ? "zone-central" : null, "REVIEW_COMPLETED",
+                    "planning-preview:" + status, key + "-transition-" + index);
+                Assert.Equal(CourierOperationsWriteOutcome.Applied, result.Outcome);
+            }
+            return courierId;
+        }
+
+        var plannedCourier = await CreateActiveCourier("planning-has-window");
+        var noWindowCourier = await CreateActiveCourier("planning-no-window");
+        var suspendedCourier = await CreateActiveCourier("planning-suspended");
+        var registered = await onboarding.RegisterAsync("WALK", ["zone-central"], "planning-registered");
+        var registeredCourier = registered.Snapshot!.CourierId;
+
+        var scheduled = await availability.CreateAsync(
+            plannedCourier, "zone-central", now.AddMinutes(10), now.AddMinutes(30), "planning-window-active");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, scheduled.Outcome);
+        var toBeCancelled = await availability.CreateAsync(
+            suspendedCourier, "zone-central", now.AddMinutes(10), now.AddMinutes(30), "planning-window-suspended");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, toBeCancelled.Outcome);
+        var suspension = new PostgresCourierSuspensionService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        Assert.Equal(CourierOperationalStatusOutcome.Applied,
+            (await suspension.SuspendAsync(suspendedCourier, "SAFETY_REVIEW", "planning-suspend")).Outcome);
+
+        var eligibility = new PostgresCourierPlanningEligibilityService(database.DataSource, context, readAudit);
+        var firstPage = await eligibility.SearchAsync(
+            "zone-central", now, now.AddHours(1), 2, null);
+        Assert.NotNull(firstPage);
+        Assert.Equal("PLANNED_CAPACITY_ONLY", firstPage.Classification);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.NotNull(firstPage.NextCursor);
+
+        var secondPage = await eligibility.SearchAsync(
+            "zone-central", now, now.AddHours(1), 2, firstPage.NextCursor);
+        Assert.NotNull(secondPage);
+        Assert.Equal(2, secondPage.Items.Count);
+        Assert.Null(secondPage.NextCursor);
+        Assert.Equal(new[] { plannedCourier, noWindowCourier, suspendedCourier, registeredCourier }.Order(),
+            firstPage.Items.Concat(secondPage.Items).Select(item => item.CourierId));
+
+        var items = firstPage.Items.Concat(secondPage.Items).ToDictionary(item => item.CourierId);
+        Assert.True(items[plannedCourier].PlannedCapacityContributor);
+        Assert.Empty(items[plannedCourier].ExclusionReasons);
+        Assert.False(items[noWindowCourier].PlannedCapacityContributor);
+        Assert.Contains("NO_SCHEDULED_WINDOW", items[noWindowCourier].ExclusionReasons);
+        Assert.Equal("SUSPENDED", items[suspendedCourier].OperationalStatus);
+        Assert.Contains("COURIER_SUSPENDED", items[suspendedCourier].ExclusionReasons);
+        Assert.False(items[suspendedCourier].HasScheduledWindow);
+        Assert.Contains("COURIER_NOT_ACTIVE", items[registeredCourier].ExclusionReasons);
+        Assert.Contains("ZONE_NOT_APPROVED", items[registeredCourier].ExclusionReasons);
+
+        var invalidCursor = await eligibility.SearchAsync(
+            "zone-central", now, now.AddHours(1), 2, "crr_00000000000000000000000000000000");
+        Assert.Null(invalidCursor);
+
+        var auditPage = await readAudit.ListAsync(50, null);
+        Assert.NotNull(auditPage);
+        Assert.Contains(auditPage.Items, item =>
+            item.Action == PostgresCourierOperationsReadAuditService.CourierPlanningEligibilitySearch &&
+            item.ResultCount == 2 && item.CourierId is null);
+    }
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string _adminConnectionString;
@@ -598,6 +697,16 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var suspensionConnection = await DataSource.OpenConnectionAsync();
             await using var suspensionCommand = new NpgsqlCommand(suspensionSql, suspensionConnection);
             await suspensionCommand.ExecuteNonQueryAsync();
+
+            const string planningEligibilityResourceName = "Mono.Api.Tests.Migrations.038_courier_planning_eligibility_audit_action.sql";
+            await using var planningEligibilityStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(planningEligibilityResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {planningEligibilityResourceName}.");
+            using var planningEligibilityReader = new StreamReader(planningEligibilityStream);
+            var planningEligibilitySql = await planningEligibilityReader.ReadToEndAsync();
+            await using var planningEligibilityConnection = await DataSource.OpenConnectionAsync();
+            await using var planningEligibilityCommand = new NpgsqlCommand(planningEligibilitySql, planningEligibilityConnection);
+            await planningEligibilityCommand.ExecuteNonQueryAsync();
         }
 
         public async ValueTask DisposeAsync()

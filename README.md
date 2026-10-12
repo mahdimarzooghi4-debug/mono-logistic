@@ -139,3 +139,4 @@ Business decisions should be documented here before they become product or imple
 - [Mono UX Flows v1](docs/22-ux-flows-v1.md)
 - [Merchant Mobile Backlog v1](docs/23-merchant-mobile-backlog-v1.md)
 - [Mono Technical Stack and Internal AI ADR v1](docs/24-technical-stack-and-internal-ai-adr-v1.md)
+- [Sprint 115 — Explainable courier planning eligibility](docs/sprints/sprint-115-courier-planning-eligibility-preview.md)

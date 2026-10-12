@@ -771,3 +771,37 @@ Mono administrator operations may suspend or reinstate an ACTIVE courier:
 Write requests require the administrator MFA policy, one `Idempotency-Key`, and a canonical `reason_code`. Exact retries return the original result; reuse with changed content returns `409 IDEMPOTENCY_CONFLICT`. Invalid lifecycle changes return `409 COURIER_STATUS_TRANSITION_NOT_ALLOWED`.
 
 Operational suspension is recorded as an immutable event and does not rewrite the courier's trust status. In the same transaction, suspension cancels every scheduled availability window that ends after the suspension timestamp, recording `COURIER_SUSPENDED` as the cancellation reason; reinstatement does not restore those windows, so operators must schedule fresh availability. The status read returns trust status, operational status, and at most the latest 50 status events. The read is added to the courier operations detail audit before the response is returned. Suspended couriers cannot receive planned availability windows and do not contribute to planned zone capacity. GPS, dispatch, and courier self-authentication remain separate capabilities.
+
+
+### 34.5 Explainable courier planning eligibility
+
+Mono administrators can inspect the staff-planned capacity contributors for a zone and UTC time range:
+
+```
+GET /operations/v1/courier-planning-eligibility?zone_id=zone-central&from=2026-10-12T12:00:00Z&to=2026-10-12T13:00:00Z&page_size=50&cursor=crr_...
+```
+
+The range is limited to 24 hours; page size is 1–100 and results use keyset pagination by Courier ID. Each summary returns trust status, operational status, zone approval, whether a scheduled window overlaps the range, whether the courier contributes to planned capacity, and exclusion reason codes. Reads append a `COURIER_PLANNING_ELIGIBILITY_SEARCH` record to the immutable courier operations read-audit ledger; audit persistence failure prevents the response.
+
+The response is classified `PLANNED_CAPACITY_ONLY`. It is a staff planning explanation, not live availability, courier identity verification, candidate assignment, or dispatch authorization. It does not use GPS, route fit, Mission load, or courier acceptance.
+
+```json
+{
+  "zone_id": "zone-central",
+  "from": "2026-10-12T12:00:00Z",
+  "to": "2026-10-12T13:00:00Z",
+  "classification": "PLANNED_CAPACITY_ONLY",
+  "items": [{
+    "courier_id": "crr_...",
+    "mode": "BIKE",
+    "trust_status": "ACTIVE",
+    "operational_status": "ACTIVE",
+    "zone_approved": true,
+    "has_scheduled_window": true,
+    "planned_capacity_contributor": true,
+    "exclusion_reasons": []
+  }],
+  "next_cursor": null
+}
+```
+
