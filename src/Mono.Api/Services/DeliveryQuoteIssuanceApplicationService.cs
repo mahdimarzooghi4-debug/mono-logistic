@@ -27,6 +27,12 @@ public interface IDeliveryQuoteStore
         DeliveryQuote quote,
         CancellationToken cancellationToken = default);
 
+    Task<DeliveryQuoteWriteResult?> FindIdempotentInitialAsync(
+        string deliveryRequestId,
+        string idempotencyKey,
+        string requestHash,
+        CancellationToken cancellationToken = default) => Task.FromResult<DeliveryQuoteWriteResult?>(null);
+
     Task<DeliveryQuoteWriteResult> IssueInitialIdempotentlyAsync(
         DeliveryQuote quote,
         string idempotencyKey,
@@ -85,6 +91,23 @@ public sealed class DeliveryQuoteIssuanceApplicationService
         {
             return new DeliveryQuoteIssuanceResult(
                 DeliveryQuoteIssuanceStatus.EvidenceIntegrityInvalid, null);
+        }
+
+        if (idempotencyKey is not null && requestHash is not null)
+        {
+            var existing = await _store.FindIdempotentInitialAsync(
+                deliveryRequestId, idempotencyKey, requestHash, cancellationToken);
+            if (existing is not null)
+            {
+                var replayStatus = existing.Outcome switch
+                {
+                    DeliveryQuoteWriteOutcome.Replayed => DeliveryQuoteIssuanceStatus.Replayed,
+                    DeliveryQuoteWriteOutcome.IdempotencyConflict => DeliveryQuoteIssuanceStatus.IdempotencyConflict,
+                    _ => throw new ArgumentOutOfRangeException(
+                        nameof(existing), "Idempotency lookup returned an unsupported outcome.")
+                };
+                return new DeliveryQuoteIssuanceResult(replayStatus, existing);
+            }
         }
 
         var issuedAt = _timeProvider.GetUtcNow();
