@@ -61,6 +61,35 @@ public static class MonoPolicyDraftOperationsEndpoints
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
         endpoints.MapGet(
+            "/operations/v1/policies/effective",
+            async (
+                [FromQuery(Name = "service_id")] string? serviceId,
+                [FromQuery(Name = "customer_id")] string? customerId,
+                [FromQuery(Name = "contract_id")] string? contractId,
+                [FromQuery(Name = "branch_id")] string? branchId,
+                [FromQuery(Name = "zone_id")] string[]? zoneIds,
+                [FromQuery(Name = "mission_id")] string? missionId,
+                [FromQuery(Name = "runtime_id")] string? runtimeId,
+                [FromQuery(Name = "requested_at")] DateTimeOffset? requestedAt,
+                [FromServices] MonoEffectivePolicyResolutionService policies,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var context = new EffectivePolicyContext(
+                        serviceId, customerId, contractId, branchId, zoneIds,
+                        missionId, runtimeId, requestedAt ?? DateTimeOffset.UtcNow);
+                    return Results.Ok(await policies.ResolveAsync(context, cancellationToken));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Policy resolution context is invalid.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet(
             "/operations/v1/policies/{policyId}",
             async (
                 string policyId,

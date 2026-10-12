@@ -63,6 +63,17 @@ Only a `DRAFT` version can be activated. If another version is active under the 
 Only an `ACTIVE` or `INACTIVE` version can be retired. Retirement is permanent; definitions and audit entries are preserved. Drafts cannot be retired directly.
 
 Both operations require a non-empty reason of at most 1000 characters. Status changes and audit entries commit atomically. A disallowed transition returns `409 POLICY_VERSION_STATE_CONFLICT`; an unknown policy or version returns `404`.
+
+## Resolve effective policy versions
+
+`GET /operations/v1/policies/effective`
+
+The operations preview resolves registry entries for an explicit context. It requires an MFA-gated Mono administrator. Optional query parameters are `service_id`, `customer_id`, `contract_id`, `branch_id`, repeated `zone_id`, `mission_id`, `runtime_id`, and `requested_at`. When omitted, `requested_at` is the current UTC time. Scope IDs are matched exactly after trimming; at most 20 zone IDs are accepted.
+
+Only `ACTIVE` versions effective at `requested_at` are returned. Platform policies always match. Other scopes match only when the corresponding context ID is supplied. Results are ordered by scope tier (Platform, Service, Customer/Contract, Branch/Zone, Mission/Runtime), then descending priority and stable policy ID. Each result includes the definition, version number, enforcement type, dates, and precedence tier.
+
+This route identifies and orders applicable policy versions. It does not merge definitions, enforce override rules, evaluate conditions, make delivery decisions, or apply financial effects. Runtime consumers and policy-family validation remain separate work.
+
 ## Inspect audit history
 
 `GET /operations/v1/policies/{policyId}/audit`

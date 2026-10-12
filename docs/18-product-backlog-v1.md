@@ -83,6 +83,7 @@ Epic
 - scope policy
 
 ### E2.2 Effective Policy Resolution
+- Sprint 034 adds context-aware resolution of active, effective policy versions, ordered by the documented scope tiers and priority; it does not evaluate policies or alter request decisions.
 - platform defaults
 - service defaults
 - preset
