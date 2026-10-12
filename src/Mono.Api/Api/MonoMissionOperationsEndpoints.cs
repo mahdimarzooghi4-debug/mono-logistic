@@ -120,6 +120,9 @@ public static class MonoMissionOperationsEndpoints
                 string? query,
                 [FromQuery(Name = "created_after")] DateTimeOffset? createdAfter,
                 [FromQuery(Name = "created_before")] DateTimeOffset? createdBefore,
+                [FromQuery(Name = "customer_id")] string? customerId,
+                [FromQuery(Name = "branch_id")] string? branchId,
+                [FromQuery(Name = "has_mission")] bool? hasMission,
                 string? cursor,
                 PostgresDeliveryRequestOperationsService deliveryRequests,
                 PostgresDeliveryRequestOperationsReadAuditService readAudit,
@@ -130,12 +133,15 @@ public static class MonoMissionOperationsEndpoints
                     !DeliveryRequestOperationsInputValidator.IsValidStatus(status) ||
                     !DeliveryRequestOperationsInputValidator.IsValidQuery(query) ||
                     !DeliveryRequestOperationsInputValidator.IsValidDateRange(createdAfter, createdBefore) ||
+                    !DeliveryRequestOperationsInputValidator.IsValidCustomerId(customerId) ||
+                    !DeliveryRequestOperationsInputValidator.IsValidBranchId(branchId) ||
                     !DeliveryRequestOperationsInputValidator.IsValidCursor(cursor))
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_REQUEST", "Delivery Request search filters are invalid.")));
  
                 var page = await deliveryRequests.ListAsync(
-                    size, status, query, createdAfter, createdBefore, cursor, cancellationToken);
+                    size, status, query, createdAfter, createdBefore,
+                    customerId, branchId, hasMission, cursor, cancellationToken);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The Delivery Request cursor is invalid for these filters.")));

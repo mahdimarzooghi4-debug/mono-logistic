@@ -146,6 +146,7 @@ Epic
 - Sprint 081 records append-only staff attribution for operations Mission searches, detail reads, and timeline reads without retaining search terms or event payloads.
 - Sprint 082 adds an MFA-gated, filterable, keyset-paginated operations view of Mission read audits; audit-ledger reads are also recorded.
 - Sprint 083 adds MFA-gated Delivery Request search and safe summary inspection across tenants, with prefix/date/status filters, cursor consistency, and append-only access audit.
+- Sprint 084 joins operations Delivery Request reads to Mission summaries and adds customer, branch, and Mission-existence filters with cursor/filter consistency.
 
 ## 6. Epic E4 — Shipment & Capability Model
 
