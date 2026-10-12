@@ -198,9 +198,9 @@ Extensible:
 ## 8. Epic E6 — Zone & Capacity
 
 ### E6.1 Zone Model
-- city
-- operating zone
-- micro-zone
+- Sprint 044 defines the geometry-neutral City → Operating Zone → Micro-zone model and validates required parents, parent-kind relationships, and unique zone IDs.
+- Geometry references, status labels, and capacity-policy IDs remain opaque metadata; the model does not define geometry, lifecycle transitions, coverage, or capacity.
+- Zone authorization, geometry membership, and operations endpoints remain future work.
 
 ### E6.2 Courier Zone Approval
 - preferred zones
