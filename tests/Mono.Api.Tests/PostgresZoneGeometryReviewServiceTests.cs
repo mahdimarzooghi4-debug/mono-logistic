@@ -58,6 +58,23 @@ public sealed class PostgresZoneGeometryReviewServiceTests(ITestOutputHelper out
             first => Assert.Equal(approval.ReviewId, first.ReviewId),
             second => Assert.Equal(rejection.ReviewId, second.ReviewId));
         Assert.Null(await service.ListAsync(zoneId, "missing-version"));
+
+        await using var auditConnection = await dataSource.OpenConnectionAsync();
+        await using var update = new NpgsqlCommand("""
+            UPDATE zone_geometry_reviews SET reason = 'tampered'
+            WHERE review_id = @review_id;
+            """, auditConnection);
+        update.Parameters.AddWithValue("review_id", approval.ReviewId);
+        await Assert.ThrowsAsync<PostgresException>(() => update.ExecuteNonQueryAsync());
+
+        await using var delete = new NpgsqlCommand("""
+            DELETE FROM zone_geometry_reviews WHERE review_id = @review_id;
+            """, auditConnection);
+        delete.Parameters.AddWithValue("review_id", approval.ReviewId);
+        await Assert.ThrowsAsync<PostgresException>(() => delete.ExecuteNonQueryAsync());
+
+        await using var truncate = new NpgsqlCommand("TRUNCATE zone_geometry_reviews;", auditConnection);
+        await Assert.ThrowsAsync<PostgresException>(() => truncate.ExecuteNonQueryAsync());
     }
 
     [Fact]
