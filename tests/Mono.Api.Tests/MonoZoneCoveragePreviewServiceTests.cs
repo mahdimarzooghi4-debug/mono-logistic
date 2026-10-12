@@ -126,7 +126,7 @@ public sealed class MonoZoneCoveragePreviewServiceTests(ITestOutputHelper output
 
     private static ZoneCoverageLayerPreview Layer(
         ZoneCoveragePreviewResponse response, ZoneKind kind) =>
-        Assert.Single(response.Layers.Where(layer => layer.Kind == kind));
+        Assert.Single(response.Layers, layer => layer.Kind == kind);
 
     private static void AssertLayer(
         ZoneCoveragePreviewResponse response,
