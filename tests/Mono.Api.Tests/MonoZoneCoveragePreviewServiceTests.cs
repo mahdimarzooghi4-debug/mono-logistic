@@ -61,6 +61,10 @@ public sealed class MonoZoneCoveragePreviewServiceTests(ITestOutputHelper output
         AssertLayer(matched, ZoneKind.OperatingZone, ZonePointResolutionStatus.Matched, zoneA);
         AssertLayer(matched, ZoneKind.MicroZone, ZonePointResolutionStatus.Matched, microId);
 
+        var inactiveVersionArea = await preview.PreviewAsync(2, 5.5);
+        AssertLayer(inactiveVersionArea, ZoneKind.OperatingZone,
+            ZonePointResolutionStatus.Matched, zoneB);
+
         var border = await preview.PreviewAsync(2.5, 5);
         AssertLayer(border, ZoneKind.OperatingZone, ZonePointResolutionStatus.Ambiguous, null);
         Assert.Equal(new[] { zoneA, zoneB }.Order(StringComparer.Ordinal),
