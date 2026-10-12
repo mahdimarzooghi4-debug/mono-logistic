@@ -11,8 +11,10 @@ namespace Mono.Api.Persistence;
 public sealed class PostgresMissionLifecycleRepository(
     NpgsqlDataSource dataSource,
     IMonoOperationsContext operationsContext,
+    ICustomerContext? customerContext = null,
     TimeProvider? timeProvider = null)
 {
+    private readonly ICustomerContext? _customerContext = customerContext;
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
     public async Task<MissionLifecycleResult> ApplyAsync(
@@ -20,7 +22,10 @@ public sealed class PostgresMissionLifecycleRepository(
         string eventType,
         string reason,
         string idempotencyKey,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? customerScopeId = null,
+        string actorType = "operations",
+        string? externalReference = null)
     {
         missionId = Required(missionId, nameof(missionId), 128);
         eventType = Required(eventType, nameof(eventType), 64);
@@ -31,9 +36,13 @@ public sealed class PostgresMissionLifecycleRepository(
         if (!MissionLifecycleTransitions.EventTypes.Contains(eventType, StringComparer.Ordinal))
             throw new ArgumentException("Mission event type is invalid.", nameof(eventType));
 
-        var actorId = Required(operationsContext.ActorId, nameof(operationsContext.ActorId), 128);
-        var requestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-            JsonSerializer.Serialize(new { mission_id = missionId, event_type = eventType, reason }))))
+        var actorId = actorType == "customer"
+            ? Required(customerScopeId, nameof(customerScopeId), 128)
+            : Required(operationsContext.ActorId, nameof(operationsContext.ActorId), 128);
+        var requestJson = actorType == "operations" && externalReference is null
+            ? JsonSerializer.Serialize(new { mission_id = missionId, event_type = eventType, reason })
+            : JsonSerializer.Serialize(new { mission_id = missionId, event_type = eventType, reason, external_reference = externalReference, actor_type = actorType });
+        var requestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(requestJson)))
             .ToLowerInvariant();
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -43,6 +52,7 @@ public sealed class PostgresMissionLifecycleRepository(
             SELECT customer_id, delivery_request_id, status
             FROM missions
             WHERE mission_id = @mission_id
+              AND (@customer_scope_id IS NULL OR customer_id = @customer_scope_id)
             FOR UPDATE;
             """;
         string? customerId = null;
@@ -51,6 +61,8 @@ public sealed class PostgresMissionLifecycleRepository(
         await using (var lockMission = new NpgsqlCommand(lockMissionSql, connection, transaction))
         {
             lockMission.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+            lockMission.Parameters.AddWithValue("customer_scope_id", NpgsqlDbType.Text,
+                (object?)customerScopeId ?? DBNull.Value);
             await using var reader = await lockMission.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
@@ -95,7 +107,7 @@ public sealed class PostgresMissionLifecycleRepository(
         if (!MissionLifecycleTransitions.TryGetNextStatus(currentStatus, eventType, out var nextStatus))
         {
             await transaction.CommitAsync(cancellationToken);
-            return new MissionLifecycleResult(MissionLifecycleOutcome.InvalidTransition, null);
+            return new MissionLifecycleResult(MissionLifecycleOutcome.InvalidTransition, null, currentStatus);
         }
 
         const string nextSequenceSql = """
@@ -125,8 +137,10 @@ public sealed class PostgresMissionLifecycleRepository(
             event_type = eventType,
             status = nextStatus,
             sequence,
+            actor_type = actorType,
             actor_id = actorId,
             reason,
+            external_reference = externalReference,
             occurred_at = occurredAt
         });
 
@@ -158,7 +172,7 @@ public sealed class PostgresMissionLifecycleRepository(
             insertEvent.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, occurredAt);
             insertEvent.Parameters.AddWithValue("correlation_id", NpgsqlDbType.Text, deliveryRequestId);
             insertEvent.Parameters.AddWithValue("causation_id", NpgsqlDbType.Text,
-                $"operations:{actorId}:{idempotencyKey}");
+                $"{actorType}:{actorId}:{idempotencyKey}");
             insertEvent.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
             insertEvent.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
             insertEvent.Parameters.AddWithValue("sequence", NpgsqlDbType.Bigint, sequence);
@@ -194,6 +208,36 @@ public sealed class PostgresMissionLifecycleRepository(
         return new MissionLifecycleResult(
             MissionLifecycleOutcome.Applied,
             new MissionLifecycleResponse(missionId, eventId, eventType, sequence, nextStatus, occurredAt));
+    }
+
+    public Task<MissionLifecycleResult> CancelForCustomerAsync(
+        string missionId,
+        string reasonCode,
+        string? externalReference,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        if (!string.Equals(reasonCode, "CUSTOMER_CANCELLED", StringComparison.Ordinal))
+            throw new ArgumentException("Mission cancellation reason code is invalid.", nameof(reasonCode));
+
+        var customerId = _customerContext?.CustomerId
+            ?? throw new InvalidOperationException("Customer context is required for customer Mission cancellation.");
+        if (externalReference is not null)
+        {
+            externalReference = externalReference.Trim();
+            if (externalReference.Length is < 1 or > 128 || externalReference.Any(char.IsControl))
+                throw new ArgumentException("External reference is invalid.", nameof(externalReference));
+        }
+
+        return ApplyAsync(
+            missionId,
+            "mission.cancelled",
+            reasonCode,
+            idempotencyKey,
+            cancellationToken,
+            customerId,
+            "customer",
+            externalReference);
     }
 
     private static string Required(string? value, string parameterName, int maximumLength)
