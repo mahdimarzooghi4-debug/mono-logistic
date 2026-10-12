@@ -691,3 +691,21 @@ GET /operations/v1/delivery-requests/{delivery_request_id}
 ```
 
 Search uses keyset pagination ordered by `created_at DESC, delivery_request_id DESC`; page size is 1–100 (default 50). The optional status filter currently accepts `RECEIVED`; the case-insensitive prefix query matches Delivery Request ID or external reference; date bounds are inclusive. A cursor must match all active filters. Responses contain Delivery Request ID, customer ID, branch ID, external reference, status, and creation time. They never include the stored request payload, addresses, coordinates, or contact details. Search and detail reads are recorded in their own append-only audit table; search terms are not persisted.
+
+
+## 34. Courier Trust Lifecycle — Domain Contract
+
+Mono's courier trust lifecycle is ordered:
+
+```
+REGISTERED
+-> IDENTITY_VERIFIED
+-> DOCUMENTS_SUBMITTED
+-> TRUST_REQUIREMENTS_VERIFIED
+-> MONO_APPROVED
+-> ACTIVE
+```
+
+The current Sprint 109 implementation is a domain rule only; no HTTP endpoint or persistence contract is available yet. Each transition requires a staff actor, canonical reason code, opaque evidence reference, and occurrence timestamp. A transition can only advance one step. Moving to ACTIVE also requires at least one approved operating zone and a primary zone included in that approved set.
+
+Evidence references identify material reviewed outside this domain component. They do not prove that identity, documents, trust conditions, or zone approvals were independently verified. Courier authentication, evidence storage and verification, operations review endpoints, and assignment eligibility remain unimplemented.
