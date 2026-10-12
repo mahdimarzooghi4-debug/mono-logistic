@@ -177,7 +177,7 @@ public static class ZoneGeometryResolver
         var candidates = inside.Concat(onBoundary).Order(StringComparer.Ordinal).ToArray();
         if (inside.Count == 1 && onBoundary.Count == 0)
             return new ZonePointResolution(ZonePointResolutionStatus.Matched, inside[0], candidates);
-        if (inside.Count > 1 || (inside.Count > 0 && onBoundary.Count > 0))
+        if (inside.Count > 1 || onBoundary.Count > 1 || (inside.Count > 0 && onBoundary.Count > 0))
             return new ZonePointResolution(ZonePointResolutionStatus.Ambiguous, null, candidates);
         if (onBoundary.Count > 0)
             return new ZonePointResolution(ZonePointResolutionStatus.Boundary, null, candidates);
