@@ -283,10 +283,11 @@ Internal states may be richer, but external semantics must remain stable.
 
 ## 11. Cancel Mission
 
-Future capability; not implemented by the current request intake.
+Implemented for authenticated customer API keys with the `missions.cancel` scope.
 
 ```
 POST /v1/missions/{mission_id}/cancel
+Idempotency-Key: <customer-generated key>
 ```
 
 Request:
@@ -298,6 +299,8 @@ Request:
 }
 ```
 
+`external_reference` is optional and, when supplied, is limited to 128 ASCII letters, digits, dots, underscores, tildes, or hyphens. The only accepted reason code in this version is `CUSTOMER_CANCELLED`.
+
 Response if allowed:
 
 ```json
@@ -307,19 +310,11 @@ Response if allowed:
 }
 ```
 
-Response if cutoff passed:
+The write is customer-tenant scoped and idempotent. The Mission state change, outbox event, and idempotency record are committed atomically. Reusing a key with the same request replays the response; changed request content returns `409 IDEMPOTENCY_CONFLICT`. Unknown and foreign-customer Missions return the same `404 MISSION_NOT_FOUND`.
 
-```json
-{
-  "error": {
-    "code": "CANCELLATION_NOT_ALLOWED",
-    "current_status": "PICKED_UP",
-    "reason_code": "HANDOFF_ALREADY_CONFIRMED"
-  }
-}
-```
+Cancellation is allowed only before `HANDED_TO_COURIER`. The Mission row lock serializes cancellation against operations lifecycle transitions, so only one side of a concurrent cancellation/handoff race can advance the Mission. Once handoff is recorded, cancellation returns `409 CANCELLATION_NOT_ALLOWED` with the current status and `HANDOFF_ALREADY_CONFIRMED`. Terminal Missions cannot be cancelled.
 
-The actual cutoff is policy-driven.
+The event records the customer tenant as its actor and excludes the external reference from customer-visible timeline fields. Physical handoff proof remains a separate capability.
 
 ## 12. Tracking
 

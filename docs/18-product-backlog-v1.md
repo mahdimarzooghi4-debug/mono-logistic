@@ -495,7 +495,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 075 verifies the Promise endpoint's stable failure mapping and rejects callers that have read scope without write scope.
 - Sprint 070 adds `POST /v1/delivery-requests/{id}/quote` (`delivery-requests.write`, tenant-scoped, idempotent first Quote issuance)
 - `GET /v1/delivery-requests` (`delivery-requests.read`, paginated history)
-- Sprint 076 adds authenticated `POST /v1/delivery-requests/{id}/confirm` with idempotent Mission creation and `GET /v1/missions/{id}` for the customer-scoped Mission summary.
+- Sprint 076 adds authenticated `POST /v1/delivery-requests/{id}/confirm` with idempotent Mission creation and `GET /v1/missions/{id}` for the customer-scoped Mission summary.\n- Sprint 108 adds `POST /v1/missions/{id}/cancel` for API keys with `missions.cancel`; it atomically cancels only before handoff, preserves tenant isolation, and replays idempotently.
 - Sprint 086 adds tenant-scoped Mission ID, status, and committed delivery time to Delivery Request detail and history responses; unconfirmed requests return null Mission context.
 - Sprint 087 composes customer Delivery Request detail with its latest safe Quote and current safe Promise; absent Quote or Promise values are null, and internal evidence remains private.
 - Sprint 088 adds a tenant-scoped Delivery Request timeline for recorded Promise and Mission outbox events, with an allowlist and payload exclusion.

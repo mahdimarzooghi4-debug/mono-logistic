@@ -80,4 +80,13 @@ public enum MissionLifecycleOutcome
 
 public sealed record MissionLifecycleResult(
     MissionLifecycleOutcome Outcome,
-    MissionLifecycleResponse? Transition);
+    MissionLifecycleResponse? Transition,
+    string? CurrentStatus = null);
+
+public sealed record MissionCancellationInput(
+    [property: JsonPropertyName("reason_code")] string? ReasonCode,
+    [property: JsonPropertyName("external_reference")] string? ExternalReference);
+
+public sealed record MissionCancellationResponse(
+    [property: JsonPropertyName("mission_id")] string MissionId,
+    [property: JsonPropertyName("status")] string Status);

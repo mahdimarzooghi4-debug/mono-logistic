@@ -71,6 +71,7 @@ app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapMissionConfirmationEndpoints();
 app.MapMonoMissionLifecycleEndpoints();
+app.MapMissionCancellationEndpoints();
 app.MapMissionHistoryEndpoints();
 app.MapMonoMissionOperationsEndpoints();
 app.MapCustomerServiceConfigurationInspectionEndpoints();
