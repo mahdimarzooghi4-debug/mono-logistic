@@ -24,7 +24,7 @@ public static class MonoZoneGeometryGeoJsonEndpoints
                         zoneId, geometryVersion, cancellationToken);
                     var etag = MonoGeoJsonCacheValidators.ForSnapshot(feature.Properties.SnapshotHash);
                     httpContext.Response.Headers["ETag"] = etag;
-                    httpContext.Response.Headers["Cache-Control"] = "private, max-age=31536000, immutable";
+                    httpContext.Response.Headers["Cache-Control"] = "private, no-cache";
                     if (MatchesIfNoneMatch(httpContext.Request.Headers["If-None-Match"], etag))
                         return Results.StatusCode(StatusCodes.Status304NotModified);
                     return Results.Ok(feature);
