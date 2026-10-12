@@ -42,8 +42,15 @@ BEGIN
         RAISE EXCEPTION 'zone geometry activation must reference the exact snapshot hash';
     END IF;
 
-    IF TG_TABLE_NAME = 'zone_geometry_activation_events' AND NEW.action = 'ACTIVATE'
-       OR TG_TABLE_NAME = 'zone_geometry_active' THEN
+    IF TG_TABLE_NAME = 'zone_geometry_active' THEN
+        SELECT decision INTO latest_decision
+        FROM zone_geometry_reviews
+        WHERE zone_id = NEW.zone_id AND geometry_version = NEW.geometry_version
+        ORDER BY review_id DESC LIMIT 1;
+        IF latest_decision IS DISTINCT FROM 'APPROVE' THEN
+            RAISE EXCEPTION 'zone geometry activation requires a latest APPROVE review';
+        END IF;
+    ELSIF NEW.action = 'ACTIVATE' THEN
         SELECT decision INTO latest_decision
         FROM zone_geometry_reviews
         WHERE zone_id = NEW.zone_id AND geometry_version = NEW.geometry_version
@@ -65,6 +72,25 @@ DROP TRIGGER IF EXISTS zone_geometry_active_valid ON zone_geometry_active;
 CREATE TRIGGER zone_geometry_active_valid
     BEFORE INSERT OR UPDATE ON zone_geometry_active
     FOR EACH ROW EXECUTE FUNCTION validate_zone_geometry_activation();
+
+CREATE OR REPLACE FUNCTION prevent_rejecting_active_zone_geometry()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.decision = 'REJECT' AND EXISTS (
+        SELECT 1 FROM zone_geometry_active
+        WHERE zone_id = NEW.zone_id AND geometry_version = NEW.geometry_version) THEN
+        RAISE EXCEPTION 'active zone geometry must be deactivated before rejection';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS zone_geometry_reviews_reject_active ON zone_geometry_reviews;
+CREATE TRIGGER zone_geometry_reviews_reject_active
+    BEFORE INSERT ON zone_geometry_reviews
+    FOR EACH ROW EXECUTE FUNCTION prevent_rejecting_active_zone_geometry();
 
 CREATE OR REPLACE FUNCTION reject_zone_geometry_activation_event_mutation()
 RETURNS trigger
