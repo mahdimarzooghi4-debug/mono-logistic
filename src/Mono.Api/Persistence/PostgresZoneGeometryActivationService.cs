@@ -79,7 +79,7 @@ public sealed class PostgresZoneGeometryActivationService(
         var target = await FindSnapshotAsync(connection, transaction, zoneId, geometryVersion, cancellationToken);
         if (target is null)
             throw new ZoneGeometryActivationSnapshotNotFoundException();
-        if (!string.Equals(target.Value.Hash, expectedHash, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(target.Value, expectedHash, StringComparison.OrdinalIgnoreCase))
             throw new ZoneGeometryActivationHashConflictException();
         if (!await IsLatestReviewApprovedAsync(connection, transaction, zoneId, geometryVersion, cancellationToken))
             throw new ZoneGeometryActivationReviewRequiredException();
@@ -95,7 +95,7 @@ public sealed class PostgresZoneGeometryActivationService(
         }
 
         await InsertEventAsync(connection, transaction, zoneId, geometryVersion,
-            target.Value.Hash, "ACTIVATE", actorId, reason, now, cancellationToken);
+            target.Value, "ACTIVATE", actorId, reason, now, cancellationToken);
         await using (var update = new NpgsqlCommand("""
             INSERT INTO zone_geometry_active (zone_id, geometry_version, snapshot_sha256, activated_at, activated_by)
             VALUES (@zone_id, @geometry_version, @snapshot_sha256, @activated_at, @activated_by)
@@ -108,13 +108,13 @@ public sealed class PostgresZoneGeometryActivationService(
         {
             update.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, zoneId);
             update.Parameters.AddWithValue("geometry_version", NpgsqlDbType.Text, geometryVersion);
-            update.Parameters.AddWithValue("snapshot_sha256", NpgsqlDbType.Text, target.Value.Hash);
+            update.Parameters.AddWithValue("snapshot_sha256", NpgsqlDbType.Text, target.Value);
             update.Parameters.AddWithValue("activated_at", NpgsqlDbType.TimestampTz, now);
             update.Parameters.AddWithValue("activated_by", NpgsqlDbType.Text, actorId);
             await update.ExecuteNonQueryAsync(cancellationToken);
         }
         await transaction.CommitAsync(cancellationToken);
-        return new ZoneGeometryActivationState(zoneId, geometryVersion, target.Value.Hash, now, actorId);
+        return new ZoneGeometryActivationState(zoneId, geometryVersion, target.Value, now, actorId);
     }
 
     public async Task<bool> DeactivateAsync(
@@ -163,21 +163,18 @@ public sealed class PostgresZoneGeometryActivationService(
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private static async Task<(string Hash, string Kind)?> FindSnapshotAsync(
+    private static async Task<string?> FindSnapshotAsync(
         NpgsqlConnection connection, NpgsqlTransaction transaction, string zoneId,
         string geometryVersion, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand("""
-            SELECT snapshot_sha256, zone_kind FROM zone_geometry_versions
+            SELECT snapshot_sha256 FROM zone_geometry_versions
             WHERE zone_id = @zone_id AND geometry_version = @geometry_version
             FOR KEY SHARE;
             """, connection, transaction);
         command.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, zoneId);
         command.Parameters.AddWithValue("geometry_version", NpgsqlDbType.Text, geometryVersion);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? (reader.GetString(0), reader.GetString(1))
-            : null;
+        return (string?)await command.ExecuteScalarAsync(cancellationToken);
     }
 
     private static async Task<bool> IsLatestReviewApprovedAsync(
@@ -277,4 +274,7 @@ public sealed record ZoneGeometryActivationEvent(
 public sealed class ZoneGeometryActivationSnapshotNotFoundException : Exception { }
 public sealed class ZoneGeometryActivationHashConflictException : Exception { }
 public sealed class ZoneGeometryActivationReviewRequiredException : Exception { }
-public sealed class ZoneGeometryActivationStateConflictException(string message) : Exception(message);
+
+public sealed class ZoneGeometryActivationStateConflictException(string message) : Exception(message)
+{
+}
