@@ -158,6 +158,16 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(System.Net.HttpStatusCode.Forbidden,
                     (await client.SendAsync(nonAdminBranch)).StatusCode);
 
+                using var emptyBranchListRequest = new HttpRequestMessage(HttpMethod.Get, branchPath);
+                emptyBranchListRequest.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var emptyBranchListResponse = await client.SendAsync(emptyBranchListRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, emptyBranchListResponse.StatusCode);
+                using var emptyBranchListBody = System.Text.Json.JsonDocument.Parse(
+                    await emptyBranchListResponse.Content.ReadAsStringAsync());
+                Assert.Empty(emptyBranchListBody.RootElement.GetProperty("branches").EnumerateArray());
+
                 using var createBranch = new HttpRequestMessage(HttpMethod.Post, branchPath)
                 {
                     Content = JsonContent.Create(new
@@ -180,6 +190,39 @@ public sealed class MonoCustomerOperationsEndpointTests
                 var branchId = branchBody.RootElement.GetProperty("branchId").GetString()!;
                 Assert.StartsWith("br_", branchId);
                 Assert.Equal("ACTIVE", branchBody.RootElement.GetProperty("status").GetString());
+
+                using var unauthorizedBranchList = new HttpRequestMessage(HttpMethod.Get, branchPath);
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthorizedBranchList)).StatusCode);
+
+                using var nonAdminBranchList = new HttpRequestMessage(HttpMethod.Get, branchPath);
+                nonAdminBranchList.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminBranchList)).StatusCode);
+
+                using var branchListRequest = new HttpRequestMessage(HttpMethod.Get, branchPath);
+                branchListRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var branchListResponse = await client.SendAsync(branchListRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, branchListResponse.StatusCode);
+                using var branchListBody = System.Text.Json.JsonDocument.Parse(
+                    await branchListResponse.Content.ReadAsStringAsync());
+                var listedBranches = branchListBody.RootElement.GetProperty("branches");
+                var listedBranch = Assert.Single(listedBranches.EnumerateArray());
+                Assert.Equal(branchId, listedBranch.GetProperty("branchId").GetString());
+                Assert.Equal(customerId, listedBranch.GetProperty("customerId").GetString());
+                Assert.Equal("Central Branch", listedBranch.GetProperty("name").GetString());
+                Assert.Equal("ACTIVE", listedBranch.GetProperty("status").GetString());
+
+                using var missingCustomerBranchList = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    "/operations/v1/customers/cus_00000000000000000000000000000000/branches");
+                missingCustomerBranchList.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(missingCustomerBranchList)).StatusCode);
 
                 using var invalidCoordinates = new HttpRequestMessage(HttpMethod.Post, branchPath)
                 {

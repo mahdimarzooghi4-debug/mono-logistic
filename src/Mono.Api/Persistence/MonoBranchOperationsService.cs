@@ -104,6 +104,49 @@ public sealed class MonoBranchOperationsService(
         return ManagedBranchSummary.From(branch);
     }
 
+    public async Task<IReadOnlyList<ManagedBranchSummary>> ListForCustomerAsync(
+        string customerId,
+        CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        customerId = NormalizeCustomerId(customerId);
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using (var customer = new NpgsqlCommand(
+            "SELECT 1 FROM customers WHERE customer_id = @customer_id;",
+            connection))
+        {
+            customer.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            if (await customer.ExecuteScalarAsync(cancellationToken) is null)
+                throw new KeyNotFoundException("Customer was not found.");
+        }
+
+        await using var command = new NpgsqlCommand("""
+            SELECT branch_id, customer_id, name, address, latitude, longitude, zone_id, status
+            FROM branches
+            WHERE customer_id = @customer_id
+            ORDER BY name, branch_id;
+            """, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var branches = new List<ManagedBranchSummary>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            branches.Add(new ManagedBranchSummary(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetDouble(4),
+                reader.IsDBNull(5) ? null : reader.GetDouble(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.GetString(7)));
+        }
+
+        return branches;
+    }
+
     public async Task<ManagedBranchSummary> UpdateForActiveCustomerAsync(
         string customerId,
         string branchId,
