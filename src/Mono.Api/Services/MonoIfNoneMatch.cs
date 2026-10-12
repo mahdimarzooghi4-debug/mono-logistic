@@ -12,6 +12,7 @@ public static class MonoIfNoneMatch
             return false;
 
         var index = 0;
+        var matched = false;
         SkipOptionalWhitespace(headerValue, ref index);
         if (index < headerValue.Length && headerValue[index] == '*')
         {
@@ -26,12 +27,12 @@ public static class MonoIfNoneMatch
             if (!TryParseTag(headerValue, ref index, out _, out var candidateOpaqueTag))
                 return false;
 
-            if (string.Equals(candidateOpaqueTag, currentOpaqueTag, StringComparison.Ordinal))
-                return true;
+            matched |= string.Equals(
+                candidateOpaqueTag, currentOpaqueTag, StringComparison.Ordinal);
 
             SkipOptionalWhitespace(headerValue, ref index);
             if (index == headerValue.Length)
-                return false;
+                return matched;
             if (headerValue[index] != ',')
                 return false;
 
