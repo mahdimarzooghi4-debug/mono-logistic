@@ -673,3 +673,18 @@ The customer's order reference is stored as `external_reference`.
 ## 32. Core Principle
 
 > **One public B2B API surface, many customer configurations, one Mono logistics core.**
+
+
+## 33. Mono Operations Mission Inspection
+
+The following internal read routes require the existing MFA-gated Mono administrator policy:
+
+```
+GET /operations/v1/missions?page_size=50&status=PROMISED&cursor=mis_...
+GET /operations/v1/missions/{mission_id}
+GET /operations/v1/missions/{mission_id}/timeline
+```
+
+Mission search uses keyset pagination ordered by `created_at DESC, mission_id DESC`. `page_size` defaults to 50 and must be between 1 and 100. The optional status filter is a canonical uppercase token. A cursor must identify a Mission and, when a status filter is present, must match that filter.
+
+Operations Mission summaries contain only Mission ID, customer ID, Delivery Request ID, status, committed delivery time, and creation time. Timeline responses expose the event ID, event type, sequence, and occurrence time; event payloads and personal/contact/location data are not returned. These endpoints are read-only.

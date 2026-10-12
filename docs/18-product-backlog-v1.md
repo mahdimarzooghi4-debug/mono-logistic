@@ -142,6 +142,7 @@ Epic
 - assignment
 - timeline
 - customer-scoped access
+- Sprint 079 adds MFA-gated, read-only operations search, summary, and timeline across customers; customer-facing Mission access remains tenant-scoped.
 
 ## 6. Epic E4 — Shipment & Capability Model
 
@@ -545,6 +546,7 @@ Dashboard must use the same application/core rules as API customers.
 ## 21. Epic E19 — Operations Console
 
 ### MVP
+- Sprint 079 adds an MFA-gated, read-only Mono operations Mission search, summary, and timeline across customer tenants, with keyset pagination and allowlisted event fields.
 - Mission search
 - Mission timeline
 - Route inspection
