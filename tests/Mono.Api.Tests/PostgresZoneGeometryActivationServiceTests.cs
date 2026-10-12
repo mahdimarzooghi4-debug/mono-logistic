@@ -43,6 +43,8 @@ public sealed class PostgresZoneGeometryActivationServiceTests(ITestOutputHelper
         await reviews.RecordAsync(zoneId, "v2", hashV2, "APPROVE", "Checked updated boundary.");
         var activeV2 = await activations.ActivateAsync(zoneId, "v2", hashV2, "Replace with updated boundary.");
         Assert.Equal("v2", activeV2.GeometryVersion);
+        await Assert.ThrowsAsync<ZoneGeometrySnapshotIsActiveException>(() =>
+            reviews.RecordAsync(zoneId, "v2", hashV2, "REJECT", "Must deactivate first."));
         await Assert.ThrowsAsync<ZoneGeometryActivationStateConflictException>(() =>
             activations.DeactivateAsync(zoneId, "v1", "Stale deactivation request."));
 
@@ -56,6 +58,7 @@ public sealed class PostgresZoneGeometryActivationServiceTests(ITestOutputHelper
             third => { Assert.Equal("v2", third.GeometryVersion); Assert.Equal("ACTIVATE", third.Action); });
 
         Assert.True(await activations.DeactivateAsync(zoneId, "v2", "Turn off while boundaries are reviewed."));
+        await reviews.RecordAsync(zoneId, "v2", hashV2, "REJECT", "Reject after deactivation.");
         Assert.Null(await activations.GetCurrentAsync(zoneId));
         Assert.Equal(4, (await activations.ListHistoryAsync(zoneId)).Count);
 
