@@ -186,9 +186,10 @@ Extensible:
 - route matrix
 
 ### E5.2 Location Validation
-- coordinate validation
-- zone resolution
-- address fallback geocoding
+- Sprint 042 adds a reusable resolver: valid supplied coordinate pairs are authoritative; when coordinates are absent, address text is resolved through the provider-neutral Maps Gateway; a geocoding no-match remains unresolved. This capability is not yet wired into delivery intake.
+- Coordinate validation
+- Address fallback geocoding
+- Zone resolution is deferred until E6.1 defines the zone registry and geometry.
 
 ### E5.3 Courier Location Ingestion
 - GPS event endpoint
