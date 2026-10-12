@@ -36,6 +36,20 @@ public sealed class BranchEndpointAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Delivery_request_creation_requires_its_write_scope()
+    {
+        await using var factory = CreateFactory(["branches.read"]);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
+
+        var response = await client.PostAsync(
+            "/v1/delivery-requests",
+            new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private static WebApplicationFactory<Program> CreateFactory(IReadOnlyList<string> scopes) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>

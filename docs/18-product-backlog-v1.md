@@ -96,6 +96,7 @@ Epic
 - valid coordinates
 - customer entitlement
 - duplicate/idempotent submission
+- Sprint 007 implements authenticated request intake, active customer branch validation, and customer-scoped idempotency; feasibility, quote, promise, and Mission remain separate backlog work.
 
 ### E3.3 Mission Creation
 - Mission created only after accepted feasibility/confirmation
@@ -398,7 +399,8 @@ Courier Net = 89% of Mission Fare
 - internal managed API-key provisioning for existing active customers
 
 ### E16.2 Endpoints
-- delivery requests
+- `GET /v1/branches` (`branches.read`)
+- `POST /v1/delivery-requests` (`delivery-requests.write`, request intake only)
 - confirm
 - Mission status
 - cancel

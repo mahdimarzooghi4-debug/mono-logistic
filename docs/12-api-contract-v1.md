@@ -52,10 +52,10 @@ Every request resolves:
 - service configuration
 - policy scope
 
-The first implemented customer operation is `GET /v1/branches`. It requires the
-`branches.read` API-key scope and returns only the authenticated customer's branch
-summaries. Customer identity is resolved from the credential and is never accepted
-from query parameters or request bodies.
+Implemented customer operations:
+
+- `GET /v1/branches` requires `branches.read` and returns only the authenticated customer's branch summaries.
+- `POST /v1/delivery-requests` requires `delivery-requests.write`; customer identity comes only from the credential.
 
 ## 5. Idempotency
 
@@ -65,15 +65,7 @@ All create/command endpoints should accept:
 Idempotency-Key
 ```
 
-Mono must return the original result for safe retries where possible.
-
-Critical examples:
-
-- create delivery request
-- accept quote
-- cancel mission
-- create withdrawal
-- manual operational commands
+Mono returns the original delivery request ID for a retry with the same key and normalized payload. Reusing the key for changed request content returns `409 IDEMPOTENCY_CONFLICT`. Keys are scoped per authenticated customer, 1–128 characters, and use only ASCII letters, digits, `.`, `_`, `~`, or `-`.
 
 ## 6. Create Delivery Request
 
@@ -81,12 +73,24 @@ Critical examples:
 POST /v1/delivery-requests
 ```
 
-Example request:
+Required JSON fields:
+
+- `external_reference` (1–128 characters)
+- `branch_id` (an active branch belonging to the authenticated customer)
+- `pickup` and `dropoff` location objects, each with an address or coordinate pair
+- `shipment` (Phase 1: BAG_BASED, positive bag_count, positive optional weight, S/M/L load class)
+- `requested_service`: `URBAN_DELIVERY`
+- `requested_priority`: `STANDARD`
+- optional `estimated_ready_at` timestamp
+
+The `Idempotency-Key` header is mandatory. Customer IDs are never accepted in request content.
+
+Example:
 
 ```json
 {
   "external_reference": "ORDER-123",
-  "branch_id": "br_...",
+  "branch_id": "br_0123456789abcdef0123456789abcdef",
   "pickup": {
     "address_text": "Store address",
     "latitude": 35.7000,
@@ -117,18 +121,11 @@ Example request:
 }
 ```
 
-Possible response:
-
-```json
-{
-  "delivery_request_id": "drq_...",
-  "status": "EVALUATING"
-}
-```
+The response has `delivery_request_id` and `status: RECEIVED`. A retry with the same key and normalized body returns the same values. No quote, feasibility decision, promise, or Mission is implied by receipt.
 
 ## 7. Evaluate / Quote
 
-Mono may evaluate automatically after request creation.
+Future capability: request intake currently records `RECEIVED` only. Feasibility evaluation, quotes, committed promises, and the read endpoint below are not implemented.
 
 Query:
 
@@ -182,6 +179,8 @@ Rejected:
 
 ## 8. Confirm / Create Mission
 
+Future capability; not implemented by the current request intake.
+
 Depending on contract, Mission may be auto-created or require customer confirmation.
 
 Explicit confirmation:
@@ -210,6 +209,8 @@ Response:
 ```
 
 ## 9. Get Mission
+
+Future capability; not implemented by the current request intake.
 
 ```
 GET /v1/missions/{mission_id}
@@ -256,6 +257,8 @@ Internal states may be richer, but external semantics must remain stable.
 
 ## 11. Cancel Mission
 
+Future capability; not implemented by the current request intake.
+
 ```
 POST /v1/missions/{mission_id}/cancel
 ```
@@ -293,6 +296,8 @@ Response if cutoff passed:
 The actual cutoff is policy-driven.
 
 ## 12. Tracking
+
+Future capability; not implemented by the current request intake.
 
 ```
 GET /v1/missions/{mission_id}/tracking
