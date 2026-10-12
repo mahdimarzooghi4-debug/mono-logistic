@@ -17,6 +17,14 @@ public sealed record CourierTrustTransitionInput(
     [property: JsonPropertyName("reason_code")] string? ReasonCode,
     [property: JsonPropertyName("evidence_reference")] string? EvidenceReference);
 
+public sealed record CourierAvailabilityWindowInput(
+    [property: JsonPropertyName("zone_id")] string? ZoneId,
+    [property: JsonPropertyName("starts_at")] DateTimeOffset StartsAt,
+    [property: JsonPropertyName("ends_at")] DateTimeOffset EndsAt);
+
+public sealed record CourierAvailabilityCancellationInput(
+    [property: JsonPropertyName("reason")] string? Reason);
+
 public static class MonoCourierOperationsEndpoints
 {
     public static IEndpointRouteBuilder MapMonoCourierOperationsEndpoints(
@@ -171,6 +179,110 @@ public static class MonoCourierOperationsEndpoints
                 catch (ArgumentException)
                 {
                     return InvalidRequest("Courier trust transition fields are invalid.");
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost("/operations/v1/couriers/{courierId}/availability-windows", async (
+                string courierId,
+                CourierAvailabilityWindowInput input,
+                HttpRequest request,
+                PostgresCourierAvailabilityService availability,
+                CancellationToken cancellationToken) =>
+            {
+                if (!IsValidCourierId(courierId) || !TryReadIdempotencyKey(request, out var key))
+                    return InvalidRequest("A valid Courier ID and exactly one Idempotency-Key are required.");
+                try
+                {
+                    var result = await availability.CreateAsync(
+                        courierId, input.ZoneId ?? string.Empty, input.StartsAt, input.EndsAt, key, cancellationToken);
+                    return result.Outcome switch
+                    {
+                        CourierAvailabilityWriteOutcome.Applied when result.Window is not null =>
+                            Results.Created($"/operations/v1/courier-availability-windows/{result.Window.WindowId}", result.Window),
+                        CourierAvailabilityWriteOutcome.Replayed when result.Window is not null =>
+                            Results.Ok(result.Window),
+                        CourierAvailabilityWriteOutcome.Conflict =>
+                            Results.Conflict(Error("IDEMPOTENCY_CONFLICT",
+                                "The Idempotency-Key was used with a different request.")),
+                        CourierAvailabilityWriteOutcome.CourierNotFound =>
+                            Results.NotFound(Error("COURIER_NOT_FOUND", "The courier was not found.")),
+                        CourierAvailabilityWriteOutcome.InvalidCourierState =>
+                            Results.Conflict(Error("COURIER_NOT_ACTIVE", "Availability requires an ACTIVE courier.")),
+                        CourierAvailabilityWriteOutcome.InvalidZone =>
+                            Results.UnprocessableEntity(Error("ZONE_NOT_APPROVED",
+                                "The zone must be active and approved for this courier.")),
+                        CourierAvailabilityWriteOutcome.Overlap =>
+                            Results.Conflict(Error("AVAILABILITY_WINDOW_OVERLAP",
+                                "The courier already has a scheduled window in this period.")),
+                        _ => throw new InvalidOperationException("Unexpected courier availability outcome.")
+                    };
+                }
+                catch (ArgumentException)
+                {
+                    return InvalidRequest("Courier availability window fields are invalid.");
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet("/operations/v1/courier-availability-windows", async (
+                [FromQuery(Name = "from")] DateTimeOffset? from,
+                [FromQuery(Name = "to")] DateTimeOffset? to,
+                [FromQuery(Name = "page_size")] int? pageSize,
+                string? zone_id,
+                string? cursor,
+                PostgresCourierAvailabilityService availability,
+                CancellationToken cancellationToken) =>
+            {
+                if (from is null || to is null)
+                    return InvalidRequest("Availability search requires from and to timestamps.");
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100)
+                    return InvalidRequest("Availability page_size must be between 1 and 100.");
+                try
+                {
+                    var page = await availability.ListAsync(
+                        to.Value, from.Value, size, zone_id, cursor, cancellationToken);
+                    return page is null
+                        ? Results.BadRequest(Error("INVALID_CURSOR", "The availability cursor is not valid."))
+                        : Results.Ok(page);
+                }
+                catch (ArgumentException)
+                {
+                    return InvalidRequest("Availability search filters are invalid.");
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost("/operations/v1/courier-availability-windows/{windowId}/cancel", async (
+                string windowId,
+                CourierAvailabilityCancellationInput input,
+                HttpRequest request,
+                PostgresCourierAvailabilityService availability,
+                CancellationToken cancellationToken) =>
+            {
+                if (!TryReadIdempotencyKey(request, out var key))
+                    return InvalidRequest("Exactly one valid Idempotency-Key header is required.");
+                try
+                {
+                    var result = await availability.CancelAsync(
+                        windowId, input.Reason ?? string.Empty, key, cancellationToken);
+                    return result.Outcome switch
+                    {
+                        CourierAvailabilityWriteOutcome.Applied or CourierAvailabilityWriteOutcome.Replayed
+                            when result.Window is not null => Results.Ok(result.Window),
+                        CourierAvailabilityWriteOutcome.Conflict =>
+                            Results.Conflict(Error("IDEMPOTENCY_CONFLICT",
+                                "The Idempotency-Key was used with a different request.")),
+                        CourierAvailabilityWriteOutcome.WindowNotFound =>
+                            Results.NotFound(Error("AVAILABILITY_WINDOW_NOT_FOUND",
+                                "The scheduled courier window was not found.")),
+                        _ => throw new InvalidOperationException("Unexpected courier availability cancellation outcome.")
+                    };
+                }
+                catch (ArgumentException)
+                {
+                    return InvalidRequest("Courier availability cancellation fields are invalid.");
                 }
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
