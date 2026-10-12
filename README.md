@@ -58,6 +58,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Distance Feasibility Criterion v1](docs/34-distance-feasibility-criterion-v1.md)
 - [Feasibility Evidence Gate v1](docs/35-feasibility-evidence-gate-v1.md)
 - [Eligible Modes Feasibility Criterion v1](docs/36-eligible-modes-feasibility-criterion-v1.md)
+- [Eligible Courier Feasibility Criterion v1](docs/37-eligible-courier-feasibility-criterion-v1.md)
 - [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 - [Hana Urban Delivery Configuration](docs/customers/hana/urban-delivery-configuration.md)
 - [Unified B2B Policy & Capability Model](docs/06-b2b-policy-capability-model.md)
