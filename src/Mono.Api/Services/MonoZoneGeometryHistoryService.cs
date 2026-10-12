@@ -148,7 +148,6 @@ public sealed class MonoZoneGeometryHistoryService(
             var parts = decoded.Split('\n');
             if (parts.Length != 3 ||
                 !long.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var ticks) ||
-                !DateTimeOffset.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.None, out _) ||
                 !long.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var eventId) ||
                 eventId < 1)
                 throw new FormatException();
