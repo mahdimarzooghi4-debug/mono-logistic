@@ -65,6 +65,83 @@ public sealed class MonoCustomerOperationsService(
         return ManagedCustomerSummary.From(customer);
     }
 
+    public async Task<MonoCustomerPageResponse?> ListAsync(
+        int pageSize,
+        string? cursor,
+        CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        if (pageSize is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(pageSize));
+
+        DateTimeOffset? cursorCreatedAt = null;
+        if (cursor is not null)
+        {
+            cursor = NormalizeCustomerId(cursor);
+            await using var cursorConnection = await dataSource.OpenConnectionAsync(cancellationToken);
+            await using var cursorCommand = new NpgsqlCommand(
+                "SELECT created_at FROM customers WHERE customer_id = @customer_id;",
+                cursorConnection);
+            cursorCommand.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, cursor);
+            await using var cursorReader = await cursorCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await cursorReader.ReadAsync(cancellationToken))
+                return null;
+            cursorCreatedAt = cursorReader.GetFieldValue<DateTimeOffset>(0);
+        }
+
+        const string firstPageSql = """
+            SELECT customer_id, legal_name, display_name, status, customer_type,
+                   default_channel, default_currency, created_at
+            FROM customers
+            ORDER BY created_at DESC, customer_id DESC
+            LIMIT @take;
+            """;
+        const string nextPageSql = """
+            SELECT customer_id, legal_name, display_name, status, customer_type,
+                   default_channel, default_currency, created_at
+            FROM customers
+            WHERE created_at < @cursor_created_at
+               OR (created_at = @cursor_created_at AND customer_id < @cursor_id)
+            ORDER BY created_at DESC, customer_id DESC
+            LIMIT @take;
+            """;
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, connection);
+        command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
+        if (cursor is not null)
+        {
+            command.Parameters.AddWithValue("cursor_created_at", NpgsqlDbType.TimestampTz, cursorCreatedAt!.Value);
+            command.Parameters.AddWithValue("cursor_id", NpgsqlDbType.Text, cursor);
+        }
+
+        var customers = new List<ManagedCustomerSummary>(pageSize + 1);
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                customers.Add(new ManagedCustomerSummary(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.GetString(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.IsDBNull(5) ? null : reader.GetString(5),
+                    reader.IsDBNull(6) ? null : reader.GetString(6),
+                    reader.GetFieldValue<DateTimeOffset>(7)));
+            }
+        }
+
+        string? nextCursor = null;
+        if (customers.Count > pageSize)
+        {
+            customers.RemoveAt(customers.Count - 1);
+            nextCursor = customers[^1].CustomerId;
+        }
+
+        return new MonoCustomerPageResponse(customers, nextCursor);
+    }
+
     public async Task<ManagedCustomerSummary?> FindAsync(
         string customerId,
         CancellationToken cancellationToken = default)
@@ -256,3 +333,7 @@ public sealed record ManagedCustomerSummary(
         new(customer.CustomerId, customer.LegalName, customer.DisplayName, customer.Status,
             customer.CustomerType, customer.DefaultChannel, customer.DefaultCurrency, customer.CreatedAt);
 }
+
+public sealed record MonoCustomerPageResponse(
+    IReadOnlyList<ManagedCustomerSummary> Customers,
+    string? NextCursor);
