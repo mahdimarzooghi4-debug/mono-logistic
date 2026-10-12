@@ -200,7 +200,7 @@ Extensible:
 ### E6.1 Zone Model
 - Sprint 044 defines the geometry-neutral City → Operating Zone → Micro-zone model and validates required parents, parent-kind relationships, and unique zone IDs.
 - Geometry references, status labels, and capacity-policy IDs remain opaque metadata; the model does not define geometry, lifecycle transitions, coverage, or capacity.
-- Geometry references, status labels, and capacity-policy IDs remain opaque metadata; the model does not define geometry, lifecycle transitions, coverage, or capacity. Courier preference and approval records are in E6.2.
+- Courier preference and approval records are in E6.2.
 - Geographic boundary enforcement and zone operations remain future work.
 
 ### E6.2 Courier Zone Approval
@@ -215,6 +215,7 @@ Extensible:
 - registered
 - online
 - effective
+- Sprint 046 adds a per-zone snapshot for registered, online, and effective counts. It validates the zone reference, observation timestamp, and non-negative values without defining a formula or ordering between the figures.
 
 ### E6.4 Hana MVP Capacity Rule
 ```
