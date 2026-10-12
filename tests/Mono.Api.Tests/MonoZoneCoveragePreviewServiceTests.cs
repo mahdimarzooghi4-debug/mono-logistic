@@ -22,8 +22,8 @@ public sealed class MonoZoneCoveragePreviewServiceTests(ITestOutputHelper output
             return;
         }
 
-        await using var dataSource = NpgsqlDataSource.Create(connectionString);
-        await ApplyMigrationsAsync(dataSource);
+        await using var testDatabase = await CreateIsolatedTestDatabaseAsync(connectionString);
+        var dataSource = testDatabase.DataSource;
         var cityId = "city-" + Guid.NewGuid().ToString("N");
         var zoneA = "zone-a-" + Guid.NewGuid().ToString("N");
         var zoneB = "zone-b-" + Guid.NewGuid().ToString("N");
@@ -85,8 +85,8 @@ public sealed class MonoZoneCoveragePreviewServiceTests(ITestOutputHelper output
             return;
         }
 
-        await using var dataSource = NpgsqlDataSource.Create(connectionString);
-        await ApplyMigrationsAsync(dataSource);
+        await using var testDatabase = await CreateIsolatedTestDatabaseAsync(connectionString);
+        var dataSource = testDatabase.DataSource;
         var context = new TestOperationsContext("zone-admin", MonoOperationsRoles.Administrator);
         var previews = new MonoZoneCoveragePreviewService(
             new PostgresZoneGeometryRepository(dataSource), context);
@@ -140,6 +140,31 @@ public sealed class MonoZoneCoveragePreviewServiceTests(ITestOutputHelper output
         Assert.Equal(expectedZoneId, layer.ZoneId);
     }
 
+    private static async Task<IsolatedTestDatabase> CreateIsolatedTestDatabaseAsync(string connectionString)
+    {
+        var adminDataSource = NpgsqlDataSource.Create(connectionString);
+        var schema = "zone_preview_" + Guid.NewGuid().ToString("N");
+        try
+        {
+            await using (var connection = await adminDataSource.OpenConnectionAsync())
+            await using (var createSchema = new NpgsqlCommand($"CREATE SCHEMA \"{schema}\";", connection))
+                await createSchema.ExecuteNonQueryAsync();
+
+            var isolatedConnectionString = new NpgsqlConnectionStringBuilder(connectionString)
+            {
+                SearchPath = schema
+            }.ConnectionString;
+            var isolatedDataSource = NpgsqlDataSource.Create(isolatedConnectionString);
+            await ApplyMigrationsAsync(isolatedDataSource);
+            return new IsolatedTestDatabase(adminDataSource, isolatedDataSource, schema);
+        }
+        catch
+        {
+            await adminDataSource.DisposeAsync();
+            throw;
+        }
+    }
+
     private static async Task ApplyMigrationsAsync(NpgsqlDataSource dataSource)
     {
         foreach (var migration in new[]
@@ -157,6 +182,23 @@ public sealed class MonoZoneCoveragePreviewServiceTests(ITestOutputHelper output
             await using var connection = await dataSource.OpenConnectionAsync();
             await using var command = new NpgsqlCommand(sql, connection);
             await command.ExecuteNonQueryAsync();
+        }
+    }
+
+    private sealed class IsolatedTestDatabase(
+        NpgsqlDataSource adminDataSource,
+        NpgsqlDataSource dataSource,
+        string schema) : IAsyncDisposable
+    {
+        public NpgsqlDataSource DataSource { get; } = dataSource;
+
+        public async ValueTask DisposeAsync()
+        {
+            await DataSource.DisposeAsync();
+            await using var connection = await adminDataSource.OpenConnectionAsync();
+            await using var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS \"{schema}\" CASCADE;", connection);
+            await drop.ExecuteNonQueryAsync();
+            await adminDataSource.DisposeAsync();
         }
     }
 
