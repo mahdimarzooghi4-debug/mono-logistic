@@ -393,7 +393,7 @@ public sealed class PostgresCourierOnboardingService(
                    evidence_reference, occurred_at
             FROM courier_trust_transitions
             WHERE courier_id = @courier_id
-            ORDER BY occurred_at, transition_id;
+            ORDER BY transition_sequence;
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
