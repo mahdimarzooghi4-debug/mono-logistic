@@ -32,5 +32,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.005_customer_service_configurations.sql" />
     <EmbeddedResource Include="../../db/migrations/006_customer_service_configuration_audit.sql"
                       LogicalName="Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/007_customer_service_configuration_retirement.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.007_customer_service_configuration_retirement.sql" />
   </ItemGroup>
 </Project>

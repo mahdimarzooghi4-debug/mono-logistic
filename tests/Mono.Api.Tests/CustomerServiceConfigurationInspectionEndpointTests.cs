@@ -281,6 +281,41 @@ public sealed class CustomerServiceConfigurationInspectionEndpointTests
                         "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
                 using var overlapActivationResponse = await client.SendAsync(activateOverlap);
                 Assert.Equal(System.Net.HttpStatusCode.Conflict, overlapActivationResponse.StatusCode);
+
+                var retirePath =
+                    $"/operations/v1/customers/{customerId}/service-configurations/{createdDraftId}/retire";
+                using var unauthorizedRetirement = new HttpRequestMessage(HttpMethod.Post, retirePath)
+                {
+                    Content = JsonContent.Create(new { reason = "must authenticate" })
+                };
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthorizedRetirement)).StatusCode);
+
+                using var nonAdminRetirement = new HttpRequestMessage(HttpMethod.Post, retirePath)
+                {
+                    Content = JsonContent.Create(new { reason = "not allowed" })
+                };
+                nonAdminRetirement.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminRetirement)).StatusCode);
+
+                using var retireActive = new HttpRequestMessage(HttpMethod.Post, retirePath)
+                {
+                    Content = JsonContent.Create(new { reason = "operations retirement test" })
+                };
+                retireActive.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NoContent,
+                    (await client.SendAsync(retireActive)).StatusCode);
+
+                using var retirementAuditRequest = new HttpRequestMessage(HttpMethod.Get, path + "/configuration-audit");
+                retirementAuditRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var retirementAuditResponse = await client.SendAsync(retirementAuditRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, retirementAuditResponse.StatusCode);
+                Assert.Contains("\"action\":\"RETIRED\"",
+                    await retirementAuditResponse.Content.ReadAsStringAsync());
             }
         }
     }
@@ -321,7 +356,8 @@ public sealed class CustomerServiceConfigurationInspectionEndpointTests
             "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql",
             "Mono.Api.Tests.Migrations.004_delivery_request_list_index.sql",
             "Mono.Api.Tests.Migrations.005_customer_service_configurations.sql",
-            "Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql"
+            "Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql",
+            "Mono.Api.Tests.Migrations.007_customer_service_configuration_retirement.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)

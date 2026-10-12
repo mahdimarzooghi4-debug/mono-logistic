@@ -52,6 +52,46 @@ public sealed class CustomerServiceConfigurationAuthoringTests
     }
 
     [Fact]
+    public async Task Active_configuration_can_be_retired_once_and_audit_is_appended()
+    {
+        var dataSource = await CreateDataSourceAsync();
+        if (dataSource is null) return;
+        await using (dataSource)
+        {
+            var customerId = await InsertCustomerAsync(dataSource);
+            var service = new CustomerServiceConfigurationAuthoringService(dataSource,
+                new FixedOperationsContext("operator-retire", [MonoOperationsRoles.Administrator]));
+            using var config = JsonDocument.Parse("{\"modes\":[\"WALK\"]}");
+            var draft = await service.CreateDraftAsync(customerId, "URBAN_DELIVERY",
+                DateTimeOffset.UtcNow, null, config.RootElement, "retirement setup");
+            await service.ActivateDraftAsync(customerId, draft.ServiceConfigurationId, "activate for retirement test");
+
+            await service.RetireActiveAsync(customerId, draft.ServiceConfigurationId, "service discontinued");
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                service.RetireActiveAsync(customerId, draft.ServiceConfigurationId, "duplicate retirement"));
+
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var command = new NpgsqlCommand("""
+                SELECT c.status, a.action, a.actor_id, a.reason
+                FROM customer_service_configurations c
+                JOIN customer_service_configuration_audit a
+                  ON a.service_configuration_id = c.service_configuration_id
+                WHERE c.service_configuration_id = @configuration_id
+                ORDER BY a.occurred_at, a.audit_id;
+                """, connection);
+            command.Parameters.AddWithValue("configuration_id", NpgsqlDbType.Text, draft.ServiceConfigurationId);
+            await using var reader = await command.ExecuteReaderAsync();
+            var audit = new List<(string Status, string Action, string Actor, string Reason)>();
+            while (await reader.ReadAsync())
+                audit.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+            Assert.Equal("RETIRED", audit[^1].Status);
+            Assert.Equal(new[] { "DRAFT_CREATED", "ACTIVATED", "RETIRED" }, audit.Select(x => x.Action));
+            Assert.All(audit, x => Assert.Equal("operator-retire", x.Actor));
+            Assert.Equal("service discontinued", audit[^1].Reason);
+        }
+    }
+
+    [Fact]
     public async Task Non_admin_context_fails_before_database_access()
     {
         await using var dataSource = NpgsqlDataSource.Create("Host=localhost;Username=unused;Password=unused;Database=unused");
@@ -102,7 +142,8 @@ public sealed class CustomerServiceConfigurationAuthoringTests
             "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql",
             "Mono.Api.Tests.Migrations.004_delivery_request_list_index.sql",
             "Mono.Api.Tests.Migrations.005_customer_service_configurations.sql",
-            "Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql"
+            "Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql",
+            "Mono.Api.Tests.Migrations.007_customer_service_configuration_retirement.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)

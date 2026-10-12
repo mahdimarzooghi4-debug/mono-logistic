@@ -80,6 +80,39 @@ public static class CustomerServiceConfigurationAuthoringEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapPost("/operations/v1/customers/{customerId}/service-configurations/{serviceConfigurationId}/retire", async (
+                string customerId,
+                string serviceConfigurationId,
+                RetireCustomerServiceConfigurationRequest request,
+                CustomerServiceConfigurationAuthoringService authoring,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    await authoring.RetireActiveAsync(
+                        customerId, serviceConfigurationId, request.Reason, cancellationToken);
+                    return Results.NoContent();
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Customer, configuration, or reason is invalid.")));
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("CONFIGURATION_NOT_FOUND",
+                            "The service configuration was not found for this customer.")));
+                }
+                catch (InvalidOperationException)
+                {
+                    return Results.Conflict(new ApiErrorResponse(
+                        new ApiError("CONFIGURATION_CONFLICT",
+                            "Only an active service configuration can be retired.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         return endpoints;
     }
 }
@@ -91,6 +124,8 @@ public sealed record CreateCustomerServiceConfigurationDraftRequest(
     string Reason);
 
 public sealed record ActivateCustomerServiceConfigurationDraftRequest(string Reason);
+
+public sealed record RetireCustomerServiceConfigurationRequest(string Reason);
 
 public sealed record CustomerServiceConfigurationDraftSummary(
     string ServiceConfigurationId,
