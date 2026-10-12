@@ -58,14 +58,69 @@ public sealed class HardPolicyEvaluatorTests
         Assert.Contains("POLICY_DEFINITION_UNSUPPORTED", response.ReasonCodes);
     }
 
+    [Fact]
+    public void ModeCapabilityPolicyPassesWhenCandidateModeIsListed()
+    {
+        using var facts = JsonDocument.Parse("""{"mode":"BIKE"}""");
+        var response = HardPolicyEvaluator.Evaluate(Resolution(
+            Policy("modes", "HARD", """{"modes":["WALK","BIKE","CAR"]}""", "MODE_CAPABILITY")),
+            facts.RootElement);
+
+        Assert.True(response.Passed);
+        Assert.False(response.CandidateExcluded);
+        Assert.Empty(response.ReasonCodes);
+    }
+
+    [Fact]
+    public void ModeCapabilityPolicyExcludesCandidateModeOutsideCatalog()
+    {
+        using var facts = JsonDocument.Parse("""{"mode":"VAN"}""");
+        var response = HardPolicyEvaluator.Evaluate(Resolution(
+            Policy("modes", "HARD", """{"modes":["WALK","BIKE","CAR"]}""", "MODE_CAPABILITY")),
+            facts.RootElement);
+
+        Assert.False(response.Passed);
+        Assert.True(response.CandidateExcluded);
+        Assert.Equal(new[] { "MODE_NOT_SUPPORTED" }, response.ReasonCodes);
+    }
+
+    [Theory]
+    [InlineData("""{}""", "POLICY_FACT_MISSING")]
+    [InlineData("""{"mode":5}""", "POLICY_DEFINITION_UNSUPPORTED")]
+    public void ModeCapabilityPolicyFailsClosedForMissingOrInvalidModeFacts(
+        string factsJson, string expectedReason)
+    {
+        using var facts = JsonDocument.Parse(factsJson);
+        var response = HardPolicyEvaluator.Evaluate(Resolution(
+            Policy("modes", "HARD", """{"modes":["WALK","BIKE","CAR"]}""", "MODE_CAPABILITY")),
+            facts.RootElement);
+
+        Assert.False(response.Passed);
+        Assert.True(response.CandidateExcluded);
+        Assert.Equal(new[] { expectedReason }, response.ReasonCodes);
+    }
+
+    [Fact]
+    public void InvalidModeCapabilityDefinitionFailsClosedDuringEvaluation()
+    {
+        using var facts = JsonDocument.Parse("""{"mode":"BIKE"}""");
+        var response = HardPolicyEvaluator.Evaluate(Resolution(
+            Policy("modes", "HARD", """{"modes":["BIKE","BIKE"]}""", "MODE_CAPABILITY")),
+            facts.RootElement);
+
+        Assert.False(response.Passed);
+        Assert.Contains("POLICY_DEFINITION_UNSUPPORTED", response.ReasonCodes);
+    }
+
     private static EffectivePolicyResolutionResponse Resolution(params ResolvedPolicyVersion[] policies) =>
         new(DateTimeOffset.Parse("2026-01-01T00:00:00Z"), policies);
 
-    private static ResolvedPolicyVersion Policy(string id, string enforcement, string definition)
+    private static ResolvedPolicyVersion Policy(
+        string id, string enforcement, string definition, string policyType = "TEST")
     {
         using var document = JsonDocument.Parse(definition);
         return new ResolvedPolicyVersion(
-            id, "TEST", "CUSTOMER", "customer-1", 1, enforcement, 0,
+            id, policyType, "CUSTOMER", "customer-1", 1, enforcement, 0,
             null, null, document.RootElement.Clone(), 2);
     }
 }
