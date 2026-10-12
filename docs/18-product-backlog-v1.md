@@ -351,6 +351,7 @@ REGISTERED
 ## 12. Epic E10 — Assignment
 
 ### E10.1 Candidate Generation
+- Sprint 115 adds an MFA-gated, audited planning-eligibility preview that explains per-courier inclusion or exclusion for a zone/time window using trust status, suspension, zone approval, and scheduled availability. It is planning-only and does not authorize assignment or dispatch.
 - available couriers
 - active routes
 - eligible modes
