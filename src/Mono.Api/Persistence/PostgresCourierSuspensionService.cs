@@ -136,6 +136,22 @@ public sealed class PostgresCourierSuspensionService(
             command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
+        if (operation == SuspendOperation)
+        {
+            const string cancelWindowsSql = """
+                UPDATE courier_availability_windows
+                SET status = 'CANCELLED', cancelled_by = @actor_id,
+                    cancelled_at = @occurred_at, cancellation_reason = 'COURIER_SUSPENDED'
+                WHERE courier_id = @courier_id AND status = 'SCHEDULED'
+                  AND ends_at > @occurred_at;
+                """;
+            await using var cancelWindows = new NpgsqlCommand(cancelWindowsSql, connection, transaction);
+            cancelWindows.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            cancelWindows.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
+            cancelWindows.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+            await cancelWindows.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         const string insertIdempotencySql = """
             INSERT INTO courier_operational_status_idempotency
                 (actor_id, operation, idempotency_key, request_hash, event_id, created_at)
