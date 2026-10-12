@@ -196,6 +196,83 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(System.Net.HttpStatusCode.BadRequest,
                     (await client.SendAsync(invalidCoordinates)).StatusCode);
 
+                var branchItemPath = branchPath + "/" + branchId;
+                using var unauthorizedBranchUpdate = new HttpRequestMessage(HttpMethod.Put, branchItemPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Updated branch",
+                        reason = "unauthenticated update"
+                    })
+                };
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthorizedBranchUpdate)).StatusCode);
+
+                using var nonAdminBranchUpdate = new HttpRequestMessage(HttpMethod.Put, branchItemPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Updated branch",
+                        reason = "unauthorized update"
+                    })
+                };
+                nonAdminBranchUpdate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminBranchUpdate)).StatusCode);
+
+                using var wrongCustomerUpdate = new HttpRequestMessage(
+                    HttpMethod.Put,
+                    "/operations/v1/customers/cus_00000000000000000000000000000000/branches/" + branchId)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Wrong tenant",
+                        reason = "tenant isolation"
+                    })
+                };
+                wrongCustomerUpdate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.NotFound,
+                    (await client.SendAsync(wrongCustomerUpdate)).StatusCode);
+
+                using var updateBranch = new HttpRequestMessage(HttpMethod.Put, branchItemPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "  Central Branch Updated  ",
+                        address = "Second street",
+                        latitude = 35.71,
+                        longitude = 51.41,
+                        zoneId = "zone-north",
+                        operatingHours = new { note = "replaced schedule object" },
+                        reason = "verified address correction"
+                    })
+                };
+                updateBranch.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var updatedBranchResponse = await client.SendAsync(updateBranch);
+                Assert.Equal(System.Net.HttpStatusCode.OK, updatedBranchResponse.StatusCode);
+                using var updatedBranchBody = System.Text.Json.JsonDocument.Parse(
+                    await updatedBranchResponse.Content.ReadAsStringAsync());
+                Assert.Equal("Central Branch Updated",
+                    updatedBranchBody.RootElement.GetProperty("name").GetString());
+
+                using var invalidBranchUpdate = new HttpRequestMessage(HttpMethod.Put, branchItemPath)
+                {
+                    Content = JsonContent.Create(new
+                    {
+                        name = "Must not persist",
+                        latitude = 91,
+                        longitude = 51,
+                        reason = "invalid update"
+                    })
+                };
+                invalidBranchUpdate.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                Assert.Equal(System.Net.HttpStatusCode.BadRequest,
+                    (await client.SendAsync(invalidBranchUpdate)).StatusCode);
+
                 using var repeatedActivate = new HttpRequestMessage(HttpMethod.Post, activatePath)
                 {
                     Content = JsonContent.Create(new { reason = "duplicate activation" })
@@ -223,6 +300,30 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.All(audit, entry => Assert.Equal("admin-test", entry.Actor));
                 Assert.Equal("approved onboarding request", audit[0].Reason);
                 Assert.Equal("contract signed and verified", audit[1].Reason);
+
+                await using var branchConnection = await dataSource.OpenConnectionAsync();
+                await using var branchCommand = new NpgsqlCommand("""
+                    SELECT b.name, b.latitude, b.longitude, a.action, a.reason
+                    FROM branches b
+                    JOIN branch_operations_audit a ON a.branch_id = b.branch_id
+                    WHERE b.branch_id = @branch_id
+                    ORDER BY a.occurred_at, a.audit_id;
+                    """, branchConnection);
+                branchCommand.Parameters.AddWithValue("branch_id", NpgsqlDbType.Text, branchId);
+                await using var branchReader = await branchCommand.ExecuteReaderAsync();
+                var branchHistory = new List<(string Name, double? Latitude, double? Longitude, string Action, string Reason)>();
+                while (await branchReader.ReadAsync())
+                    branchHistory.Add((
+                        branchReader.GetString(0),
+                        branchReader.IsDBNull(1) ? null : branchReader.GetDouble(1),
+                        branchReader.IsDBNull(2) ? null : branchReader.GetDouble(2),
+                        branchReader.GetString(3),
+                        branchReader.GetString(4)));
+                Assert.Equal("Central Branch Updated", branchHistory[^1].Name);
+                Assert.Equal(35.71, branchHistory[^1].Latitude);
+                Assert.Equal(51.41, branchHistory[^1].Longitude);
+                Assert.Equal(new[] { "CREATED", "UPDATED" }, branchHistory.Select(x => x.Action));
+                Assert.Equal("verified address correction", branchHistory[^1].Reason);
             }
         }
     }
@@ -263,7 +364,8 @@ public sealed class MonoCustomerOperationsEndpointTests
             "Mono.Api.Tests.Migrations.006_customer_service_configuration_audit.sql",
             "Mono.Api.Tests.Migrations.007_customer_service_configuration_retirement.sql",
             "Mono.Api.Tests.Migrations.008_customer_operations_audit.sql",
-            "Mono.Api.Tests.Migrations.009_branch_operations_audit.sql"
+            "Mono.Api.Tests.Migrations.009_branch_operations_audit.sql",
+            "Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql"
         })
         {
             await using var stream = assembly.GetManifestResourceStream(name)

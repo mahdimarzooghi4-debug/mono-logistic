@@ -38,5 +38,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.008_customer_operations_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/009_branch_operations_audit.sql"
                       LogicalName="Mono.Api.Tests.Migrations.009_branch_operations_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/010_branch_operations_audit_update.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.010_branch_operations_audit_update.sql" />
   </ItemGroup>
 </Project>
