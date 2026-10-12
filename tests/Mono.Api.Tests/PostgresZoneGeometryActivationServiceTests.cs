@@ -108,6 +108,45 @@ public sealed class PostgresZoneGeometryActivationServiceTests(ITestOutputHelper
         Assert.Null(await activations.GetCurrentAsync(zoneId));
     }
 
+    [Fact]
+    public async Task Serializes_parallel_activation_changes_for_one_zone()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ApplyMigrationsAsync(dataSource);
+        var zoneId = "activation-race-" + Guid.NewGuid().ToString("N");
+        var snapshots = new PostgresZoneGeometryRepository(dataSource);
+        await snapshots.PersistAsync(Boundary(zoneId, "v1", 2));
+        await snapshots.PersistAsync(Boundary(zoneId, "v2", 3));
+        var hashV1 = await ReadSnapshotHashAsync(dataSource, zoneId, "v1");
+        var hashV2 = await ReadSnapshotHashAsync(dataSource, zoneId, "v2");
+        var context = new TestOperationsContext("zone-admin", MonoOperationsRoles.Administrator);
+        var reviews = new PostgresZoneGeometryReviewService(dataSource, context);
+        await reviews.RecordAsync(zoneId, "v1", hashV1, "APPROVE", "Reviewed v1.");
+        await reviews.RecordAsync(zoneId, "v2", hashV2, "APPROVE", "Reviewed v2.");
+
+        var activations = new PostgresZoneGeometryActivationService(dataSource, context);
+        var outcomes = await Task.WhenAll(
+            activations.ActivateAsync(zoneId, "v1", hashV1, "Concurrent activation v1."),
+            activations.ActivateAsync(zoneId, "v2", hashV2, "Concurrent activation v2."));
+        var current = await activations.GetCurrentAsync(zoneId);
+        var history = await activations.ListHistoryAsync(zoneId);
+
+        Assert.Equal(2, outcomes.Length);
+        Assert.NotNull(current);
+        Assert.Contains(current.GeometryVersion, new[] { "v1", "v2" });
+        Assert.Equal(3, history.Count);
+        Assert.Single(history, entry => entry.Action == "DEACTIVATE");
+        Assert.Equal(2, history.Count(entry => entry.Action == "ACTIVATE"));
+        Assert.Equal(history[^1].GeometryVersion, current.GeometryVersion);
+    }
+
     private static ZoneGeometryBoundary Boundary(string zoneId, string version, int edge)
     {
         var geometry = new WKTReader().Read(
