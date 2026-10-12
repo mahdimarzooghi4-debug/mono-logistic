@@ -107,6 +107,62 @@ public sealed class DeliveryRequestValidationTests
         Assert.DoesNotContain("\"external_reference\":\" ORDER-1 \"", canonical, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Shipment_facts_normalize_and_accept_optional_package_volume_and_temperature()
+    {
+        var request = ValidRequest() with
+        {
+            Shipment = new DeliveryShipmentInput
+            {
+                ShipmentModel = "BAG_BASED",
+                BagCount = 2,
+                PackageCount = 3,
+                EstimatedWeightKg = 8,
+                EstimatedVolumeM3 = 0.025m,
+                LoadClass = "M",
+                TemperatureClass = " chilled "
+            }
+        };
+
+        Assert.Empty(DeliveryRequestInputValidator.Validate(request));
+        Assert.Equal("CHILLED", request.Normalize().Shipment!.TemperatureClass);
+        Assert.Equal(3, request.Normalize().Shipment!.PackageCount);
+        Assert.Equal(0.025m, request.Normalize().Shipment!.EstimatedVolumeM3);
+    }
+
+    [Fact]
+    public void Shipment_facts_reject_non_positive_values_and_unknown_temperature()
+    {
+        var request = ValidRequest() with
+        {
+            Shipment = new DeliveryShipmentInput
+            {
+                ShipmentModel = "BAG_BASED",
+                BagCount = 2,
+                PackageCount = 0,
+                EstimatedVolumeM3 = 0,
+                LoadClass = "M",
+                TemperatureClass = "ROOM"
+            }
+        };
+
+        var errors = DeliveryRequestInputValidator.Validate(request);
+
+        Assert.Contains(errors, error => error.Contains("package_count", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("estimated_volume_m3", StringComparison.Ordinal));
+        Assert.Contains(errors, error => error.Contains("temperature_class", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Omitted_shipment_facts_do_not_change_legacy_canonical_payload()
+    {
+        var canonical = ValidRequest().ToCanonicalJson();
+
+        Assert.DoesNotContain("package_count", canonical, StringComparison.Ordinal);
+        Assert.DoesNotContain("estimated_volume_m3", canonical, StringComparison.Ordinal);
+        Assert.DoesNotContain("temperature_class", canonical, StringComparison.Ordinal);
+    }
+
     private static DeliveryRequestInput ValidRequest() => new()
     {
         ExternalReference = "ORDER-1",

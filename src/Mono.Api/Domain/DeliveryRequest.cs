@@ -109,10 +109,25 @@ public sealed record DeliveryShipmentInput
     [JsonPropertyName("keep_upright")]
     public bool KeepUpright { get; init; }
 
+    [JsonPropertyName("package_count")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? PackageCount { get; init; }
+
+    [JsonPropertyName("estimated_volume_m3")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? EstimatedVolumeM3 { get; init; }
+
+    [JsonPropertyName("temperature_class")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TemperatureClass { get; init; }
+
     public DeliveryShipmentInput Normalize() => this with
     {
         ShipmentModel = ShipmentModel?.Trim().ToUpperInvariant() ?? string.Empty,
-        LoadClass = LoadClass?.Trim().ToUpperInvariant() ?? string.Empty
+        LoadClass = LoadClass?.Trim().ToUpperInvariant() ?? string.Empty,
+        TemperatureClass = string.IsNullOrWhiteSpace(TemperatureClass)
+            ? null
+            : TemperatureClass.Trim().ToUpperInvariant()
     };
 }
 
@@ -166,6 +181,12 @@ public static class DeliveryRequestInputValidator
                 errors.Add("shipment.estimated_weight_kg must be greater than zero when provided.");
             if (shipment.LoadClass is not ("S" or "M" or "L"))
                 errors.Add("shipment.load_class must be S, M, or L.");
+            if (shipment.PackageCount is <= 0)
+                errors.Add("shipment.package_count must be greater than zero when provided.");
+            if (shipment.EstimatedVolumeM3 is <= 0)
+                errors.Add("shipment.estimated_volume_m3 must be greater than zero when provided.");
+            if (shipment.TemperatureClass is not null and not ("AMBIENT" or "CHILLED" or "FROZEN"))
+                errors.Add("shipment.temperature_class must be AMBIENT, CHILLED, or FROZEN when provided.");
         }
 
         return errors;

@@ -146,6 +146,7 @@ Epic
 ## 6. Epic E4 — Shipment & Capability Model
 
 ### E4.1 Shipment Facts
+- Sprint 037 adds optional package count, cubic-metre volume, and catalog temperature class to the existing shipment request facts, preserving legacy idempotency hashes when omitted.
 - bag count
 - package count
 - weight
