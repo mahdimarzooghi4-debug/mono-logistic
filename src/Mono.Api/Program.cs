@@ -32,6 +32,7 @@ builder.Services.AddScoped<PostgresDeliveryRequestOperationsService>();
 builder.Services.AddScoped<PostgresDeliveryRequestOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresPromiseCommitRepository>();
 builder.Services.AddScoped<PostgresDeliveryQuoteRepository>();
+builder.Services.AddScoped<PostgresZoneGeometryRepository>();
 builder.Services.AddScoped<IDeliveryQuoteStore>(services =>
     services.GetRequiredService<PostgresDeliveryQuoteRepository>());
 builder.Services.AddScoped<DeliveryQuoteIssuanceApplicationService>();
