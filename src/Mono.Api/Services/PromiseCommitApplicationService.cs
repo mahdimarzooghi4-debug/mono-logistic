@@ -27,6 +27,19 @@ public interface IPromiseCommitStore
     Task<PromiseCommitWriteResult> CommitAsync(
         PromiseCommitProposal proposal,
         CancellationToken cancellationToken = default);
+
+    Task<PromiseCommitWriteResult?> FindIdempotentAsync(
+        string deliveryRequestId,
+        string decisionId,
+        string requestHash,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<PromiseCommitWriteResult?>(null);
+
+    Task<PromiseCommitWriteResult> CommitIdempotentlyAsync(
+        PromiseCommitProposal proposal,
+        string requestHash,
+        CancellationToken cancellationToken = default) =>
+        CommitAsync(proposal, cancellationToken);
 }
 
 /// <summary>
@@ -38,12 +51,32 @@ public sealed class PromiseCommitApplicationService(
     ICustomerContext customerContext,
     IFeasibilityEvidenceSourceVerifier sourceVerifier)
 {
-    public async Task<PromiseCommitApplicationResult> EvaluateAndCommitAsync(
+    public Task<PromiseCommitApplicationResult> EvaluateAndCommitAsync(
         IReadOnlyCollection<FeasibilityCriterionResult>? requestedCriteria,
         DateTimeOffset? requestedDeliveryAt,
         AlternativePromiseSearchEvidence? alternativeSearch,
         PromiseCommitProposal proposal,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        EvaluateAndCommitCoreAsync(
+            requestedCriteria, requestedDeliveryAt, alternativeSearch, proposal, null, cancellationToken);
+
+    public Task<PromiseCommitApplicationResult> EvaluateAndCommitIdempotentlyAsync(
+        IReadOnlyCollection<FeasibilityCriterionResult>? requestedCriteria,
+        DateTimeOffset? requestedDeliveryAt,
+        AlternativePromiseSearchEvidence? alternativeSearch,
+        PromiseCommitProposal proposal,
+        string requestHash,
+        CancellationToken cancellationToken = default) =>
+        EvaluateAndCommitCoreAsync(
+            requestedCriteria, requestedDeliveryAt, alternativeSearch, proposal, requestHash, cancellationToken);
+
+    private async Task<PromiseCommitApplicationResult> EvaluateAndCommitCoreAsync(
+        IReadOnlyCollection<FeasibilityCriterionResult>? requestedCriteria,
+        DateTimeOffset? requestedDeliveryAt,
+        AlternativePromiseSearchEvidence? alternativeSearch,
+        PromiseCommitProposal proposal,
+        string? requestHash,
+        CancellationToken cancellationToken)
     {
         var evaluation = FeasibilityOutcomeEvaluator.Evaluate(
             requestedCriteria,
@@ -88,6 +121,26 @@ public sealed class PromiseCommitApplicationService(
                 null);
         }
 
+        if (requestHash is not null)
+        {
+            var existing = await store.FindIdempotentAsync(
+                proposal.DeliveryRequestId,
+                proposal.DecisionId,
+                requestHash,
+                cancellationToken);
+            if (existing is not null)
+            {
+                var replayStatus = existing.Outcome switch
+                {
+                    PromiseCommitWriteOutcome.Replayed => PromiseCommitApplicationStatus.Replayed,
+                    PromiseCommitWriteOutcome.Conflict => PromiseCommitApplicationStatus.Conflict,
+                    _ => throw new ArgumentOutOfRangeException(
+                        nameof(existing), "Idempotency lookup returned an unsupported outcome.")
+                };
+                return new PromiseCommitApplicationResult(replayStatus, evaluation, existing);
+            }
+        }
+
         foreach (var criteria in evidenceSets)
         {
             foreach (var criterion in criteria!)
@@ -108,7 +161,9 @@ public sealed class PromiseCommitApplicationService(
         }
 
         PromiseCommitProposalValidator.Validate(proposal);
-        var persistence = await store.CommitAsync(proposal, cancellationToken);
+        var persistence = requestHash is null
+            ? await store.CommitAsync(proposal, cancellationToken)
+            : await store.CommitIdempotentlyAsync(proposal, requestHash, cancellationToken);
         var status = persistence.Outcome switch
         {
             PromiseCommitWriteOutcome.Committed => PromiseCommitApplicationStatus.Committed,
