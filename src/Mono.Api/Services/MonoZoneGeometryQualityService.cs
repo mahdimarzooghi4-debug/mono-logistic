@@ -84,6 +84,94 @@ public sealed class MonoZoneGeometryQualityService(
             overlaps.Count == 0, overlaps);
     }
 
+    public async Task<ZoneGeometryContainmentReport> CheckContainmentAsync(
+        string parentKind,
+        ZoneGeometrySnapshotReference? parent,
+        string childKind,
+        IReadOnlyList<ZoneGeometrySnapshotReference>? children,
+        CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+
+        if (!Enum.TryParse<ZoneKind>(parentKind, ignoreCase: false, out var parsedParentKind) ||
+            !Enum.IsDefined(typeof(ZoneKind), parsedParentKind))
+            throw new ArgumentException("Unsupported parent zone kind.", nameof(parentKind));
+        if (!Enum.TryParse<ZoneKind>(childKind, ignoreCase: false, out var parsedChildKind) ||
+            !Enum.IsDefined(typeof(ZoneKind), parsedChildKind))
+            throw new ArgumentException("Unsupported child zone kind.", nameof(childKind));
+
+        var validHierarchy =
+            (parsedParentKind == ZoneKind.City && parsedChildKind == ZoneKind.OperatingZone) ||
+            (parsedParentKind == ZoneKind.OperatingZone && parsedChildKind == ZoneKind.MicroZone);
+        if (!validHierarchy)
+            throw new ArgumentException("Only City to OperatingZone and OperatingZone to MicroZone checks are supported.");
+        if (parent is null || string.IsNullOrWhiteSpace(parent.ZoneId) ||
+            string.IsNullOrWhiteSpace(parent.GeometryVersion))
+            throw new ArgumentException("A valid parent snapshot is required.", nameof(parent));
+        if (children is null || children.Count is < 1 or > MaximumSnapshots)
+            throw new ArgumentException(
+                $"Between 1 and {MaximumSnapshots} child snapshots are required.", nameof(children));
+        if (children.Any(item => item is null ||
+                string.IsNullOrWhiteSpace(item.ZoneId) ||
+                string.IsNullOrWhiteSpace(item.GeometryVersion)))
+            throw new ArgumentException("Every child snapshot requires a zone ID and geometry version.", nameof(children));
+
+        var normalizedParent = new ZoneGeometrySnapshotReference(
+            parent.ZoneId.Trim(), parent.GeometryVersion.Trim());
+        var normalizedChildren = children.Select(item => new ZoneGeometrySnapshotReference(
+                item.ZoneId.Trim(), item.GeometryVersion.Trim()))
+            .ToArray();
+        if (normalizedChildren.Any(item => item.ZoneId == normalizedParent.ZoneId) ||
+            normalizedChildren.Select(item => item.ZoneId).Distinct(StringComparer.Ordinal).Count() != normalizedChildren.Length)
+            throw new ArgumentException("Parent and child zone IDs must be unique in a containment check.", nameof(children));
+
+        var parentBoundary = await geometryRepository.FindAsync(
+            normalizedParent.ZoneId, normalizedParent.GeometryVersion, cancellationToken);
+        if (parentBoundary is null)
+            throw new KeyNotFoundException(
+                $"Parent snapshot {normalizedParent.ZoneId}/{normalizedParent.GeometryVersion} was not found.");
+        if (parentBoundary.Kind != parsedParentKind)
+            throw new ArgumentException("Parent snapshot kind does not match parentKind.", nameof(parent));
+
+        var parentGeometry = new WKBReader().Read(parentBoundary.ToWellKnownBinary());
+        parentGeometry.SRID = 4326;
+        var coordinateCount = parentGeometry.NumPoints;
+        if (coordinateCount > MaximumCoordinates)
+            throw new ArgumentException(
+                $"The selected snapshots exceed the {MaximumCoordinates} coordinate limit.", nameof(children));
+
+        var checkedChildren = new List<CheckedSnapshot>(normalizedChildren.Length);
+        foreach (var reference in normalizedChildren)
+        {
+            var boundary = await geometryRepository.FindAsync(
+                reference.ZoneId, reference.GeometryVersion, cancellationToken);
+            if (boundary is null)
+                throw new KeyNotFoundException(
+                    $"Child snapshot {reference.ZoneId}/{reference.GeometryVersion} was not found.");
+            if (boundary.Kind != parsedChildKind)
+                throw new ArgumentException("A child snapshot kind does not match childKind.", nameof(children));
+
+            var geometry = new WKBReader().Read(boundary.ToWellKnownBinary());
+            geometry.SRID = 4326;
+            coordinateCount += geometry.NumPoints;
+            if (coordinateCount > MaximumCoordinates)
+                throw new ArgumentException(
+                    $"The selected snapshots exceed the {MaximumCoordinates} coordinate limit.", nameof(children));
+            checkedChildren.Add(new CheckedSnapshot(reference, geometry));
+        }
+
+        var findings = checkedChildren
+            .Where(child => !parentGeometry.Covers(child.Geometry))
+            .Select(child => new ZoneGeometryContainmentFinding(
+                child.Reference, normalizedParent, "OutsideParent"))
+            .ToArray();
+
+        return new ZoneGeometryContainmentReport(
+            parsedParentKind.ToString(), normalizedParent,
+            parsedChildKind.ToString(), checkedChildren.Count, coordinateCount,
+            findings.Length == 0, findings);
+    }
+
     private void RequireAdministrator()
     {
         if (string.IsNullOrWhiteSpace(operationsContext.ActorId) ||
@@ -109,3 +197,17 @@ public sealed record ZoneGeometryQualityReport(
     int CoordinateCount,
     bool Passed,
     IReadOnlyList<ZoneGeometryOverlap> Findings);
+
+public sealed record ZoneGeometryContainmentFinding(
+    ZoneGeometrySnapshotReference Child,
+    ZoneGeometrySnapshotReference Parent,
+    string Issue);
+
+public sealed record ZoneGeometryContainmentReport(
+    string ParentKind,
+    ZoneGeometrySnapshotReference Parent,
+    string ChildKind,
+    int ChildCount,
+    int CoordinateCount,
+    bool Passed,
+    IReadOnlyList<ZoneGeometryContainmentFinding> Findings);
