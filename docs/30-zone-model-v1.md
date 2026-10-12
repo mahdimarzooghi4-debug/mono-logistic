@@ -16,11 +16,13 @@ The City node is the canonical city context for its descendant operating and mic
 
 ## Metadata boundaries
 
-- geometry_reference is optional and opaque; no geometry format, coordinate system, boundary algorithm, or provider is selected.
+- geometry_reference remains an optional opaque link from a zone definition to a separately versioned geometry snapshot.
+- Sprint 092 adds validated WGS84 Polygon/MultiPolygon snapshots, with GeoJSON coordinate order (longitude, latitude), source/revision/attribution metadata, and point classification as inside, outside, or boundary.
+- A registry lookup only resolves within one requested hierarchy level. Overlap or shared-edge ambiguity is returned explicitly and never silently chooses a zone.
 - status is optional opaque metadata; this contract defines no status values or transitions.
 - capacity_policy_id is optional opaque metadata; this contract does not calculate or allocate capacity.
 - An empty registry is valid and means no zone definitions have been supplied.
 
 ## Out of scope
 
-This model does not determine whether a coordinate belongs to a zone, activate or retire zones, authorize couriers, decide coverage, calculate capacity, persist definitions, or expose operations APIs. A Zone is a hard boundary in the approved business architecture, but it cannot be enforced until geometry and lifecycle behavior are defined.
+The geometry primitive does not activate or retire zone snapshots, authorize couriers, decide delivery coverage, calculate capacity, persist definitions, or expose operations APIs. No OSM boundary data is imported by Sprint 092. A Zone is a hard boundary in the approved business architecture, but operational enforcement still depends on trusted data ingestion, persistence/lifecycle, and authorization.
