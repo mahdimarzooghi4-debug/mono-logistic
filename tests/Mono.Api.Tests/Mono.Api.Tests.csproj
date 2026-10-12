@@ -74,5 +74,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.027_delivery_request_operations_read_audit_inspection.sql" />
     <EmbeddedResource Include="../../db/migrations/028_quote_issued_event.sql"
                       LogicalName="Mono.Api.Tests.Migrations.028_quote_issued_event.sql" />
+    <EmbeddedResource Include="../../db/migrations/029_zone_geometry_versions.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.029_zone_geometry_versions.sql" />
   </ItemGroup>
 </Project>

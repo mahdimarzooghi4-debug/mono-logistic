@@ -1,4 +1,5 @@
 using NetTopologySuite.Geometries;
+using NetTopologySuite.IO;
 
 namespace Mono.Api.Domain;
 
@@ -41,6 +42,7 @@ public sealed class ZoneGeometryBoundary
         SourceRevision = sourceRevision;
         Attribution = attribution;
         _geometry = (Geometry)geometry.Copy();
+        GeometryType = _geometry.GeometryType;
     }
 
     public string ZoneId { get; }
@@ -49,6 +51,9 @@ public sealed class ZoneGeometryBoundary
     public string SourceId { get; }
     public string SourceRevision { get; }
     public string Attribution { get; }
+    public string GeometryType { get; }
+
+    internal byte[] ToWellKnownBinary() => new WKBWriter().Write(_geometry);
 
     public static ZoneGeometryBoundary Create(
         string zoneId,
