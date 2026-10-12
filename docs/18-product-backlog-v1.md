@@ -263,6 +263,7 @@ Evaluate:
 - Sprint 060 adds an authenticated, tenant-scoped read endpoint for the current committed Promise of a delivery request. It returns the current version and committed time, while internal safety-buffer and decision-reason evidence remain private.
 - Sprint 061 adds a paginated, tenant-scoped Promise version history endpoint. It exposes version, committed time, outcome, and record timestamp without returning internal decision evidence.
 - Sprint 063 wires a fail-closed evidence-source verification boundary into the Promise commit service; no production source is trusted yet.
+- Sprint 073 exposes the Promise commit service through an authenticated, tenant-scoped write endpoint. The server derives the decision ID from `Idempotency-Key`, evaluates E7.2, verifies evidence sources, and persists only a matching resolved proposal; the existing fail-closed verifier remains unchanged. PostgreSQL-backed HTTP coverage checks replay, changed-input conflict, a single persisted version, and the safe response shape.
 
 ### Acceptance
 - Mono never commits a Mission before proving feasibility.
@@ -476,6 +477,7 @@ Courier Net = 89% of Mission Fare
 - `GET /v1/delivery-requests/{id}` (`delivery-requests.read`, customer-scoped request summary)
 - `GET /v1/delivery-requests/{id}/promise` (`delivery-requests.read`, customer-scoped current committed Promise)
 - `GET /v1/delivery-requests/{id}/promise/versions` (`delivery-requests.read`, paginated customer-scoped Promise history)
+- Sprint 073 adds `POST /v1/delivery-requests/{id}/promise` (`delivery-requests.write`, evaluator-backed, source-verified and idempotent Promise commit)
 - Sprint 070 adds `POST /v1/delivery-requests/{id}/quote` (`delivery-requests.write`, tenant-scoped, idempotent first Quote issuance)
 - `GET /v1/delivery-requests` (`delivery-requests.read`, paginated history)
 - confirm
