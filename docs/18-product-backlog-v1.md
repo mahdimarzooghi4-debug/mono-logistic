@@ -37,6 +37,7 @@ Epic
 - Sprint 020 adds audited operations updates for existing active branches; omitted optional fields are cleared by the full-replacement contract.
 - Sprint 021 adds an admin-only, customer-scoped read view of branch summaries for Mono operations.
 - Sprint 030 adds an MFA-gated branch detail view and paginated, customer-scoped branch audit history.
+- Sprint 031 adds Mono-admin-managed, customer-scoped external branch identifiers with uniqueness, retirement, and immutable audit history.
 - Create/update Branch
 - Store pickup coordinates
 - Operating hours
