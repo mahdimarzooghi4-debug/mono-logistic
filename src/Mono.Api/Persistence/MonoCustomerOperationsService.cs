@@ -65,6 +65,76 @@ public sealed class MonoCustomerOperationsService(
         return ManagedCustomerSummary.From(customer);
     }
 
+    public async Task<ManagedCustomerSummary?> FindAsync(
+        string customerId,
+        CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        customerId = NormalizeCustomerId(customerId);
+
+        const string sql = """
+            SELECT customer_id, legal_name, display_name, status, customer_type,
+                   default_channel, default_currency, created_at
+            FROM customers
+            WHERE customer_id = @customer_id;
+            """;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            return null;
+
+        return new ManagedCustomerSummary(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetString(2),
+            reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetString(6),
+            reader.GetFieldValue<DateTimeOffset>(7));
+    }
+
+    public async Task<IReadOnlyList<MonoCustomerAuditSummary>?> ListAuditAsync(
+        string customerId,
+        CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        customerId = NormalizeCustomerId(customerId);
+
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using (var customer = new NpgsqlCommand(
+            "SELECT 1 FROM customers WHERE customer_id = @customer_id;",
+            connection))
+        {
+            customer.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            if (await customer.ExecuteScalarAsync(cancellationToken) is null)
+                return null;
+        }
+
+        const string sql = """
+            SELECT action, actor_id, reason, occurred_at
+            FROM customer_operations_audit
+            WHERE customer_id = @customer_id
+            ORDER BY occurred_at, audit_id;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var entries = new List<MonoCustomerAuditSummary>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            entries.Add(new MonoCustomerAuditSummary(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetFieldValue<DateTimeOffset>(3)));
+        }
+
+        return entries;
+    }
+
     public async Task ActivateAsync(
         string customerId,
         string reason,
@@ -165,6 +235,12 @@ public sealed class MonoCustomerOperationsService(
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }
+
+public sealed record MonoCustomerAuditSummary(
+    string Action,
+    string ActorId,
+    string Reason,
+    DateTimeOffset OccurredAt);
 
 public sealed record ManagedCustomerSummary(
     string CustomerId,
