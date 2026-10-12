@@ -183,6 +183,28 @@ public static class MonoCourierOperationsEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/courier-capacity-projection", async (
+                [FromQuery(Name = "zone_id")] string? zoneId,
+                [FromQuery(Name = "from")] DateTimeOffset? from,
+                [FromQuery(Name = "to")] DateTimeOffset? to,
+                [FromQuery(Name = "bucket_minutes")] int? bucketMinutes,
+                PostgresCourierCapacityProjectionService capacity,
+                CancellationToken cancellationToken) =>
+            {
+                if (zoneId is null || from is null || to is null || bucketMinutes is null)
+                    return InvalidRequest("Capacity projection requires zone_id, from, to, and bucket_minutes.");
+                try
+                {
+                    return Results.Ok(await capacity.ProjectAsync(
+                        zoneId, from.Value, to.Value, bucketMinutes.Value, cancellationToken));
+                }
+                catch (ArgumentException)
+                {
+                    return InvalidRequest("Capacity projection filters are invalid.");
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapPost("/operations/v1/couriers/{courierId}/availability-windows", async (
                 string courierId,
                 CourierAvailabilityWindowInput input,
