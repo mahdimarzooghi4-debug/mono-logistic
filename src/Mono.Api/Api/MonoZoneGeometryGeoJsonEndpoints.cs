@@ -15,12 +15,19 @@ public static class MonoZoneGeometryGeoJsonEndpoints
                 string zoneId,
                 string geometryVersion,
                 [FromServices] MonoZoneGeometryGeoJsonService geoJson,
+                HttpContext httpContext,
                 CancellationToken cancellationToken) =>
             {
                 try
                 {
-                    return Results.Ok(await geoJson.GetAsync(
-                        zoneId, geometryVersion, cancellationToken));
+                    var feature = await geoJson.GetAsync(
+                        zoneId, geometryVersion, cancellationToken);
+                    var etag = MonoGeoJsonCacheValidators.ForSnapshot(feature.Properties.SnapshotHash);
+                    httpContext.Response.Headers["ETag"] = etag;
+                    httpContext.Response.Headers["Cache-Control"] = "private, no-cache";
+                    if (MatchesIfNoneMatch(httpContext.Request.Headers["If-None-Match"], etag))
+                        return Results.StatusCode(StatusCodes.Status304NotModified);
+                    return Results.Ok(feature);
                 }
                 catch (ArgumentException)
                 {
@@ -38,4 +45,8 @@ public static class MonoZoneGeometryGeoJsonEndpoints
 
         return endpoints;
     }
+
+    private static bool MatchesIfNoneMatch(string? header, string etag) =>
+        header?.Split(',').Select(value => value.Trim())
+            .Any(value => value == "*" || string.Equals(value, etag, StringComparison.Ordinal)) == true;
 }

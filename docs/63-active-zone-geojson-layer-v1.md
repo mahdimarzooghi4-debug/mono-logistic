@@ -8,7 +8,7 @@ This operations endpoint provides a paginated GeoJSON FeatureCollection for the 
 
 Supported kinds are `City`, `OperatingZone`, and `MicroZone`. The endpoint requires Mono administrator authorization. Page size is 1–25, ordered by zone ID, and the next page uses an opaque keyset cursor.
 
-Only rows referenced by `zone_geometry_active` are included. The active pointer's hash is checked against its immutable snapshot, and each feature is produced through the integrity-checking GeoJSON snapshot service. The response wraps standard GeoJSON `FeatureCollection` data with the selected kind, feature and coordinate counts, and pagination fields. The total page is capped at 250,000 coordinates; reduce page size if a selected page exceeds that limit.
+Only rows referenced by `zone_geometry_active` are included. The active pointer's hash is checked against its immutable snapshot, and each feature is produced through the integrity-checking GeoJSON snapshot service. The response wraps standard GeoJSON `FeatureCollection` data with the selected kind, feature and coordinate counts, and pagination fields. The total page is capped at 250,000 coordinates; reduce page size if a selected page exceeds that limit. Each page has a strong ETag derived from its active snapshot hashes and pagination state. Responses use `Cache-Control: private, no-cache`; a matching `If-None-Match` returns HTTP 304 after authorization and active pointers are revalidated.
 
 ## Scope
 
