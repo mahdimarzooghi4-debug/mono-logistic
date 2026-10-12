@@ -42,6 +42,60 @@ CREATE TABLE IF NOT EXISTS courier_trust_transitions (
 CREATE INDEX IF NOT EXISTS courier_trust_transitions_history_idx
     ON courier_trust_transitions (courier_id, occurred_at, transition_id);
 
+
+CREATE OR REPLACE FUNCTION validate_courier_trust_status_step()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+DECLARE
+    expected_status text;
+BEGIN
+    IF NEW.status IS NOT DISTINCT FROM OLD.status THEN
+        RETURN NEW;
+    END IF;
+
+    expected_status := CASE OLD.status
+        WHEN 'REGISTERED' THEN 'IDENTITY_VERIFIED'
+        WHEN 'IDENTITY_VERIFIED' THEN 'DOCUMENTS_SUBMITTED'
+        WHEN 'DOCUMENTS_SUBMITTED' THEN 'TRUST_REQUIREMENTS_VERIFIED'
+        WHEN 'TRUST_REQUIREMENTS_VERIFIED' THEN 'MONO_APPROVED'
+        WHEN 'MONO_APPROVED' THEN 'ACTIVE'
+        ELSE NULL
+    END;
+    IF expected_status IS NULL OR NEW.status IS DISTINCT FROM expected_status THEN
+        RAISE EXCEPTION 'courier trust status must advance by exactly one lifecycle step';
+    END IF;
+    RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS couriers_trust_status_step ON couriers;
+CREATE TRIGGER couriers_trust_status_step
+    BEFORE UPDATE OF status ON couriers
+    FOR EACH ROW EXECUTE FUNCTION validate_courier_trust_status_step();
+
+CREATE OR REPLACE FUNCTION require_courier_trust_transition_record()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM courier_trust_transitions
+        WHERE courier_id = NEW.courier_id
+          AND from_status = OLD.status
+          AND to_status = NEW.status) THEN
+        RAISE EXCEPTION 'courier status change requires a matching trust transition record';
+    END IF;
+    RETURN NULL;
+END;
+$;
+
+DROP TRIGGER IF EXISTS couriers_status_transition_record_required ON couriers;
+CREATE CONSTRAINT TRIGGER couriers_status_transition_record_required
+    AFTER UPDATE OF status ON couriers
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION require_courier_trust_transition_record();
+
 CREATE TABLE IF NOT EXISTS courier_operations_idempotency (
     actor_id text NOT NULL CHECK (length(btrim(actor_id)) BETWEEN 1 AND 128),
     operation text NOT NULL CHECK (operation IN ('REGISTER', 'TRUST_TRANSITION')),
