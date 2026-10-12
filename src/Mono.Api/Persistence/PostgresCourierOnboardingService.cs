@@ -282,10 +282,10 @@ public sealed class PostgresCourierOnboardingService(
             await using var cursorCommand = new NpgsqlCommand(
                 "SELECT created_at FROM couriers WHERE courier_id = @courier_id;", cursorConnection);
             cursorCommand.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, cursor);
-            var value = await cursorCommand.ExecuteScalarAsync(cancellationToken);
-            if (value is not DateTimeOffset createdAt)
+            await using var cursorReader = await cursorCommand.ExecuteReaderAsync(cancellationToken);
+            if (!await cursorReader.ReadAsync(cancellationToken))
                 return null;
-            cursorCreatedAt = createdAt;
+            cursorCreatedAt = cursorReader.GetFieldValue<DateTimeOffset>(0);
         }
 
         const string firstPageSql = """
