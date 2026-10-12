@@ -105,6 +105,44 @@ public sealed class PostgresZoneGeometryRepository
         return await FindAsync(connection, zoneId, geometryVersion, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ZoneGeometryBoundary>> ListActiveAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        var activeVersions = new List<(string ZoneId, string GeometryVersion, string ActiveHash, string SnapshotHash)>();
+        await using (var command = new NpgsqlCommand("""
+            SELECT active.zone_id, active.geometry_version,
+                   active.snapshot_sha256, snapshot.snapshot_sha256
+            FROM zone_geometry_active active
+            JOIN zone_geometry_versions snapshot
+              ON snapshot.zone_id = active.zone_id
+             AND snapshot.geometry_version = active.geometry_version
+            ORDER BY snapshot.zone_kind, active.zone_id;
+            """, connection))
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+                activeVersions.Add((reader.GetString(0), reader.GetString(1),
+                    reader.GetString(2), reader.GetString(3)));
+        }
+
+        var boundaries = new List<ZoneGeometryBoundary>(activeVersions.Count);
+        foreach (var active in activeVersions)
+        {
+            if (!string.Equals(active.ActiveHash, active.SnapshotHash, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    "Active zone geometry hash does not match its immutable snapshot.");
+
+            var boundary = await FindAsync(
+                connection, active.ZoneId, active.GeometryVersion, cancellationToken);
+            if (boundary is null)
+                throw new InvalidOperationException("Active zone geometry snapshot could not be loaded.");
+            boundaries.Add(boundary);
+        }
+
+        return boundaries;
+    }
+
     private static async Task<ZoneGeometryBoundary?> FindAsync(
         NpgsqlConnection connection,
         string zoneId,
