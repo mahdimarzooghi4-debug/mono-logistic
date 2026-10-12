@@ -12,7 +12,7 @@ public sealed class ApiKeyIssuerTests
     {
         var issued = MonoApiKeyIssuer.Create(
             "cus_0123456789abcdef0123456789abcdef",
-            ["branches.read"],
+            ["branches.read", "missions.cancel"],
             Now.AddDays(30),
             Now);
 
@@ -22,7 +22,7 @@ public sealed class ApiKeyIssuerTests
         Assert.Equal("key_" + issued.Value.Substring("mono_live_".Length, 16), issued.Credential.KeyId);
         Assert.Equal(ApiKeyCredentialVerifier.ComputeHash(issued.Value), issued.Credential.SecretHash);
         Assert.DoesNotContain(issued.Value, issued.Credential.SecretHash);
-        Assert.Equal(new[] { "branches.read" }, issued.Credential.Scopes);
+        Assert.Equal(new[] { "branches.read", "missions.cancel" }, issued.Credential.Scopes);
     }
 
     [Fact]
