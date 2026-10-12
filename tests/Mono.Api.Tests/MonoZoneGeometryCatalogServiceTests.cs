@@ -78,7 +78,7 @@ public sealed class MonoZoneGeometryCatalogServiceTests(ITestOutputHelper output
             await using var admin = new NpgsqlConnection(adminBuilder.ConnectionString);
             await admin.OpenAsync();
             await using var dropSchema = new NpgsqlCommand(
-                $"DROP SCHEMA {NpgsqlCommandBuilder.QuoteIdentifier(schema)} CASCADE;", admin);
+                $"DROP SCHEMA {schema} CASCADE;", admin);
             await dropSchema.ExecuteNonQueryAsync();
         }
     }
@@ -141,7 +141,6 @@ public sealed class MonoZoneGeometryCatalogServiceTests(ITestOutputHelper output
             """, connection);
         command.Parameters.AddWithValue("zone_id", zoneId);
         command.Parameters.AddWithValue("version", version);
-        _ = snapshotHash;
         Assert.Equal(1, await command.ExecuteNonQueryAsync());
     }
 
