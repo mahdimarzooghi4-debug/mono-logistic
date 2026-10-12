@@ -134,7 +134,7 @@ The response has `delivery_request_id` and `status: RECEIVED`. A retry with the 
 GET /v1/delivery-requests?page_size=50&cursor=drq_...
 ```
 
-Requires `delivery-requests.read`. The default page size is 50 and the maximum is 100. Results are ordered by creation time descending, then request ID descending. `next_cursor` is the last returned request ID and may be sent as `cursor` to fetch the next page. A cursor must belong to the authenticated customer; unknown and foreign-customer cursors return `400 INVALID_CURSOR`. The list contains request summaries only and excludes pickup/dropoff and contact data.
+Requires `delivery-requests.read`. The default page size is 50 and the maximum is 100. Results are ordered by creation time descending, then request ID descending. `next_cursor` is the last returned request ID and may be sent as `cursor` to fetch the next page. A cursor must belong to the authenticated customer; unknown and foreign-customer cursors return `400 INVALID_CURSOR`. The list contains customer-scoped request summaries only and excludes pickup/dropoff and contact data. Each item includes `mission_id`, `mission_status`, and `committed_delivery_at` when the request has been confirmed; those fields are null before confirmation.
 
 Response:
 
@@ -145,7 +145,10 @@ Response:
       "delivery_request_id": "drq_...",
       "external_reference": "ORDER-123",
       "status": "RECEIVED",
-      "created_at": "2026-10-10T12:00:00Z"
+      "created_at": "2026-10-10T12:00:00Z",
+      "mission_id": null,
+      "mission_status": null,
+      "committed_delivery_at": null
     }
   ],
   "next_cursor": null
@@ -154,7 +157,7 @@ Response:
 
 ## 7. Evaluate / Quote
 
-The implemented `GET /v1/delivery-requests/{delivery_request_id}` requires `delivery-requests.read` and returns only the authenticated customer's request summary. An unknown or foreign-customer ID returns 404, without exposing another tenant's data.
+The implemented `GET /v1/delivery-requests/{delivery_request_id}` requires `delivery-requests.read` and returns the authenticated customer's request summary with its Mission context when confirmed. The Mission lookup is tenant-scoped by the authenticated customer and Delivery Request ID. An unknown or foreign-customer ID returns 404, without exposing another tenant's data. The response never includes the stored request payload, pickup/dropoff locations, or contact details.
 
 Current response:
 
@@ -163,7 +166,10 @@ Current response:
   "delivery_request_id": "drq_...",
   "external_reference": "ORDER-123",
   "status": "RECEIVED",
-  "created_at": "2026-10-10T12:00:00Z"
+  "created_at": "2026-10-10T12:00:00Z",
+  "mission_id": "mis_...",
+  "mission_status": "PROMISED",
+  "committed_delivery_at": "2026-10-10T15:00:00Z"
 }
 ```
 
