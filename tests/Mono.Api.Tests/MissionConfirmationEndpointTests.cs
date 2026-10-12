@@ -20,6 +20,142 @@ public sealed class MissionConfirmationEndpointTests
         "mono_live_0123456789abcdef_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     [Fact]
+    public async Task Customer_cancellation_is_tenant_scoped_idempotent_and_serialized()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return;
+
+        var schema = "mission_cancel_" + Guid.NewGuid().ToString("N");
+        var adminConnectionString = new NpgsqlConnectionStringBuilder(connectionString).ConnectionString;
+        await using (var admin = new NpgsqlConnection(adminConnectionString))
+        {
+            await admin.OpenAsync();
+            await using var create = new NpgsqlCommand($"CREATE SCHEMA {schema};", admin);
+            await create.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            var scoped = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema };
+            await using var dataSource = NpgsqlDataSource.Create(scoped.ConnectionString);
+            await ApplyMigrationsAsync(dataSource, includeMissionLifecycle: true);
+
+            var customer = Customer.Create("Mission Cancellation Test", "ACTIVE");
+            var otherCustomer = Customer.Create("Other Mission Cancellation Test", "ACTIVE");
+            await InsertCustomerAsync(dataSource, customer);
+            await InsertCustomerAsync(dataSource, otherCustomer);
+            var branch = Branch.Create(customer.CustomerId, "Cancellation Branch", "ACTIVE");
+            var branches = new CustomerBranchRepository(dataSource, new FixedCustomerContext(customer.CustomerId));
+            await branches.CreateBranchAsync(branch);
+
+            var requestInput = new DeliveryRequestInput
+            {
+                ExternalReference = "CANCEL-ORDER-1",
+                BranchId = branch.BranchId,
+                Pickup = new DeliveryLocationInput { AddressText = "Pickup" },
+                Dropoff = new DeliveryLocationInput { AddressText = "Dropoff" },
+                Shipment = new DeliveryShipmentInput
+                    { ShipmentModel = "BAG_BASED", BagCount = 1, LoadClass = "S" },
+                RequestedService = "URBAN_DELIVERY",
+                RequestedPriority = "STANDARD"
+            };
+            var requests = new PostgresDeliveryRequestRepository(
+                dataSource, new FixedCustomerContext(customer.CustomerId));
+            var created = await requests.CreateOrReplayAsync(
+                branch.BranchId, requestInput.ExternalReference, "cancel-intake-1", requestInput.ToCanonicalJson());
+
+            var quoteId = "qte_0123456789abcdef0123456789abcdef";
+            var promiseId = "prm_0123456789abcdef0123456789abcdef";
+            var committedAt = DateTimeOffset.UtcNow.AddHours(2);
+            await InsertQuoteAsync(dataSource, customer.CustomerId, created.DeliveryRequestId, quoteId);
+            await InsertPromiseAsync(dataSource, customer.CustomerId,
+                created.DeliveryRequestId, promiseId, committedAt);
+
+            await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId,
+                ["delivery-requests.write", "missions.cancel", "delivery-requests.read"]);
+            await using var foreignFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["missions.cancel"]);
+            await using var noCancelFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.read"]);
+            using var ownerClient = ownerFactory.CreateClient();
+            using var foreignClient = foreignFactory.CreateClient();
+            using var noCancelClient = noCancelFactory.CreateClient();
+            ownerClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
+            foreignClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
+            noCancelClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
+
+            var confirmed = await PostAsync(ownerClient,
+                $"/v1/delivery-requests/{created.DeliveryRequestId}/confirm",
+                "cancel-confirm-1", new MissionConfirmationInput(quoteId, 1));
+            Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+            using var missionResponse = JsonDocument.Parse(await confirmed.Content.ReadAsStringAsync());
+            var missionId = missionResponse.RootElement.GetProperty("mission_id").GetString()!;
+            var cancelPath = $"/v1/missions/{missionId}/cancel";
+            var body = new MissionCancellationInput("CUSTOMER_CANCELLED", "cancel-order-1");
+
+            var race = await Task.WhenAll(
+                PostCancellationAsync(ownerClient, cancelPath, "cancel-race-a", body),
+                PostCancellationAsync(ownerClient, cancelPath, "cancel-race-b", body));
+            Assert.Single(race, response => response.StatusCode == HttpStatusCode.OK);
+            Assert.Single(race, response => response.StatusCode == HttpStatusCode.Conflict);
+            var winnerKey = race[0].StatusCode == HttpStatusCode.OK ? "cancel-race-a" : "cancel-race-b";
+            var winner = race.Single(response => response.StatusCode == HttpStatusCode.OK);
+            var replay = await PostCancellationAsync(ownerClient, cancelPath, winnerKey, body);
+            var changedReplay = await PostCancellationAsync(ownerClient, cancelPath, winnerKey,
+                body with { ExternalReference = "changed-reference" });
+            var foreign = await PostCancellationAsync(foreignClient, cancelPath, "foreign-cancel", body);
+            var noScope = await PostCancellationAsync(noCancelClient, cancelPath, "no-scope-cancel", body);
+
+            Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+            Assert.Equal(await winner.Content.ReadAsStringAsync(), await replay.Content.ReadAsStringAsync());
+            Assert.Equal(HttpStatusCode.Conflict, changedReplay.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, noScope.StatusCode);
+            using (var response = JsonDocument.Parse(await replay.Content.ReadAsStringAsync()))
+            {
+                Assert.Equal(missionId, response.RootElement.GetProperty("mission_id").GetString());
+                Assert.Equal("CANCELLED", response.RootElement.GetProperty("status").GetString());
+            }
+
+            var late = await PostCancellationAsync(ownerClient, cancelPath, "late-cancel-key",
+                body with { ExternalReference = "late-cancel" });
+            Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
+            using (var error = JsonDocument.Parse(await late.Content.ReadAsStringAsync()))
+            {
+                var details = error.RootElement.GetProperty("error");
+                Assert.Equal("CANCELLATION_NOT_ALLOWED", details.GetProperty("code").GetString());
+                Assert.Equal("CANCELLED", details.GetProperty("current_status").GetString());
+            }
+
+            var timeline = await ownerClient.GetAsync($"/v1/missions/{missionId}/timeline");
+            var timelineJson = await timeline.Content.ReadAsStringAsync();
+            Assert.Equal(HttpStatusCode.OK, timeline.StatusCode);
+            Assert.DoesNotContain("cancel-order-1", timelineJson, StringComparison.Ordinal);
+            using (var timelineDocument = JsonDocument.Parse(timelineJson))
+            {
+                var events = timelineDocument.RootElement.GetProperty("events");
+                Assert.Equal(2, events.GetArrayLength());
+                Assert.Equal("mission.cancelled", events[1].GetProperty("event_type").GetString());
+            }
+
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var count = new NpgsqlCommand("""
+                SELECT count(*) FROM outbox_events
+                WHERE customer_id = @customer_id AND aggregate_type = 'mission'
+                  AND event_type = 'mission.cancelled';
+                """, connection);
+            count.Parameters.AddWithValue("customer_id", customer.CustomerId);
+            Assert.Equal(1L, await count.ExecuteScalarAsync());
+        }
+        finally
+        {
+            await using var admin = new NpgsqlConnection(adminConnectionString);
+            await admin.OpenAsync();
+            await using var drop = new NpgsqlCommand($"DROP SCHEMA {schema} CASCADE;", admin);
+            await drop.ExecuteNonQueryAsync();
+        }
+    }
+
+    [Fact]
     public async Task Confirmation_creates_one_tenant_scoped_mission_and_outbox_event_and_replays_exact_request()
     {
         var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
@@ -269,6 +405,17 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Equal(1L, counts.GetInt64(2));
     }
 
+    private static async Task<HttpResponseMessage> PostCancellationAsync(
+        HttpClient client, string path, string idempotencyKey, MissionCancellationInput body)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        return await client.SendAsync(request);
+    }
+
     private static async Task<HttpResponseMessage> PostAsync(
         HttpClient client, string path, string idempotencyKey, MissionConfirmationInput body)
     {
@@ -446,10 +593,11 @@ public sealed class MissionConfirmationEndpointTests
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task ApplyMigrationsAsync(NpgsqlDataSource dataSource)
+    private static async Task ApplyMigrationsAsync(
+        NpgsqlDataSource dataSource, bool includeMissionLifecycle = false)
     {
         var assembly = typeof(MissionConfirmationEndpointTests).Assembly;
-        foreach (var resourceName in new[]
+        var migrationResources = new List<string>
                  {
                      "Mono.Api.Tests.Migrations.001_customer_branch.sql",
                      "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql",
@@ -458,7 +606,11 @@ public sealed class MissionConfirmationEndpointTests
                      "Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql",
                      "Mono.Api.Tests.Migrations.021_mission_confirmation.sql",
                      "Mono.Api.Tests.Migrations.028_quote_issued_event.sql",
-                 })
+                 };
+        if (includeMissionLifecycle)
+            migrationResources.Add("Mono.Api.Tests.Migrations.032_mission_lifecycle.sql");
+
+        foreach (var resourceName in migrationResources)
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
                 ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
