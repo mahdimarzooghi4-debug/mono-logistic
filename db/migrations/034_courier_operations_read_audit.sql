@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS courier_operations_read_audit (
     actor_id text NOT NULL CHECK (length(btrim(actor_id)) BETWEEN 1 AND 128),
     action text NOT NULL CHECK (action IN (
         'COURIER_SEARCH', 'COURIER_DETAIL', 'COURIER_AUDIT_INSPECTION')),
-    courier_id text NULL REFERENCES couriers(courier_id),
+    courier_id text NULL,
     result_count integer NOT NULL CHECK (result_count BETWEEN 0 AND 101),
     occurred_at timestamp with time zone NOT NULL,
     CHECK (
