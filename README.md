@@ -64,6 +64,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Route Insertion Feasibility Evidence v1](docs/40-route-insertion-feasibility-evidence-v1.md)
 - [SLA Feasibility Criterion v1](docs/41-sla-feasibility-criterion-v1.md)
 - [Feasibility Outcome Evaluation v1](docs/42-feasibility-outcome-evaluation-v1.md)
+- [Promise Commit Contract v1](docs/43-promise-commit-contract-v1.md)
 - [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 - [Hana Urban Delivery Configuration](docs/customers/hana/urban-delivery-configuration.md)
 - [Unified B2B Policy & Capability Model](docs/06-b2b-policy-capability-model.md)

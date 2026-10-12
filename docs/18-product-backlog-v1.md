@@ -255,6 +255,7 @@ Evaluate:
 - version
 - safety buffer
 - reason evidence
+- Sprint 057 adds a validated Promise commit proposal contract with delivery time, positive version, accepted outcome, explicit safety-buffer value and policy version, decision reasons, and policy-version evidence. It is validation-only; persistence, atomic commit, version sequencing, and buffer calculation remain future work.
 
 ### Acceptance
 - Mono never commits a Mission before proving feasibility.
