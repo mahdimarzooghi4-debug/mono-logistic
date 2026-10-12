@@ -68,11 +68,13 @@ public sealed class MonoCustomerOperationsService(
     public async Task<MonoCustomerPageResponse?> ListAsync(
         int pageSize,
         string? cursor,
+        string? status,
         CancellationToken cancellationToken = default)
     {
         RequireAdministrator();
         if (pageSize is < 1 or > 100)
             throw new ArgumentOutOfRangeException(nameof(pageSize));
+        status = NormalizeCustomerStatus(status);
 
         DateTimeOffset? cursorCreatedAt = null;
         if (cursor is not null)
@@ -93,6 +95,7 @@ public sealed class MonoCustomerOperationsService(
             SELECT customer_id, legal_name, display_name, status, customer_type,
                    default_channel, default_currency, created_at
             FROM customers
+            WHERE (@status IS NULL OR status = @status)
             ORDER BY created_at DESC, customer_id DESC
             LIMIT @take;
             """;
@@ -100,8 +103,9 @@ public sealed class MonoCustomerOperationsService(
             SELECT customer_id, legal_name, display_name, status, customer_type,
                    default_channel, default_currency, created_at
             FROM customers
-            WHERE created_at < @cursor_created_at
-               OR (created_at = @cursor_created_at AND customer_id < @cursor_id)
+            WHERE (@status IS NULL OR status = @status)
+              AND (created_at < @cursor_created_at
+                   OR (created_at = @cursor_created_at AND customer_id < @cursor_id))
             ORDER BY created_at DESC, customer_id DESC
             LIMIT @take;
             """;
@@ -109,6 +113,8 @@ public sealed class MonoCustomerOperationsService(
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, connection);
         command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
+        command.Parameters.AddWithValue(
+            "status", NpgsqlDbType.Text, status is null ? DBNull.Value : status);
         if (cursor is not null)
         {
             command.Parameters.AddWithValue("cursor_created_at", NpgsqlDbType.TimestampTz, cursorCreatedAt!.Value);
@@ -260,6 +266,17 @@ public sealed class MonoCustomerOperationsService(
             !operationsContext.Roles.Contains(MonoOperationsRoles.Administrator, StringComparer.Ordinal))
             throw new UnauthorizedAccessException("An authenticated Mono administrator is required.");
         return operationsContext.ActorId;
+    }
+
+    private static string? NormalizeCustomerStatus(string? status)
+    {
+        if (status is null)
+            return null;
+
+        var normalized = status.Trim().ToUpperInvariant();
+        if (normalized is not ("PENDING" or "ACTIVE"))
+            throw new ArgumentException("Customer status filter is invalid.", nameof(status));
+        return normalized;
     }
 
     private static string NormalizeCustomerId(string customerId)
