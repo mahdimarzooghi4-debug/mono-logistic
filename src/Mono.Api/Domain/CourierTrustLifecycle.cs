@@ -18,7 +18,6 @@ public sealed record CourierTrustProfile(
     CourierTrustStatus Status,
     CourierZoneApproval ZoneApproval)
 {
-    public bool CanReceiveMissions => Status == CourierTrustStatus.Active;
 }
 
 public sealed record CourierTrustTransition(
@@ -62,8 +61,12 @@ public static class CourierTrustLifecycle
             throw new ArgumentException("Courier ID is invalid.", nameof(profile));
         if (string.IsNullOrWhiteSpace(profile.Mode) ||
             profile.Mode.Length > 32 ||
-            profile.Mode.Any(character => !char.IsAsciiLetterOrDigit(character) && character != '_'))
-            throw new ArgumentException("Courier mode must be a canonical identifier.", nameof(profile));
+            profile.Mode[0] is < 'A' or > 'Z' ||
+            profile.Mode.Any(character =>
+                (character is < 'A' or > 'Z') &&
+                (character is < '0' or > '9') &&
+                character != '_'))
+            throw new ArgumentException("Courier mode must be a canonical uppercase identifier.", nameof(profile));
         if (!Enum.IsDefined(profile.Status) || !Enum.IsDefined(targetStatus))
             throw new ArgumentException("Courier trust status is unsupported.", nameof(targetStatus));
         if (string.IsNullOrWhiteSpace(actorId) || actorId.Length > 128 || actorId.Any(char.IsControl))
@@ -81,6 +84,8 @@ public static class CourierTrustLifecycle
                 $"Courier trust cannot move from {profile.Status} to {targetStatus}; expected {expected?.ToString() ?? "no further state"}.");
 
         var zoneApproval = profile.ZoneApproval.Normalize();
+        if (!string.Equals(zoneApproval.CourierId, profile.CourierId, StringComparison.Ordinal))
+            throw new ArgumentException("Zone approval must belong to this courier.", nameof(profile));
         if (targetStatus == CourierTrustStatus.Active &&
             (zoneApproval.ApprovedZoneIds.Count == 0 ||
              string.IsNullOrWhiteSpace(zoneApproval.PrimaryZoneId) ||
