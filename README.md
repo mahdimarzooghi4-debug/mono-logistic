@@ -52,6 +52,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Pricing, Batching & Settlement](docs/03-pricing-batching-settlement.md)
 - [Courier, Trust, Zones & Capacity](docs/04-courier-zones-trust-capacity.md)
 - [Zone Model v1](docs/30-zone-model-v1.md)
+- [Courier Zone Approval v1](docs/31-courier-zone-approval-v1.md)
 - [Maps, GPS, Location & Routing](docs/05-maps-location-routing.md)
 - [Hana Urban Delivery Configuration](docs/customers/hana/urban-delivery-configuration.md)
 - [Unified B2B Policy & Capability Model](docs/06-b2b-policy-capability-model.md)
