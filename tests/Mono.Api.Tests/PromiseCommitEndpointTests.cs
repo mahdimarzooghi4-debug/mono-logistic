@@ -224,7 +224,8 @@ public sealed class PromiseCommitEndpointTests
                     integrity.ObservedAt,
                     integrity.PayloadSha256,
                     integrity.SourceId,
-                    integrity.SourceAttestation));
+                    integrity.SourceAttestation,
+                    integrity.SourcePayloadSha256));
         }).ToArray();
 
         return new PromiseCommitInput(

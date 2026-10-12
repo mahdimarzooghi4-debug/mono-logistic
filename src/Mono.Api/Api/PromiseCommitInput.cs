@@ -61,7 +61,8 @@ public sealed record PromiseCommitInput(
                     observed_at = item.Integrity.ObservedAt?.ToUniversalTime().ToString("O"),
                     payload_sha256 = item.Integrity.PayloadSha256,
                     source_id = item.Integrity.SourceId,
-                    source_attestation = item.Integrity.SourceAttestation
+                    source_attestation = item.Integrity.SourceAttestation,
+                    source_payload_sha256 = item.Integrity.SourcePayloadSha256
                 }
             })
             .ToArray();
@@ -137,7 +138,8 @@ public sealed record PromiseEvidenceIntegrityInput(
     [property: JsonPropertyName("observed_at")] DateTimeOffset? ObservedAt,
     [property: JsonPropertyName("payload_sha256")] string? PayloadSha256,
     [property: JsonPropertyName("source_id")] string? SourceId,
-    [property: JsonPropertyName("source_attestation")] string? SourceAttestation)
+    [property: JsonPropertyName("source_attestation")] string? SourceAttestation,
+    [property: JsonPropertyName("source_payload_sha256")] string? SourcePayloadSha256 = null)
 {
     public FeasibilityEvidenceIntegrity ToDomain() =>
         new(
@@ -145,7 +147,8 @@ public sealed record PromiseEvidenceIntegrityInput(
             ObservedAt ?? default,
             PayloadSha256 ?? string.Empty,
             SourceId,
-            SourceAttestation);
+            SourceAttestation,
+            SourcePayloadSha256);
 }
 
 public sealed record PromiseAlternativeSearchInput(
