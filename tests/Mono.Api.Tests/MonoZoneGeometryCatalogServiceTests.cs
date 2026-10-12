@@ -27,7 +27,7 @@ public sealed class MonoZoneGeometryCatalogServiceTests(ITestOutputHelper output
         {
             await admin.OpenAsync();
             await using var createSchema = new NpgsqlCommand(
-                $"CREATE SCHEMA {NpgsqlCommandBuilder.QuoteIdentifier(schema)};", admin);
+                $"CREATE SCHEMA {schema};", admin);
             await createSchema.ExecuteNonQueryAsync();
         }
 
@@ -45,10 +45,10 @@ public sealed class MonoZoneGeometryCatalogServiceTests(ITestOutputHelper output
             var v2 = Boundary(zoneId, "v2", "POLYGON ((0 0, 20 0, 20 20, 0 20, 0 0))");
             await repository.PersistAsync(v1);
             await repository.PersistAsync(v2);
-            await AddReviewAsync(dataSource, zoneId, "v1", SnapshotHash(v1), "APPROVE");
-            await AddReviewAsync(dataSource, zoneId, "v2", SnapshotHash(v2), "APPROVE");
-            await AddReviewAsync(dataSource, zoneId, "v2", SnapshotHash(v2), "REJECT");
-            await ActivateAsync(dataSource, zoneId, "v1", SnapshotHash(v1));
+            await AddReviewAsync(dataSource, zoneId, "v1", "APPROVE");
+            await AddReviewAsync(dataSource, zoneId, "v2", "APPROVE");
+            await AddReviewAsync(dataSource, zoneId, "v2", "REJECT");
+            await ActivateAsync(dataSource, zoneId, "v1");
 
             var context = new TestOperationsContext();
             var service = new MonoZoneGeometryCatalogService(
@@ -110,14 +110,8 @@ public sealed class MonoZoneGeometryCatalogServiceTests(ITestOutputHelper output
             "revision-1", "© OpenStreetMap contributors", geometry);
     }
 
-    private static string SnapshotHash(ZoneGeometryBoundary boundary)
-    {
-        // The repository owns the canonical hash. Reading the persisted snapshot also verifies it.
-        return boundary.ZoneId + "/" + boundary.GeometryVersion;
-    }
-
     private static async Task AddReviewAsync(
-        NpgsqlDataSource dataSource, string zoneId, string version, string snapshotHash, string decision)
+        NpgsqlDataSource dataSource, string zoneId, string version, string decision)
     {
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var command = new NpgsqlCommand("""
@@ -131,12 +125,11 @@ public sealed class MonoZoneGeometryCatalogServiceTests(ITestOutputHelper output
         command.Parameters.AddWithValue("zone_id", zoneId);
         command.Parameters.AddWithValue("version", version);
         command.Parameters.AddWithValue("decision", decision);
-        _ = snapshotHash;
         Assert.Equal(1, await command.ExecuteNonQueryAsync());
     }
 
     private static async Task ActivateAsync(
-        NpgsqlDataSource dataSource, string zoneId, string version, string snapshotHash)
+        NpgsqlDataSource dataSource, string zoneId, string version)
     {
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var command = new NpgsqlCommand("""
