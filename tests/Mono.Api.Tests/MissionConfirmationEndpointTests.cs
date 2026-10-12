@@ -66,8 +66,8 @@ public sealed class MissionConfirmationEndpointTests
         await InsertPromiseOutboxEventAsync(dataSource, customer.CustomerId,
             created.DeliveryRequestId, promiseId, DateTimeOffset.UtcNow.AddMinutes(-1));
 
-        await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.write", "delivery-requests.read"]);
-        await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.write", "delivery-requests.read"]);
+        await using var ownerFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.write", "delivery-requests.read", "missions.cancel"]);
+        await using var otherFactory = CreateFactory(dataSource, otherCustomer.CustomerId, ["delivery-requests.write", "delivery-requests.read", "missions.cancel"]);
         await using var readOnlyFactory = CreateFactory(dataSource, customer.CustomerId, ["delivery-requests.read"]);
         using var ownerClient = ownerFactory.CreateClient();
         using var otherClient = otherFactory.CreateClient();
@@ -247,6 +247,46 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, invalidQuote.StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, expiredQuote.StatusCode);
 
+        var cancelPath = $"/v1/missions/{missionId}/cancel";
+        var cancelBody = new MissionCancellationInput("CUSTOMER_CANCELLED", "cancel-order-1");
+        var cancelled = await PostCancellationAsync(ownerClient, cancelPath, "cancel-mission-1", cancelBody);
+        var cancelledReplay = await PostCancellationAsync(ownerClient, cancelPath, "cancel-mission-1", cancelBody);
+        var changedCancelReplay = await PostCancellationAsync(ownerClient, cancelPath, "cancel-mission-1",
+            cancelBody with { ExternalReference = "cancel-order-changed" });
+        var foreignCancel = await PostCancellationAsync(otherClient, cancelPath, "foreign-cancel", cancelBody);
+        var readOnlyCancel = await PostCancellationAsync(readOnlyClient, cancelPath, "read-only-cancel", cancelBody);
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+        Assert.Equal(await cancelled.Content.ReadAsStringAsync(), await cancelledReplay.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Conflict, changedCancelReplay.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, foreignCancel.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, readOnlyCancel.StatusCode);
+        using (var cancelledJson = JsonDocument.Parse(await cancelled.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(missionId, cancelledJson.RootElement.GetProperty("mission_id").GetString());
+            Assert.Equal("CANCELLED", cancelledJson.RootElement.GetProperty("status").GetString());
+        }
+
+        using var secondMissionJson = JsonDocument.Parse(await secondMissionResponse.Content.ReadAsStringAsync());
+        var secondMissionId = secondMissionJson.RootElement.GetProperty("mission_id").GetString()!;
+        var concurrentCancellations = await Task.WhenAll(
+            PostCancellationAsync(ownerClient, $"/v1/missions/{secondMissionId}/cancel",
+                "concurrent-cancel-a", cancelBody),
+            PostCancellationAsync(ownerClient, $"/v1/missions/{secondMissionId}/cancel",
+                "concurrent-cancel-b", cancelBody));
+        Assert.Single(concurrentCancellations.Where(response => response.StatusCode == HttpStatusCode.OK));
+        Assert.Single(concurrentCancellations.Where(response => response.StatusCode == HttpStatusCode.Conflict));
+
+        var lateCancel = await PostCancellationAsync(ownerClient, cancelPath, "cancel-after-cancel",
+            cancelBody with { ExternalReference = "cancel-late" });
+        Assert.Equal(HttpStatusCode.Conflict, lateCancel.StatusCode);
+        using (var lateError = JsonDocument.Parse(await lateCancel.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal("CANCELLATION_NOT_ALLOWED", lateError.RootElement
+                .GetProperty("error").GetProperty("code").GetString());
+            Assert.Equal("CANCELLED", lateError.RootElement
+                .GetProperty("error").GetProperty("current_status").GetString());
+        }
+
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var countCommand = new NpgsqlCommand("""
             SELECT
@@ -271,6 +311,17 @@ public sealed class MissionConfirmationEndpointTests
 
     private static async Task<HttpResponseMessage> PostAsync(
         HttpClient client, string path, string idempotencyKey, MissionConfirmationInput body)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path)
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        return await client.SendAsync(request);
+    }
+
+    private static async Task<HttpResponseMessage> PostCancellationAsync(
+        HttpClient client, string path, string idempotencyKey, MissionCancellationInput body)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, path)
         {
@@ -458,6 +509,7 @@ public sealed class MissionConfirmationEndpointTests
                      "Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql",
                      "Mono.Api.Tests.Migrations.021_mission_confirmation.sql",
                      "Mono.Api.Tests.Migrations.028_quote_issued_event.sql",
+                     "Mono.Api.Tests.Migrations.032_mission_lifecycle.sql",
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
