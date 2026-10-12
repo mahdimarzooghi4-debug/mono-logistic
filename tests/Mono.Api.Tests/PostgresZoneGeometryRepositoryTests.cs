@@ -71,7 +71,7 @@ public sealed class PostgresZoneGeometryRepositoryTests(ITestOutputHelper output
             WHERE zone_id = @zone_id AND geometry_version = 'v1';
             """, connection);
         delete.Parameters.AddWithValue("zone_id", zoneId);
-        await Assert.ThrowsAsync<PostgresException>(() => delete.ExecuteNonQuery());
+        await Assert.ThrowsAsync<PostgresException>(() => delete.ExecuteNonQueryAsync());
 
         await using var truncate = new NpgsqlCommand("TRUNCATE zone_geometry_versions;", connection);
         await Assert.ThrowsAsync<PostgresException>(() => truncate.ExecuteNonQueryAsync());
