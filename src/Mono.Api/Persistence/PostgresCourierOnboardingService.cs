@@ -544,13 +544,15 @@ public sealed class PostgresCourierOnboardingService(
         return key;
     }
 
-    private static CourierTrustStatus ParseTargetStatus(string? status)
+    private static CourierTrustStatus ParseTargetStatus(string? status) => status switch
     {
-        if (!Enum.TryParse<CourierTrustStatus>(status, ignoreCase: true, out var parsed) ||
-            !string.Equals(ToApiStatus(parsed), status, StringComparison.Ordinal))
-            throw new ArgumentException("Target status is invalid.", nameof(status));
-        return parsed;
-    }
+        "IDENTITY_VERIFIED" => CourierTrustStatus.IdentityVerified,
+        "DOCUMENTS_SUBMITTED" => CourierTrustStatus.DocumentsSubmitted,
+        "TRUST_REQUIREMENTS_VERIFIED" => CourierTrustStatus.TrustRequirementsVerified,
+        "MONO_APPROVED" => CourierTrustStatus.MonoApproved,
+        "ACTIVE" => CourierTrustStatus.Active,
+        _ => throw new ArgumentException("Target status is invalid.", nameof(status))
+    };
 
     private static CourierTrustStatus ParseCurrentStatus(string status) =>
         Enum.GetValues<CourierTrustStatus>().Single(value =>
