@@ -19,6 +19,7 @@ builder.Services.AddScoped<MonoBranchInspectionService>();
 builder.Services.AddScoped<MonoBranchExternalIdentifierOperationsService>();
 builder.Services.AddScoped<MonoPolicyDraftOperationsService>();
 builder.Services.AddScoped<MonoEffectivePolicyResolutionService>();
+builder.Services.AddScoped<MonoHardPolicyEvaluationService>();
 builder.Services.AddScoped<CustomerBranchRepository>();
 builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
@@ -43,6 +44,7 @@ app.MapMonoApiKeyOperationsEndpoints();
 app.MapMonoBranchOperationsEndpoints();
 app.MapMonoBranchExternalIdentifierOperationsEndpoints();
 app.MapMonoPolicyDraftOperationsEndpoints();
+app.MapMonoHardPolicyEvaluationEndpoints();
 
 app.Run();
 
