@@ -80,10 +80,30 @@ public sealed class PostgresDeliveryQuoteRepositoryTests(ITestOutputHelper outpu
             """, connection);
         count.Parameters.AddWithValue("customer_id", customer.CustomerId);
         count.Parameters.AddWithValue("request_id", request.DeliveryRequestId);
-        await using var reader = await count.ExecuteReaderAsync();
-        Assert.True(await reader.ReadAsync());
-        Assert.Equal(3L, reader.GetInt64(0));
-        Assert.Equal(3, reader.GetInt32(1));
+        await using (var reader = await count.ExecuteReaderAsync())
+        {
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal(3L, reader.GetInt64(0));
+            Assert.Equal(3, reader.GetInt32(1));
+        }
+
+        await using var outboxCount = new NpgsqlCommand("""
+            SELECT count(*), min(sequence), max(sequence),
+                   bool_and(event_type = 'quote.issued' AND aggregate_type = 'quote')
+            FROM outbox_events
+            WHERE customer_id = @customer_id AND aggregate_type = 'quote'
+              AND data->>'delivery_request_id' = @request_id;
+            """, connection);
+        outboxCount.Parameters.AddWithValue("customer_id", customer.CustomerId);
+        outboxCount.Parameters.AddWithValue("request_id", request.DeliveryRequestId);
+        await using (var outboxReader = await outboxCount.ExecuteReaderAsync())
+        {
+            Assert.True(await outboxReader.ReadAsync());
+            Assert.Equal(3L, outboxReader.GetInt64(0));
+            Assert.Equal(1L, outboxReader.GetInt64(1));
+            Assert.Equal(3L, outboxReader.GetInt64(2));
+            Assert.True(outboxReader.GetBoolean(3));
+        }
 
         var otherTenantId = Customer.Create("Other Quote Tenant", "ACTIVE").CustomerId;
         var otherTenant = new PostgresDeliveryQuoteRepository(
@@ -233,7 +253,8 @@ public sealed class PostgresDeliveryQuoteRepositoryTests(ITestOutputHelper outpu
                      "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql",
                      "Mono.Api.Tests.Migrations.018_promise_commit.sql",
                      "Mono.Api.Tests.Migrations.019_delivery_quote_versions.sql",
-                     "Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql"
+                     "Mono.Api.Tests.Migrations.020_delivery_quote_issuance_idempotency.sql",
+                     "Mono.Api.Tests.Migrations.028_quote_issued_event.sql",
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)

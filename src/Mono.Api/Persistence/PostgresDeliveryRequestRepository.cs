@@ -199,6 +199,18 @@ public sealed class PostgresDeliveryRequestRepository(
     {
         const string sql = """
             WITH request_events AS (
+                SELECT q.customer_id, q.delivery_request_id,
+                       e.event_id, e.event_type, e.aggregate_type, e.sequence, e.occurred_at
+                FROM delivery_quote_versions q
+                JOIN outbox_events e
+                  ON e.customer_id = q.customer_id
+                 AND e.aggregate_type = 'quote'
+                 AND e.aggregate_id = q.quote_id
+                 AND e.sequence = q.version
+                 AND e.event_type = 'quote.issued'
+                WHERE q.customer_id = @customer_id
+                  AND q.delivery_request_id = @delivery_request_id
+                UNION ALL
                 SELECT p.customer_id, p.delivery_request_id,
                        e.event_id, e.event_type, e.aggregate_type, e.sequence, e.occurred_at
                 FROM promises p

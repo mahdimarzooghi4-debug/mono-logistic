@@ -7,7 +7,7 @@ ALTER TABLE outbox_events
     DROP CONSTRAINT IF EXISTS outbox_events_event_type_check;
 ALTER TABLE outbox_events
     ADD CONSTRAINT outbox_events_event_type_check
-    CHECK (event_type IN ('promise.committed', 'promise.revised', 'mission.created'));
+    CHECK (event_type IN ('quote.issued', 'promise.committed', 'promise.revised', 'mission.created'));
 
 CREATE TABLE IF NOT EXISTS missions (
     mission_id text PRIMARY KEY CHECK (mission_id ~ '^mis_[0-9a-f]{32}$'),
