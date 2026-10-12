@@ -61,11 +61,17 @@ public sealed class PostgresCourierAvailabilityService(
         }
 
         const string courierSql = """
-            SELECT status, approved_zone_ids ? @zone_id
+            SELECT status, approved_zone_ids ? @zone_id,
+                COALESCE((
+                    SELECT action = 'SUSPENDED'
+                    FROM courier_operational_status_events
+                    WHERE courier_id = @courier_id
+                    ORDER BY event_sequence DESC LIMIT 1), FALSE)
             FROM couriers WHERE courier_id = @courier_id FOR UPDATE;
             """;
         string? courierStatus = null;
         var zoneApproved = false;
+        var suspended = false;
         await using (var command = new NpgsqlCommand(courierSql, connection, transaction))
         {
             command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
@@ -75,6 +81,7 @@ public sealed class PostgresCourierAvailabilityService(
             {
                 courierStatus = reader.GetString(0);
                 zoneApproved = reader.GetBoolean(1);
+                suspended = reader.GetBoolean(2);
             }
         }
         if (courierStatus is null)
@@ -83,6 +90,11 @@ public sealed class PostgresCourierAvailabilityService(
             return new CourierAvailabilityWriteResult(CourierAvailabilityWriteOutcome.CourierNotFound, null);
         }
         if (courierStatus != "ACTIVE")
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new CourierAvailabilityWriteResult(CourierAvailabilityWriteOutcome.InvalidCourierState, null);
+        }
+        if (suspended)
         {
             await transaction.CommitAsync(cancellationToken);
             return new CourierAvailabilityWriteResult(CourierAvailabilityWriteOutcome.InvalidCourierState, null);

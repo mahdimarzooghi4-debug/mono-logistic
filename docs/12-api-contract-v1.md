@@ -758,3 +758,16 @@ These windows are staff-entered planning data. They are not courier-reported liv
 Mono administrators can request a projection for one active zone over a UTC range up to 24 hours, using 15, 30, or 60 minute buckets aligned to the selected interval. Each bucket counts distinct ACTIVE couriers whose scheduled window overlaps that period. Reads are appended to the courier operations audit ledger, and the API fails closed if the audit write fails.
 
 The projection represents staff-entered planned capacity only. It does not incorporate live courier reports, GPS freshness, route capacity, or Mission assignment decisions.
+
+
+### 34.4 Courier operational suspension
+
+Mono administrator operations may suspend or reinstate an ACTIVE courier:
+
+- `POST /operations/v1/couriers/{courier_id}/suspend`
+- `POST /operations/v1/couriers/{courier_id}/reinstate`
+- `GET /operations/v1/couriers/{courier_id}/operational-status`
+
+Write requests require the administrator MFA policy, one `Idempotency-Key`, and a canonical `reason_code`. Exact retries return the original result; reuse with changed content returns `409 IDEMPOTENCY_CONFLICT`. Invalid lifecycle changes return `409 COURIER_STATUS_TRANSITION_NOT_ALLOWED`.
+
+Operational suspension is recorded as an immutable event and does not rewrite the courier's trust status. In the same transaction, suspension cancels every scheduled availability window that ends after the suspension timestamp, recording `COURIER_SUSPENDED` as the cancellation reason; reinstatement does not restore those windows, so operators must schedule fresh availability. The status read returns trust status, operational status, and at most the latest 50 status events. The read is added to the courier operations detail audit before the response is returned. Suspended couriers cannot receive planned availability windows and do not contribute to planned zone capacity. GPS, dispatch, and courier self-authentication remain separate capabilities.

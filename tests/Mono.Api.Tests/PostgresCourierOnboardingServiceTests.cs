@@ -376,6 +376,126 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             item.ResultCount == 4 && item.CourierId is null);
     }
 
+    [Fact]
+    public async Task Courier_suspension_is_separate_audited_idempotent_and_excludes_planned_capacity()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var utcNow = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(
+            utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, (utcNow.Minute / 15) * 15, 0, TimeSpan.Zero);
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var registration = await onboarding.RegisterAsync("BIKE", ["zone-central"], "suspension-register");
+        var courierId = registration.Snapshot!.CourierId;
+        var statuses = new[]
+        {
+            "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+            "MONO_APPROVED", "ACTIVE"
+        };
+        for (var index = 0; index < statuses.Length; index++)
+        {
+            var status = statuses[index];
+            var transition = await onboarding.AdvanceTrustAsync(
+                courierId, status, status == "ACTIVE" ? ["zone-central"] : null,
+                status == "ACTIVE" ? "zone-central" : null, "REVIEW_COMPLETED",
+                $"review:{status}", $"suspension-transition-{index}");
+            Assert.Equal(CourierOperationsWriteOutcome.Applied, transition.Outcome);
+        }
+
+        var readAudit = new PostgresCourierOperationsReadAuditService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var availability = new PostgresCourierAvailabilityService(
+            database.DataSource, context, readAudit, new FixedTimeProvider(now));
+        var planned = await availability.CreateAsync(
+            courierId, "zone-central", now, now.AddMinutes(45), "suspension-window");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, planned.Outcome);
+
+        var suspension = new PostgresCourierSuspensionService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var suspended = await suspension.SuspendAsync(
+            courierId, "SAFETY_REVIEW", "suspend-courier");
+        Assert.Equal(CourierOperationalStatusOutcome.Applied, suspended.Outcome);
+        Assert.Equal("ACTIVE", suspended.Snapshot!.TrustStatus);
+        Assert.Equal("SUSPENDED", suspended.Snapshot.OperationalStatus);
+        Assert.Single(suspended.Snapshot.History);
+
+        var replay = await suspension.SuspendAsync(
+            courierId, "SAFETY_REVIEW", "suspend-courier");
+        Assert.Equal(CourierOperationalStatusOutcome.Replayed, replay.Outcome);
+        Assert.Equal(suspended.Snapshot.History[0].EventId, replay.Snapshot!.History[0].EventId);
+
+        var changedReplay = await suspension.SuspendAsync(
+            courierId, "OTHER_REASON", "suspend-courier");
+        Assert.Equal(CourierOperationalStatusOutcome.Conflict, changedReplay.Outcome);
+
+        var duplicateSuspension = await suspension.SuspendAsync(
+            courierId, "SAFETY_REVIEW", "suspend-again");
+        Assert.Equal(CourierOperationalStatusOutcome.InvalidState, duplicateSuspension.Outcome);
+
+        var rejectedWindow = await availability.CreateAsync(
+            courierId, "zone-central", now.AddHours(1), now.AddHours(2), "suspended-window");
+        Assert.Equal(CourierAvailabilityWriteOutcome.InvalidCourierState, rejectedWindow.Outcome);
+
+        await using (var cancellationCheckConnection = await database.DataSource.OpenConnectionAsync())
+        {
+            await using var cancelledWindow = new NpgsqlCommand(
+                """
+                SELECT status, cancellation_reason FROM courier_availability_windows
+                WHERE window_id = @window_id;
+                """, cancellationCheckConnection);
+            cancelledWindow.Parameters.AddWithValue("window_id", planned.Window!.WindowId);
+            await using var reader = await cancelledWindow.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("CANCELLED", reader.GetString(0));
+            Assert.Equal("COURIER_SUSPENDED", reader.GetString(1));
+        }
+
+        var projection = new PostgresCourierCapacityProjectionService(database.DataSource, context, readAudit);
+        var suspendedCapacity = await projection.ProjectAsync(
+            "zone-central", now, now.AddHours(1), 15);
+        Assert.All(suspendedCapacity.Buckets, bucket => Assert.Equal(0, bucket.PlannedCourierCount));
+
+        var reinstated = await suspension.ReinstateAsync(
+            courierId, "REVIEW_CLEARED", "reinstate-courier");
+        Assert.Equal(CourierOperationalStatusOutcome.Applied, reinstated.Outcome);
+        Assert.Equal("ACTIVE", reinstated.Snapshot!.OperationalStatus);
+        Assert.Equal(new[] { "REINSTATED", "SUSPENDED" },
+            reinstated.Snapshot.History.Select(item => item.Action));
+
+        var activeCapacity = await projection.ProjectAsync(
+            "zone-central", now, now.AddHours(1), 15);
+        Assert.All(activeCapacity.Buckets, bucket => Assert.Equal(0, bucket.PlannedCourierCount));
+
+        var replacementWindow = await availability.CreateAsync(
+            courierId, "zone-central", now.AddMinutes(45), now.AddHours(1), "reinstated-window");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, replacementWindow.Outcome);
+        var replacementCapacity = await projection.ProjectAsync(
+            "zone-central", now, now.AddHours(1), 15);
+        Assert.Equal(new[] { 0, 0, 0, 1 },
+            replacementCapacity.Buckets.Select(bucket => bucket.PlannedCourierCount));
+
+        var operationalStatusSnapshot = await suspension.FindAsync(courierId);
+        Assert.Equal("ACTIVE", operationalStatusSnapshot!.TrustStatus);
+        Assert.Equal("ACTIVE", operationalStatusSnapshot.OperationalStatus);
+        Assert.Equal(2, operationalStatusSnapshot.History.Count);
+
+        await using var connection = await database.DataSource.OpenConnectionAsync();
+        await using var mutation = new NpgsqlCommand(
+            "UPDATE courier_operational_status_events SET reason_code = 'TAMPERED' WHERE courier_id = @courier_id;",
+            connection);
+        mutation.Parameters.AddWithValue("courier_id", courierId);
+        await Assert.ThrowsAsync<PostgresException>(() => mutation.ExecuteNonQueryAsync());
+    }
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string _adminConnectionString;
@@ -468,6 +588,16 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var capacityAuditConnection = await DataSource.OpenConnectionAsync();
             await using var capacityAuditCommand = new NpgsqlCommand(capacityAuditSql, capacityAuditConnection);
             await capacityAuditCommand.ExecuteNonQueryAsync();
+
+            const string suspensionResourceName = "Mono.Api.Tests.Migrations.037_courier_operational_suspension.sql";
+            await using var suspensionStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(suspensionResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {suspensionResourceName}.");
+            using var suspensionReader = new StreamReader(suspensionStream);
+            var suspensionSql = await suspensionReader.ReadToEndAsync();
+            await using var suspensionConnection = await DataSource.OpenConnectionAsync();
+            await using var suspensionCommand = new NpgsqlCommand(suspensionSql, suspensionConnection);
+            await suspensionCommand.ExecuteNonQueryAsync();
         }
 
         public async ValueTask DisposeAsync()

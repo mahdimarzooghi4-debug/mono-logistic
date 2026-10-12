@@ -61,6 +61,11 @@ public sealed class PostgresCourierCapacityProjectionService(
             LEFT JOIN couriers courier
               ON courier.courier_id = availability.courier_id
              AND courier.status = 'ACTIVE'
+             AND COALESCE((
+                SELECT action = 'SUSPENDED'
+                FROM courier_operational_status_events
+                WHERE courier_id = courier.courier_id
+                ORDER BY event_sequence DESC LIMIT 1), FALSE) = FALSE
             GROUP BY bucket_start
             ORDER BY bucket_start;
             """;
