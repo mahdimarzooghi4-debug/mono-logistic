@@ -63,7 +63,7 @@ public sealed class ZoneGeometryBoundaryTests
         Assert.Throws<ArgumentException>(() => ZoneGeometryBoundary.Create(
             "zone-a", ZoneKind.OperatingZone, "v1", "osm", "r1", "© OpenStreetMap contributors", outOfRange));
 
-        var line = new WKTReader(Factory).Read("LINESTRING (0 0, 1 1)");
+        var line = ReadWkt("LINESTRING (0 0, 1 1)");
         Assert.Throws<ArgumentException>(() => ZoneGeometryBoundary.Create(
             "zone-a", ZoneKind.OperatingZone, "v1", "osm", "r1", "© OpenStreetMap contributors", line));
     }
@@ -201,7 +201,7 @@ public sealed class ZoneGeometryBoundaryTests
 
     private static Geometry ReadWkt(string wkt, int srid = 4326)
     {
-        var geometry = new WKTReader(Factory).Read(wkt);
+        var geometry = new WKTReader().Read(wkt);
         geometry.SRID = srid;
         return geometry;
     }
