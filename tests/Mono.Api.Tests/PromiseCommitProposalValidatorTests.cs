@@ -8,17 +8,13 @@ public sealed class PromiseCommitProposalValidatorTests
     [Theory]
     [InlineData(FeasibilityOutcome.Accepted)]
     [InlineData(FeasibilityOutcome.AlternativePromise)]
-    public void ValidPromiseProposalPasses(FeasibilityOutcome outcome)
-    {
+    public void ValidPromiseProposalPasses(FeasibilityOutcome outcome) =>
         PromiseCommitProposalValidator.Validate(Proposal(outcome));
-    }
 
     [Fact]
-    public void RejectedOutcomeCannotBeCommittedAsPromise()
-    {
+    public void RejectedOutcomeCannotBeCommittedAsPromise() =>
         Assert.Throws<ArgumentException>(() =>
             PromiseCommitProposalValidator.Validate(Proposal(FeasibilityOutcome.Rejected)));
-    }
 
     [Fact]
     public void DeliveryMustFollowEvaluationAndVersionMustBePositive()
@@ -65,17 +61,19 @@ public sealed class PromiseCommitProposalValidatorTests
     }
 
     [Fact]
-    public void DecisionIdMustBePresentAndBounded()
+    public void IdentifiersMustMatchMonoFormats()
     {
         Assert.Throws<ArgumentException>(() =>
-            PromiseCommitProposalValidator.Validate(Proposal() with { DecisionId = " " }));
+            PromiseCommitProposalValidator.Validate(Proposal() with { PromiseId = "promise-1" }));
         Assert.Throws<ArgumentException>(() =>
-            PromiseCommitProposalValidator.Validate(Proposal() with { DecisionId = new string('x', 129) }));
+            PromiseCommitProposalValidator.Validate(Proposal() with { DeliveryRequestId = "request-1" }));
     }
 
     private static PromiseCommitProposal Proposal(
         FeasibilityOutcome outcome = FeasibilityOutcome.Accepted) =>
         new(
+            "prm_11111111111111111111111111111111",
+            "drq_22222222222222222222222222222222",
             "decision-1",
             1,
             DateTimeOffset.UnixEpoch.AddHours(1),
