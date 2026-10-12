@@ -342,7 +342,7 @@ REGISTERED
 -> ACTIVE
 ```
 - Sprint 109 adds a unit-tested ordered trust lifecycle with staff attribution and bounded evidence references; ACTIVE also requires an approved primary zone. Persistence, courier authentication, evidence verification, operations APIs, and dispatch integration remain future work.
-- Sprint 110 adds durable Mono-operations courier registration, cursor-paginated roster/detail reads, and MFA-gated stepwise trust transitions. The database rejects skipped status changes or status changes without immutable transition history; idempotent writes store only operational metadata and opaque evidence references. Courier self-authentication, document storage/verification, and dispatch integration remain future work.
+- Sprint 110 adds durable Mono-operations courier registration, cursor-paginated roster/detail reads, and MFA-gated stepwise trust transitions. The database rejects skipped status changes or status changes without immutable transition history; idempotent writes store only operational metadata and opaque evidence references.
 - Sprint 111 records privileged roster, detail, and audit-ledger reads in an append-only courier operations audit table. Reads fail closed if audit persistence fails, and administrators can inspect the ledger with bounded keyset pagination.
 - Sprint 112 adds staff-planned, zone-aware courier availability windows with overlap prevention, idempotent create/cancel, and audited bounded search. Planned windows support capacity planning; they do not represent live availability or dispatch eligibility.
 - Sprint 113 adds a bounded zone capacity projection over those planned windows, grouped into UTC time buckets and logged in the courier read-audit ledger. It reports scheduled planning counts only; it does not calculate live supply or assign Missions.
@@ -352,6 +352,7 @@ REGISTERED
 
 ### E10.1 Candidate Generation
 - Sprint 115 adds an MFA-gated, audited planning-eligibility preview that explains per-courier inclusion or exclusion for a zone/time window using trust status, suspension, zone approval, and scheduled availability. It is planning-only and does not authorize assignment or dispatch.
+- Sprint 116 adds a separate, configurable OIDC/JWT courier authentication boundary and minimal self-session endpoint. Tokens are checked against current ACTIVE/unsuspended state; authority, verified mobile binding, and token provisioning remain unconfigured.
 - available couriers
 - active routes
 - eligible modes
