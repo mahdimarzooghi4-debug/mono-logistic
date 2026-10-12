@@ -21,6 +21,7 @@ Epic
 ## 3. Epic E1 — Customer, Contract & Configuration
 
 ### E1.1 Customer
+- Sprint 018 adds Mono-administrator onboarding for new customers in PENDING status and audited activation to ACTIVE.
 - Create Customer
 - Customer status
 - Customer tenant context
@@ -49,6 +50,7 @@ Epic
 - Sprint 015 exposes read-only customer service configuration versions and audit history through Mono administrator-only operations routes.
 - Sprint 016 exposes internal Mono-administrator routes to create Draft customer service configurations and activate them with the existing overlap checks and append-only audit trail.
 - Sprint 017 adds audited retirement of active customer service configurations through the Mono administrator boundary.
+- Sprint 018 adds an internal Mono-operations API to create a customer in PENDING status and activate it with an append-only audit trail.
 - enabled modes
 - coverage
 - policy set binding
