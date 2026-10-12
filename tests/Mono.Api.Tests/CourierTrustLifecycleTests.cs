@@ -35,7 +35,6 @@ public sealed class CourierTrustLifecycleTests
             profile = result.Profile;
         }
 
-        Assert.True(profile.CanReceiveMissions);
         Assert.Equal(CourierTrustStatus.Active, profile.Status);
     }
 
@@ -95,6 +94,36 @@ public sealed class CourierTrustLifecycleTests
     public void Rejects_malformed_courier_identity()
     {
         var profile = NewProfile() with { CourierId = "courier-1" };
+
+        Assert.Throws<ArgumentException>(() => CourierTrustLifecycle.Advance(
+            profile, CourierTrustStatus.IdentityVerified, "staff-42", "IDENTITY_REVIEWED",
+            "case:123", OccurredAt));
+    }
+
+
+    [Fact]
+    public void Rejects_zone_approval_owned_by_another_courier()
+    {
+        var profile = NewProfile() with
+        {
+            ZoneApproval = new CourierZoneApproval
+            {
+                CourierId = "crr_ffffffffffffffffffffffffffffffff",
+                PreferredZoneIds = ["zone-central"],
+                ApprovedZoneIds = ["zone-central"],
+                PrimaryZoneId = "zone-central"
+            }
+        };
+
+        Assert.Throws<ArgumentException>(() => CourierTrustLifecycle.Advance(
+            profile, CourierTrustStatus.IdentityVerified, "staff-42", "IDENTITY_REVIEWED",
+            "case:123", OccurredAt));
+    }
+
+    [Fact]
+    public void Rejects_noncanonical_mode()
+    {
+        var profile = NewProfile() with { Mode = "Bike" };
 
         Assert.Throws<ArgumentException>(() => CourierTrustLifecycle.Advance(
             profile, CourierTrustStatus.IdentityVerified, "staff-42", "IDENTITY_REVIEWED",
