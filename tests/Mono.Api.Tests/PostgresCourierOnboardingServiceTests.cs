@@ -445,13 +445,13 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             courierId, "zone-central", now.AddHours(1), now.AddHours(2), "suspended-window");
         Assert.Equal(CourierAvailabilityWriteOutcome.InvalidCourierState, rejectedWindow.Outcome);
 
-        await using (var connection = await database.DataSource.OpenConnectionAsync())
+        await using (var cancellationCheckConnection = await database.DataSource.OpenConnectionAsync())
         {
             await using var cancelledWindow = new NpgsqlCommand(
                 """
                 SELECT status, cancellation_reason FROM courier_availability_windows
                 WHERE window_id = @window_id;
-                """, connection);
+                """, cancellationCheckConnection);
             cancelledWindow.Parameters.AddWithValue("window_id", planned.Window!.WindowId);
             await using var reader = await cancelledWindow.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
