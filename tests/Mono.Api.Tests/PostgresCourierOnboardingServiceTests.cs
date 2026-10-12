@@ -196,6 +196,45 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         public override DateTimeOffset GetUtcNow() => now;
     }
 
+    [Fact]
+    public async Task Courier_reads_are_audited_and_audit_ledger_is_append_only()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var onboarding = new PostgresCourierOnboardingService(database.DataSource, new TestOperationsContext());
+        var courier = await onboarding.RegisterAsync("BIKE", ["zone-central"], "read-audit-register");
+        var service = new PostgresCourierOperationsReadAuditService(
+            database.DataSource, new TestOperationsContext());
+
+        await service.RecordAsync(PostgresCourierOperationsReadAuditService.CourierSearch, null, 1);
+        await service.RecordAsync(
+            PostgresCourierOperationsReadAuditService.CourierDetail, courier.Snapshot!.CourierId, 1);
+        var page = await service.ListAsync(10, null);
+
+        Assert.NotNull(page);
+        Assert.Contains(page.Items, item =>
+            item.Action == PostgresCourierOperationsReadAuditService.CourierSearch &&
+            item.ResultCount == 1 && item.CourierId is null);
+        Assert.Contains(page.Items, item =>
+            item.Action == PostgresCourierOperationsReadAuditService.CourierDetail &&
+            item.CourierId == courier.Snapshot.CourierId);
+
+        await using var connection = await database.DataSource.OpenConnectionAsync();
+        await Assert.ThrowsAsync<PostgresException>(async () =>
+        {
+            await using var command = new NpgsqlCommand(
+                "DELETE FROM courier_operations_read_audit;", connection);
+            await command.ExecuteNonQueryAsync();
+        });
+    }
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string _adminConnectionString;
@@ -258,6 +297,16 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var migrationConnection = await DataSource.OpenConnectionAsync();
             await using var command = new NpgsqlCommand(sql, migrationConnection);
             await command.ExecuteNonQueryAsync();
+
+            const string auditResourceName = "Mono.Api.Tests.Migrations.034_courier_operations_read_audit.sql";
+            await using var auditStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(auditResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {auditResourceName}.");
+            using var auditReader = new StreamReader(auditStream);
+            var auditSql = await auditReader.ReadToEndAsync();
+            await using var auditConnection = await DataSource.OpenConnectionAsync();
+            await using var auditCommand = new NpgsqlCommand(auditSql, auditConnection);
+            await auditCommand.ExecuteNonQueryAsync();
         }
 
         public async ValueTask DisposeAsync()
