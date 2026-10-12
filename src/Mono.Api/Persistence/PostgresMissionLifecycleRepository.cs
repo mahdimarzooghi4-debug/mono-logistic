@@ -115,7 +115,9 @@ public sealed class PostgresMissionLifecycleRepository(
         }
 
         var eventId = $"evt_{Guid.NewGuid():N}";
-        var occurredAt = _timeProvider.GetUtcNow();
+        var now = _timeProvider.GetUtcNow();
+        // PostgreSQL timestamp precision is one microsecond; keep the first response identical to a replay.
+        var occurredAt = new DateTimeOffset(now.Ticks - now.Ticks % 10, TimeSpan.Zero);
         var eventData = JsonSerializer.Serialize(new
         {
             mission_id = missionId,
