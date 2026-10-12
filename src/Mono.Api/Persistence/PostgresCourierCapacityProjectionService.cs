@@ -6,7 +6,7 @@ using NpgsqlTypes;
 namespace Mono.Api.Persistence;
 
 /// <summary>
-/// Projects staff-planned windows into zone capacity buckets. The result is planning
+/// Projects staff-planned availabilitys into zone capacity buckets. The result is planning
 /// data only; it is neither live availability nor a dispatch authorization decision.
 /// </summary>
 public sealed class PostgresCourierCapacityProjectionService(
@@ -53,13 +53,13 @@ public sealed class PostgresCourierCapacityProjectionService(
                 @from,
                 @to - make_interval(mins => @bucket_minutes),
                 make_interval(mins => @bucket_minutes)) AS series(bucket_start)
-            LEFT JOIN courier_availability_windows window
-              ON window.zone_id = @zone_id
-             AND window.status = 'SCHEDULED'
-             AND window.starts_at < series.bucket_start + make_interval(mins => @bucket_minutes)
-             AND window.ends_at > series.bucket_start
+            LEFT JOIN courier_availability_windows availability
+              ON availability.zone_id = @zone_id
+             AND availability.status = 'SCHEDULED'
+             AND availability.starts_at < series.bucket_start + make_interval(mins => @bucket_minutes)
+             AND availability.ends_at > series.bucket_start
             LEFT JOIN couriers courier
-              ON courier.courier_id = window.courier_id
+              ON courier.courier_id = availability.courier_id
              AND courier.status = 'ACTIVE'
             GROUP BY bucket_start
             ORDER BY bucket_start;
