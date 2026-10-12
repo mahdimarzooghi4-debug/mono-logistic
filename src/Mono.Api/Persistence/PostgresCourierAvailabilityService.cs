@@ -190,16 +190,16 @@ public sealed class PostgresCourierAvailabilityService(
     }
 
     public async Task<CourierAvailabilityWindowPage?> ListAsync(
-        DateTimeOffset startsBefore,
-        DateTimeOffset endsAfter,
+        DateTimeOffset from,
+        DateTimeOffset to,
         int pageSize,
         string? zoneId,
         string? cursor,
         CancellationToken cancellationToken = default)
     {
         RequireAdministrator();
-        if (startsBefore.Offset != TimeSpan.Zero || endsAfter.Offset != TimeSpan.Zero ||
-            endsAfter <= startsBefore || endsAfter - startsBefore > TimeSpan.FromDays(31) ||
+        if (from.Offset != TimeSpan.Zero || to.Offset != TimeSpan.Zero ||
+            to <= from || to - from > TimeSpan.FromDays(31) ||
             pageSize is < 1 or > 100 || !IsValidZoneFilter(zoneId) ||
             (cursor is not null && !WindowIdPattern.IsMatch(cursor)))
             throw new ArgumentException("Courier availability search filters are invalid.");
@@ -223,7 +223,7 @@ public sealed class PostgresCourierAvailabilityService(
             SELECT window_id, courier_id, zone_id, starts_at, ends_at, status,
                 created_by, created_at, cancelled_by, cancelled_at, cancellation_reason
             FROM courier_availability_windows
-            WHERE starts_at < @ends_after AND ends_at > @starts_before
+            WHERE starts_at < @to AND ends_at > @from
               AND (@zone_id IS NULL OR zone_id = @zone_id)
             ORDER BY starts_at, window_id LIMIT @take;
             """;
@@ -231,7 +231,7 @@ public sealed class PostgresCourierAvailabilityService(
             SELECT window_id, courier_id, zone_id, starts_at, ends_at, status,
                 created_by, created_at, cancelled_by, cancelled_at, cancellation_reason
             FROM courier_availability_windows
-            WHERE starts_at < @ends_after AND ends_at > @starts_before
+            WHERE starts_at < @to AND ends_at > @from
               AND (@zone_id IS NULL OR zone_id = @zone_id)
               AND (starts_at > @cursor_starts_at OR
                    (starts_at = @cursor_starts_at AND window_id > @cursor_id))
@@ -239,8 +239,8 @@ public sealed class PostgresCourierAvailabilityService(
             """;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, connection);
-        command.Parameters.AddWithValue("starts_before", NpgsqlDbType.TimestampTz, startsBefore);
-        command.Parameters.AddWithValue("ends_after", NpgsqlDbType.TimestampTz, endsAfter);
+        command.Parameters.AddWithValue("from", NpgsqlDbType.TimestampTz, from);
+        command.Parameters.AddWithValue("to", NpgsqlDbType.TimestampTz, to);
         command.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, (object?)zoneId ?? DBNull.Value);
         command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
