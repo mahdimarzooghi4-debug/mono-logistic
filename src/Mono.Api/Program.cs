@@ -15,6 +15,7 @@ builder.Services.AddScoped<MonoCustomerOperationsService>();
 builder.Services.AddScoped<MonoCustomerExternalIdentifierOperationsService>();
 builder.Services.AddScoped<MonoApiKeyOperationsService>();
 builder.Services.AddScoped<MonoBranchOperationsService>();
+builder.Services.AddScoped<MonoBranchInspectionService>();
 builder.Services.AddScoped<CustomerBranchRepository>();
 builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();

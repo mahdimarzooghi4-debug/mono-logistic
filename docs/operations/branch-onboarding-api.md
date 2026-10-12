@@ -34,9 +34,23 @@ The request uses the same fields as branch registration, with a required `name` 
 
 The update and its `UPDATED` audit entry are committed in one transaction. Invalid coordinates, non-object operating-hours data, or invalid text leave the branch and audit history unchanged.
 
+## Inspect branch details
+
+`GET /operations/v1/customers/{customerId}/branches/{branchId}`
+
+Returns the current branch metadata for the specified customer and branch, including the stored operating-hours JSON object. The route is read-only and requires Mono administrator authentication with issuer-asserted MFA. A missing branch or a branch owned by another customer returns `404 BRANCH_NOT_FOUND`.
+
+## Inspect branch audit history
+
+`GET /operations/v1/customers/{customerId}/branches/{branchId}/audit?page_size=50&cursor=boa_...`
+
+Returns branch creation and update audit records in chronological order. The default page size is 50; accepted values are 1–100. When another page exists, `nextCursor` contains the last audit ID in the current page; pass it as `cursor` to continue. The cursor must belong to the same customer and branch. Unknown or cross-branch cursors return `400 INVALID_CURSOR`; a missing or cross-customer branch returns `404 BRANCH_NOT_FOUND`.
+
 ## Errors
 
-- `400 INVALID_REQUEST`: invalid name, coordinates, operating-hours shape, or reason.
+- `400 INVALID_REQUEST`: invalid name, coordinates, operating-hours shape, reason, or page size.
+- `400 INVALID_CURSOR`: audit cursor is malformed or does not belong to the specified branch.
 - `404 CUSTOMER_NOT_FOUND`: customer ID is unknown.
+- `404 BRANCH_NOT_FOUND`: branch ID is unknown for the specified customer.
 - `409 CUSTOMER_CONFLICT`: customer exists but is not active.
 - `401` and `403`: missing/invalid administrator authentication or insufficient role.
