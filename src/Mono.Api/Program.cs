@@ -25,6 +25,7 @@ builder.Services.AddScoped<CustomerBranchRepository>();
 builder.Services.AddScoped<CustomerServiceConfigurationRepository>();
 builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
 builder.Services.AddScoped<PostgresMissionConfirmationRepository>();
+builder.Services.AddScoped<PostgresMissionHistoryRepository>();
 builder.Services.AddScoped<PostgresPromiseCommitRepository>();
 builder.Services.AddScoped<PostgresDeliveryQuoteRepository>();
 builder.Services.AddScoped<IDeliveryQuoteStore>(services =>
@@ -50,6 +51,7 @@ app.MapHealthChecks("/health/ready");
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapMissionConfirmationEndpoints();
+app.MapMissionHistoryEndpoints();
 app.MapCustomerServiceConfigurationInspectionEndpoints();
 app.MapCustomerServiceConfigurationAuthoringEndpoints();
 app.MapMonoCustomerOperationsEndpoints();

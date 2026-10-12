@@ -266,6 +266,10 @@ Requires `delivery-requests.read`. The response includes Mission status, linked 
 
 `GET /v1/missions/{mission_id}/timeline` requires `delivery-requests.read` and returns the customer's Mission lifecycle event envelope in sequence order. The timeline reads only the tenant-owned Mission aggregate and allowlisted public Mission event types. It returns event ID, type, sequence, and occurrence time; internal event payloads and pickup/dropoff details are omitted. A missing or foreign-customer Mission returns `404 MISSION_NOT_FOUND`. The initial implementation exposes `mission.created`; later lifecycle events appear as those operations are implemented.
 
+### 9.2 Mission History
+
+GET /v1/missions?page_size=50&cursor=mis_... requires delivery-requests.read. It returns customer-scoped Mission summaries ordered by creation time descending and then Mission ID descending. The default page size is 50 and the maximum is 100. next_cursor is the last Mission ID on a non-final page; cursors must resolve to a Mission owned by the authenticated customer or the API returns 400 INVALID_CURSOR. The response reuses the safe Mission summary fields and excludes pickup/dropoff, contacts, and internal evidence.
+
 ## 10. Mission Status Model
 
 External normalized statuses:

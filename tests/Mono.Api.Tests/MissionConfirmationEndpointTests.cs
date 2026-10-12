@@ -105,6 +105,47 @@ public sealed class MissionConfirmationEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, foreignMissionResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, timelineResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, foreignTimelineResponse.StatusCode);
+        var secondRequestInput = requestInput with { ExternalReference = "CONFIRM-ORDER-2" };
+        var secondRequest = await deliveryRequests.CreateOrReplayAsync(
+            branch.BranchId, secondRequestInput.ExternalReference, "confirm-intake-2", secondRequestInput.ToCanonicalJson());
+        var secondQuoteId = "qte_22222222222222222222222222222222";
+        var secondPromiseId = "prm_22222222222222222222222222222222";
+        await InsertQuoteAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId, secondQuoteId);
+        await InsertPromiseAsync(dataSource, customer.CustomerId, secondRequest.DeliveryRequestId,
+            secondPromiseId, committedAt.AddHours(1), "decision-confirm-2");
+        var secondMissionResponse = await PostAsync(
+            ownerClient,
+            $"/v1/delivery-requests/{secondRequest.DeliveryRequestId}/confirm",
+            "confirm-mission-2",
+            new MissionConfirmationInput(secondQuoteId, 1));
+        Assert.Equal(HttpStatusCode.OK, secondMissionResponse.StatusCode);
+        var historyResponse = await ownerClient.GetAsync("/v1/missions?page_size=1");
+        var invalidHistoryPage = await ownerClient.GetAsync("/v1/missions?page_size=101");
+        Assert.Equal(HttpStatusCode.OK, historyResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidHistoryPage.StatusCode);
+        var historyJson = await historyResponse.Content.ReadAsStringAsync();
+        using var historyDocument = JsonDocument.Parse(historyJson);
+        var history = historyDocument.RootElement;
+        Assert.Single(history.GetProperty("items").EnumerateArray());
+        var historyCursor = history.GetProperty("next_cursor").GetString();
+        Assert.NotNull(historyCursor);
+        var nextHistoryResponse = await ownerClient.GetAsync($"/v1/missions?page_size=1&cursor={historyCursor}");
+        var foreignHistoryResponse = await otherClient.GetAsync("/v1/missions");
+        var foreignCursorResponse = await otherClient.GetAsync($"/v1/missions?cursor={historyCursor}");
+        Assert.Equal(HttpStatusCode.OK, nextHistoryResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, foreignHistoryResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, foreignCursorResponse.StatusCode);
+        var nextHistoryJson = await nextHistoryResponse.Content.ReadAsStringAsync();
+        using var nextHistoryDocument = JsonDocument.Parse(nextHistoryJson);
+        var nextHistory = nextHistoryDocument.RootElement;
+        Assert.Single(nextHistory.GetProperty("items").EnumerateArray());
+        Assert.Null(nextHistory.GetProperty("next_cursor").GetString());
+        Assert.NotEqual(history.GetProperty("items")[0].GetProperty("mission_id").GetString(),
+            nextHistory.GetProperty("items")[0].GetProperty("mission_id").GetString());
+        Assert.Empty(JsonDocument.Parse(await foreignHistoryResponse.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("items").EnumerateArray());
+        Assert.DoesNotContain("Pickup", historyJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("Dropoff", historyJson, StringComparison.Ordinal);
         var timelineJson = await timelineResponse.Content.ReadAsStringAsync();
         using var timelineDocument = JsonDocument.Parse(timelineJson);
         var timeline = timelineDocument.RootElement;
@@ -127,8 +168,14 @@ public sealed class MissionConfirmationEndpointTests
         await using var countCommand = new NpgsqlCommand("""
             SELECT
               (SELECT count(*) FROM missions WHERE customer_id = @customer_id AND delivery_request_id = @request_id),
-              (SELECT count(*) FROM mission_confirmation_idempotency WHERE customer_id = @customer_id),
-              (SELECT count(*) FROM outbox_events WHERE customer_id = @customer_id AND event_type = 'mission.created');
+              (SELECT count(*) FROM mission_confirmation_idempotency
+               WHERE customer_id = @customer_id AND delivery_request_id = @request_id),
+              (SELECT count(*) FROM outbox_events
+               WHERE customer_id = @customer_id AND aggregate_type = 'mission'
+                 AND aggregate_id = (
+                   SELECT mission_id FROM missions
+                   WHERE customer_id = @customer_id AND delivery_request_id = @request_id)
+                 AND event_type = 'mission.created');
             """, connection);
         countCommand.Parameters.AddWithValue("customer_id", customer.CustomerId);
         countCommand.Parameters.AddWithValue("request_id", created.DeliveryRequestId);
@@ -217,7 +264,7 @@ public sealed class MissionConfirmationEndpointTests
 
     private static async Task InsertPromiseAsync(
         NpgsqlDataSource dataSource, string customerId, string requestId, string promiseId,
-        DateTimeOffset committedAt)
+        DateTimeOffset committedAt, string decisionId = "decision-confirm-1")
     {
         await using var connection = await dataSource.OpenConnectionAsync();
         await using (var promise = new NpgsqlCommand("""
@@ -225,7 +272,7 @@ public sealed class MissionConfirmationEndpointTests
                 promise_id, customer_id, delivery_request_id, current_version, latest_decision_id,
                 committed_delivery_at, outcome, safety_buffer_ticks, safety_buffer_policy_version,
                 policy_versions, reason_codes, updated_at)
-            VALUES (@promise_id, @customer_id, @request_id, 1, 'decision-confirm-1',
+            VALUES (@promise_id, @customer_id, @request_id, 1, @decision_id,
                 @committed_at, 'ACCEPTED', 0, 'test-policy', '{}'::jsonb, '[]'::jsonb, @committed_at);
             """, connection))
         {
@@ -233,21 +280,23 @@ public sealed class MissionConfirmationEndpointTests
             promise.Parameters.AddWithValue("customer_id", customerId);
             promise.Parameters.AddWithValue("request_id", requestId);
             promise.Parameters.AddWithValue("committed_at", committedAt);
+            promise.Parameters.AddWithValue("decision_id", decisionId);
             await promise.ExecuteNonQueryAsync();
         }
 
         await using var version = new NpgsqlCommand("""
             INSERT INTO promise_versions (
                 promise_id, customer_id, version, decision_id, proposal_hash, proposal, event_id, created_at)
-            VALUES (@promise_id, @customer_id, 1, 'decision-confirm-1', @hash,
+            VALUES (@promise_id, @customer_id, 1, @decision_id, @hash,
                 jsonb_build_object('delivery_request_id', @request_id), @event_id, @created_at);
             """, connection);
         version.Parameters.AddWithValue("promise_id", promiseId);
         version.Parameters.AddWithValue("customer_id", customerId);
         version.Parameters.AddWithValue("request_id", requestId);
         version.Parameters.AddWithValue("hash", new string('b', 64));
-        version.Parameters.AddWithValue("event_id", "evt_0123456789abcdef0123456789abcdef");
+        version.Parameters.AddWithValue("event_id", $"evt_{Guid.NewGuid():N}");
         version.Parameters.AddWithValue("created_at", committedAt);
+        version.Parameters.AddWithValue("decision_id", decisionId);
         await version.ExecuteNonQueryAsync();
     }
 
