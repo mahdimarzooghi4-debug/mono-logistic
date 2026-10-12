@@ -805,3 +805,20 @@ The response is classified `PLANNED_CAPACITY_ONLY`. It is a staff planning expla
 }
 ```
 
+
+
+### 34.6 Courier self-service authentication
+
+Courier self-service APIs use a dedicated OIDC/JWT bearer scheme, isolated from customer API keys and Mono operations identities. The issuer and audience are configured as a pair using `MonoCourier:Authority` and `MonoCourier:Audience`; the authority must use HTTPS. With no configured authority, courier tokens fail closed.
+
+A validated token must contain exactly one non-empty `sub`, one canonical Mono Courier ID in `mono/courier_id`, and one `mono/role = COURIER` claim. The trusted issuer is responsible for issuing the Mono Courier ID claim only after completing the verified account binding. Mono also checks current PostgreSQL trust and operational status during token validation; unknown, inactive, or suspended couriers are rejected.
+
+The initial self-service route is:
+
+```
+GET /courier/v1/session
+Authorization: Bearer <courier access token>
+```
+
+It returns only the authenticated caller's internal Courier ID and identity domain. It exposes no identity, contact, financial, location, or trust-history fields. No identity provider, mobile verification or OTP delivery, credential provisioning, or deployment is configured by this contract. Authentication remains unavailable until those trusted issuer settings and account-binding controls exist.
+
