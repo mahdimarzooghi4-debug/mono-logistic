@@ -270,7 +270,7 @@ Evaluate:
 ## 10. Epic E8 — Pricing
 
 ### E8.1 Pricing Engine
-- Sprint 064 implements a pure Hana Phase-1 distance-band calculator with the approved fare values and 50/50 buyer/seller split. Its distance intervals are lower-inclusive; the final interval includes the 5 km maximum. Quote lifecycle and persistence, other pricing dimensions, and contract-specific pricing remain future work.
+- Sprint 064 implements a pure Hana Phase-1 distance-band calculator with the approved fare values and 50/50 buyer/seller split. Its distance intervals are lower-inclusive; the final interval includes the 5 km maximum. Other pricing dimensions and contract-specific pricing remain future work.
 - distance bands
 - flat
 - base + per-km
@@ -288,7 +288,8 @@ Evaluate:
 - 4–5 km: 50,000
 
 ### E8.3 Quote
-- Sprint 065 adds a tenant-scoped immutable Quote contract with positive version, explicit issue/expiry timestamps, policy-version evidence tied to the Hana tariff, and required audit-evidence IDs. Expiry is evaluated at the supplied instant; no default TTL is invented. Quote persistence, issuance endpoint, and version sequencing remain future work.
+- Sprint 065 adds a tenant-scoped immutable Quote contract with positive version, explicit issue/expiry timestamps, policy-version evidence tied to the Hana tariff, and required audit-evidence IDs. Expiry is evaluated at the supplied instant; no default TTL is invented.
+- Sprint 066 persists canonical Quote snapshots in PostgreSQL with tenant/request scoping, immutable version history, consecutive version checks, and replay detection. Expiry remains caller-supplied; issuance and read APIs remain future work.
 - quote version
 - expiration
 - policy versions
