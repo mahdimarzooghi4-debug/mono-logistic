@@ -105,12 +105,7 @@ public sealed class MonoZoneGeometryGeoJsonService(
     private static double[][] Positions(LineString ring) =>
         ring.Coordinates.Select(coordinate => new[] { coordinate.X, coordinate.Y }).ToArray();
 
-    private static string Required(string? value, string parameterName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            throw new ArgumentException("Value is required.", parameterName);
-        return value.Trim();
-    }
+
 }
 
 public sealed record ZoneGeometryGeoJsonFeature(
