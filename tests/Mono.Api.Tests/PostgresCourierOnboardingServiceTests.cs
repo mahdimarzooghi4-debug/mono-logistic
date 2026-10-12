@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
@@ -593,6 +595,80 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         Assert.Contains(auditPage.Items, item =>
             item.Action == PostgresCourierOperationsReadAuditService.CourierPlanningEligibilitySearch &&
             item.ResultCount == 2 && item.CourierId is null);
+    }
+
+    [Fact]
+    public async Task Courier_tokens_require_unique_claims_and_current_active_unsuspended_binding()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(
+            database.DataSource, context, new FixedTimeProvider(now));
+
+        async Task<string> RegisterActive(string key)
+        {
+            var registration = await onboarding.RegisterAsync("BIKE", ["zone-central"], key + "-register");
+            var courierId = registration.Snapshot!.CourierId;
+            var statuses = new[]
+            {
+                "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+                "MONO_APPROVED", "ACTIVE"
+            };
+            for (var index = 0; index < statuses.Length; index++)
+            {
+                var status = statuses[index];
+                var result = await onboarding.AdvanceTrustAsync(
+                    courierId, status, status == "ACTIVE" ? ["zone-central"] : null,
+                    status == "ACTIVE" ? "zone-central" : null, "REVIEW_COMPLETED",
+                    "courier-auth:" + status, key + "-transition-" + index);
+                Assert.Equal(CourierOperationsWriteOutcome.Applied, result.Outcome);
+            }
+            return courierId;
+        }
+
+        var activeCourierId = await RegisterActive("auth-active");
+        var suspendedCourierId = await RegisterActive("auth-suspended");
+        var registered = await onboarding.RegisterAsync("WALK", ["zone-central"], "auth-registered");
+        var registeredCourierId = registered.Snapshot!.CourierId;
+        var suspension = new PostgresCourierSuspensionService(database.DataSource, context, new FixedTimeProvider(now));
+        Assert.Equal(CourierOperationalStatusOutcome.Applied,
+            (await suspension.SuspendAsync(suspendedCourierId, "SAFETY_REVIEW", "auth-suspend")).Outcome);
+
+        var validator = new MonoCourierTokenValidator(database.DataSource);
+        static ClaimsPrincipal Token(string courierId) => new(new ClaimsIdentity(
+        [
+            new Claim(MonoCourierClaimTypes.Subject, "provider-subject-" + courierId),
+            new Claim(MonoCourierClaimTypes.CourierId, courierId),
+            new Claim(MonoCourierClaimTypes.Role, MonoCourierDefaults.RoleValue)
+        ], MonoCourierDefaults.Scheme));
+
+        var activeToken = Token(activeCourierId);
+        Assert.True(await validator.ValidateAsync(activeToken));
+        var httpContext = new DefaultHttpContext();
+        httpContext.User = activeToken;
+        var courierContext = new HttpMonoCourierContext(new HttpContextAccessor { HttpContext = httpContext });
+        Assert.Equal(activeCourierId, courierContext.CourierId);
+
+        Assert.False(await validator.ValidateAsync(Token(suspendedCourierId)));
+        Assert.False(await validator.ValidateAsync(Token(registeredCourierId)));
+
+        var duplicateSubjectToken = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(MonoCourierClaimTypes.Subject, "first"),
+            new Claim(MonoCourierClaimTypes.Subject, "second"),
+            new Claim(MonoCourierClaimTypes.CourierId, activeCourierId),
+            new Claim(MonoCourierClaimTypes.Role, MonoCourierDefaults.RoleValue)
+        ], MonoCourierDefaults.Scheme));
+        Assert.False(await validator.ValidateAsync(duplicateSubjectToken));
     }
 
     private sealed class TestDatabase : IAsyncDisposable
