@@ -65,6 +65,12 @@ public static class MonoZoneGeometryReviewEndpoints
                 return Results.Conflict(new ApiErrorResponse(new ApiError(
                     "ZONE_GEOMETRY_SNAPSHOT_CHANGED", "Review must reference the stored snapshot hash.")));
             }
+            catch (ZoneGeometrySnapshotIsActiveException)
+            {
+                return Results.Conflict(new ApiErrorResponse(new ApiError(
+                    "ZONE_GEOMETRY_MUST_BE_DEACTIVATED",
+                    "Deactivate this geometry before recording a REJECT review.")));
+            }
         });
 
         return endpoints;
