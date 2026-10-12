@@ -37,6 +37,13 @@ public sealed class PostgresZoneGeometryReviewService(
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var zoneLock = new NpgsqlCommand(
+            "SELECT pg_advisory_xact_lock(hashtext(@zone_id));", connection, transaction))
+        {
+            zoneLock.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, zoneId);
+            await zoneLock.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         string? storedHash;
         await using (var find = new NpgsqlCommand("""
             SELECT snapshot_sha256
@@ -54,6 +61,19 @@ public sealed class PostgresZoneGeometryReviewService(
             throw new ZoneGeometrySnapshotNotFoundException();
         if (!string.Equals(storedHash, expectedSnapshotSha256, StringComparison.OrdinalIgnoreCase))
             throw new ZoneGeometrySnapshotHashConflictException();
+
+        if (decision == "REJECT")
+        {
+            await using var active = new NpgsqlCommand("""
+                SELECT EXISTS (
+                    SELECT 1 FROM zone_geometry_active
+                    WHERE zone_id = @zone_id AND geometry_version = @geometry_version);
+                """, connection, transaction);
+            active.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, zoneId);
+            active.Parameters.AddWithValue("geometry_version", NpgsqlDbType.Text, geometryVersion);
+            if (Equals(await active.ExecuteScalarAsync(cancellationToken), true))
+                throw new ZoneGeometrySnapshotIsActiveException();
+        }
 
         const string insertSql = """
             INSERT INTO zone_geometry_reviews (
@@ -152,5 +172,9 @@ public sealed class ZoneGeometrySnapshotNotFoundException : Exception
 }
 
 public sealed class ZoneGeometrySnapshotHashConflictException : Exception
+{
+}
+
+public sealed class ZoneGeometrySnapshotIsActiveException : Exception
 {
 }
