@@ -46,5 +46,7 @@
                       LogicalName="Mono.Api.Tests.Migrations.012_customer_registry_listing_index.sql" />
     <EmbeddedResource Include="../../db/migrations/013_customer_registry_search_indexes.sql"
                       LogicalName="Mono.Api.Tests.Migrations.013_customer_registry_search_indexes.sql" />
+    <EmbeddedResource Include="../../db/migrations/014_customer_external_identifiers.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.014_customer_external_identifiers.sql" />
   </ItemGroup>
 </Project>

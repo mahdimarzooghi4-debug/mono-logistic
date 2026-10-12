@@ -26,6 +26,7 @@ Epic
 - Sprint 026 adds an MFA-gated Mono operations customer directory with keyset pagination and summary-only fields.
 - Sprint 027 adds `PENDING` and `ACTIVE` status filters to the admin customer directory without changing customer lifecycle rules.
 - Sprint 028 adds case-insensitive prefix search by customer ID, legal name, or display name to the admin customer directory.
+- Sprint 029 adds Mono-admin-managed, namespaced external customer identifiers with uniqueness, retirement, and immutable audit history.
 - Create Customer
 - Customer status
 - Customer tenant context

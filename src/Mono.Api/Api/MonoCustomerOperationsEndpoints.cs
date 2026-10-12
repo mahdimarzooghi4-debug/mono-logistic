@@ -55,6 +55,126 @@ public static class MonoCustomerOperationsEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet(
+            "/operations/v1/customers/{customerId}/external-identifiers",
+            async (
+                string customerId,
+                MonoCustomerExternalIdentifierOperationsService identifiers,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var entries = await identifiers.ListAsync(customerId, cancellationToken);
+                    return entries is null
+                        ? Results.NotFound(new ApiErrorResponse(
+                            new ApiError("CUSTOMER_NOT_FOUND", "Customer was not found.")))
+                        : Results.Ok(new CustomerExternalIdentifierListResponse(entries));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Customer ID is invalid.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost(
+            "/operations/v1/customers/{customerId}/external-identifiers",
+            async (
+                string customerId,
+                AddCustomerExternalIdentifierRequest request,
+                MonoCustomerExternalIdentifierOperationsService identifiers,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var entry = await identifiers.AddAsync(
+                        customerId,
+                        request.Namespace ?? string.Empty,
+                        request.ExternalId ?? string.Empty,
+                        request.Reason ?? string.Empty,
+                        cancellationToken);
+                    return Results.Created(
+                        $"/operations/v1/customers/{customerId}/external-identifiers",
+                        entry);
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST",
+                            "Customer ID, namespace, external ID, or reason is invalid.")));
+                }
+                catch (KeyNotFoundException)
+                {
+                    return Results.NotFound(new ApiErrorResponse(
+                        new ApiError("CUSTOMER_NOT_FOUND", "Customer was not found.")));
+                }
+                catch (CustomerExternalIdentifierConflictException)
+                {
+                    return Results.Conflict(new ApiErrorResponse(
+                        new ApiError("EXTERNAL_IDENTIFIER_CONFLICT",
+                            "The external identifier is already assigned in this namespace.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost(
+            "/operations/v1/customers/{customerId}/external-identifiers/{identifierId}/retire",
+            async (
+                string customerId,
+                string identifierId,
+                RetireCustomerExternalIdentifierRequest request,
+                MonoCustomerExternalIdentifierOperationsService identifiers,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var retired = await identifiers.RetireAsync(
+                        customerId, identifierId, request.Reason ?? string.Empty, cancellationToken);
+                    return retired
+                        ? Results.NoContent()
+                        : Results.NotFound(new ApiErrorResponse(
+                            new ApiError("EXTERNAL_IDENTIFIER_NOT_FOUND",
+                                "External identifier was not found for this customer.")));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST",
+                            "Customer ID, external identifier ID, or reason is invalid.")));
+                }
+                catch (CustomerExternalIdentifierConflictException)
+                {
+                    return Results.Conflict(new ApiErrorResponse(
+                        new ApiError("EXTERNAL_IDENTIFIER_CONFLICT",
+                            "External identifier is already retired or conflicts with another assignment.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet(
+            "/operations/v1/customers/{customerId}/external-identifiers/audit",
+            async (
+                string customerId,
+                MonoCustomerExternalIdentifierOperationsService identifiers,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var entries = await identifiers.ListAuditAsync(customerId, cancellationToken);
+                    return entries is null
+                        ? Results.NotFound(new ApiErrorResponse(
+                            new ApiError("CUSTOMER_NOT_FOUND", "Customer was not found.")))
+                        : Results.Ok(new CustomerExternalIdentifierAuditListResponse(entries));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Customer ID is invalid.")));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapGet("/operations/v1/customers/{customerId}", async (
                 string customerId,
                 MonoCustomerOperationsService customers,
@@ -159,6 +279,19 @@ public static class MonoCustomerOperationsEndpoints
 
 public sealed record MonoCustomerAuditListResponse(
     IReadOnlyList<MonoCustomerAuditSummary> Entries);
+
+public sealed record CustomerExternalIdentifierListResponse(
+    IReadOnlyList<CustomerExternalIdentifierSummary> Identifiers);
+
+public sealed record CustomerExternalIdentifierAuditListResponse(
+    IReadOnlyList<CustomerExternalIdentifierAuditSummary> Entries);
+
+public sealed record RetireCustomerExternalIdentifierRequest(string? Reason);
+
+public sealed record AddCustomerExternalIdentifierRequest(
+    string? Namespace,
+    string? ExternalId,
+    string? Reason);
 
 public sealed record CreateMonoCustomerRequest(
     string? LegalName,

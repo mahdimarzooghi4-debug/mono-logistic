@@ -12,6 +12,7 @@ builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
 builder.Services.AddScoped<CustomerServiceConfigurationAuthoringService>();
 builder.Services.AddScoped<CustomerServiceConfigurationInspectionService>();
 builder.Services.AddScoped<MonoCustomerOperationsService>();
+builder.Services.AddScoped<MonoCustomerExternalIdentifierOperationsService>();
 builder.Services.AddScoped<MonoApiKeyOperationsService>();
 builder.Services.AddScoped<MonoBranchOperationsService>();
 builder.Services.AddScoped<CustomerBranchRepository>();

@@ -39,6 +39,26 @@ Returns customer registry summaries ordered by `createdAt` descending, then `cus
 
 This route requires Mono administrator authentication with issuer-asserted MFA.
 
+## Manage external customer identifiers
+
+- `GET /operations/v1/customers/{customerId}/external-identifiers` lists active external identifiers for a customer.
+- `POST /operations/v1/customers/{customerId}/external-identifiers` adds a mapping:
+
+```json
+{
+  "namespace": "hana",
+  "externalId": "merchant-001",
+  "reason": "Verified customer account mapping"
+}
+```
+
+A namespace identifies the source or integration account. It is trimmed and stored in lowercase, must be 1–64 characters, and may contain lowercase letters, digits, dots, underscores, and hyphens. An external ID is trimmed, case-sensitive, and limited to 256 characters. An active `namespace + externalId` pair can map to one Mono customer at a time. Duplicate active mappings return `409 EXTERNAL_IDENTIFIER_CONFLICT`.
+
+- `POST /operations/v1/customers/{customerId}/external-identifiers/{identifierId}/retire` retires a mapping and requires a non-empty reason.
+- `GET /operations/v1/customers/{customerId}/external-identifiers/audit` returns the append-only add/retire history, including administrator, reason, and timestamp.
+
+These routes require Mono administrator authentication with issuer-asserted MFA. Retired mappings disappear from the active list; their history remains. A retired external ID can be assigned again in the same namespace, including to another Mono customer. Unknown customers return `404 CUSTOMER_NOT_FOUND`; an unknown identifier during retirement returns `404 EXTERNAL_IDENTIFIER_NOT_FOUND`.
+
 ## Inspect a customer
 
 - `GET /operations/v1/customers/{customerId}` returns the customer registry summary, including current status.
@@ -50,6 +70,7 @@ Both read routes require Mono administrator authentication with issuer-asserted 
 
 - `400 INVALID_REQUEST`: missing/invalid customer fields, ID, reason, page size, status filter, or search value.
 - `400 INVALID_CURSOR`: malformed or unknown customer-list cursor.
+- `409 EXTERNAL_IDENTIFIER_CONFLICT`: an active namespace/external ID pair is already assigned, or the mapping is already retired.
 - `404 CUSTOMER_NOT_FOUND`: customer ID is unknown.
 - `409 CUSTOMER_CONFLICT`: customer is not in `PENDING` status.
 - `401` and `403`: missing/invalid administrator authentication or insufficient role.
