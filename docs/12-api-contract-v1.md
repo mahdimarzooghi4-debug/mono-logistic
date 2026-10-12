@@ -157,9 +157,11 @@ Response:
 
 ## 7. Evaluate / Quote
 
-The implemented `GET /v1/delivery-requests/{delivery_request_id}` requires `delivery-requests.read` and returns the authenticated customer's request summary with its Mission context when confirmed. The Mission lookup is tenant-scoped by the authenticated customer and Delivery Request ID. An unknown or foreign-customer ID returns 404, without exposing another tenant's data. The response never includes the stored request payload, pickup/dropoff locations, or contact details.
+The implemented `GET /v1/delivery-requests/{delivery_request_id}` requires `delivery-requests.read` and returns one authenticated-customer view of the request, its Mission context, the latest Quote, and the current Promise. Quote and Promise are null until they exist. The customer and request scope is applied to every read. An unknown or foreign-customer ID returns 404 without exposing another tenant's data.
 
-Current response:
+The response excludes the stored request payload, pickup/dropoff locations, contact details, and internal pricing or feasibility evidence. Quote and Promise contain only the safe public fields already exposed by their individual read endpoints.
+
+Example after Quote, Promise, and Mission confirmation:
 
 ```json
 {
@@ -169,54 +171,26 @@ Current response:
   "created_at": "2026-10-10T12:00:00Z",
   "mission_id": "mis_...",
   "mission_status": "PROMISED",
-  "committed_delivery_at": "2026-10-10T15:00:00Z"
-}
-```
-
-Feasibility evaluation, quotes, and committed promises remain future capabilities. The example below describes a future response after those capabilities are implemented.
-
-Future feasibility response example:
-
-Possible result:
-
-```json
-{
-  "delivery_request_id": "drq_...",
-  "feasibility": {
-    "result": "ACCEPTED"
-  },
+  "committed_delivery_at": "2026-10-10T15:00:00Z",
   "quote": {
     "quote_id": "qte_...",
-    "currency": "IRT",
-    "gross_fare": 35000,
-    "expires_at": "2026-09-27T12:05:00Z"
+    "delivery_request_id": "drq_...",
+    "version": 1,
+    "issued_at": "2026-10-10T12:00:00Z",
+    "expires_at": "2026-10-10T12:15:00Z",
+    "is_expired": false,
+    "distance_meters": 1500,
+    "fare_toman": 35000,
+    "buyer_share_toman": 35000,
+    "seller_share_toman": 0,
+    "recorded_at": "2026-10-10T12:00:00Z"
   },
   "promise": {
-    "committed_delivery_at": "2026-09-27T12:40:00Z"
-  }
-}
-```
-
-Alternative:
-
-```json
-{
-  "feasibility": {
-    "result": "ALTERNATIVE_PROMISE"
-  },
-  "promise": {
-    "committed_delivery_at": "2026-09-27T12:53:00Z"
-  }
-}
-```
-
-Rejected:
-
-```json
-{
-  "feasibility": {
-    "result": "REJECTED",
-    "reason_codes": ["NO_EFFECTIVE_CAPACITY"]
+    "promise_id": "prm_...",
+    "delivery_request_id": "drq_...",
+    "version": 1,
+    "committed_delivery_at": "2026-10-10T15:00:00Z",
+    "outcome": "ACCEPTED"
   }
 }
 ```

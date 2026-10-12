@@ -88,14 +88,24 @@ public sealed class DeliveryRequestStatusEndpointTests
         var responseJson = await ownerResponse.Content.ReadAsStringAsync();
         Assert.DoesNotContain("Store", responseJson, StringComparison.Ordinal);
         Assert.DoesNotContain("Customer", responseJson, StringComparison.Ordinal);
-        var response = JsonSerializer.Deserialize<DeliveryRequestStatusResponse>(responseJson);
-        Assert.NotNull(response);
-        Assert.Equal(created.DeliveryRequestId, response.DeliveryRequestId);
-        Assert.Equal("ORDER-STATUS-1", response.ExternalReference);
-        Assert.Equal("RECEIVED", response.Status);
-        Assert.Equal(missionId, response.MissionId);
-        Assert.Equal("PROMISED", response.MissionStatus);
-        Assert.Equal(committedAt, response.CommittedDeliveryAt);
+        var detailResponse = JsonSerializer.Deserialize<DeliveryRequestDetailResponse>(responseJson);
+        Assert.NotNull(detailResponse);
+        Assert.Equal(created.DeliveryRequestId, detailResponse.DeliveryRequestId);
+        Assert.Equal("ORDER-STATUS-1", detailResponse.ExternalReference);
+        Assert.Equal("RECEIVED", detailResponse.Status);
+        Assert.Equal(missionId, detailResponse.MissionId);
+        Assert.Equal("PROMISED", detailResponse.MissionStatus);
+        Assert.Equal(committedAt, detailResponse.CommittedDeliveryAt);
+        Assert.NotNull(detailResponse.Quote);
+        Assert.Equal(1, detailResponse.Quote.Version);
+        Assert.Equal(35_000, detailResponse.Quote.FareToman);
+        Assert.NotNull(detailResponse.Promise);
+        Assert.Equal(1, detailResponse.Promise.Version);
+        Assert.Equal("ACCEPTED", detailResponse.Promise.Outcome);
+        Assert.Equal(committedAt, detailResponse.Promise.CommittedDeliveryAt);
+        Assert.DoesNotContain("safety_buffer", responseJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("reason_codes", responseJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("policy_versions", responseJson, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(System.Net.HttpStatusCode.OK, unconfirmedResponse.StatusCode);
         var unconfirmedJson = await unconfirmedResponse.Content.ReadAsStringAsync();
         var unconfirmed = JsonSerializer.Deserialize<DeliveryRequestStatusResponse>(unconfirmedJson);
@@ -103,6 +113,9 @@ public sealed class DeliveryRequestStatusEndpointTests
         Assert.Null(unconfirmed.MissionId);
         Assert.Null(unconfirmed.MissionStatus);
         Assert.Null(unconfirmed.CommittedDeliveryAt);
+        using var unconfirmedDetailDocument = JsonDocument.Parse(unconfirmedJson);
+        Assert.Equal(JsonValueKind.Null, unconfirmedDetailDocument.RootElement.GetProperty("quote").ValueKind);
+        Assert.Equal(JsonValueKind.Null, unconfirmedDetailDocument.RootElement.GetProperty("promise").ValueKind);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, otherResponse.StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, unknownResponse.StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.OK, firstPageResponse.StatusCode);
@@ -153,7 +166,9 @@ public sealed class DeliveryRequestStatusEndpointTests
                 customer_id, delivery_request_id, quote_id, version, issued_at, expires_at,
                 snapshot_hash, snapshot, created_at)
             VALUES (@customer_id, @request_id, @quote_id, 1, @issued_at, @expires_at,
-                @hash, '{}'::jsonb, @issued_at);
+                @hash, jsonb_build_object('fare', jsonb_build_object(
+                    'distance_meters', 1500, 'fare_toman', 35000,
+                    'buyer_share_toman', 35000, 'seller_share_toman', 0)), @issued_at);
             """, connection))
         {
             quote.Parameters.AddWithValue("customer_id", customerId);

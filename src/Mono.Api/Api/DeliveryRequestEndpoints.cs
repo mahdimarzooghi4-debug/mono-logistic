@@ -61,6 +61,8 @@ public static class DeliveryRequestEndpoints
         endpoints.MapGet("/v1/delivery-requests/{deliveryRequestId}", async (
                 string deliveryRequestId,
                 PostgresDeliveryRequestRepository deliveryRequests,
+                PostgresDeliveryQuoteRepository quotes,
+                PostgresPromiseCommitRepository promises,
                 CancellationToken cancellationToken) =>
             {
                 var result = await deliveryRequests.FindStatusAsync(deliveryRequestId, cancellationToken);
@@ -70,7 +72,18 @@ public static class DeliveryRequestEndpoints
                         new ApiError("DELIVERY_REQUEST_NOT_FOUND", "The delivery request was not found for this customer.")));
                 }
 
-                return Results.Ok(result);
+                var quote = await quotes.FindLatestByDeliveryRequestAsync(deliveryRequestId, cancellationToken);
+                var promise = await promises.FindByDeliveryRequestAsync(deliveryRequestId, cancellationToken);
+                return Results.Ok(new DeliveryRequestDetailResponse(
+                    result.DeliveryRequestId,
+                    result.ExternalReference,
+                    result.Status,
+                    result.CreatedAt,
+                    result.MissionId,
+                    result.MissionStatus,
+                    result.CommittedDeliveryAt,
+                    quote,
+                    promise));
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
 
