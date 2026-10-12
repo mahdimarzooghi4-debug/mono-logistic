@@ -34,3 +34,11 @@ CREATE TRIGGER zone_geometry_versions_immutable
     BEFORE UPDATE OR DELETE ON zone_geometry_versions
     FOR EACH ROW
     EXECUTE FUNCTION reject_zone_geometry_version_mutation();
+
+DROP TRIGGER IF EXISTS zone_geometry_versions_no_truncate
+    ON zone_geometry_versions;
+
+CREATE TRIGGER zone_geometry_versions_no_truncate
+    BEFORE TRUNCATE ON zone_geometry_versions
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION reject_zone_geometry_version_mutation();
