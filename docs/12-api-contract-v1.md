@@ -692,6 +692,23 @@ GET /operations/v1/delivery-requests/{delivery_request_id}
 
 Search uses keyset pagination ordered by `created_at DESC, delivery_request_id DESC`; page size is 1–100 (default 50). The optional status filter currently accepts `RECEIVED`; the case-insensitive prefix query matches Delivery Request ID or external reference; date bounds are inclusive. A cursor must match all active filters. Responses contain Delivery Request ID, customer ID, branch ID, external reference, status, and creation time. They never include the stored request payload, addresses, coordinates, or contact details. Search and detail reads are recorded in their own append-only audit table; search terms are not persisted.
 
+## 34. Courier Trust Lifecycle — Domain Contract
+
+Mono's courier trust lifecycle is ordered:
+
+```
+REGISTERED
+-> IDENTITY_VERIFIED
+-> DOCUMENTS_SUBMITTED
+-> TRUST_REQUIREMENTS_VERIFIED
+-> MONO_APPROVED
+-> ACTIVE
+```
+
+The current Sprint 109 implementation is a domain rule only; no HTTP endpoint or persistence contract is available yet. Each transition requires a staff actor, canonical reason code, opaque evidence reference, and occurrence timestamp. A transition can only advance one step. Moving to ACTIVE also requires at least one approved operating zone and a primary zone included in that approved set.
+
+Evidence references identify material reviewed outside this domain component. They do not prove that identity, documents, trust conditions, or zone approvals were independently verified. Courier authentication, evidence storage and verification, operations review endpoints, and assignment eligibility remain unimplemented.
+
 ### 34.1 Mono Operations courier onboarding
 
 All routes below require the MFA-gated Mono administrator policy and use Mono staff actor attribution. These are internal operations routes; they are not part of the customer B2B API.
@@ -719,21 +736,3 @@ Mono generates the internal Courier ID and creates the courier in REGISTERED sta
 A trust transition accepts the exact next uppercase status, a canonical reason code, and an opaque evidence reference. The target ACTIVE transition also supplies approved zone IDs and a primary zone. Approved zones must be selected from the courier's preferences and refer to active Mono zone geometry. Each successful transition updates the courier, appends immutable transition history, and saves the idempotency response in one PostgreSQL transaction. Exact retries replay the saved response; changed request content using the same actor/action/key returns 409 IDEMPOTENCY_CONFLICT.
 
 The database enforces single-step lifecycle progression and requires a matching append-only history row for every status change. Evidence references point to externally reviewed material; this API does not store or verify personal identity documents. ACTIVE is an onboarding state and is not yet connected to Mission assignment or courier availability.
-
-
-## 34. Courier Trust Lifecycle — Domain Contract
-
-Mono's courier trust lifecycle is ordered:
-
-```
-REGISTERED
--> IDENTITY_VERIFIED
--> DOCUMENTS_SUBMITTED
--> TRUST_REQUIREMENTS_VERIFIED
--> MONO_APPROVED
--> ACTIVE
-```
-
-The current Sprint 109 implementation is a domain rule only; no HTTP endpoint or persistence contract is available yet. Each transition requires a staff actor, canonical reason code, opaque evidence reference, and occurrence timestamp. A transition can only advance one step. Moving to ACTIVE also requires at least one approved operating zone and a primary zone included in that approved set.
-
-Evidence references identify material reviewed outside this domain component. They do not prove that identity, documents, trust conditions, or zone approvals were independently verified. Courier authentication, evidence storage and verification, operations review endpoints, and assignment eligibility remain unimplemented.
