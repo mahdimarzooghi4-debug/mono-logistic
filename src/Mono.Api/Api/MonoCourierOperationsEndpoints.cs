@@ -242,7 +242,7 @@ public static class MonoCourierOperationsEndpoints
                 try
                 {
                     var page = await availability.ListAsync(
-                        to.Value, from.Value, size, zone_id, cursor, cancellationToken);
+                        from.Value, to.Value, size, zone_id, cursor, cancellationToken);
                     return page is null
                         ? Results.BadRequest(Error("INVALID_CURSOR", "The availability cursor is not valid."))
                         : Results.Ok(page);
