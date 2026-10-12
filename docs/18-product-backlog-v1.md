@@ -221,6 +221,7 @@ Extensible:
 ```
 registered_capacity_target = active_hana_stores * 10
 ```
+- Sprint 047 implements this formula as a pure rule for the shared Zone courier pool. It validates a non-negative active-store count and does not allocate the target to individual stores or Zones.
 
 ## 9. Epic E7 — Feasibility & Promise
 
