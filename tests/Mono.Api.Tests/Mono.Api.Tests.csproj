@@ -21,5 +21,7 @@
   <ItemGroup>
     <EmbeddedResource Include="../../db/migrations/001_customer_branch.sql"
                       LogicalName="Mono.Api.Tests.Migrations.001_customer_branch.sql" />
+    <EmbeddedResource Include="../../db/migrations/002_customer_api_keys.sql"
+                      LogicalName="Mono.Api.Tests.Migrations.002_customer_api_keys.sql" />
   </ItemGroup>
 </Project>

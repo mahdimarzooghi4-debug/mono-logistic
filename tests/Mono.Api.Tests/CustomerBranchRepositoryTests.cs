@@ -31,7 +31,7 @@ public sealed class CustomerBranchRepositoryTests(ITestOutputHelper output)
         }
 
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
-        await ApplyInitialMigrationAsync(dataSource);
+        await ApplyMigrationsAsync(dataSource);
 
         var customer = Customer.Create("Mono Integration Test", "ACTIVE");
         var repository = new CustomerBranchRepository(dataSource, new FixedCustomerContext(customer.CustomerId));
@@ -80,16 +80,25 @@ public sealed class CustomerBranchRepositoryTests(ITestOutputHelper output)
         await command.ExecuteNonQueryAsync();
     }
 
-    private static async Task ApplyInitialMigrationAsync(NpgsqlDataSource dataSource)
+    private static async Task ApplyMigrationsAsync(NpgsqlDataSource dataSource)
     {
-        const string resourceName = "Mono.Api.Tests.Migrations.001_customer_branch.sql";
-        await using var stream = typeof(CustomerBranchRepositoryTests).Assembly.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException($"Missing embedded migration resource: {resourceName}");
-        using var reader = new StreamReader(stream);
-        var migrationSql = await reader.ReadToEndAsync();
+        var assembly = typeof(CustomerBranchRepositoryTests).Assembly;
+        var migrationNames = new[]
+        {
+            "Mono.Api.Tests.Migrations.001_customer_branch.sql",
+            "Mono.Api.Tests.Migrations.002_customer_api_keys.sql"
+        };
 
-        await using var connection = await dataSource.OpenConnectionAsync();
-        await using var command = new NpgsqlCommand(migrationSql, connection);
-        await command.ExecuteNonQueryAsync();
+        foreach (var resourceName in migrationNames)
+        {
+            await using var stream = assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
+            using var reader = new StreamReader(stream);
+            var migrationSql = await reader.ReadToEndAsync();
+
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var command = new NpgsqlCommand(migrationSql, connection);
+            await command.ExecuteNonQueryAsync();
+        }
     }
 }

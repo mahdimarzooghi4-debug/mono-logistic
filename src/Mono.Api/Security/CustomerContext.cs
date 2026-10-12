@@ -27,7 +27,7 @@ public sealed class CustomerContextUnavailableException(string message) : Unauth
 public sealed class HttpCustomerContext(IHttpContextAccessor httpContextAccessor) : ICustomerContext
 {
     private static readonly Regex CustomerIdPattern = new(
-        "^cus_[0-9a-f]{32}$",
+        @"\Acus_[0-9a-f]{32}\z",
         RegexOptions.CultureInvariant);
 
     public string CustomerId
@@ -90,6 +90,7 @@ public static class CustomerTenantServiceCollectionExtensions
         {
             options.AddPolicy(MonoAuthorizationPolicies.CustomerTenant, policy =>
             {
+                policy.AddAuthenticationSchemes(MonoApiKeyDefaults.Scheme);
                 policy.RequireAuthenticatedUser();
                 policy.AddRequirements(new CustomerTenantRequirement());
             });
