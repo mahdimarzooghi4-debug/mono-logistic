@@ -419,6 +419,7 @@ Courier Net = 89% of Mission Fare
 - tenant context
 - internal managed API-key provisioning for existing active customers
 - Sprint 022 adds administrator-triggered immediate key revocation with an immutable operations audit trail.
+- Sprint 023 adds a secret-free, administrator-only read view of customer API key metadata.
 
 ### E16.2 Endpoints
 - `GET /v1/branches` (`branches.read`)

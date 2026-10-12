@@ -370,10 +370,59 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.Equal(new[] { "CREATED", "UPDATED" }, branchHistory.Select(x => x.Action));
                 Assert.Equal("verified address correction", branchHistory[^1].Reason);
 
+                var apiKeysPath = $"/operations/v1/customers/{customerId}/api-keys";
+                using var emptyKeyListRequest = new HttpRequestMessage(HttpMethod.Get, apiKeysPath);
+                emptyKeyListRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var emptyKeyListResponse = await client.SendAsync(emptyKeyListRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, emptyKeyListResponse.StatusCode);
+                using var emptyKeyListBody = System.Text.Json.JsonDocument.Parse(
+                    await emptyKeyListResponse.Content.ReadAsStringAsync());
+                Assert.Empty(emptyKeyListBody.RootElement.GetProperty("apiKeys").EnumerateArray());
+
+                using var missingCustomerKeyListRequest = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    "/operations/v1/customers/cus_00000000000000000000000000000000/api-keys");
+                missingCustomerKeyListRequest.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var missingCustomerKeyListResponse = await client.SendAsync(missingCustomerKeyListRequest);
+                Assert.Equal(System.Net.HttpStatusCode.NotFound, missingCustomerKeyListResponse.StatusCode);
+
+                using var unauthorizedKeyListRequest = new HttpRequestMessage(HttpMethod.Get, apiKeysPath);
+                Assert.Equal(System.Net.HttpStatusCode.Unauthorized,
+                    (await client.SendAsync(unauthorizedKeyListRequest)).StatusCode);
+                using var nonAdminKeyListRequest = new HttpRequestMessage(HttpMethod.Get, apiKeysPath);
+                nonAdminKeyListRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "operator-test", "MONO_OPERATOR", includeMfa: false));
+                Assert.Equal(System.Net.HttpStatusCode.Forbidden,
+                    (await client.SendAsync(nonAdminKeyListRequest)).StatusCode);
+
                 var issuedAt = DateTimeOffset.UtcNow;
                 var issuedKey = MonoApiKeyIssuer.Create(
                     customerId, ["branches.read"], issuedAt.AddDays(7), issuedAt);
                 await new PostgresApiKeyProvisioner(dataSource).CreateAsync(issuedKey.Credential);
+                using var keyListRequest = new HttpRequestMessage(HttpMethod.Get, apiKeysPath);
+                keyListRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+                    "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var keyListResponse = await client.SendAsync(keyListRequest);
+                Assert.Equal(System.Net.HttpStatusCode.OK, keyListResponse.StatusCode);
+                using var keyListBody = System.Text.Json.JsonDocument.Parse(
+                    await keyListResponse.Content.ReadAsStringAsync());
+                var listedKeys = keyListBody.RootElement.GetProperty("apiKeys");
+                var listedKey = Assert.Single(listedKeys.EnumerateArray());
+                Assert.Equal(issuedKey.Credential.KeyId, listedKey.GetProperty("keyId").GetString());
+                Assert.Equal(customerId, listedKey.GetProperty("customerId").GetString());
+                Assert.Equal("branches.read",
+                    Assert.Single(listedKey.GetProperty("scopes").EnumerateArray()).GetString());
+                var listedExpiry = listedKey.GetProperty("expiresAt").GetDateTimeOffset();
+                Assert.InRange(
+                    (issuedKey.Credential.ExpiresAt - listedExpiry).Duration(),
+                    TimeSpan.Zero,
+                    TimeSpan.FromMicroseconds(1));
+                Assert.False(listedKey.TryGetProperty("secret", out _));
+                Assert.False(listedKey.TryGetProperty("secretHash", out _));
+
                 var revokePath = $"/operations/v1/customers/{customerId}/api-keys/{issuedKey.Credential.KeyId}/revoke";
 
                 using var unauthenticatedRevoke = new HttpRequestMessage(HttpMethod.Post, revokePath)
@@ -424,6 +473,19 @@ public sealed class MonoCustomerOperationsEndpointTests
                 Assert.NotNull(storedCredential.RevokedAt);
                 Assert.False(ApiKeyCredentialVerifier.TryValidate(
                     issuedKey.Value, storedCredential, DateTimeOffset.UtcNow, out _));
+
+                using var keyListAfterRevokeRequest = new HttpRequestMessage(HttpMethod.Get, apiKeysPath);
+                keyListAfterRevokeRequest.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue(
+                        "Bearer", CreateToken(signingKey, "admin-test", MonoOperationsRoles.Administrator));
+                using var keyListAfterRevokeResponse = await client.SendAsync(keyListAfterRevokeRequest);
+                using var keyListAfterRevokeBody = System.Text.Json.JsonDocument.Parse(
+                    await keyListAfterRevokeResponse.Content.ReadAsStringAsync());
+                var revokedListedKey = Assert.Single(
+                    keyListAfterRevokeBody.RootElement.GetProperty("apiKeys").EnumerateArray());
+                Assert.Equal(issuedKey.Credential.KeyId, revokedListedKey.GetProperty("keyId").GetString());
+                Assert.NotEqual(System.Text.Json.JsonValueKind.Null,
+                    revokedListedKey.GetProperty("revokedAt").ValueKind);
 
                 using var repeatedRevoke = new HttpRequestMessage(HttpMethod.Post, revokePath)
                 {
