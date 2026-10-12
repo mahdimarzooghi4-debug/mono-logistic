@@ -28,6 +28,7 @@ app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
+app.MapCustomerServiceConfigurationInspectionEndpoints();
 
 app.Run();
 
