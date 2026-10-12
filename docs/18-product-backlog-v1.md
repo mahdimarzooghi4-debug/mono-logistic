@@ -206,6 +206,7 @@ Extensible:
 
 ### E6.1 Zone Model
 - Sprint 044 defines the geometry-neutral City → Operating Zone → Micro-zone model and validates required parents, parent-kind relationships, and unique zone IDs.
+- Sprint 092 adds versioned WGS84 Polygon/MultiPolygon zone-boundary validation and deterministic point resolution for one zone hierarchy level; boundary and overlapping-zone results remain explicit and fail closed. OSM boundary ingestion, geometry persistence/lifecycle, and operational enforcement are future work.
 - Geometry references, status labels, and capacity-policy IDs remain opaque metadata; the model does not define geometry, lifecycle transitions, coverage, or capacity.
 - Courier preference and approval records are in E6.2.
 - Geographic boundary enforcement and zone operations remain future work.
