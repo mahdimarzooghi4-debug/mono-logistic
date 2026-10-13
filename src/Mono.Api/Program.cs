@@ -32,6 +32,11 @@ builder.Services.AddScoped<PostgresCourierOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresCourierAvailabilityService>();
 builder.Services.AddScoped<PostgresCourierCapacityProjectionService>();
 builder.Services.AddScoped<PostgresCourierSuspensionService>();
+builder.Services.AddScoped(services => new PostgresCourierIdentityBindingService(
+    services.GetRequiredService<NpgsqlDataSource>(),
+    services.GetRequiredService<IMonoOperationsContext>(),
+    builder.Configuration["MonoCourier:Authority"],
+    services.GetRequiredService<TimeProvider>()));
 builder.Services.AddScoped<PostgresCourierPlanningEligibilityService>();
 builder.Services.AddScoped<PostgresMissionHistoryRepository>();
 builder.Services.AddScoped<PostgresMissionOperationsService>();
@@ -84,6 +89,7 @@ app.MapMonoMissionOperationsEndpoints();
 app.MapMonoCourierOperationsEndpoints();
 app.MapMonoCourierSuspensionEndpoints();
 app.MapMonoCourierSessionEndpoints();
+app.MapMonoCourierIdentityBindingEndpoints();
 app.MapCustomerServiceConfigurationInspectionEndpoints();
 app.MapCustomerServiceConfigurationAuthoringEndpoints();
 app.MapMonoCustomerOperationsEndpoints();
