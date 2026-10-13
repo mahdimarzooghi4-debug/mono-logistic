@@ -192,6 +192,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(created.Offer.OfferId, pendingWithOffer.Items[0].ActiveOffer!.OfferId);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer!.Status);
             Assert.Equal(created.Offer.ExpiresAt, pendingWithOffer.Items[0].ActiveOffer.ExpiresAt);
+            Assert.False(pendingWithOffer.Items[0].ActiveOffer.DeadlinePassed);
             Assert.Equal(1, pendingWithOffer.Items[0].AttemptCount);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].LatestAttempt!.Status);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].LatestAttempt.LastAction);
@@ -344,6 +345,14 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
             Assert.Equal(MissionCourierOfferOutcome.InvalidState, earlyExpiry.Outcome);
             offerClock.Advance(TimeSpan.FromMinutes(6));
+            var overdueQueue = await new PostgresMissionDispatchQueueService(dataSource, offerClock)
+                .ListAsync(20, true, MissionId, null);
+            Assert.Single(overdueQueue!.Items);
+            Assert.Equal("OFFERED", overdueQueue.Items[0].ActiveOffer!.Status);
+            Assert.True(overdueQueue.Items[0].ActiveOffer.DeadlinePassed);
+            Assert.True(overdueQueue.Items[0].ActiveOffer.ExpiresAt <= offerClock.GetUtcNow());
+
+
             var expiredOffer = await offers.ExpireAsync(
                 MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
             Assert.Equal(MissionCourierOfferOutcome.Applied, expiredOffer.Outcome);
