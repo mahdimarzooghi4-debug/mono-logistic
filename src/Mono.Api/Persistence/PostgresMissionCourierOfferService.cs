@@ -19,6 +19,7 @@ public sealed class PostgresMissionCourierOfferService(
     TimeProvider? timeProvider = null)
 {
     public const int MaximumExpiryBatchSize = 20;
+    public const int MaximumDispatchOfferBatchSize = 20;
 
     private static readonly Regex MissionIdPattern = new(
         @"\Amis_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -118,6 +119,43 @@ public sealed class PostgresMissionCourierOfferService(
             idempotencyKey, hash, snapshot, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new MissionCourierOfferResult(MissionCourierOfferOutcome.Applied, snapshot);
+    }
+
+    /// <summary>
+    /// Creates a bounded set of explicit courier offers. Every offer keeps its own
+    /// idempotency scope and transaction; all submitted commands are validated first.
+    /// </summary>
+    public async Task<IReadOnlyList<MissionCourierOfferBatchItem>> CreateBatchAsync(
+        IReadOnlyList<MissionCourierOfferBatchCommand> commands,
+        CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        if (commands is null || commands.Count is < 1 or > MaximumDispatchOfferBatchSize ||
+            commands.Any(command => command is null) ||
+            commands.Select(command => command.MissionId).Distinct(StringComparer.Ordinal).Count() != commands.Count ||
+            commands.Select(command => (command.MissionId, command.IdempotencyKey))
+                .Distinct().Count() != commands.Count)
+            throw new ArgumentException("The courier offer batch is invalid.", nameof(commands));
+
+        foreach (var command in commands)
+        {
+            Validate(MissionIdPattern, command.MissionId, nameof(command.MissionId));
+            Validate(CourierIdPattern, command.CourierId, nameof(command.CourierId));
+            Validate(ZoneIdPattern, command.ZoneId, nameof(command.ZoneId));
+            Validate(KeyPattern, command.IdempotencyKey, nameof(command.IdempotencyKey));
+        }
+
+        var results = new List<MissionCourierOfferBatchItem>(commands.Count);
+        foreach (var command in commands)
+        {
+            var result = await CreateOfferAsync(
+                command.MissionId, command.CourierId, command.ZoneId,
+                command.IdempotencyKey, cancellationToken);
+            results.Add(new MissionCourierOfferBatchItem(
+                command.MissionId, command.CourierId, command.ZoneId,
+                result.Outcome.ToString(), result.Offer));
+        }
+        return results;
     }
 
     public async Task<MissionCourierOfferResult> ExpireAsync(
