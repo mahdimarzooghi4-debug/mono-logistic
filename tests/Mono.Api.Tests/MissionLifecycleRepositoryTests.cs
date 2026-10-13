@@ -169,6 +169,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             var pendingBeforeOffer = await dispatchQueue.ListAsync(20, false, null, null);
             Assert.Single(pendingBeforeOffer!.Items);
             Assert.Null(pendingBeforeOffer.Items[0].ActiveOffer);
+            Assert.Equal(0, pendingBeforeOffer.Items[0].AttemptCount);
+            Assert.Null(pendingBeforeOffer.Items[0].LatestAttempt);
             await dispatchAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
                 null, pendingBeforeOffer.Items.Count);
@@ -190,6 +192,9 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(created.Offer.OfferId, pendingWithOffer.Items[0].ActiveOffer!.OfferId);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer!.Status);
             Assert.Equal(created.Offer.ExpiresAt, pendingWithOffer.Items[0].ActiveOffer.ExpiresAt);
+            Assert.Equal(1, pendingWithOffer.Items[0].AttemptCount);
+            Assert.Equal("OFFERED", pendingWithOffer.Items[0].LatestAttempt!.Status);
+            Assert.Equal("OFFERED", pendingWithOffer.Items[0].LatestAttempt.LastAction);
             await dispatchAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
                 null, pendingWithOffer.Items.Count);
@@ -232,6 +237,12 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 Assert.Equal(MissionId, auditReader.GetString(1));
                 Assert.Equal(2, auditReader.GetInt32(2));
             }
+
+            var pendingAfterWithdrawal = await dispatchQueue.ListAsync(20, false, MissionId, null);
+            Assert.Single(pendingAfterWithdrawal!.Items);
+            Assert.Equal(1, pendingAfterWithdrawal.Items[0].AttemptCount);
+            Assert.Equal("WITHDRAWN", pendingAfterWithdrawal.Items[0].LatestAttempt!.Status);
+            Assert.Equal("OPERATIONS_WITHDREW_OFFER", pendingAfterWithdrawal.Items[0].LatestAttempt.LastReason);
 
             var replacementOffer = await offers.CreateOfferAsync(
                 MissionId, courierId, "zone-central", "mission-offer-create-replacement");
