@@ -131,6 +131,7 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 140 — Dispatch delivery overdue filter](docs/sprints/sprint-140-dispatch-delivery-overdue-filter.md)
 - [Sprint 141 — Dispatch delivery due sorting](docs/sprints/sprint-141-dispatch-delivery-due-sort.md)
 - [Sprint 142 — Dispatch delivery window filter](docs/sprints/sprint-142-dispatch-delivery-window-filter.md)
+- [Sprint 143 — Dispatch delivery window state](docs/sprints/sprint-143-dispatch-delivery-window-state.md)
 - [Policy Draft Authoring API](docs/operations/policy-authoring-api.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)
