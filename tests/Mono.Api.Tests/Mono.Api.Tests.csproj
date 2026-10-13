@@ -60,5 +60,6 @@
     <EmbeddedResource Include="../../db/migrations/039_courier_identity_bindings.sql" LogicalName="Mono.Api.Tests.Migrations.039_courier_identity_bindings.sql" />
     <EmbeddedResource Include="../../db/migrations/040_courier_live_presence.sql" LogicalName="Mono.Api.Tests.Migrations.040_courier_live_presence.sql" />
     <EmbeddedResource Include="../../db/migrations/041_mission_courier_offers.sql" LogicalName="Mono.Api.Tests.Migrations.041_mission_courier_offers.sql" />
+    <EmbeddedResource Include="../../db/migrations/042_mission_courier_offer_withdrawal.sql" LogicalName="Mono.Api.Tests.Migrations.042_mission_courier_offer_withdrawal.sql" />
   </ItemGroup>
 </Project>
