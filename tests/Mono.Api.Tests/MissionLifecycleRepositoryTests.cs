@@ -235,6 +235,12 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Null(pendingBeforeOffer.Items[0].LatestAttempt);
             Assert.False(pendingBeforeOffer.Items[0].DeliveryOverdue);
             Assert.Equal("upcoming", pendingBeforeOffer.Items[0].DeliveryWindowState);
+            Assert.Single((await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryWindowState: "upcoming"))!.Items);
+            Assert.Null(await dispatchQueue.ListAsync(
+                20, null, null, MissionId, deliveryWindowState: "due_now"));
+            await Assert.ThrowsAsync<ArgumentException>(() => dispatchQueue.ListAsync(
+                20, null, null, null, deliveryWindowState: "unknown"));
             var committedDeliveryCutoff = pendingBeforeOffer.Items[0].CommittedDeliveryAt;
             var nonOverdueQueue = await dispatchQueue.ListAsync(
                 20, null, null, null, deliveryOverdue: false);
@@ -245,10 +251,16 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Single(overdueAtExactDeadline!.Items);
             Assert.True(overdueAtExactDeadline.Items[0].DeliveryOverdue);
             Assert.Equal("due_now", overdueAtExactDeadline.Items[0].DeliveryWindowState);
+            Assert.Single((await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryWindowState: "due_now"))!.Items);
+            Assert.Empty((await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryWindowState: "upcoming"))!.Items);
             dispatchClock.Set(committedDeliveryCutoff.AddMilliseconds(1));
             var overdueAfterDeadline = await dispatchQueue.ListAsync(
                 20, null, null, null, deliveryOverdue: true);
             Assert.Equal("overdue", Assert.Single(overdueAfterDeadline!.Items).DeliveryWindowState);
+            Assert.Single((await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryWindowState: "overdue"))!.Items);
             dispatchClock.Set(committedDeliveryCutoff.AddMilliseconds(-1));
             var cursorRejectedByDeliveryOverdueFilter = await dispatchQueue.ListAsync(
                 20, null, null, MissionId, deliveryOverdue: true);
