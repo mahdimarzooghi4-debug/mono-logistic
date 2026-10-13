@@ -144,3 +144,4 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 117 — Mono-managed courier identity binding](docs/sprints/sprint-117-courier-identity-binding.md)
 - [Sprint 118 — Courier live presence](docs/sprints/sprint-118-courier-live-presence.md)
 - [Sprint 119 — Live presence in courier planning evidence](docs/sprints/sprint-119-live-presence-planning-gate.md)
+- [Sprint 120 — Courier mission offers](docs/sprints/sprint-120-courier-dispatch-offers.md)
