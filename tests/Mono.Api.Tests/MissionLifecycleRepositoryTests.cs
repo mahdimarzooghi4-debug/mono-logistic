@@ -193,6 +193,12 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer!.Status);
             Assert.Equal(created.Offer.ExpiresAt, pendingWithOffer.Items[0].ActiveOffer.ExpiresAt);
             Assert.False(pendingWithOffer.Items[0].ActiveOffer.DeadlinePassed);
+            var notOverdueOnly = await dispatchQueue.ListAsync(
+                20, true, MissionId, null, deadlinePassed: false);
+            Assert.Single(notOverdueOnly!.Items);
+            var overdueOnlyBeforeDeadline = await dispatchQueue.ListAsync(
+                20, true, MissionId, null, deadlinePassed: true);
+            Assert.Empty(overdueOnlyBeforeDeadline!.Items);
             Assert.Equal(1, pendingWithOffer.Items[0].AttemptCount);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].LatestAttempt!.Status);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].LatestAttempt.LastAction);
@@ -350,6 +356,12 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Single(overdueQueue!.Items);
             Assert.Equal("OFFERED", overdueQueue.Items[0].ActiveOffer!.Status);
             Assert.True(overdueQueue.Items[0].ActiveOffer.DeadlinePassed);
+            var overdueOnly = await new PostgresMissionDispatchQueueService(dataSource, offerClock)
+                .ListAsync(20, true, MissionId, null, deadlinePassed: true);
+            Assert.Single(overdueOnly!.Items);
+            var notOverdueOnlyAfterDeadline = await new PostgresMissionDispatchQueueService(dataSource, offerClock)
+                .ListAsync(20, true, MissionId, null, deadlinePassed: false);
+            Assert.Empty(notOverdueOnlyAfterDeadline!.Items);
             Assert.True(overdueQueue.Items[0].ActiveOffer.ExpiresAt!.Value <= offerClock.GetUtcNow());
 
 
