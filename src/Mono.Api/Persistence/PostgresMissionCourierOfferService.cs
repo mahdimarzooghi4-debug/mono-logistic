@@ -18,6 +18,8 @@ public sealed class PostgresMissionCourierOfferService(
     IMonoOperationsContext operationsContext,
     TimeProvider? timeProvider = null)
 {
+    public const int MaximumExpiryBatchSize = 20;
+
     private static readonly Regex MissionIdPattern = new(
         @"\Amis_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private static readonly Regex CourierIdPattern = new(
@@ -200,6 +202,39 @@ public sealed class PostgresMissionCourierOfferService(
             idempotencyKey, hash, snapshot, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new MissionCourierOfferResult(MissionCourierOfferOutcome.Applied, snapshot, mission.Value.Status);
+    }
+
+    /// <summary>
+    /// Expires a bounded list of offers with independent idempotency and transactions.
+    /// The whole command list is validated before any offer is changed.
+    /// </summary>
+    public async Task<IReadOnlyList<MissionCourierOfferExpiryBatchItem>> ExpireBatchAsync(
+        IReadOnlyList<MissionCourierOfferExpiryCommand> commands,
+        CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        if (commands is null || commands.Count is < 1 or > MaximumExpiryBatchSize ||
+            commands.Any(command => command is null) ||
+            commands.Select(command => command.OfferId).Distinct(StringComparer.Ordinal).Count() != commands.Count)
+            throw new ArgumentException("The offer expiry batch is invalid.", nameof(commands));
+
+        foreach (var command in commands)
+        {
+            Validate(MissionIdPattern, command.MissionId, nameof(command.MissionId));
+            Validate(OfferIdPattern, command.OfferId, nameof(command.OfferId));
+            Validate(KeyPattern, command.IdempotencyKey, nameof(command.IdempotencyKey));
+        }
+
+        var results = new List<MissionCourierOfferExpiryBatchItem>(commands.Count);
+        foreach (var command in commands)
+        {
+            var result = await ExpireAsync(
+                command.MissionId, command.OfferId, command.IdempotencyKey, cancellationToken);
+            results.Add(new MissionCourierOfferExpiryBatchItem(
+                command.MissionId, command.OfferId, result.Outcome.ToString(),
+                result.Offer, result.MissionStatus));
+        }
+        return results;
     }
 
     public async Task<MissionCourierOfferResult> ReleaseAssignmentAsync(
