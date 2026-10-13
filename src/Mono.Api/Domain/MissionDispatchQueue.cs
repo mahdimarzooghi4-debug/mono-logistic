@@ -28,7 +28,8 @@ public sealed record MissionDispatchQueueItem(
     [property: JsonPropertyName("active_offer")] MissionDispatchQueueOffer? ActiveOffer,
     [property: JsonPropertyName("attempt_count")] int AttemptCount,
     [property: JsonPropertyName("latest_attempt")] MissionDispatchQueueAttempt? LatestAttempt,
-    [property: JsonPropertyName("delivery_overdue")] bool DeliveryOverdue);
+    [property: JsonPropertyName("delivery_overdue")] bool DeliveryOverdue,
+    [property: JsonPropertyName("delivery_window_state")] string DeliveryWindowState);
 
 public sealed record MissionDispatchQueuePage(
     [property: JsonPropertyName("items")] IReadOnlyList<MissionDispatchQueueItem> Items,
