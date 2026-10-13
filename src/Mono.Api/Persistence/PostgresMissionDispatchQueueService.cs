@@ -5,8 +5,10 @@ using NpgsqlTypes;
 namespace Mono.Api.Persistence;
 
 /// <summary>Provides an audited, paginated view of missions waiting for courier dispatch.</summary>
-public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSource)
+public sealed class PostgresMissionDispatchQueueService(
+    NpgsqlDataSource dataSource, TimeProvider? timeProvider = null)
 {
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     public async Task<MissionDispatchQueuePage?> ListAsync(
         int pageSize, bool? hasOffer, string? query, string? cursor,
         CancellationToken cancellationToken = default)
@@ -136,7 +138,8 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
                     : new MissionDispatchQueueOffer(
                         reader.GetString(5), reader.GetString(6), reader.GetString(7),
                         reader.GetString(8), reader.GetFieldValue<DateTimeOffset>(9),
-                        reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10));
+                        reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10),
+                        !reader.IsDBNull(10) && reader.GetFieldValue<DateTimeOffset>(10) <= _timeProvider.GetUtcNow());
                 MissionDispatchQueueAttempt? latestAttempt = reader.IsDBNull(12)
                     ? null
                     : new MissionDispatchQueueAttempt(
