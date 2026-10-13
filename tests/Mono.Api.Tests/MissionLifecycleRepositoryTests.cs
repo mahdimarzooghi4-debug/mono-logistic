@@ -207,13 +207,13 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 10, null, null, null, deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt);
             Assert.Equal(secondaryMissionId, Assert.Single(exactLowerBound!.Items).MissionId);
             var noDeliveryAfterUpperBound = await dispatchQueue.ListAsync(
-                10, null, null, null, deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt.AddTicks(1));
+                10, null, null, null, deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt.AddMilliseconds(1));
             Assert.Empty(noDeliveryAfterUpperBound!.Items);
             var windowFirstPage = await dispatchQueue.ListAsync(
                 1, null, null, null, deliveryAfter: primaryDeliveryAt);
             var cursorRejectedByChangedDeliveryWindow = await dispatchQueue.ListAsync(
                 1, null, null, windowFirstPage!.NextCursor,
-                deliveryAfter: deliveryWindow.Items[1].CommittedDeliveryAt.AddTicks(1));
+                deliveryAfter: deliveryWindow.Items[1].CommittedDeliveryAt.AddMilliseconds(1));
             Assert.Null(cursorRejectedByChangedDeliveryWindow);
             await Assert.ThrowsAsync<ArgumentException>(() => dispatchQueue.ListAsync(
                 10, null, null, null,
