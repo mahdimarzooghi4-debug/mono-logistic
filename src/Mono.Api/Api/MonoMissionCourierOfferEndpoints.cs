@@ -38,6 +38,22 @@ public static class MonoMissionCourierOfferEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/missions/{missionId}/courier-offers", async (
+                string missionId,
+                PostgresMissionCourierOfferService offers,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    return Results.Ok(await offers.ListForMissionAsync(missionId, cancellationToken));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(Error("INVALID_REQUEST", "Mission ID is invalid."));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapGet("/courier/v1/mission-offers", async (
                 IMonoCourierContext courier,
                 PostgresMissionCourierOfferService offers,
