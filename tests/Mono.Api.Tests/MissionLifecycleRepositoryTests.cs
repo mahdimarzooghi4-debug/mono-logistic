@@ -222,6 +222,20 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             var beforeCommittedDelivery = await dispatchQueue.ListAsync(
                 20, true, MissionId, null, deliveryBefore: committedDeliveryAt.AddTicks(-1));
             Assert.Empty(beforeCommittedDelivery!.Items);
+            var atLeastOneAttempt = await dispatchQueue.ListAsync(
+                20, null, null, null, minAttemptCount: 1);
+            Assert.Single(atLeastOneAttempt!.Items);
+            var atLeastTwoAttempts = await dispatchQueue.ListAsync(
+                20, null, null, null, minAttemptCount: 2);
+            Assert.Empty(atLeastTwoAttempts!.Items);
+            var atMostOneAttempt = await dispatchQueue.ListAsync(
+                20, null, null, null, maxAttemptCount: 1);
+            Assert.Single(atMostOneAttempt!.Items);
+            var atMostZeroAttempts = await dispatchQueue.ListAsync(
+                20, null, null, null, maxAttemptCount: 0);
+            Assert.Empty(atMostZeroAttempts!.Items);
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => dispatchQueue.ListAsync(20, null, null, null, minAttemptCount: 2, maxAttemptCount: 1));
             var notOverdueOnly = await dispatchQueue.ListAsync(
                 20, true, MissionId, null, deadlinePassed: false);
             Assert.Single(notOverdueOnly!.Items);
