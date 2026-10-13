@@ -180,9 +180,8 @@ public sealed class PostgresMissionDispatchQueueService(
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
 
-              AND (m.created_at < @cursor_created_at
-                   OR (m.created_at = @cursor_created_at AND m.mission_id < @cursor_id))
-            ORDER BY m.created_at DESC, m.mission_id DESC
+              AND {cursorPredicate}
+            ORDER BY {orderBy}
             LIMIT @take;
             """;
 
