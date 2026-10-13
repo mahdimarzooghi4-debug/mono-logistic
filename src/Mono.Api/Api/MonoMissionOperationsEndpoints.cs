@@ -49,6 +49,8 @@ public static class MonoMissionOperationsEndpoints
                 [FromQuery(Name = "has_offer")] bool? hasOffer,
                 [FromQuery(Name = "deadline_passed")] bool? deadlinePassed,
                 [FromQuery(Name = "delivery_before")] DateTimeOffset? deliveryBefore,
+                [FromQuery(Name = "min_attempt_count")] int? minAttemptCount,
+                [FromQuery(Name = "max_attempt_count")] int? maxAttemptCount,
                 [FromQuery(Name = "latest_action")] string? latestAction,
                 string? query,
                 string? cursor,
@@ -61,12 +63,17 @@ public static class MonoMissionOperationsEndpoints
                     !MissionOperationsInputValidator.IsValidQuery(query) ||
                     !MissionOperationsInputValidator.IsValidCursor(cursor) ||
                     latestAction is not (null or "OFFERED" or "ACCEPTED" or "DECLINED" or "WITHDRAWN" or
-                        "EXPIRED" or "RELEASED" or "CANCELLED" or "COMPLETED"))
+                        "EXPIRED" or "RELEASED" or "CANCELLED" or "COMPLETED") ||
+                    (minAttemptCount.HasValue && minAttemptCount.Value < 0) ||
+                    (maxAttemptCount.HasValue && maxAttemptCount.Value < 0) ||
+                    (minAttemptCount.HasValue && maxAttemptCount.HasValue &&
+                     minAttemptCount.Value > maxAttemptCount.Value))
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_REQUEST", "Dispatch queue filters are invalid.")));
 
                 var page = await dispatchQueue.ListAsync(
-                    size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction, deliveryBefore);
+                    size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction,
+                    deliveryBefore, minAttemptCount, maxAttemptCount);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));

@@ -12,12 +12,15 @@ public sealed class PostgresMissionDispatchQueueService(
     public async Task<MissionDispatchQueuePage?> ListAsync(
         int pageSize, bool? hasOffer, string? query, string? cursor,
         CancellationToken cancellationToken = default, bool? deadlinePassed = null, string? latestAction = null,
-        DateTimeOffset? deliveryBefore = null)
+        DateTimeOffset? deliveryBefore = null, int? minAttemptCount = null, int? maxAttemptCount = null)
     {
         if (pageSize is < 1 or > 100 ||
             !MissionOperationsInputValidator.IsValidQuery(query) ||
             !MissionOperationsInputValidator.IsValidCursor(cursor) ||
-            !IsValidLatestAction(latestAction))
+            !IsValidLatestAction(latestAction) ||
+            (minAttemptCount.HasValue && minAttemptCount.Value < 0) ||
+            (maxAttemptCount.HasValue && maxAttemptCount.Value < 0) ||
+            (minAttemptCount.HasValue && maxAttemptCount.HasValue && minAttemptCount.Value > maxAttemptCount.Value))
             throw new ArgumentException("Dispatch queue filters are invalid.");
 
         var normalizedQuery = query?.ToLowerInvariant();
@@ -29,12 +32,19 @@ public sealed class PostgresMissionDispatchQueueService(
                 SELECT m.created_at, (o.offer_id IS NOT NULL)
                 FROM missions m
                 LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
+                LEFT JOIN LATERAL (
+                    SELECT count(*)::integer AS attempt_count
+                    FROM mission_courier_offers previous
+                    WHERE previous.mission_id = m.mission_id
+                ) attempts ON TRUE
                 WHERE m.mission_id = @mission_id AND m.status = 'SEARCHING_COURIER'
                   AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
                   AND (@deadline_passed IS NULL OR
                        (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
                   AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
+                  AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
                   AND (@latest_action IS NULL OR (
                        SELECT latest.action
                        FROM mission_courier_offers previous
@@ -56,7 +66,7 @@ public sealed class PostgresMissionDispatchQueueService(
                 """;
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(cursorSql, connection);
-            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, asOf);
+            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, asOf);
             command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, cursor);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
@@ -97,6 +107,8 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+              AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
+              AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
               AND (@latest_action IS NULL OR (
                    SELECT latest.action
                    FROM mission_courier_offers previous
@@ -151,6 +163,8 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+              AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
+              AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
               AND (@latest_action IS NULL OR (
                    SELECT latest.action
                    FROM mission_courier_offers previous
@@ -177,7 +191,7 @@ public sealed class PostgresMissionDispatchQueueService(
 
         await using var pageConnection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var pageCommand = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, pageConnection);
-        AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, asOf);
+        AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, asOf);
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
@@ -222,7 +236,8 @@ public sealed class PostgresMissionDispatchQueueService(
 
     private static void AddFilterParameters(
         NpgsqlCommand command, bool? hasOffer, string? query, bool? deadlinePassed,
-        string? latestAction, DateTimeOffset? deliveryBefore, DateTimeOffset asOf)
+        string? latestAction, DateTimeOffset? deliveryBefore, int? minAttemptCount, int? maxAttemptCount,
+        DateTimeOffset asOf)
     {
         command.Parameters.AddWithValue("has_offer", NpgsqlDbType.Boolean, (object?)hasOffer ?? DBNull.Value);
         command.Parameters.AddWithValue("query_pattern", NpgsqlDbType.Text,
@@ -234,6 +249,10 @@ public sealed class PostgresMissionDispatchQueueService(
             latestAction is null ? DBNull.Value : latestAction);
         command.Parameters.AddWithValue("delivery_before", NpgsqlDbType.TimestampTz,
             (object?)deliveryBefore ?? DBNull.Value);
+        command.Parameters.AddWithValue("min_attempt_count", NpgsqlDbType.Integer,
+            minAttemptCount ?? 0);
+        command.Parameters.AddWithValue("max_attempt_count", NpgsqlDbType.Integer,
+            maxAttemptCount ?? int.MaxValue);
     }
 
     private static bool IsValidLatestAction(string? latestAction) =>
