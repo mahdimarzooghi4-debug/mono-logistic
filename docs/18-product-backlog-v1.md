@@ -583,6 +583,7 @@ Dashboard must use the same application/core rules as API customers.
 - Sprint 143 adds a UTC-clock-consistent `delivery_window_state` (`upcoming`, `due_now`, or `overdue`) to dispatch queue items while retaining the inclusive `delivery_overdue` contract.
 - Sprint 144 adds an optional `delivery_window_state` queue filter, consistent across cursor validation and page queries.
 - Sprint 145 adds an inclusive 1–10,080 minute relative delivery due horizon filter, applied consistently to queue pages and cursor validation.
+- Sprint 146 adds an optional exact `customer_id` scope to the dispatch queue, validates customer ID shape, and binds the scope to cursor validation and every page query.
 - Mission timeline
 - Route inspection
 - courier state
