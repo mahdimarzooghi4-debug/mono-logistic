@@ -69,7 +69,11 @@ public sealed class PostgresCourierIdentityBindingService(
             return new(CourierIdentityBindingOutcome.AuthorityNotConfigured, null);
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        const string query = "SELECT subject FROM courier_identity_bindings WHERE courier_id = @courier_id AND issuer = @issuer AND status = 'BOUND';";
+        const string query = """
+            SELECT subject FROM courier_identity_binding_events
+            WHERE courier_id = @courier_id AND issuer = @issuer AND action = 'BOUND'
+            ORDER BY event_sequence DESC LIMIT 1;
+            """;
         await using var command = new NpgsqlCommand(query, connection);
         command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
         command.Parameters.AddWithValue("issuer", NpgsqlDbType.Text, issuer);
