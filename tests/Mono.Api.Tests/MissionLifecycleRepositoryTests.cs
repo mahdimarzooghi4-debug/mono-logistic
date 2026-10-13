@@ -187,7 +187,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             var pendingWithOffer = await dispatchQueue.ListAsync(20, true, MissionId, null);
             Assert.Single(pendingWithOffer!.Items);
             Assert.Equal(created.Offer.OfferId, pendingWithOffer.Items[0].ActiveOffer!.OfferId);
-            Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer.Status);
+            Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer!.Status);
             await dispatchAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
                 null, pendingWithOffer.Items.Count);
@@ -490,6 +490,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 customer_id text NOT NULL REFERENCES customers(customer_id),
                 delivery_request_id text NOT NULL,
                 committed_delivery_at timestamp with time zone NOT NULL DEFAULT now(),
+                created_at timestamp with time zone NOT NULL DEFAULT now(),
                 status text NOT NULL CONSTRAINT missions_status_check CHECK (status = 'PROMISED'));
             CREATE TABLE outbox_events (
                 event_id text PRIMARY KEY,
