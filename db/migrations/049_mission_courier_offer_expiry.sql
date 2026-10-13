@@ -67,6 +67,9 @@ BEGIN
         IF NEW.action IN ('CANCELLED', 'COMPLETED') AND NEW.actor_type <> 'SYSTEM' THEN
             RAISE EXCEPTION 'system transition actor is required';
         END IF;
+        IF NEW.action = 'RELEASED' AND current_offer_status <> 'ACCEPTED' THEN
+            RAISE EXCEPTION 'only an accepted courier offer can be released';
+        END IF;
         IF NEW.action = 'RELEASED' AND NOT (NEW.actor_type = 'OPERATIONS' AND NEW.reason = 'OPERATIONS_REASSIGNED_COURIER') THEN
             RAISE EXCEPTION 'authorized assignment release actor is required';
         END IF;
