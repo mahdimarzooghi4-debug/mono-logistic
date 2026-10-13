@@ -28,7 +28,7 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
                   AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
                   AND (@query_pattern IS NULL
                        OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
-                       OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!'
+                       OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
 
                 """;
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -50,7 +50,7 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
-                   OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!'
+                   OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
 
             ORDER BY m.created_at DESC, m.mission_id DESC
             LIMIT @take;
@@ -64,7 +64,7 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
-                   OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!'
+                   OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
 
               AND (m.created_at < @cursor_created_at
                    OR (m.created_at = @cursor_created_at AND m.mission_id < @cursor_id))
