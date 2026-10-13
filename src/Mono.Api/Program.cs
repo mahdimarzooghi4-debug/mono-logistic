@@ -44,6 +44,7 @@ builder.Services.AddScoped(services => new PostgresCourierIdentityBindingService
 builder.Services.AddScoped<PostgresCourierPlanningEligibilityService>();
 builder.Services.AddScoped<PostgresMissionHistoryRepository>();
 builder.Services.AddScoped<PostgresMissionOperationsService>();
+builder.Services.AddScoped<PostgresMissionDispatchQueueService>();
 builder.Services.AddScoped<PostgresMissionOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresDeliveryRequestOperationsService>();
 builder.Services.AddScoped<PostgresDeliveryRequestOperationsReadAuditService>();
