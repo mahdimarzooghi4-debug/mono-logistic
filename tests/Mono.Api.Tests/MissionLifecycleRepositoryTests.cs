@@ -489,6 +489,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 mission_id text PRIMARY KEY,
                 customer_id text NOT NULL REFERENCES customers(customer_id),
                 delivery_request_id text NOT NULL,
+                committed_delivery_at timestamp with time zone NOT NULL DEFAULT now(),
                 status text NOT NULL CONSTRAINT missions_status_check CHECK (status = 'PROMISED'));
             CREATE TABLE outbox_events (
                 event_id text PRIMARY KEY,
