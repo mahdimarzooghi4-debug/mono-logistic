@@ -23,15 +23,13 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
             const string cursorSql = """
                 SELECT m.created_at, (o.offer_id IS NOT NULL)
                 FROM missions m
-                JOIN delivery_requests d ON d.customer_id = m.customer_id
-                    AND d.delivery_request_id = m.delivery_request_id
                 LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
                 WHERE m.mission_id = @mission_id AND m.status = 'SEARCHING_COURIER'
                   AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
                   AND (@query_pattern IS NULL
                        OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                        OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!'
-                       OR lower(d.external_reference) LIKE @query_pattern ESCAPE '!');
+
                 """;
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(cursorSql, connection);
@@ -44,36 +42,30 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
         }
 
         const string firstPageSql = """
-            SELECT m.mission_id, m.customer_id, m.delivery_request_id, d.external_reference,
-                   m.committed_delivery_at, m.created_at,
+            SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at
             FROM missions m
-            JOIN delivery_requests d ON d.customer_id = m.customer_id
-                AND d.delivery_request_id = m.delivery_request_id
             LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
             WHERE m.status = 'SEARCHING_COURIER'
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!'
-                   OR lower(d.external_reference) LIKE @query_pattern ESCAPE '!')
+
             ORDER BY m.created_at DESC, m.mission_id DESC
             LIMIT @take;
             """;
         const string nextPageSql = """
-            SELECT m.mission_id, m.customer_id, m.delivery_request_id, d.external_reference,
-                   m.committed_delivery_at, m.created_at,
+            SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at
             FROM missions m
-            JOIN delivery_requests d ON d.customer_id = m.customer_id
-                AND d.delivery_request_id = m.delivery_request_id
             LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
             WHERE m.status = 'SEARCHING_COURIER'
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!'
-                   OR lower(d.external_reference) LIKE @query_pattern ESCAPE '!')
+
               AND (m.created_at < @cursor_created_at
                    OR (m.created_at = @cursor_created_at AND m.mission_id < @cursor_id))
             ORDER BY m.created_at DESC, m.mission_id DESC
@@ -98,11 +90,11 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
                 MissionDispatchQueueOffer? activeOffer = reader.IsDBNull(6)
                     ? null
                     : new MissionDispatchQueueOffer(
-                        reader.GetString(6), reader.GetString(7), reader.GetString(8),
-                        reader.GetString(9), reader.GetFieldValue<DateTimeOffset>(10));
+                        reader.GetString(5), reader.GetString(6), reader.GetString(7),
+                        reader.GetString(8), reader.GetFieldValue<DateTimeOffset>(9));
                 items.Add(new MissionDispatchQueueItem(
-                    reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-                    reader.GetFieldValue<DateTimeOffset>(4), reader.GetFieldValue<DateTimeOffset>(5), activeOffer));
+                    reader.GetString(0), reader.GetString(1), reader.GetString(2),
+                    reader.GetFieldValue<DateTimeOffset>(3), reader.GetFieldValue<DateTimeOffset>(4), activeOffer));
             }
         }
 
