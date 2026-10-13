@@ -52,7 +52,7 @@ public sealed class PostgresMissionDispatchQueueService(
                         LIMIT 1
                     ) latest ON TRUE
                     WHERE previous.mission_id = m.mission_id
-                    ORDER BY previous.created_at DESC, previous.offer_id DESC
+                    ORDER BY latest.occurred_at DESC NULLS LAST, previous.created_at DESC, previous.offer_id DESC
                     LIMIT 1
                 ) latest_attempt ON TRUE
                 WHERE m.mission_id = @mission_id AND m.status = 'SEARCHING_COURIER'
@@ -104,7 +104,7 @@ public sealed class PostgresMissionDispatchQueueService(
                     LIMIT 1
                 ) latest ON TRUE
                 WHERE previous.mission_id = m.mission_id
-                ORDER BY previous.created_at DESC, previous.offer_id DESC
+                ORDER BY latest.occurred_at DESC NULLS LAST, previous.created_at DESC, previous.offer_id DESC
                 LIMIT 1
             ) latest_attempt ON TRUE
             WHERE m.status = 'SEARCHING_COURIER'
@@ -148,7 +148,7 @@ public sealed class PostgresMissionDispatchQueueService(
                     LIMIT 1
                 ) latest ON TRUE
                 WHERE previous.mission_id = m.mission_id
-                ORDER BY previous.created_at DESC, previous.offer_id DESC
+                ORDER BY latest.occurred_at DESC NULLS LAST, previous.created_at DESC, previous.offer_id DESC
                 LIMIT 1
             ) latest_attempt ON TRUE
             WHERE m.status = 'SEARCHING_COURIER'
