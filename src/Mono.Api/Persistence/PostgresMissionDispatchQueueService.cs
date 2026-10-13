@@ -192,7 +192,9 @@ public sealed class PostgresMissionDispatchQueueService(
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
-            pageCommand.Parameters.AddWithValue("cursor_delivery_at", NpgsqlDbType.TimestampTz, cursorDeliveryAt!.Value);
+            if (deliveryDueSort)
+                pageCommand.Parameters.AddWithValue(
+                    "cursor_delivery_at", NpgsqlDbType.TimestampTz, cursorDeliveryAt!.Value);
             pageCommand.Parameters.AddWithValue("cursor_created_at", NpgsqlDbType.TimestampTz, cursorCreatedAt!.Value);
             pageCommand.Parameters.AddWithValue("cursor_id", NpgsqlDbType.Text, cursor);
         }
