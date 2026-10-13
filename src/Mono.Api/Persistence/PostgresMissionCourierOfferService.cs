@@ -241,6 +241,44 @@ public sealed class PostgresMissionCourierOfferService(
         return new MissionCourierOfferResult(MissionCourierOfferOutcome.Applied, snapshot, mission.Value.Status);
     }
 
+    public async Task<IReadOnlyList<MissionCourierOfferEvent>?> ListOfferEventsAsync(
+        string missionId, string offerId, CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        Validate(MissionIdPattern, missionId, nameof(missionId));
+        Validate(OfferIdPattern, offerId, nameof(offerId));
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        const string existsSql = """
+            SELECT EXISTS (SELECT 1 FROM mission_courier_offers
+                WHERE mission_id = @mission_id AND offer_id = @offer_id);
+            """;
+        await using (var exists = new NpgsqlCommand(existsSql, connection))
+        {
+            exists.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+            exists.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offerId);
+            if ((bool)(await exists.ExecuteScalarAsync(cancellationToken) ?? false) is false)
+                return null;
+        }
+        const string sql = """
+            SELECT event_sequence, event_id, offer_id, mission_id, action, actor_type,
+                   actor_id, reason, occurred_at
+            FROM mission_courier_offer_events
+            WHERE mission_id = @mission_id AND offer_id = @offer_id
+            ORDER BY event_sequence ASC;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+        command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offerId);
+        var events = new List<MissionCourierOfferEvent>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            events.Add(new MissionCourierOfferEvent(
+                reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+                reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7),
+                reader.GetFieldValue<DateTimeOffset>(8)));
+        return events;
+    }
+
     public Task<MissionCourierOfferResult> AcceptAsync(
         string offerId, string courierId, string idempotencyKey,
         CancellationToken cancellationToken = default) =>
