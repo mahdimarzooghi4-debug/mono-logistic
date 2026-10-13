@@ -28,7 +28,13 @@ CREATE TABLE IF NOT EXISTS mission_courier_offer_events (
     event_id text PRIMARY KEY CHECK (
         length(event_id) = 36 AND left(event_id, 4) = 'mce_' AND
         substring(event_id from 5) !~ '[^0-9a-f]'),
-    offer_id text NOT NULL REFERENCES mission_courier_offers(offer_id) DEFERRABLE INITIALLY DEFERRED,
+    offer_id text NOT NULL CHECK (
+        length(offer_id) = 36 AND left(offer_id, 4) = 'mco_' AND
+        substring(offer_id from 5) !~ '[^0-9a-f]'),
+    mission_id text NOT NULL REFERENCES missions(mission_id),
+    customer_id text NOT NULL REFERENCES customers(customer_id),
+    courier_id text NOT NULL REFERENCES couriers(courier_id),
+    zone_id text NOT NULL CHECK (length(btrim(zone_id)) BETWEEN 1 AND 128),
     action text NOT NULL CHECK (action IN ('OFFERED', 'ACCEPTED', 'DECLINED', 'CANCELLED', 'COMPLETED')),
     actor_type text NOT NULL CHECK (actor_type IN ('OPERATIONS', 'COURIER', 'SYSTEM')),
     actor_id text NOT NULL CHECK (length(btrim(actor_id)) BETWEEN 1 AND 128),
@@ -84,14 +90,16 @@ DECLARE
     offer_mission_id text;
     offer_courier_id text;
     offer_zone_id text;
+    offer_customer_id text;
 BEGIN
     IF NEW.action = 'OFFERED' THEN
-        SELECT offer.mission_id, offer.courier_id, offer.zone_id
-            INTO offer_mission_id, offer_courier_id, offer_zone_id
-        FROM mission_courier_offers offer WHERE offer.offer_id = NEW.offer_id;
+        offer_mission_id := NEW.mission_id;
+        offer_customer_id := NEW.customer_id;
+        offer_courier_id := NEW.courier_id;
+        offer_zone_id := NEW.zone_id;
     ELSE
-        SELECT offer.status, offer.mission_id, offer.courier_id, offer.zone_id
-            INTO current_offer_status, offer_mission_id, offer_courier_id, offer_zone_id
+        SELECT offer.status, offer.mission_id, offer.customer_id, offer.courier_id, offer.zone_id
+            INTO current_offer_status, offer_mission_id, offer_customer_id, offer_courier_id, offer_zone_id
         FROM mission_courier_offers offer WHERE offer.offer_id = NEW.offer_id FOR UPDATE;
     END IF;
     IF offer_mission_id IS NULL OR offer_courier_id IS NULL THEN
@@ -109,7 +117,7 @@ BEGIN
         END IF;
     ELSE
         IF current_offer_status IS DISTINCT FROM 'OFFERED' AND
-            NOT (NEW.action = 'CANCELLED' AND current_offer_status = 'ACCEPTED') THEN
+            NOT (NEW.action IN ('CANCELLED', 'COMPLETED') AND current_offer_status = 'ACCEPTED') THEN
             RAISE EXCEPTION 'mission courier offer transition is invalid';
         END IF;
         IF NEW.action IN ('ACCEPTED', 'DECLINED') AND NEW.actor_type <> 'COURIER' THEN
@@ -167,10 +175,8 @@ BEGIN
     IF NEW.action = 'OFFERED' THEN
         INSERT INTO mission_courier_offers
             (offer_id, mission_id, customer_id, courier_id, zone_id, status, created_at, updated_at, last_event_id)
-        SELECT offer.offer_id, offer.mission_id, offer.customer_id, offer.courier_id,
-            offer.zone_id, 'OFFERED', NEW.occurred_at, NEW.occurred_at, NEW.event_id
-        FROM mission_courier_offers offer WHERE offer.offer_id = NEW.offer_id
-        ON CONFLICT (offer_id) DO NOTHING;
+        VALUES (NEW.offer_id, NEW.mission_id, NEW.customer_id, NEW.courier_id,
+            NEW.zone_id, 'OFFERED', NEW.occurred_at, NEW.occurred_at, NEW.event_id);
     ELSE
         UPDATE mission_courier_offers
         SET status = NEW.action, updated_at = NEW.occurred_at, last_event_id = NEW.event_id
@@ -216,17 +222,20 @@ BEGIN
         RETURN NULL;
     END IF;
     FOR active_offer IN
-        SELECT offer_id, status FROM mission_courier_offers
+        SELECT offer_id, mission_id, customer_id, courier_id, zone_id, status
+        FROM mission_courier_offers
         WHERE mission_id = NEW.mission_id AND status IN ('OFFERED', 'ACCEPTED')
         FOR UPDATE
     LOOP
         INSERT INTO mission_courier_offer_events
-            (event_id, offer_id, action, actor_type, actor_id, reason, occurred_at)
+            (event_id, offer_id, mission_id, customer_id, courier_id, zone_id,
+                action, actor_type, actor_id, reason, occurred_at)
         VALUES (
             'mce_' || replace(gen_random_uuid()::text, '-', ''),
-            active_offer.offer_id,
+            active_offer.offer_id, active_offer.mission_id, active_offer.customer_id,
+            active_offer.courier_id, active_offer.zone_id,
             CASE WHEN NEW.status = 'DELIVERED' THEN 'COMPLETED' ELSE 'CANCELLED' END,
-            'SYSTEM', 'mono-mission-lifecycle', 'MISSION_' || NEW.status, NEW.updated_at);
+            'SYSTEM', 'mono-mission-lifecycle', 'MISSION_' || NEW.status, now());
     END LOOP;
     RETURN NULL;
 END;
