@@ -120,6 +120,7 @@ Business
 Business decisions should be documented here before they become product or implementation decisions.
 
 - [Internal API Key Provisioning](docs/operations/api-key-provisioning.md)
+- [Dispatch Operations API](docs/operations/dispatch-api.md)
 - [Policy Draft Authoring API](docs/operations/policy-authoring-api.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)
@@ -156,3 +157,4 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 129 — Courier offer expiry](docs/sprints/sprint-129-courier-offer-expiry.md)
 - [Sprint 130 — Mission dispatch attempt history](docs/sprints/sprint-130-dispatch-attempt-history.md)
 - [Sprint 131 — Dispatch queue attempt outcomes](docs/sprints/sprint-131-dispatch-queue-outcomes.md)
+- [Sprint 132 — Overdue offer queue guidance](docs/sprints/sprint-132-expired-offer-queue-guidance.md)
