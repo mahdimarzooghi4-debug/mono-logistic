@@ -61,7 +61,7 @@ public sealed class PostgresMissionDispatchQueueService(
                        (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
                   AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
-                  AND (NOT @last_attempt_before_enabled OR latest_attempt.occurred_at <= @last_attempt_before)
+                  {recencyPredicate}
                   AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
                   AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
                   AND (@latest_action IS NULL OR (
@@ -126,7 +126,7 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
-                  AND (NOT @last_attempt_before_enabled OR latest_attempt.occurred_at <= @last_attempt_before)
+                  {recencyPredicate}
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
               AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
               AND (@latest_action IS NULL OR (
@@ -183,7 +183,7 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
-                  AND (NOT @last_attempt_before_enabled OR latest_attempt.occurred_at <= @last_attempt_before)
+                  {recencyPredicate}
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
               AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
               AND (@latest_action IS NULL OR (
