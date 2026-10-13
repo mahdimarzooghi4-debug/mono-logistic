@@ -54,6 +54,29 @@ public static class MonoMissionCourierOfferEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/missions/{missionId}/courier-offers/{offerId}/events", async (
+                string missionId,
+                string offerId,
+                PostgresMissionCourierOfferService offers,
+                PostgresMissionOperationsReadAuditService readAudit,
+                CancellationToken cancellationToken) =>
+            {
+                try
+                {
+                    var history = await offers.ListOfferEventsAsync(missionId, offerId, cancellationToken);
+                    if (history is null)
+                        return Results.NotFound(Error("MISSION_OFFER_NOT_FOUND", "The mission offer was not found."));
+                    await readAudit.RecordAsync(PostgresMissionOperationsReadAuditService.MissionCourierOfferHistory,
+                        missionId, history.Count, cancellationToken);
+                    return Results.Ok(new { events = history });
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(Error("INVALID_REQUEST", "Mission or offer ID is invalid."));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapPost("/operations/v1/missions/{missionId}/courier-offers/{offerId}/withdraw", async (
                 string missionId,
                 string offerId,
