@@ -10,6 +10,28 @@ CREATE TABLE IF NOT EXISTS courier_identity_bindings (
 CREATE UNIQUE INDEX IF NOT EXISTS courier_identity_bindings_active_subject_idx
     ON courier_identity_bindings (issuer, subject) WHERE status = 'BOUND';
 
+CREATE OR REPLACE FUNCTION require_courier_identity_binding_event_projection()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $projection_guard$
+BEGIN
+    IF pg_trigger_depth() < 2 THEN
+        RAISE EXCEPTION 'courier identity binding projection is maintained by events';
+    END IF;
+    RETURN NEW;
+END;
+$projection_guard$;
+
+DROP TRIGGER IF EXISTS courier_identity_bindings_event_only ON courier_identity_bindings;
+CREATE TRIGGER courier_identity_bindings_event_only
+    BEFORE INSERT OR UPDATE OR DELETE ON courier_identity_bindings
+    FOR EACH ROW EXECUTE FUNCTION require_courier_identity_binding_event_projection();
+
+DROP TRIGGER IF EXISTS courier_identity_bindings_no_truncate ON courier_identity_bindings;
+CREATE TRIGGER courier_identity_bindings_no_truncate
+    BEFORE TRUNCATE ON courier_identity_bindings
+    FOR EACH STATEMENT EXECUTE FUNCTION reject_courier_append_only_mutation();
+
 CREATE TABLE IF NOT EXISTS courier_identity_binding_events (
     event_sequence bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
     event_id text PRIMARY KEY CHECK (
