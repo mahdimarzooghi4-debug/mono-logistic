@@ -105,6 +105,126 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
         }
     }
 
+
+    [Fact]
+    public async Task Courier_offer_acceptance_assigns_mission_atomically_and_terminal_state_closes_offer()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var schema = "mission_courier_offer_" + Guid.NewGuid().ToString("N");
+        var adminConnectionString = new NpgsqlConnectionStringBuilder(connectionString).ConnectionString;
+        await using (var admin = new NpgsqlConnection(adminConnectionString))
+        {
+            await admin.OpenAsync();
+            await using var create = new NpgsqlCommand($"CREATE SCHEMA {schema};", admin);
+            await create.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            var scoped = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema };
+            await using var dataSource = NpgsqlDataSource.Create(scoped.ConnectionString);
+            await CreatePreLifecycleSchemaAsync(dataSource);
+            await ApplyLifecycleMigrationAsync(dataSource);
+            await SeedMissionAsync(dataSource);
+            await ApplyCourierMigrationsAsync(dataSource);
+            await SeedActiveZoneAsync(dataSource, "zone-central");
+
+            var context = new TestOperationsContext();
+            var onboarding = new PostgresCourierOnboardingService(dataSource, context);
+            var registered = await onboarding.RegisterAsync("BIKE", ["zone-central"], "offer-courier-register");
+            var courierId = registered.Snapshot!.CourierId;
+            var statuses = new[]
+            {
+                "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+                "MONO_APPROVED", "ACTIVE"
+            };
+            for (var index = 0; index < statuses.Length; index++)
+            {
+                var status = statuses[index];
+                var transition = await onboarding.AdvanceTrustAsync(
+                    courierId, status,
+                    status == "ACTIVE" ? ["zone-central"] : null,
+                    status == "ACTIVE" ? "zone-central" : null,
+                    "REVIEW_COMPLETED", "mission-offer:" + status, "offer-trust-" + index);
+                Assert.Equal(CourierOperationsWriteOutcome.Applied, transition.Outcome);
+            }
+
+            var presence = new PostgresCourierLivePresenceService(dataSource);
+            Assert.Equal(CourierLivePresenceOutcome.Applied,
+                (await presence.GoOnlineAsync(courierId, "zone-central", "offer-presence-online")).Outcome);
+
+            var lifecycle = new PostgresMissionLifecycleRepository(dataSource, context);
+            Assert.Equal(MissionLifecycleOutcome.Applied,
+                (await lifecycle.ApplyAsync(MissionId, "mission.searching_courier",
+                    "Dispatch initiated", "offer-searching")).Outcome);
+
+            var offers = new PostgresMissionCourierOfferService(dataSource, context);
+            var created = await offers.CreateOfferAsync(
+                MissionId, courierId, "zone-central", "mission-offer-create");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, created.Outcome);
+            Assert.Equal("OFFERED", created.Offer!.Status);
+            Assert.Single(await offers.ListMyOffersAsync(courierId));
+
+            var replayedCreate = await offers.CreateOfferAsync(
+                MissionId, courierId, "zone-central", "mission-offer-create");
+            Assert.Equal(MissionCourierOfferOutcome.Replayed, replayedCreate.Outcome);
+            Assert.Equal(created.Offer, replayedCreate.Offer);
+            var changedCreate = await offers.CreateOfferAsync(
+                MissionId, courierId, "zone-east", "mission-offer-create");
+            Assert.Equal(MissionCourierOfferOutcome.Conflict, changedCreate.Outcome);
+
+            var accepted = await offers.AcceptAsync(
+                created.Offer.OfferId, courierId, "mission-offer-accept");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, accepted.Outcome);
+            Assert.Equal("ACCEPTED", accepted.Offer!.Status);
+            Assert.Equal("COURIER_ASSIGNED", accepted.MissionStatus);
+
+            var acceptedReplay = await offers.AcceptAsync(
+                created.Offer.OfferId, courierId, "mission-offer-accept");
+            Assert.Equal(MissionCourierOfferOutcome.Replayed, acceptedReplay.Outcome);
+            Assert.Equal(accepted.Offer, acceptedReplay.Offer);
+
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            {
+                await using var state = new NpgsqlCommand(
+                    "SELECT status FROM missions WHERE mission_id = @mission_id;", connection);
+                state.Parameters.AddWithValue("mission_id", MissionId);
+                Assert.Equal("COURIER_ASSIGNED", await state.ExecuteScalarAsync());
+
+                await using var assignedEvent = new NpgsqlCommand("""
+                    SELECT event_type, sequence, data->>'courier_id'
+                    FROM outbox_events
+                    WHERE aggregate_type = 'mission' AND aggregate_id = @mission_id
+                    ORDER BY sequence DESC LIMIT 1;
+                    """, connection);
+                assignedEvent.Parameters.AddWithValue("mission_id", MissionId);
+                await using var reader = await assignedEvent.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("mission.courier_assigned", reader.GetString(0));
+                Assert.Equal(3L, reader.GetInt64(1));
+                Assert.Equal(courierId, reader.GetString(2));
+            }
+
+            var cancelled = await lifecycle.ApplyAsync(
+                MissionId, "mission.cancelled", "Cancellation before handoff", "offer-mission-cancel");
+            Assert.Equal(MissionLifecycleOutcome.Applied, cancelled.Outcome);
+            Assert.Equal("CANCELLED", await GetOfferStatusAsync(dataSource, created.Offer.OfferId));
+        }
+        finally
+        {
+            await using var admin = new NpgsqlConnection(adminConnectionString);
+            await admin.OpenAsync();
+            await using var drop = new NpgsqlCommand($"DROP SCHEMA {schema} CASCADE;", admin);
+            await drop.ExecuteNonQueryAsync();
+        }
+    }
+
     [Theory]
     [InlineData("PROMISED", "mission.cancelled", true)]
     [InlineData("ARRIVED_PICKUP", "mission.cancelled", true)]
@@ -129,6 +249,58 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
         var result = await repository.ApplyAsync(MissionId, eventType, reason, idempotencyKey);
         Assert.Equal(MissionLifecycleOutcome.Applied, result.Outcome);
         Assert.Equal(expectedSequence, result.Transition!.Sequence);
+    }
+
+
+    private static async Task ApplyCourierMigrationsAsync(NpgsqlDataSource dataSource)
+    {
+        const string createZoneSql = "CREATE TABLE zone_geometry_active (zone_id text PRIMARY KEY);";
+        await using (var connection = await dataSource.OpenConnectionAsync())
+        await using (var createZone = new NpgsqlCommand(createZoneSql, connection))
+            await createZone.ExecuteNonQueryAsync();
+
+        var migrationNames = new[]
+        {
+            "033_courier_onboarding.sql",
+            "034_courier_operations_read_audit.sql",
+            "035_courier_availability_windows.sql",
+            "036_courier_planned_capacity_audit_action.sql",
+            "037_courier_operational_suspension.sql",
+            "038_courier_planning_eligibility_audit_action.sql",
+            "039_courier_identity_bindings.sql",
+            "040_courier_live_presence.sql",
+            "041_mission_courier_offers.sql"
+        };
+        foreach (var migrationName in migrationNames)
+        {
+            var resourceName = "Mono.Api.Tests.Migrations." + migrationName;
+            await using var stream = typeof(MissionLifecycleRepositoryTests).Assembly
+                .GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {resourceName}.");
+            using var reader = new StreamReader(stream);
+            var sql = await reader.ReadToEndAsync();
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+
+    private static async Task SeedActiveZoneAsync(NpgsqlDataSource dataSource, string zoneId)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(
+            "INSERT INTO zone_geometry_active (zone_id) VALUES (@zone_id);", connection);
+        command.Parameters.AddWithValue("zone_id", zoneId);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task<string> GetOfferStatusAsync(NpgsqlDataSource dataSource, string offerId)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT status FROM mission_courier_offers WHERE offer_id = @offer_id;", connection);
+        command.Parameters.AddWithValue("offer_id", offerId);
+        return (string?)await command.ExecuteScalarAsync() ?? throw new InvalidOperationException("Offer not found.");
     }
 
     private const string CustomerId = "cus_0123456789abcdef0123456789abcdef";
