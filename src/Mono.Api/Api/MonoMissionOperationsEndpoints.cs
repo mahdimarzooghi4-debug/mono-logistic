@@ -47,6 +47,7 @@ public static class MonoMissionOperationsEndpoints
         endpoints.MapGet("/operations/v1/dispatch/queue", async (
                 [FromQuery(Name = "page_size")] int? pageSize,
                 [FromQuery(Name = "has_offer")] bool? hasOffer,
+                [FromQuery(Name = "deadline_passed")] bool? deadlinePassed,
                 string? query,
                 string? cursor,
                 PostgresMissionDispatchQueueService dispatchQueue,
@@ -60,7 +61,8 @@ public static class MonoMissionOperationsEndpoints
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_REQUEST", "Dispatch queue filters are invalid.")));
 
-                var page = await dispatchQueue.ListAsync(size, hasOffer, query, cursor, cancellationToken);
+                var page = await dispatchQueue.ListAsync(
+                    size, hasOffer, query, cursor, cancellationToken, deadlinePassed);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));
