@@ -29,6 +29,7 @@ public sealed class PostgresMissionCourierOfferService(
     private static readonly Regex KeyPattern = new(
         @"\A[A-Za-z0-9._~-]{1,128}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+    private static readonly TimeSpan OfferLifetime = TimeSpan.FromMinutes(5);
 
     public async Task<MissionCourierOfferResult> CreateOfferAsync(
         string missionId, string courierId, string zoneId, string idempotencyKey,
@@ -41,6 +42,7 @@ public sealed class PostgresMissionCourierOfferService(
         Validate(KeyPattern, idempotencyKey, nameof(idempotencyKey));
         var hash = Hash(JsonSerializer.Serialize(new { mission_id = missionId, courier_id = courierId, zone_id = zoneId }));
         var now = UtcNow();
+        var expiresAt = now.Add(OfferLifetime);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await LockKeyAsync(connection, transaction, missionId, "CREATE_OFFER", idempotencyKey, cancellationToken);
@@ -89,10 +91,10 @@ public sealed class PostgresMissionCourierOfferService(
         const string insertEventSql = """
             INSERT INTO mission_courier_offer_events
                 (event_id, offer_id, mission_id, customer_id, courier_id, zone_id,
-                 action, actor_type, actor_id, reason, occurred_at)
+                 action, actor_type, actor_id, reason, occurred_at, expires_at)
             VALUES
                 (@event_id, @offer_id, @mission_id, @customer_id, @courier_id, @zone_id,
-                 'OFFERED', 'OPERATIONS', @actor_id, 'OPERATIONS_CREATED_OFFER', @occurred_at);
+                 'OFFERED', 'OPERATIONS', @actor_id, 'OPERATIONS_CREATED_OFFER', @occurred_at, @expires_at);
             """;
         await using (var command = new NpgsqlCommand(insertEventSql, connection, transaction))
         {
@@ -104,6 +106,7 @@ public sealed class PostgresMissionCourierOfferService(
             command.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, zoneId);
             command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, RequireAdministrator());
             command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
+            command.Parameters.AddWithValue("expires_at", NpgsqlDbType.TimestampTz, expiresAt);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -113,6 +116,90 @@ public sealed class PostgresMissionCourierOfferService(
             idempotencyKey, hash, snapshot, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new MissionCourierOfferResult(MissionCourierOfferOutcome.Applied, snapshot);
+    }
+
+    public async Task<MissionCourierOfferResult> ExpireAsync(
+        string missionId, string offerId, string idempotencyKey, CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        Validate(MissionIdPattern, missionId, nameof(missionId));
+        Validate(OfferIdPattern, offerId, nameof(offerId));
+        Validate(KeyPattern, idempotencyKey, nameof(idempotencyKey));
+        const string operation = "EXPIRE_OFFER";
+        var hash = Hash(JsonSerializer.Serialize(new { mission_id = missionId, offer_id = offerId, action = operation }));
+        var now = UtcNow();
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockKeyAsync(connection, transaction, offerId, operation, idempotencyKey, cancellationToken);
+        var replay = await FindReplayAsync(connection, transaction, offerId, operation,
+            idempotencyKey, hash, cancellationToken);
+        if (replay is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return replay;
+        }
+
+        var offerMissionId = await FindOfferMissionIdAsync(connection, transaction, offerId, cancellationToken);
+        if (!string.Equals(missionId, offerMissionId, StringComparison.Ordinal))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        var mission = await LockMissionAsync(connection, transaction, missionId, cancellationToken);
+        if (mission is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        const string lockSql = """
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at, expires_at
+            FROM mission_courier_offers WHERE offer_id = @offer_id FOR UPDATE;
+            """;
+        MissionCourierOffer? offer;
+        await using (var command = new NpgsqlCommand(lockSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offerId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            offer = await reader.ReadAsync(cancellationToken) ? ReadOffer(reader) : null;
+        }
+        if (offer is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        if (offer.Status != "OFFERED" || mission.Value.Status != "SEARCHING_COURIER" ||
+            offer.ExpiresAt is null || offer.ExpiresAt > now)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(
+                MissionCourierOfferOutcome.InvalidState, offer, mission.Value.Status);
+        }
+
+        const string insertSql = """
+            INSERT INTO mission_courier_offer_events
+                (event_id, offer_id, mission_id, customer_id, courier_id, zone_id,
+                 action, actor_type, actor_id, reason, occurred_at)
+            VALUES (@event_id, @offer_id, @mission_id, @customer_id, @courier_id, @zone_id,
+                'EXPIRED', 'OPERATIONS', @actor_id, 'OPERATIONS_EXPIRED_OFFER', @occurred_at);
+            """;
+        await using (var command = new NpgsqlCommand(insertSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, "mce_" + Guid.NewGuid().ToString("N"));
+            command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offer.OfferId);
+            command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, offer.MissionId);
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, mission.Value.CustomerId);
+            command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, offer.CourierId);
+            command.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, offer.ZoneId);
+            command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        var snapshot = await ReadOfferAsync(connection, transaction, offerId, cancellationToken)
+            ?? throw new InvalidOperationException("Expired courier offer projection is missing.");
+        await SaveIdempotencyAsync(connection, transaction, offerId, operation,
+            idempotencyKey, hash, snapshot, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new MissionCourierOfferResult(MissionCourierOfferOutcome.Applied, snapshot, mission.Value.Status);
     }
 
     public async Task<MissionCourierOfferResult> ReleaseAssignmentAsync(
@@ -149,7 +236,7 @@ public sealed class PostgresMissionCourierOfferService(
             return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
         }
         const string lockSql = """
-            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at, expires_at
             FROM mission_courier_offers WHERE offer_id = @offer_id FOR UPDATE;
             """;
         MissionCourierOffer? offer;
@@ -252,7 +339,7 @@ public sealed class PostgresMissionCourierOfferService(
     {
         Validate(CourierIdPattern, courierId, nameof(courierId));
         const string sql = """
-            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at, expires_at
             FROM mission_courier_offers
             WHERE courier_id = @courier_id AND status = 'OFFERED'
             ORDER BY created_at DESC, offer_id DESC
@@ -274,7 +361,7 @@ public sealed class PostgresMissionCourierOfferService(
         RequireAdministrator();
         Validate(MissionIdPattern, missionId, nameof(missionId));
         const string sql = """
-            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at, expires_at
             FROM mission_courier_offers
             WHERE mission_id = @mission_id
             ORDER BY created_at DESC, offer_id DESC
@@ -324,7 +411,7 @@ public sealed class PostgresMissionCourierOfferService(
             return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
         }
         const string lockOfferSql = """
-            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at, expires_at
             FROM mission_courier_offers WHERE offer_id = @offer_id FOR UPDATE;
             """;
         MissionCourierOffer? offer;
@@ -687,7 +774,7 @@ public sealed class PostgresMissionCourierOfferService(
         string offerId, string courierId, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at, expires_at
             FROM mission_courier_offers
             WHERE offer_id = @offer_id AND courier_id = @courier_id FOR UPDATE;
             """;
@@ -703,7 +790,7 @@ public sealed class PostgresMissionCourierOfferService(
         string offerId, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at, expires_at
             FROM mission_courier_offers WHERE offer_id = @offer_id;
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -714,7 +801,8 @@ public sealed class PostgresMissionCourierOfferService(
 
     private static MissionCourierOffer ReadOffer(NpgsqlDataReader reader) =>
         new(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-            reader.GetString(4), reader.GetFieldValue<DateTimeOffset>(5), reader.GetFieldValue<DateTimeOffset>(6));
+            reader.GetString(4), reader.GetFieldValue<DateTimeOffset>(5), reader.GetFieldValue<DateTimeOffset>(6),
+            reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7));
 
     private static async Task LockKeyAsync(
         NpgsqlConnection connection, NpgsqlTransaction transaction,

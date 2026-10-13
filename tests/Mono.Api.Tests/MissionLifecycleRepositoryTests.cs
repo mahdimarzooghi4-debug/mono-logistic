@@ -173,7 +173,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
                 null, pendingBeforeOffer.Items.Count);
 
-            var offers = new PostgresMissionCourierOfferService(dataSource, context);
+            var offerClock = new AdjustableTimeProvider(DateTimeOffset.UtcNow);
+            var offers = new PostgresMissionCourierOfferService(dataSource, context, offerClock);
             var created = await offers.CreateOfferAsync(
                 MissionId, courierId, "zone-central", "mission-offer-create");
             Assert.Equal(MissionCourierOfferOutcome.Applied, created.Outcome);
@@ -188,6 +189,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Single(pendingWithOffer!.Items);
             Assert.Equal(created.Offer.OfferId, pendingWithOffer.Items[0].ActiveOffer!.OfferId);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer!.Status);
+            Assert.Equal(created.Offer.ExpiresAt, pendingWithOffer.Items[0].ActiveOffer.ExpiresAt);
             await dispatchAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
                 null, pendingWithOffer.Items.Count);
@@ -323,6 +325,25 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(released.Offer, releaseReplay.Offer);
             Assert.Equal("SEARCHING_COURIER", await GetMissionStatusAsync(dataSource));
 
+            var expiringOffer = await offers.CreateOfferAsync(
+                MissionId, courierId, "zone-central", "mission-offer-create-expiring");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, expiringOffer.Outcome);
+            Assert.NotNull(expiringOffer.Offer!.ExpiresAt);
+            var earlyExpiry = await offers.ExpireAsync(
+                MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
+            Assert.Equal(MissionCourierOfferOutcome.InvalidState, earlyExpiry.Outcome);
+            offerClock.Advance(TimeSpan.FromMinutes(6));
+            var expiredOffer = await offers.ExpireAsync(
+                MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, expiredOffer.Outcome);
+            Assert.Equal("EXPIRED", expiredOffer.Offer!.Status);
+            Assert.Equal("SEARCHING_COURIER", expiredOffer.MissionStatus);
+            var expiryReplay = await offers.ExpireAsync(
+                MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
+            Assert.Equal(MissionCourierOfferOutcome.Replayed, expiryReplay.Outcome);
+            Assert.Equal(expiredOffer.Offer, expiryReplay.Offer);
+            offerClock.Set(DateTimeOffset.UtcNow);
+
             var reassignedOffer = await offers.CreateOfferAsync(
                 MissionId, courierId, "zone-central", "mission-offer-create-reassigned");
             Assert.Equal(MissionCourierOfferOutcome.Applied, reassignedOffer.Outcome);
@@ -370,6 +391,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, created.Offer.OfferId));
             Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, replacementOffer.Offer.OfferId));
             Assert.Equal("RELEASED", await GetOfferStatusAsync(dataSource, finalOffer.Offer.OfferId));
+            Assert.Equal("EXPIRED", await GetOfferStatusAsync(dataSource, expiringOffer.Offer.OfferId));
             Assert.Equal("COMPLETED", await GetOfferStatusAsync(dataSource, reassignedOffer.Offer.OfferId));
         }
         finally
@@ -434,7 +456,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "045_mission_courier_issue_reports.sql",
             "046_mission_courier_issue_read_audit.sql",
             "047_mission_courier_assignment_release.sql",
-            "048_mission_dispatch_queue_read_audit.sql"
+            "048_mission_dispatch_queue_read_audit.sql",
+            "049_mission_courier_offer_expiry.sql"
         };
         foreach (var migrationName in migrationNames)
         {
@@ -558,6 +581,17 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
         createdEvent.Parameters.AddWithValue("customer_id", CustomerId);
         createdEvent.Parameters.AddWithValue("mission_id", MissionId);
         await createdEvent.ExecuteNonQueryAsync();
+    }
+
+    private sealed class AdjustableTimeProvider(DateTimeOffset initial) : TimeProvider
+    {
+        private DateTimeOffset _now = initial;
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void Advance(TimeSpan duration) => _now = _now.Add(duration);
+
+        public void Set(DateTimeOffset value) => _now = value;
     }
 
     private sealed class TestOperationsContext : IMonoOperationsContext
