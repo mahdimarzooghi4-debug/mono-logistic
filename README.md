@@ -149,3 +149,4 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 122 — Courier offer withdrawal](docs/sprints/sprint-122-courier-offer-withdrawal.md)
 - [Sprint 123 — Suspension offer recovery](docs/sprints/sprint-123-suspension-offer-recovery.md)
 - [Sprint 124 — Courier offer event history](docs/sprints/sprint-124-offer-event-history.md)
+- [Sprint 125 — Courier mission execution](docs/sprints/sprint-125-courier-mission-execution.md)
