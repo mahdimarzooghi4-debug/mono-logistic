@@ -171,7 +171,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                     mission_id, customer_id, delivery_request_id, committed_delivery_at, created_at, status)
                 VALUES (
                     @mission_id, @customer_id, 'drq_11111111111111111111111111111111',
-                    now() - interval '1 day', now() + interval '1 minute', 'SEARCHING_COURIER');
+                    now() + interval '1 day', now() + interval '1 minute', 'SEARCHING_COURIER');
                 """, seedSecondary))
             {
                 insertSecondary.Parameters.AddWithValue("mission_id", secondaryMissionId);
@@ -182,11 +182,11 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             var dispatchClock = new AdjustableTimeProvider(DateTimeOffset.UtcNow.AddDays(-1));
             var dispatchQueue = new PostgresMissionDispatchQueueService(dataSource, dispatchClock);
             var dueFirstPage = await dispatchQueue.ListAsync(1, null, null, null, sortBy: "delivery_due");
-            Assert.Equal(secondaryMissionId, Assert.Single(dueFirstPage!.Items).MissionId);
-            Assert.Equal(secondaryMissionId, dueFirstPage.NextCursor);
+            Assert.Equal(MissionId, Assert.Single(dueFirstPage!.Items).MissionId);
+            Assert.Equal(MissionId, dueFirstPage.NextCursor);
             var dueSecondPage = await dispatchQueue.ListAsync(
                 1, null, null, dueFirstPage.NextCursor, sortBy: "delivery_due");
-            Assert.Equal(MissionId, Assert.Single(dueSecondPage!.Items).MissionId);
+            Assert.Equal(secondaryMissionId, Assert.Single(dueSecondPage!.Items).MissionId);
             Assert.Null(dueSecondPage.NextCursor);
             var defaultFirstPage = await dispatchQueue.ListAsync(1, null, null, null);
             Assert.Equal(secondaryMissionId, Assert.Single(defaultFirstPage!.Items).MissionId);
