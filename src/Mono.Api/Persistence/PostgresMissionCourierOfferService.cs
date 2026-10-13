@@ -115,6 +115,138 @@ public sealed class PostgresMissionCourierOfferService(
         return new MissionCourierOfferResult(MissionCourierOfferOutcome.Applied, snapshot);
     }
 
+    public async Task<MissionCourierOfferResult> ReleaseAssignmentAsync(
+        string missionId, string offerId, string idempotencyKey, CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        Validate(MissionIdPattern, missionId, nameof(missionId));
+        Validate(OfferIdPattern, offerId, nameof(offerId));
+        Validate(KeyPattern, idempotencyKey, nameof(idempotencyKey));
+        const string operation = "RELEASE_ASSIGNMENT";
+        var hash = Hash(JsonSerializer.Serialize(new { mission_id = missionId, offer_id = offerId, action = operation }));
+        var now = UtcNow();
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockKeyAsync(connection, transaction, offerId, operation, idempotencyKey, cancellationToken);
+        var replay = await FindReplayAsync(connection, transaction, offerId, operation,
+            idempotencyKey, hash, cancellationToken);
+        if (replay is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return replay;
+        }
+
+        var offerMissionId = await FindOfferMissionIdAsync(connection, transaction, offerId, cancellationToken);
+        if (!string.Equals(missionId, offerMissionId, StringComparison.Ordinal))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        var mission = await LockMissionAsync(connection, transaction, missionId, cancellationToken);
+        if (mission is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        const string lockSql = """
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            FROM mission_courier_offers WHERE offer_id = @offer_id FOR UPDATE;
+            """;
+        MissionCourierOffer? offer;
+        await using (var command = new NpgsqlCommand(lockSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offerId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            offer = await reader.ReadAsync(cancellationToken) ? ReadOffer(reader) : null;
+        }
+        if (offer is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        if (offer.Status != "ACCEPTED" ||
+            mission.Value.Status is not ("COURIER_ASSIGNED" or "ARRIVED_PICKUP"))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(
+                MissionCourierOfferOutcome.InvalidState, offer, mission.Value.Status);
+        }
+
+        const string insertSql = """
+            INSERT INTO mission_courier_offer_events
+                (event_id, offer_id, mission_id, customer_id, courier_id, zone_id,
+                 action, actor_type, actor_id, reason, occurred_at)
+            VALUES (@event_id, @offer_id, @mission_id, @customer_id, @courier_id, @zone_id,
+                'RELEASED', 'OPERATIONS', @actor_id, 'OPERATIONS_REASSIGNED_COURIER', @occurred_at);
+            """;
+        await using (var command = new NpgsqlCommand(insertSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, "mce_" + Guid.NewGuid().ToString("N"));
+            command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offer.OfferId);
+            command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, offer.MissionId);
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, mission.Value.CustomerId);
+            command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, offer.CourierId);
+            command.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, offer.ZoneId);
+            command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var sequence = await NextMissionSequenceAsync(
+            connection, transaction, mission.Value.CustomerId, missionId, cancellationToken);
+        const string updateSql = """
+            UPDATE missions SET status = 'SEARCHING_COURIER'
+            WHERE mission_id = @mission_id AND status IN ('COURIER_ASSIGNED', 'ARRIVED_PICKUP');
+            """;
+        await using (var command = new NpgsqlCommand(updateSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+            if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+                throw new InvalidOperationException("Mission status changed while its row was locked.");
+        }
+        var payload = JsonSerializer.Serialize(new
+        {
+            mission_id = missionId,
+            delivery_request_id = mission.Value.DeliveryRequestId,
+            event_type = "mission.courier_unassigned",
+            status = "SEARCHING_COURIER",
+            sequence,
+            actor_type = "operations",
+            actor_id = actorId,
+            courier_id = offer.CourierId,
+            courier_offer_id = offer.OfferId,
+            reason = "OPERATIONS_REASSIGNED_COURIER",
+            occurred_at = now
+        });
+        const string outboxSql = """
+            INSERT INTO outbox_events (
+                event_id, event_type, event_version, occurred_at, producer, correlation_id,
+                causation_id, customer_id, aggregate_type, aggregate_id, sequence, data, created_at)
+            VALUES (@event_id, 'mission.courier_unassigned', 1, @occurred_at, 'mono-api',
+                @correlation_id, @causation_id, @customer_id, 'mission', @mission_id,
+                @sequence, @data, @created_at);
+            """;
+        await using (var command = new NpgsqlCommand(outboxSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, "evt_" + Guid.NewGuid().ToString("N"));
+            command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
+            command.Parameters.AddWithValue("correlation_id", NpgsqlDbType.Text, mission.Value.DeliveryRequestId);
+            command.Parameters.AddWithValue("causation_id", NpgsqlDbType.Text, $"operations:{actorId}:{idempotencyKey}");
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, mission.Value.CustomerId);
+            command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+            command.Parameters.AddWithValue("sequence", NpgsqlDbType.Bigint, sequence);
+            command.Parameters.AddWithValue("data", NpgsqlDbType.Jsonb, payload);
+            command.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, now);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        var snapshot = await ReadOfferAsync(connection, transaction, offerId, cancellationToken)
+            ?? throw new InvalidOperationException("Released courier offer projection is missing.");
+        await SaveIdempotencyAsync(connection, transaction, offerId, operation,
+            idempotencyKey, hash, snapshot, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new MissionCourierOfferResult(MissionCourierOfferOutcome.Applied, snapshot, "SEARCHING_COURIER");
+    }
+
     public async Task<IReadOnlyList<MissionCourierOffer>> ListMyOffersAsync(
         string courierId, CancellationToken cancellationToken = default)
     {
