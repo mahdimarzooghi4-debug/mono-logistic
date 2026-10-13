@@ -4,7 +4,7 @@ All operations routes require the Mono administrator authorization policy.
 
 ## Dispatch queue
 
-`GET /operations/v1/dispatch/queue?page_size=50&has_offer=true&deadline_passed=true&delivery_before=2026-10-13T18:00:00Z&last_attempt_before=2026-10-13T17:30:00Z&delivery_overdue=true&min_attempt_count=2&max_attempt_count=4&latest_action=EXPIRED&query=mis_`
+`GET /operations/v1/dispatch/queue?page_size=50&has_offer=true&deadline_passed=true&delivery_before=2026-10-13T18:00:00Z&last_attempt_before=2026-10-13T17:30:00Z&delivery_overdue=true&sort_by=delivery_due&min_attempt_count=2&max_attempt_count=4&latest_action=EXPIRED&query=mis_`
 
 The response contains the active offer (if any), the number of offers created for each Mission, and a summary of its latest attempt. An active offer includes `expires_at` and `deadline_passed`. The latter is computed against the API's UTC clock:
 
@@ -23,6 +23,8 @@ Use the optional `delivery_overdue` filter to focus on searching Missions whose 
 Use `min_attempt_count` and `max_attempt_count` to restrict results by the number of offers created for each Mission, including previous attempts. Both bounds are optional and inclusive; values must be non-negative, and the minimum cannot exceed the maximum. These filters are applied before pagination and during cursor validation, so use the same bounds on every page.
 
 Use `last_attempt_before` to return Missions whose most recent courier-offer event occurred at or before an explicit UTC ISO 8601 timestamp. Missions with no offer history do not match this filter. The cutoff is inclusive and is applied during cursor validation; keep it unchanged for all pages.
+
+Use `sort_by=delivery_due` to order the queue by earliest committed delivery time first. Equal due times are ordered by newest Mission creation time, then descending Mission ID, giving stable keyset pagination. Omit `sort_by` or use `sort_by=created_at` to preserve the existing newest-created-first order. Keep the sort and filters unchanged while following a cursor.
 
 Queue reads are recorded as `MISSION_DISPATCH_QUEUE` audit events.
 

@@ -13,12 +13,13 @@ public sealed class PostgresMissionDispatchQueueService(
         int pageSize, bool? hasOffer, string? query, string? cursor,
         CancellationToken cancellationToken = default, bool? deadlinePassed = null, string? latestAction = null,
         DateTimeOffset? deliveryBefore = null, int? minAttemptCount = null, int? maxAttemptCount = null,
-        DateTimeOffset? lastAttemptBefore = null, bool? deliveryOverdue = null)
+        DateTimeOffset? lastAttemptBefore = null, bool? deliveryOverdue = null, string? sortBy = null)
     {
         if (pageSize is < 1 or > 100 ||
             !MissionOperationsInputValidator.IsValidQuery(query) ||
             !MissionOperationsInputValidator.IsValidCursor(cursor) ||
             !IsValidLatestAction(latestAction) ||
+            !IsValidSortBy(sortBy) ||
             (minAttemptCount.HasValue && minAttemptCount.Value < 0) ||
             (maxAttemptCount.HasValue && maxAttemptCount.Value < 0) ||
             (minAttemptCount.HasValue && maxAttemptCount.HasValue && minAttemptCount.Value > maxAttemptCount.Value))
@@ -26,14 +27,22 @@ public sealed class PostgresMissionDispatchQueueService(
 
         var normalizedQuery = query?.ToLowerInvariant();
         var asOf = _timeProvider.GetUtcNow();
+        var deliveryDueSort = sortBy == "delivery_due";
+        var orderBy = deliveryDueSort
+            ? "m.committed_delivery_at ASC, m.created_at DESC, m.mission_id DESC"
+            : "m.created_at DESC, m.mission_id DESC";
+        var cursorPredicate = deliveryDueSort
+            ? "(m.committed_delivery_at > @cursor_delivery_at OR (m.committed_delivery_at = @cursor_delivery_at AND (m.created_at < @cursor_created_at OR (m.created_at = @cursor_created_at AND m.mission_id < @cursor_id))))"
+            : "(m.created_at < @cursor_created_at OR (m.created_at = @cursor_created_at AND m.mission_id < @cursor_id))";
         var recencyPredicate = lastAttemptBefore.HasValue
             ? "AND latest_attempt.occurred_at <= @last_attempt_before"
             : string.Empty;
+        DateTimeOffset? cursorDeliveryAt = null;
         DateTimeOffset? cursorCreatedAt = null;
         if (cursor is not null)
         {
             var cursorSql = $"""
-                SELECT m.created_at, (o.offer_id IS NOT NULL)
+                SELECT m.committed_delivery_at, m.created_at, (o.offer_id IS NOT NULL)
                 FROM missions m
                 LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
                 LEFT JOIN LATERAL (
@@ -78,7 +87,8 @@ public sealed class PostgresMissionDispatchQueueService(
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
                 return null;
-            cursorCreatedAt = reader.GetFieldValue<DateTimeOffset>(0);
+            cursorDeliveryAt = reader.GetFieldValue<DateTimeOffset>(0);
+            cursorCreatedAt = reader.GetFieldValue<DateTimeOffset>(1);
         }
 
         var firstPageSql = $"""
@@ -124,7 +134,7 @@ public sealed class PostgresMissionDispatchQueueService(
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
 
-            ORDER BY m.created_at DESC, m.mission_id DESC
+            ORDER BY {orderBy}
             LIMIT @take;
             """;
         var nextPageSql = $"""
@@ -170,9 +180,8 @@ public sealed class PostgresMissionDispatchQueueService(
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
 
-              AND (m.created_at < @cursor_created_at
-                   OR (m.created_at = @cursor_created_at AND m.mission_id < @cursor_id))
-            ORDER BY m.created_at DESC, m.mission_id DESC
+              AND {cursorPredicate}
+            ORDER BY {orderBy}
             LIMIT @take;
             """;
 
@@ -183,6 +192,9 @@ public sealed class PostgresMissionDispatchQueueService(
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
+            if (deliveryDueSort)
+                pageCommand.Parameters.AddWithValue(
+                    "cursor_delivery_at", NpgsqlDbType.TimestampTz, cursorDeliveryAt!.Value);
             pageCommand.Parameters.AddWithValue("cursor_created_at", NpgsqlDbType.TimestampTz, cursorCreatedAt!.Value);
             pageCommand.Parameters.AddWithValue("cursor_id", NpgsqlDbType.Text, cursor);
         }
@@ -246,6 +258,8 @@ public sealed class PostgresMissionDispatchQueueService(
         command.Parameters.AddWithValue("delivery_overdue", NpgsqlDbType.Boolean,
             (object?)deliveryOverdue ?? DBNull.Value);
     }
+
+    private static bool IsValidSortBy(string? sortBy) => sortBy is null or "created_at" or "delivery_due";
 
     private static bool IsValidLatestAction(string? latestAction) =>
         latestAction is null or "OFFERED" or "ACCEPTED" or "DECLINED" or "WITHDRAWN" or
