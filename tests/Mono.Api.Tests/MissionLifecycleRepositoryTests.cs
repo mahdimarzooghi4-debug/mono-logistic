@@ -342,6 +342,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
             Assert.Equal(MissionCourierOfferOutcome.Replayed, expiryReplay.Outcome);
             Assert.Equal(expiredOffer.Offer, expiryReplay.Offer);
+            offerClock.Set(DateTimeOffset.UtcNow);
 
             var reassignedOffer = await offers.CreateOfferAsync(
                 MissionId, courierId, "zone-central", "mission-offer-create-reassigned");
@@ -589,6 +590,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
         public override DateTimeOffset GetUtcNow() => _now;
 
         public void Advance(TimeSpan duration) => _now = _now.Add(duration);
+
+        public void Set(DateTimeOffset value) => _now = value;
     }
 
     private sealed class TestOperationsContext : IMonoOperationsContext
