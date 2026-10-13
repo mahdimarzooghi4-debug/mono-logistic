@@ -203,10 +203,10 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 10, null, null, null, deliveryAfter: primaryDeliveryAt);
             Assert.Equal(2, deliveryWindow!.Items.Count);
             var exactLowerBound = await dispatchQueue.ListAsync(
-                10, null, null, null, deliveryAfter: deliveryWindow.Items[1].CommittedDeliveryAt);
+                10, null, null, null, deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt);
             Assert.Equal(secondaryMissionId, Assert.Single(exactLowerBound!.Items).MissionId);
             var noDeliveryAfterUpperBound = await dispatchQueue.ListAsync(
-                10, null, null, null, deliveryAfter: deliveryWindow.Items[1].CommittedDeliveryAt.AddTicks(1));
+                10, null, null, null, deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt.AddTicks(1));
             Assert.Empty(noDeliveryAfterUpperBound!.Items);
             var windowFirstPage = await dispatchQueue.ListAsync(
                 1, null, null, null, deliveryAfter: primaryDeliveryAt);
