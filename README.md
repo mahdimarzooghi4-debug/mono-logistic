@@ -146,3 +146,4 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 119 — Live presence in courier planning evidence](docs/sprints/sprint-119-live-presence-planning-gate.md)
 - [Sprint 120 — Courier mission offers](docs/sprints/sprint-120-courier-dispatch-offers.md)
 - [Sprint 121 — Operations courier offer queue](docs/sprints/sprint-121-dispatch-offer-operations-control.md)
+- [Sprint 122 — Courier offer withdrawal](docs/sprints/sprint-122-courier-offer-withdrawal.md)

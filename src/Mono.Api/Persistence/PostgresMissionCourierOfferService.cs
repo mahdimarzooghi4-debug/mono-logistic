@@ -158,6 +158,89 @@ public sealed class PostgresMissionCourierOfferService(
         return offers;
     }
 
+    public async Task<MissionCourierOfferResult> WithdrawAsync(
+        string missionId, string offerId, string idempotencyKey, CancellationToken cancellationToken = default)
+    {
+        var actorId = RequireAdministrator();
+        Validate(MissionIdPattern, missionId, nameof(missionId));
+        Validate(OfferIdPattern, offerId, nameof(offerId));
+        Validate(KeyPattern, idempotencyKey, nameof(idempotencyKey));
+        const string operation = "WITHDRAW_OFFER";
+        var hash = Hash(JsonSerializer.Serialize(new { mission_id = missionId, offer_id = offerId, action = operation }));
+        var now = UtcNow();
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockKeyAsync(connection, transaction, offerId, operation, idempotencyKey, cancellationToken);
+        var replay = await FindReplayAsync(connection, transaction, offerId, operation,
+            idempotencyKey, hash, cancellationToken);
+        if (replay is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return replay;
+        }
+
+        var offerMissionId = await FindOfferMissionIdAsync(connection, transaction, offerId, cancellationToken);
+        if (!string.Equals(missionId, offerMissionId, StringComparison.Ordinal))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        var mission = await LockMissionAsync(connection, transaction, missionId, cancellationToken);
+        if (mission is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        const string lockOfferSql = """
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            FROM mission_courier_offers WHERE offer_id = @offer_id FOR UPDATE;
+            """;
+        MissionCourierOffer? offer;
+        await using (var command = new NpgsqlCommand(lockOfferSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offerId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            offer = await reader.ReadAsync(cancellationToken) ? ReadOffer(reader) : null;
+        }
+        if (offer is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
+        }
+        if (offer.Status != "OFFERED" || mission.Value.Status != "SEARCHING_COURIER")
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new MissionCourierOfferResult(MissionCourierOfferOutcome.InvalidState, offer, mission.Value.Status);
+        }
+
+        const string insertSql = """
+            INSERT INTO mission_courier_offer_events
+                (event_id, offer_id, mission_id, customer_id, courier_id, zone_id,
+                 action, actor_type, actor_id, reason, occurred_at)
+            VALUES (@event_id, @offer_id, @mission_id, @customer_id, @courier_id, @zone_id,
+                'WITHDRAWN', 'OPERATIONS', @actor_id, 'OPERATIONS_WITHDREW_OFFER', @occurred_at);
+            """;
+        await using (var command = new NpgsqlCommand(insertSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, "mce_" + Guid.NewGuid().ToString("N"));
+            command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offer.OfferId);
+            command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, offer.MissionId);
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, mission.Value.CustomerId);
+            command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, offer.CourierId);
+            command.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, offer.ZoneId);
+            command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var snapshot = await ReadOfferAsync(connection, transaction, offerId, cancellationToken)
+            ?? throw new InvalidOperationException("Withdrawn courier offer projection is missing.");
+        await SaveIdempotencyAsync(connection, transaction, offerId, operation,
+            idempotencyKey, hash, snapshot, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new MissionCourierOfferResult(MissionCourierOfferOutcome.Applied, snapshot, mission.Value.Status);
+    }
+
     public Task<MissionCourierOfferResult> AcceptAsync(
         string offerId, string courierId, string idempotencyKey,
         CancellationToken cancellationToken = default) =>
@@ -403,6 +486,16 @@ public sealed class PostgresMissionCourierOfferService(
         command.Parameters.AddWithValue("zone_id", NpgsqlDbType.Text, zoneId);
         var result = await command.ExecuteScalarAsync(cancellationToken);
         return result is null ? (false, false) : (true, result is true);
+    }
+
+    private static async Task<string?> FindOfferMissionIdAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction,
+        string offerId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT mission_id FROM mission_courier_offers WHERE offer_id = @offer_id;", connection, transaction);
+        command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offerId);
+        return await command.ExecuteScalarAsync(cancellationToken) as string;
     }
 
     private static async Task<string?> FindOwnedOfferMissionAsync(
