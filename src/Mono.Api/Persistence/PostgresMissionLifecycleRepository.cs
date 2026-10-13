@@ -76,15 +76,21 @@ public sealed class PostgresMissionLifecycleRepository(
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        const string lockMissionSql = """
+        var lockMissionSql = courierScopeId is null ? """
             SELECT customer_id, delivery_request_id, status
             FROM missions
             WHERE mission_id = @mission_id
               AND (@customer_scope_id IS NULL OR customer_id = @customer_scope_id)
-              AND (@courier_scope_id IS NULL OR EXISTS (
+            FOR UPDATE;
+            """ : """
+            SELECT customer_id, delivery_request_id, status
+            FROM missions
+            WHERE mission_id = @mission_id
+              AND (@customer_scope_id IS NULL OR customer_id = @customer_scope_id)
+              AND EXISTS (
                   SELECT 1 FROM mission_courier_offers offer
                   WHERE offer.mission_id = missions.mission_id
-                    AND offer.courier_id = @courier_scope_id AND offer.status = 'ACCEPTED'))
+                    AND offer.courier_id = @courier_scope_id AND offer.status = 'ACCEPTED')
             FOR UPDATE;
             """;
         string? customerId = null;
@@ -95,8 +101,8 @@ public sealed class PostgresMissionLifecycleRepository(
             lockMission.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
             lockMission.Parameters.AddWithValue("customer_scope_id", NpgsqlDbType.Text,
                 (object?)customerScopeId ?? DBNull.Value);
-            lockMission.Parameters.AddWithValue("courier_scope_id", NpgsqlDbType.Text,
-                (object?)courierScopeId ?? DBNull.Value);
+            if (courierScopeId is not null)
+                lockMission.Parameters.AddWithValue("courier_scope_id", NpgsqlDbType.Text, courierScopeId);
             await using var reader = await lockMission.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
