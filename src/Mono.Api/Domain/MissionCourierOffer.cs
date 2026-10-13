@@ -27,3 +27,14 @@ public sealed record MissionCourierOfferResult(
     MissionCourierOfferOutcome Outcome,
     MissionCourierOffer? Offer,
     string? MissionStatus = null);
+
+public sealed record MissionCourierOfferEvent(
+    [property: JsonPropertyName("event_sequence")] long EventSequence,
+    [property: JsonPropertyName("event_id")] string EventId,
+    [property: JsonPropertyName("offer_id")] string OfferId,
+    [property: JsonPropertyName("mission_id")] string MissionId,
+    [property: JsonPropertyName("action")] string Action,
+    [property: JsonPropertyName("actor_type")] string ActorType,
+    [property: JsonPropertyName("actor_id")] string ActorId,
+    [property: JsonPropertyName("reason")] string Reason,
+    [property: JsonPropertyName("occurred_at")] DateTimeOffset OccurredAt);

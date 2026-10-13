@@ -193,6 +193,25 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(MissionCourierOfferOutcome.Replayed, withdrawalReplay.Outcome);
             Assert.Equal(withdrawn.Offer, withdrawalReplay.Offer);
             Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, created.Offer.OfferId));
+            var history = await offers.ListOfferEventsAsync(MissionId, created.Offer.OfferId);
+            Assert.NotNull(history);
+            Assert.Equal(new[] { "OFFERED", "WITHDRAWN" }, history!.Select(item => item.Action));
+            var readAudit = new PostgresMissionOperationsReadAuditService(dataSource, context);
+            await readAudit.RecordAsync(
+                PostgresMissionOperationsReadAuditService.MissionCourierOfferHistory,
+                MissionId, history.Count);
+            await using (var auditConnection = await dataSource.OpenConnectionAsync())
+            await using (var auditCommand = new NpgsqlCommand("""
+                SELECT action, mission_id, result_count FROM mission_operations_read_audit
+                ORDER BY occurred_at DESC, audit_id DESC LIMIT 1;
+                """, auditConnection))
+            await using (var auditReader = await auditCommand.ExecuteReaderAsync())
+            {
+                Assert.True(await auditReader.ReadAsync());
+                Assert.Equal(PostgresMissionOperationsReadAuditService.MissionCourierOfferHistory, auditReader.GetString(0));
+                Assert.Equal(MissionId, auditReader.GetString(1));
+                Assert.Equal(2, auditReader.GetInt32(2));
+            }
 
             var replacementOffer = await offers.CreateOfferAsync(
                 MissionId, courierId, "zone-central", "mission-offer-create-replacement");
@@ -296,6 +315,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
 
         var migrationNames = new[]
         {
+            "024_mission_operations_read_audit.sql",
+            "025_mission_operations_read_audit_inspection.sql",
             "033_courier_onboarding.sql",
             "034_courier_operations_read_audit.sql",
             "035_courier_availability_windows.sql",
@@ -306,7 +327,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "040_courier_live_presence.sql",
             "041_mission_courier_offers.sql",
             "042_mission_courier_offer_withdrawal.sql",
-            "043_courier_suspension_withdraws_offers.sql"
+            "043_courier_suspension_withdraws_offers.sql",
+            "044_mission_courier_offer_history_audit.sql"
         };
         foreach (var migrationName in migrationNames)
         {
