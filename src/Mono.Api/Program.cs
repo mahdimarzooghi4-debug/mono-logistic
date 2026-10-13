@@ -35,6 +35,7 @@ builder.Services.AddScoped<PostgresCourierCapacityProjectionService>();
 builder.Services.AddScoped<PostgresCourierSuspensionService>();
 builder.Services.AddScoped<PostgresCourierLivePresenceService>();
 builder.Services.AddScoped<PostgresMissionCourierOfferService>();
+builder.Services.AddScoped<PostgresMissionCourierIssueService>();
 builder.Services.AddScoped(services => new PostgresCourierIdentityBindingService(
     services.GetRequiredService<NpgsqlDataSource>(),
     services.GetRequiredService<IMonoOperationsContext>(),
