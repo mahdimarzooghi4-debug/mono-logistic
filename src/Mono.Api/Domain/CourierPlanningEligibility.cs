@@ -10,7 +10,12 @@ public sealed record CourierPlanningEligibilityItem(
     [property: JsonPropertyName("zone_approved")] bool ZoneApproved,
     [property: JsonPropertyName("has_scheduled_window")] bool HasScheduledWindow,
     [property: JsonPropertyName("planned_capacity_contributor")] bool PlannedCapacityContributor,
-    [property: JsonPropertyName("exclusion_reasons")] IReadOnlyList<string> ExclusionReasons);
+    [property: JsonPropertyName("exclusion_reasons")] IReadOnlyList<string> ExclusionReasons,
+    [property: JsonPropertyName("is_online")] bool IsOnline,
+    [property: JsonPropertyName("live_presence_zone_id")] string? LivePresenceZoneId,
+    [property: JsonPropertyName("live_presence_updated_at")] DateTimeOffset? LivePresenceUpdatedAt,
+    [property: JsonPropertyName("live_presence_candidate")] bool LivePresenceCandidate,
+    [property: JsonPropertyName("live_presence_exclusion_reasons")] IReadOnlyList<string> LivePresenceExclusionReasons);
 
 public sealed record CourierPlanningEligibilityPage(
     [property: JsonPropertyName("zone_id")] string ZoneId,
