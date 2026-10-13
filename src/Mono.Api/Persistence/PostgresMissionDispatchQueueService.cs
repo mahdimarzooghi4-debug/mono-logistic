@@ -22,7 +22,8 @@ public sealed class PostgresMissionDispatchQueueService(
             !IsValidLatestAction(latestAction) ||
             !IsValidSortBy(sortBy) ||
             !IsValidDeliveryWindowState(deliveryWindowState) ||
-            (deliveryDueWithinMinutes.HasValue && deliveryDueWithinMinutes.Value is < 1 or > 10080) ||
+            (deliveryDueWithinMinutes.HasValue &&
+             (deliveryDueWithinMinutes.Value < 1 || deliveryDueWithinMinutes.Value > 10080)) ||
             (deliveryAfter.HasValue && deliveryBefore.HasValue && deliveryAfter.Value > deliveryBefore.Value) ||
             (minAttemptCount.HasValue && minAttemptCount.Value < 0) ||
             (maxAttemptCount.HasValue && maxAttemptCount.Value < 0) ||
@@ -220,7 +221,7 @@ public sealed class PostgresMissionDispatchQueueService(
         await using var pageCommand = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, pageConnection);
         AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction,
             deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore,
-            deliveryOverdue, deliveryAfter, deliveryWindowState, asOf);
+            deliveryOverdue, deliveryAfter, deliveryWindowState, deliveryDueThrough, asOf);
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
