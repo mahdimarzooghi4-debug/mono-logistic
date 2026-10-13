@@ -48,6 +48,7 @@ public static class MonoMissionOperationsEndpoints
                 [FromQuery(Name = "page_size")] int? pageSize,
                 [FromQuery(Name = "has_offer")] bool? hasOffer,
                 [FromQuery(Name = "deadline_passed")] bool? deadlinePassed,
+                [FromQuery(Name = "latest_action")] string? latestAction,
                 string? query,
                 string? cursor,
                 PostgresMissionDispatchQueueService dispatchQueue,
@@ -57,12 +58,14 @@ public static class MonoMissionOperationsEndpoints
                 var size = pageSize ?? 50;
                 if (size is < 1 or > 100 ||
                     !MissionOperationsInputValidator.IsValidQuery(query) ||
-                    !MissionOperationsInputValidator.IsValidCursor(cursor))
+                    !MissionOperationsInputValidator.IsValidCursor(cursor) ||
+                    latestAction is not (null or "OFFERED" or "ACCEPTED" or "DECLINED" or "WITHDRAWN" or
+                        "EXPIRED" or "RELEASED" or "CANCELLED" or "COMPLETED"))
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_REQUEST", "Dispatch queue filters are invalid.")));
 
                 var page = await dispatchQueue.ListAsync(
-                    size, hasOffer, query, cursor, cancellationToken, deadlinePassed);
+                    size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));
