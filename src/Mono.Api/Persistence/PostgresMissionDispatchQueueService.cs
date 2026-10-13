@@ -131,7 +131,8 @@ public sealed class PostgresMissionDispatchQueueService(
             SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at,
                    attempts.attempt_count, latest_attempt.offer_id, latest_attempt.courier_id,
-                   latest_attempt.status, latest_attempt.action, latest_attempt.reason, latest_attempt.occurred_at
+                   latest_attempt.status, latest_attempt.action, latest_attempt.reason, latest_attempt.occurred_at,
+                   (m.committed_delivery_at <= @as_of) AS delivery_overdue
             FROM missions m
             LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
             LEFT JOIN LATERAL (
@@ -161,6 +162,7 @@ public sealed class PostgresMissionDispatchQueueService(
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
                   {recencyPredicate}
+              AND (@delivery_overdue IS NULL OR (m.committed_delivery_at <= @as_of) = @delivery_overdue)
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
               AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
               AND (@latest_action IS NULL OR latest_attempt.action = @latest_action)
