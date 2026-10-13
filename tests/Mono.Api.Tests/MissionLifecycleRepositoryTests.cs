@@ -263,12 +263,39 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 Assert.Equal(courierId, reader.GetString(2));
             }
 
-            var cancelled = await lifecycle.ApplyAsync(
-                MissionId, "mission.cancelled", "Cancellation before handoff", "offer-mission-cancel");
-            Assert.Equal(MissionLifecycleOutcome.Applied, cancelled.Outcome);
+            var unauthorizedCourier = await lifecycle.ApplyForCourierAsync(
+                "crr_11111111111111111111111111111111", MissionId,
+                "mission.arrived_pickup", "Wrong courier", "wrong-courier-progress");
+            Assert.Equal(MissionLifecycleOutcome.MissionNotFound, unauthorizedCourier.Outcome);
+
+            var progressEvents = new[]
+            {
+                ("mission.arrived_pickup", "ARRIVED_PICKUP"),
+                ("mission.handed_to_courier", "HANDED_TO_COURIER"),
+                ("mission.picked_up", "PICKED_UP"),
+                ("mission.in_transit", "IN_TRANSIT"),
+                ("mission.arrived_dropoff", "ARRIVED_DROPOFF"),
+                ("mission.delivered", "DELIVERED")
+            };
+            for (var index = 0; index < progressEvents.Length; index++)
+            {
+                var (eventType, expectedStatus) = progressEvents[index];
+                var progress = await lifecycle.ApplyForCourierAsync(
+                    courierId, MissionId, eventType, "Courier milestone " + index, "courier-progress-" + index);
+                Assert.Equal(MissionLifecycleOutcome.Applied, progress.Outcome);
+                Assert.Equal(expectedStatus, progress.Transition!.Status);
+                if (index == 0)
+                {
+                    var replayedProgress = await lifecycle.ApplyForCourierAsync(
+                        courierId, MissionId, eventType, "Courier milestone " + index, "courier-progress-" + index);
+                    Assert.Equal(MissionLifecycleOutcome.Replayed, replayedProgress.Outcome);
+                    Assert.Equal(progress.Transition, replayedProgress.Transition);
+                }
+            }
+            Assert.Equal("DELIVERED", await GetMissionStatusAsync(dataSource));
             Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, created.Offer.OfferId));
             Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, replacementOffer.Offer.OfferId));
-            Assert.Equal("CANCELLED", await GetOfferStatusAsync(dataSource, finalOffer.Offer.OfferId));
+            Assert.Equal("COMPLETED", await GetOfferStatusAsync(dataSource, finalOffer.Offer.OfferId));
         }
         finally
         {
@@ -351,6 +378,15 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "INSERT INTO zone_geometry_active (zone_id) VALUES (@zone_id);", connection);
         command.Parameters.AddWithValue("zone_id", zoneId);
         await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task<string> GetMissionStatusAsync(NpgsqlDataSource dataSource)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT status FROM missions WHERE mission_id = @mission_id;", connection);
+        command.Parameters.AddWithValue("mission_id", MissionId);
+        return (string?)await command.ExecuteScalarAsync() ?? throw new InvalidOperationException("Mission not found.");
     }
 
     private static async Task<string> GetOfferStatusAsync(NpgsqlDataSource dataSource, string offerId)
