@@ -172,7 +172,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(0, pendingBeforeOffer.Items[0].AttemptCount);
             Assert.Null(pendingBeforeOffer.Items[0].LatestAttempt);
             var noAttemptMatchesRecencyCutoff = await dispatchQueue.ListAsync(
-                20, null, null, null, lastAttemptBefore: DateTimeOffset.MaxValue);
+                20, null, null, null, lastAttemptBefore: DateTimeOffset.UtcNow.AddDays(1));
             Assert.Empty(noAttemptMatchesRecencyCutoff!.Items);
             await dispatchAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
