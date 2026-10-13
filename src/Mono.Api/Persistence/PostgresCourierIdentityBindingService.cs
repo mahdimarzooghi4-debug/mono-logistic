@@ -44,7 +44,7 @@ public sealed class PostgresCourierIdentityBindingService(
         TryConfiguredAuthority(out var expected) &&
         string.Equals(expected, issuer, StringComparison.Ordinal);
 
-    public async Task<CourierIdentityBindingWriteResult> BindAsync(
+    public async Task<CourierIdentityBindingWriteResult> BindIdentityAsync(
         string courierId, string subject, string reasonCode, string evidenceReference,
         string idempotencyKey, CancellationToken cancellationToken = default)
     {
