@@ -259,8 +259,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(MissionCourierIssueOutcome.Conflict, changedIssueReplay.Outcome);
             var issueQueue = await issues.ListForMissionAsync(MissionId);
             Assert.Single(issueQueue);
-            var readAudit = new PostgresMissionOperationsReadAuditService(dataSource, context);
-            await readAudit.RecordAsync(
+            var issueReadAudit = new PostgresMissionOperationsReadAuditService(dataSource, context);
+            await issueReadAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionCourierIssueSearch,
                 MissionId, issueQueue.Count);
             var resolvedIssue = await issues.ResolveAsync(
