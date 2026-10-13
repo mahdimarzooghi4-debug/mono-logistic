@@ -137,17 +137,17 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
                         reader.GetString(5), reader.GetString(6), reader.GetString(7),
                         reader.GetString(8), reader.GetFieldValue<DateTimeOffset>(9),
                         reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10));
-                MissionDispatchQueueAttempt? latestAttempt = reader.IsDBNull(11)
+                MissionDispatchQueueAttempt? latestAttempt = reader.IsDBNull(12)
                     ? null
                     : new MissionDispatchQueueAttempt(
-                        reader.GetString(11), reader.GetString(12), reader.GetString(13),
-                        reader.IsDBNull(14) ? null : reader.GetString(14),
+                        reader.GetString(12), reader.GetString(13), reader.GetString(14),
                         reader.IsDBNull(15) ? null : reader.GetString(15),
-                        reader.IsDBNull(16) ? null : reader.GetFieldValue<DateTimeOffset>(16));
+                        reader.IsDBNull(16) ? null : reader.GetString(16),
+                        reader.IsDBNull(17) ? null : reader.GetFieldValue<DateTimeOffset>(17));
                 items.Add(new MissionDispatchQueueItem(
                     reader.GetString(0), reader.GetString(1), reader.GetString(2),
                     reader.GetFieldValue<DateTimeOffset>(3), reader.GetFieldValue<DateTimeOffset>(4), activeOffer,
-                    reader.GetInt32(10), latestAttempt));
+                    reader.GetInt32(11), latestAttempt));
             }
         }
 
