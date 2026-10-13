@@ -643,6 +643,10 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var bindings = new PostgresCourierIdentityBindingService(
             database.DataSource, context, issuer, new FixedTimeProvider(now));
 
+        var inactiveBinding = await bindings.BindAsync(registeredCourierId, "opaque-provider-subject-inactive",
+            "IDENTITY_VERIFIED", "test:evidence:inactive", "auth-bind-inactive");
+        Assert.Equal(CourierIdentityBindingOutcome.InvalidState, inactiveBinding.Outcome);
+
         const string activeSubject = "opaque-provider-subject-active";
         var bind = await bindings.BindAsync(activeCourierId, activeSubject,
             "IDENTITY_VERIFIED", "test:evidence:active", "auth-bind-active");
