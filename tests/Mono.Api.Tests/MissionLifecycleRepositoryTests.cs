@@ -215,6 +215,13 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer!.Status);
             Assert.Equal(created.Offer.ExpiresAt, pendingWithOffer.Items[0].ActiveOffer.ExpiresAt);
             Assert.False(pendingWithOffer.Items[0].ActiveOffer.DeadlinePassed);
+            var committedDeliveryAt = pendingWithOffer.Items[0].CommittedDeliveryAt;
+            var dueByCommittedDelivery = await dispatchQueue.ListAsync(
+                20, true, MissionId, null, deliveryBefore: committedDeliveryAt);
+            Assert.Single(dueByCommittedDelivery!.Items);
+            var beforeCommittedDelivery = await dispatchQueue.ListAsync(
+                20, true, MissionId, null, deliveryBefore: committedDeliveryAt.AddTicks(-1));
+            Assert.Empty(beforeCommittedDelivery!.Items);
             var notOverdueOnly = await dispatchQueue.ListAsync(
                 20, true, MissionId, null, deadlinePassed: false);
             Assert.Single(notOverdueOnly!.Items);
