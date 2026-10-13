@@ -579,6 +579,7 @@ Dashboard must use the same application/core rules as API customers.
 - Sprint 139 adds an inclusive UTC cutoff on the latest courier-offer event, excluding Missions with no recorded offer history.
 - Sprint 140 adds an API-clock-consistent `delivery_overdue` signal and queue filter for searching Missions whose committed delivery time has passed, including cursor-consistent filtering.
 - Sprint 141 adds optional committed-delivery-first sorting to the dispatch queue while preserving the created-at default and cursor-consistent keyset pagination.
+- Sprint 142 adds an inclusive `delivery_after` lower bound that combines with `delivery_before` into a validated, cursor-consistent committed-delivery window.
 - Mission timeline
 - Route inspection
 - courier state
