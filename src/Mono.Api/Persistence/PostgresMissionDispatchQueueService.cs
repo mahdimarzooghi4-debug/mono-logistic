@@ -26,10 +26,13 @@ public sealed class PostgresMissionDispatchQueueService(
 
         var normalizedQuery = query?.ToLowerInvariant();
         var asOf = _timeProvider.GetUtcNow();
+        var recencyPredicate = lastAttemptBefore.HasValue
+            ? "AND latest_attempt.occurred_at <= @last_attempt_before"
+            : string.Empty;
         DateTimeOffset? cursorCreatedAt = null;
         if (cursor is not null)
         {
-            const string cursorSql = """
+            var cursorSql = $"""
                 SELECT m.created_at, (o.offer_id IS NOT NULL)
                 FROM missions m
                 LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
@@ -90,7 +93,7 @@ public sealed class PostgresMissionDispatchQueueService(
             cursorCreatedAt = reader.GetFieldValue<DateTimeOffset>(0);
         }
 
-        const string firstPageSql = """
+        var firstPageSql = $"""
             SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at,
                    attempts.attempt_count, latest_attempt.offer_id, latest_attempt.courier_id,
@@ -147,7 +150,7 @@ public sealed class PostgresMissionDispatchQueueService(
             ORDER BY m.created_at DESC, m.mission_id DESC
             LIMIT @take;
             """;
-        const string nextPageSql = """
+        var nextPageSql = $"""
             SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at,
                    attempts.attempt_count, latest_attempt.offer_id, latest_attempt.courier_id,
@@ -272,9 +275,8 @@ public sealed class PostgresMissionDispatchQueueService(
             minAttemptCount ?? 0);
         command.Parameters.AddWithValue("max_attempt_count", NpgsqlDbType.Integer,
             maxAttemptCount ?? int.MaxValue);
-        command.Parameters.AddWithValue("last_attempt_before_enabled", NpgsqlDbType.Boolean, lastAttemptBefore.HasValue);
-        command.Parameters.AddWithValue("last_attempt_before", NpgsqlDbType.TimestampTz,
-            lastAttemptBefore ?? DateTimeOffset.MaxValue);
+        if (lastAttemptBefore.HasValue)
+            command.Parameters.AddWithValue("last_attempt_before", NpgsqlDbType.TimestampTz, lastAttemptBefore.Value);
     }
 
     private static bool IsValidLatestAction(string? latestAction) =>
