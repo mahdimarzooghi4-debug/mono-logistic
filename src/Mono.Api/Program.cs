@@ -1,3 +1,4 @@
+using Npgsql;
 using Mono.Api.Api;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
