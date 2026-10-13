@@ -66,10 +66,7 @@ public static class MonoMissionCourierOfferEndpoints
                         "Exactly one valid Idempotency-Key header is required."));
                 try
                 {
-                    var queue = await offers.ListForMissionAsync(missionId, cancellationToken);
-                    if (!queue.Any(offer => offer.OfferId == offerId))
-                        return Results.NotFound(Error("MISSION_OFFER_NOT_FOUND", "The mission offer was not found."));
-                    return Map(await offers.WithdrawAsync(offerId, key, cancellationToken));
+                    return Map(await offers.WithdrawAsync(missionId, offerId, key, cancellationToken));
                 }
                 catch (ArgumentException)
                 {
