@@ -11,11 +11,12 @@ public sealed class PostgresMissionDispatchQueueService(
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     public async Task<MissionDispatchQueuePage?> ListAsync(
         int pageSize, bool? hasOffer, string? query, string? cursor,
-        CancellationToken cancellationToken = default, bool? deadlinePassed = null)
+        CancellationToken cancellationToken = default, bool? deadlinePassed = null, string? latestAction = null)
     {
         if (pageSize is < 1 or > 100 ||
             !MissionOperationsInputValidator.IsValidQuery(query) ||
-            !MissionOperationsInputValidator.IsValidCursor(cursor))
+            !MissionOperationsInputValidator.IsValidCursor(cursor) ||
+            !IsValidLatestAction(latestAction))
             throw new ArgumentException("Dispatch queue filters are invalid.");
 
         var normalizedQuery = query?.ToLowerInvariant();
@@ -31,6 +32,20 @@ public sealed class PostgresMissionDispatchQueueService(
                   AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
                   AND (@deadline_passed IS NULL OR
                        (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
+                  AND (@latest_action IS NULL OR (
+                       SELECT latest.action
+                       FROM mission_courier_offers previous
+                       LEFT JOIN LATERAL (
+                           SELECT event.action
+                           FROM mission_courier_offer_events event
+                           WHERE event.offer_id = previous.offer_id
+                           ORDER BY event.event_sequence DESC
+                           LIMIT 1
+                       ) latest ON TRUE
+                       WHERE previous.mission_id = m.mission_id
+                       ORDER BY previous.created_at DESC, previous.offer_id DESC
+                       LIMIT 1
+                  ) = @latest_action)
                   AND (@query_pattern IS NULL
                        OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                        OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -38,7 +53,7 @@ public sealed class PostgresMissionDispatchQueueService(
                 """;
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(cursorSql, connection);
-            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, asOf);
+            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, asOf);
             command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, cursor);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
@@ -77,6 +92,20 @@ public sealed class PostgresMissionDispatchQueueService(
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
               AND (@deadline_passed IS NULL OR
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
+              AND (@latest_action IS NULL OR (
+                   SELECT latest.action
+                   FROM mission_courier_offers previous
+                   LEFT JOIN LATERAL (
+                       SELECT event.action
+                       FROM mission_courier_offer_events event
+                       WHERE event.offer_id = previous.offer_id
+                       ORDER BY event.event_sequence DESC
+                       LIMIT 1
+                   ) latest ON TRUE
+                   WHERE previous.mission_id = m.mission_id
+                   ORDER BY previous.created_at DESC, previous.offer_id DESC
+                   LIMIT 1
+              ) = @latest_action)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -115,6 +144,20 @@ public sealed class PostgresMissionDispatchQueueService(
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
               AND (@deadline_passed IS NULL OR
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
+              AND (@latest_action IS NULL OR (
+                   SELECT latest.action
+                   FROM mission_courier_offers previous
+                   LEFT JOIN LATERAL (
+                       SELECT event.action
+                       FROM mission_courier_offer_events event
+                       WHERE event.offer_id = previous.offer_id
+                       ORDER BY event.event_sequence DESC
+                       LIMIT 1
+                   ) latest ON TRUE
+                   WHERE previous.mission_id = m.mission_id
+                   ORDER BY previous.created_at DESC, previous.offer_id DESC
+                   LIMIT 1
+              ) = @latest_action)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -127,7 +170,7 @@ public sealed class PostgresMissionDispatchQueueService(
 
         await using var pageConnection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var pageCommand = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, pageConnection);
-        AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, asOf);
+        AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction, asOf);
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
@@ -171,7 +214,8 @@ public sealed class PostgresMissionDispatchQueueService(
     }
 
     private static void AddFilterParameters(
-        NpgsqlCommand command, bool? hasOffer, string? query, bool? deadlinePassed, DateTimeOffset asOf)
+        NpgsqlCommand command, bool? hasOffer, string? query, bool? deadlinePassed,
+        string? latestAction, DateTimeOffset asOf)
     {
         command.Parameters.AddWithValue("has_offer", NpgsqlDbType.Boolean, (object?)hasOffer ?? DBNull.Value);
         command.Parameters.AddWithValue("query_pattern", NpgsqlDbType.Text,
@@ -179,7 +223,13 @@ public sealed class PostgresMissionDispatchQueueService(
         command.Parameters.AddWithValue("deadline_passed", NpgsqlDbType.Boolean,
             (object?)deadlinePassed ?? DBNull.Value);
         command.Parameters.AddWithValue("as_of", NpgsqlDbType.TimestampTz, asOf);
+        command.Parameters.AddWithValue("latest_action", NpgsqlDbType.Text,
+            latestAction is null ? DBNull.Value : latestAction);
     }
+
+    private static bool IsValidLatestAction(string? latestAction) =>
+        latestAction is null or "OFFERED" or "ACCEPTED" or "DECLINED" or "WITHDRAWN" or
+            "EXPIRED" or "RELEASED" or "CANCELLED" or "COMPLETED";
 
     private static string BuildPrefixPattern(string query) =>
         query.Replace("!", "!!", StringComparison.Ordinal)

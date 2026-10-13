@@ -4,7 +4,7 @@ All operations routes require the Mono administrator authorization policy.
 
 ## Dispatch queue
 
-`GET /operations/v1/dispatch/queue?page_size=50&has_offer=true&deadline_passed=true&query=mis_`
+`GET /operations/v1/dispatch/queue?page_size=50&has_offer=true&deadline_passed=true&latest_action=EXPIRED&query=mis_`
 
 The response contains the active offer (if any), the number of offers created for each Mission, and a summary of its latest attempt. An active offer includes `expires_at` and `deadline_passed`. The latter is computed against the API's UTC clock:
 
@@ -13,6 +13,8 @@ The response contains the active offer (if any), the number of offers created fo
 - `active_offer: null`: no offer is currently active. Use `latest_attempt` to see the most recent outcome and `attempt_count` to see how many offers were made.
 
 Use the optional `deadline_passed` query filter to return only Missions with an active offer whose deadline is in the requested state. Set it to `true` to focus on offers ready for the expiry action or `false` to see active offers with time remaining. The filter uses one API-clock timestamp for the page and its cursor validation.
+
+Use the optional `latest_action` filter to focus on Missions by their most recent courier-offer action. Supported values are `OFFERED`, `ACCEPTED`, `DECLINED`, `WITHDRAWN`, `EXPIRED`, `RELEASED`, `CANCELLED`, and `COMPLETED`. The value is case-sensitive. Missions without an offer attempt do not match a supplied action. The filter is bound to cursor validation, so continue pagination with the same filters.
 
 Queue reads are recorded as `MISSION_DISPATCH_QUEUE` audit events.
 

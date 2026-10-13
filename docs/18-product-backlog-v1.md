@@ -361,6 +361,7 @@ REGISTERED
 
 ### E10.2 Offer Lifecycle
 - Sprint 135 adds an administrator-only bounded batch API for explicit offers to distinct Missions, validating all commands before execution and preserving independent idempotency and per-item outcomes.
+- Sprint 136 adds a cursor-consistent operations queue filter for the latest courier-offer action, enabling manual dispatch recovery without changing Mission or offer state.
 - offer
 - accept
 - reject

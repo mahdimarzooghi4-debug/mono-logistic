@@ -224,6 +224,11 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(1, pendingWithOffer.Items[0].AttemptCount);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].LatestAttempt!.Status);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].LatestAttempt.LastAction);
+            var offeredOutcomeOnly = await dispatchQueue.ListAsync(
+                20, null, null, null, latestAction: "OFFERED");
+            Assert.Single(offeredOutcomeOnly!.Items);
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => dispatchQueue.ListAsync(20, null, null, null, latestAction: "NOT_AN_ACTION"));
             await dispatchAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
                 null, pendingWithOffer.Items.Count);
@@ -427,6 +432,13 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 item => item.OfferId == expiringOffer.Offer.OfferId);
             Assert.Equal("EXPIRED", expiredAttempt.Status);
             Assert.Equal("EXPIRED", expiredAttempt.LastAction);
+            var expiredOutcomeOnly = await new PostgresMissionDispatchQueueService(dataSource, offerClock)
+                .ListAsync(20, null, null, null, latestAction: "EXPIRED");
+            Assert.Single(expiredOutcomeOnly!.Items);
+            Assert.Equal("EXPIRED", expiredOutcomeOnly.Items[0].LatestAttempt!.LastAction);
+            var declinedOutcomeOnly = await dispatchQueue.ListAsync(
+                20, null, null, null, latestAction: "DECLINED");
+            Assert.Empty(declinedOutcomeOnly!.Items);
             Assert.Equal("OPERATIONS_EXPIRED_OFFER", expiredAttempt.LastReason);
             Assert.NotNull(expiredAttempt.LastOccurredAt);
             var withdrawnAttempt = Assert.Single(attemptHistory.Attempts,
