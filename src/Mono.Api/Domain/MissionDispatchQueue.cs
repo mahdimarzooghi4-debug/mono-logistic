@@ -13,7 +13,6 @@ public sealed record MissionDispatchQueueItem(
     [property: JsonPropertyName("mission_id")] string MissionId,
     [property: JsonPropertyName("customer_id")] string CustomerId,
     [property: JsonPropertyName("delivery_request_id")] string DeliveryRequestId,
-    [property: JsonPropertyName("external_reference")] string ExternalReference,
     [property: JsonPropertyName("committed_delivery_at")] DateTimeOffset CommittedDeliveryAt,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
     [property: JsonPropertyName("active_offer")] MissionDispatchQueueOffer? ActiveOffer);
