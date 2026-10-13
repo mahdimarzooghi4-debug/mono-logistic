@@ -177,8 +177,30 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
 
             var offerClock = new AdjustableTimeProvider(DateTimeOffset.UtcNow);
             var offers = new PostgresMissionCourierOfferService(dataSource, context, offerClock);
-            var created = await offers.CreateOfferAsync(
-                MissionId, courierId, "zone-central", "mission-offer-create");
+            var duplicateMissionBatch = new[]
+            {
+                new MissionCourierOfferBatchCommand(
+                    MissionId, courierId, "zone-central", "batch-offer-duplicate-1"),
+                new MissionCourierOfferBatchCommand(
+                    MissionId, courierId, "zone-central", "batch-offer-duplicate-2")
+            };
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => offers.CreateBatchAsync(duplicateMissionBatch));
+            Assert.Empty(await offers.ListForMissionAsync(MissionId));
+
+            var offerCommands = new[]
+            {
+                new MissionCourierOfferBatchCommand(
+                    MissionId, courierId, "zone-central", "mission-offer-create")
+            };
+            var createdBatch = await offers.CreateBatchAsync(offerCommands);
+            var createdBatchItem = Assert.Single(createdBatch);
+            Assert.Equal("Applied", createdBatchItem.Outcome);
+            var createdBatchReplay = await offers.CreateBatchAsync(offerCommands);
+            Assert.Equal("Replayed", Assert.Single(createdBatchReplay).Outcome);
+            var created = new MissionCourierOfferResult(
+                Enum.Parse<MissionCourierOfferOutcome>(createdBatchItem.Outcome),
+                createdBatchItem.Offer);
             Assert.Equal(MissionCourierOfferOutcome.Applied, created.Outcome);
             Assert.Equal("OFFERED", created.Offer!.Status);
             Assert.Single(await offers.ListMyOffersAsync(courierId));
