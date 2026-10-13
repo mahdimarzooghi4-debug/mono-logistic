@@ -43,7 +43,7 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
 
         const string firstPageSql = """
             SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
-                   o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at
+                   o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at
             FROM missions m
             LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
             WHERE m.status = 'SEARCHING_COURIER'
@@ -57,7 +57,7 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
             """;
         const string nextPageSql = """
             SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
-                   o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at
+                   o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at
             FROM missions m
             LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
             WHERE m.status = 'SEARCHING_COURIER'
@@ -91,7 +91,8 @@ public sealed class PostgresMissionDispatchQueueService(NpgsqlDataSource dataSou
                     ? null
                     : new MissionDispatchQueueOffer(
                         reader.GetString(5), reader.GetString(6), reader.GetString(7),
-                        reader.GetString(8), reader.GetFieldValue<DateTimeOffset>(9));
+                        reader.GetString(8), reader.GetFieldValue<DateTimeOffset>(9),
+                        reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10));
                 items.Add(new MissionDispatchQueueItem(
                     reader.GetString(0), reader.GetString(1), reader.GetString(2),
                     reader.GetFieldValue<DateTimeOffset>(3), reader.GetFieldValue<DateTimeOffset>(4), activeOffer));
