@@ -129,6 +129,7 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 138 — Dispatch attempt count filters](docs/sprints/sprint-138-dispatch-attempt-count-filters.md)
 - [Sprint 139 — Dispatch attempt recency filter](docs/sprints/sprint-139-dispatch-attempt-recency-filter.md)
 - [Sprint 140 — Dispatch delivery overdue filter](docs/sprints/sprint-140-dispatch-delivery-overdue-filter.md)
+- [Sprint 141 — Dispatch delivery due sorting](docs/sprints/sprint-141-dispatch-delivery-due-sort.md)
 - [Policy Draft Authoring API](docs/operations/policy-authoring-api.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)
