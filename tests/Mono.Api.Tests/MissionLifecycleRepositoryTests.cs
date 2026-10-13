@@ -164,6 +164,15 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 (await lifecycle.ApplyAsync(MissionId, "mission.searching_courier",
                     "Dispatch initiated", "offer-searching")).Outcome);
 
+            var dispatchQueue = new PostgresMissionDispatchQueueService(dataSource);
+            var dispatchAudit = new PostgresMissionOperationsReadAuditService(dataSource, context);
+            var pendingBeforeOffer = await dispatchQueue.ListAsync(20, false, null, null);
+            Assert.Single(pendingBeforeOffer!.Items);
+            Assert.Null(pendingBeforeOffer.Items[0].ActiveOffer);
+            await dispatchAudit.RecordAsync(
+                PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
+                null, pendingBeforeOffer.Items.Count);
+
             var offers = new PostgresMissionCourierOfferService(dataSource, context);
             var created = await offers.CreateOfferAsync(
                 MissionId, courierId, "zone-central", "mission-offer-create");
@@ -174,6 +183,15 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Single(operationsQueue);
             Assert.Equal(created.Offer.OfferId, operationsQueue[0].OfferId);
             Assert.Equal("OFFERED", operationsQueue[0].Status);
+
+            var pendingWithOffer = await dispatchQueue.ListAsync(20, true, MissionId, null);
+            Assert.Single(pendingWithOffer!.Items);
+            Assert.Equal(created.Offer.OfferId, pendingWithOffer.Items[0].ActiveOffer!.OfferId);
+            Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer.Status);
+            await dispatchAudit.RecordAsync(
+                PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
+                null, pendingWithOffer.Items.Count);
+            Assert.Empty((await dispatchQueue.ListAsync(20, false, null, null))!.Items);
 
             var replayedCreate = await offers.CreateOfferAsync(
                 MissionId, courierId, "zone-central", "mission-offer-create");
@@ -415,7 +433,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "044_mission_courier_offer_history_audit.sql",
             "045_mission_courier_issue_reports.sql",
             "046_mission_courier_issue_read_audit.sql",
-            "047_mission_courier_assignment_release.sql"
+            "047_mission_courier_assignment_release.sql",
+            "048_mission_dispatch_queue_read_audit.sql"
         };
         foreach (var migrationName in migrationNames)
         {
