@@ -576,6 +576,7 @@ Dashboard must use the same application/core rules as API customers.
 - Mission search
 - Sprint 137 adds a committed-delivery cutoff filter to the dispatch queue, with inclusive UTC semantics and cursor-consistent pagination.
 - Sprint 138 adds inclusive minimum and maximum offer-attempt count filters to the dispatch queue, with range validation and cursor-consistent pagination.
+- Sprint 139 adds an inclusive UTC cutoff on the latest courier-offer event, excluding Missions with no recorded offer history.
 - Mission timeline
 - Route inspection
 - courier state
