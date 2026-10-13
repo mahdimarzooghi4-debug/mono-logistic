@@ -189,6 +189,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Single(pendingWithOffer!.Items);
             Assert.Equal(created.Offer.OfferId, pendingWithOffer.Items[0].ActiveOffer!.OfferId);
             Assert.Equal("OFFERED", pendingWithOffer.Items[0].ActiveOffer!.Status);
+            Assert.Equal(created.Offer.ExpiresAt, pendingWithOffer.Items[0].ActiveOffer.ExpiresAt);
             await dispatchAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
                 null, pendingWithOffer.Items.Count);
