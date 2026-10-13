@@ -273,7 +273,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "038_courier_planning_eligibility_audit_action.sql",
             "039_courier_identity_bindings.sql",
             "040_courier_live_presence.sql",
-            "041_mission_courier_offers.sql"
+            "041_mission_courier_offers.sql",
+            "042_mission_courier_offer_withdrawal.sql"
         };
         foreach (var migrationName in migrationNames)
         {
