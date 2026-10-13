@@ -179,19 +179,8 @@ public sealed class PostgresMissionCourierOfferService(
             return replay;
         }
 
-        const string findMissionSql = "SELECT mission_id FROM mission_courier_offers WHERE offer_id = @offer_id;";
-        string? missionId;
-        await using (var command = new NpgsqlCommand(findMissionSql, connection, transaction))
-        {
-            command.Parameters.AddWithValue("offer_id", NpgsqlDbType.Text, offerId);
-            missionId = await command.ExecuteScalarAsync(cancellationToken) as string;
-        }
-        if (missionId is null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
-        }
-        if (!string.Equals(missionId, await FindOfferMissionIdAsync(connection, transaction, offerId, cancellationToken), StringComparison.Ordinal))
+        var offerMissionId = await FindOfferMissionIdAsync(connection, transaction, offerId, cancellationToken);
+        if (!string.Equals(missionId, offerMissionId, StringComparison.Ordinal))
         {
             await transaction.CommitAsync(cancellationToken);
             return new MissionCourierOfferResult(MissionCourierOfferOutcome.OfferNotFound, null);
