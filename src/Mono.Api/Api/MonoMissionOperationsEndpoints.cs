@@ -51,6 +51,7 @@ public static class MonoMissionOperationsEndpoints
                 [FromQuery(Name = "delivery_before")] DateTimeOffset? deliveryBefore,
                 [FromQuery(Name = "delivery_after")] DateTimeOffset? deliveryAfter,
                 [FromQuery(Name = "delivery_window_state")] string? deliveryWindowState,
+                [FromQuery(Name = "delivery_due_within_minutes")] int? deliveryDueWithinMinutes,
                 [FromQuery(Name = "last_attempt_before")] DateTimeOffset? lastAttemptBefore,
                 [FromQuery(Name = "delivery_overdue")] bool? deliveryOverdue,
                 [FromQuery(Name = "sort_by")] string? sortBy,
@@ -73,6 +74,8 @@ public static class MonoMissionOperationsEndpoints
                     (maxAttemptCount.HasValue && maxAttemptCount.Value < 0) ||
                     sortBy is not (null or "created_at" or "delivery_due") ||
                     deliveryWindowState is not (null or "upcoming" or "due_now" or "overdue") ||
+                    (deliveryDueWithinMinutes.HasValue &&
+                     (deliveryDueWithinMinutes.Value < 1 || deliveryDueWithinMinutes.Value > 10080)) ||
                     (deliveryAfter.HasValue && deliveryBefore.HasValue && deliveryAfter.Value > deliveryBefore.Value) ||
                     (minAttemptCount.HasValue && maxAttemptCount.HasValue &&
                      minAttemptCount.Value > maxAttemptCount.Value))
@@ -81,7 +84,7 @@ public static class MonoMissionOperationsEndpoints
 
                 var page = await dispatchQueue.ListAsync(
                     size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction,
-                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, sortBy, deliveryAfter, deliveryWindowState);
+                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, sortBy, deliveryAfter, deliveryWindowState, deliveryDueWithinMinutes);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));
