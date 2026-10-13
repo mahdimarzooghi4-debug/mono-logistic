@@ -7,6 +7,10 @@ namespace Mono.Api.Api;
 
 public static class MonoMissionOperationsEndpoints
 {
+    private static bool IsValidCustomerId(string? customerId) => customerId is null ||
+        (customerId.Length == 36 && customerId.StartsWith("cus_", StringComparison.Ordinal) &&
+         customerId.Skip(4).All(character => char.IsAsciiHexDigit(character) && !char.IsUpper(character)));
+
     public static IEndpointRouteBuilder MapMonoMissionOperationsEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
@@ -52,6 +56,7 @@ public static class MonoMissionOperationsEndpoints
                 [FromQuery(Name = "delivery_after")] DateTimeOffset? deliveryAfter,
                 [FromQuery(Name = "delivery_window_state")] string? deliveryWindowState,
                 [FromQuery(Name = "delivery_due_within_minutes")] int? deliveryDueWithinMinutes,
+                [FromQuery(Name = "customer_id")] string? customerId,
                 [FromQuery(Name = "last_attempt_before")] DateTimeOffset? lastAttemptBefore,
                 [FromQuery(Name = "delivery_overdue")] bool? deliveryOverdue,
                 [FromQuery(Name = "sort_by")] string? sortBy,
@@ -68,6 +73,7 @@ public static class MonoMissionOperationsEndpoints
                 if (size is < 1 or > 100 ||
                     !MissionOperationsInputValidator.IsValidQuery(query) ||
                     !MissionOperationsInputValidator.IsValidCursor(cursor) ||
+                    !IsValidCustomerId(customerId) ||
                     latestAction is not (null or "OFFERED" or "ACCEPTED" or "DECLINED" or "WITHDRAWN" or
                         "EXPIRED" or "RELEASED" or "CANCELLED" or "COMPLETED") ||
                     (minAttemptCount.HasValue && minAttemptCount.Value < 0) ||
@@ -84,7 +90,7 @@ public static class MonoMissionOperationsEndpoints
 
                 var page = await dispatchQueue.ListAsync(
                     size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction,
-                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, sortBy, deliveryAfter, deliveryWindowState, deliveryDueWithinMinutes);
+                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, sortBy, deliveryAfter, deliveryWindowState, deliveryDueWithinMinutes, customerId);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));

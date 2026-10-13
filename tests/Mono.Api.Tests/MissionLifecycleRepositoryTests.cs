@@ -164,7 +164,16 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 (await lifecycle.ApplyAsync(MissionId, "mission.searching_courier",
                     "Dispatch initiated", "offer-searching")).Outcome);
 
+            const string secondaryCustomerId = "cus_11111111111111111111111111111111";
             const string secondaryMissionId = "mis_11111111111111111111111111111111";
+            await using (var seedCustomer = await dataSource.OpenConnectionAsync())
+            await using (var insertCustomer = new NpgsqlCommand(
+                "INSERT INTO customers (customer_id) VALUES (@customer_id);", seedCustomer))
+            {
+                insertCustomer.Parameters.AddWithValue("customer_id", secondaryCustomerId);
+                await insertCustomer.ExecuteNonQueryAsync();
+            }
+
             await using (var seedSecondary = await dataSource.OpenConnectionAsync())
             await using (var insertSecondary = new NpgsqlCommand("""
                 INSERT INTO missions (
@@ -175,7 +184,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 """, seedSecondary))
             {
                 insertSecondary.Parameters.AddWithValue("mission_id", secondaryMissionId);
-                insertSecondary.Parameters.AddWithValue("customer_id", CustomerId);
+                insertSecondary.Parameters.AddWithValue("customer_id", secondaryCustomerId);
                 await insertSecondary.ExecuteNonQueryAsync();
             }
 
@@ -198,6 +207,15 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 1, null, null, upcomingFirstPage.NextCursor, deliveryWindowState: "overdue"));
             var defaultFirstPage = await dispatchQueue.ListAsync(1, null, null, null);
             Assert.Equal(secondaryMissionId, Assert.Single(defaultFirstPage!.Items).MissionId);
+
+            var primaryCustomerPage = await dispatchQueue.ListAsync(
+                10, null, null, null, customerId: CustomerId);
+            Assert.Equal(MissionId, Assert.Single(primaryCustomerPage!.Items).MissionId);
+            var secondaryCustomerPage = await dispatchQueue.ListAsync(
+                10, null, null, null, customerId: secondaryCustomerId);
+            Assert.Equal(secondaryMissionId, Assert.Single(secondaryCustomerPage!.Items).MissionId);
+            Assert.Null(await dispatchQueue.ListAsync(
+                10, null, null, defaultFirstPage.NextCursor, customerId: CustomerId));
 
             DateTimeOffset primaryDeliveryAt;
             await using (var readDue = await dataSource.OpenConnectionAsync())
