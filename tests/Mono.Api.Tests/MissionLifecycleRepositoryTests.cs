@@ -197,7 +197,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 "SELECT committed_delivery_at FROM missions WHERE mission_id = @mission_id;", readDue))
             {
                 readDueCommand.Parameters.AddWithValue("mission_id", MissionId);
-                primaryDeliveryAt = (DateTimeOffset)(await readDueCommand.ExecuteScalarAsync())!;
+                var primaryDeliveryValue = (DateTime)(await readDueCommand.ExecuteScalarAsync())!;
+                primaryDeliveryAt = new DateTimeOffset(DateTime.SpecifyKind(primaryDeliveryValue, DateTimeKind.Utc));
             }
             var deliveryWindow = await dispatchQueue.ListAsync(
                 10, null, null, null, deliveryAfter: primaryDeliveryAt);
