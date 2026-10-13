@@ -95,12 +95,7 @@ public static class MonoMissionCourierOfferEndpoints
     private static IResult Map(MissionCourierOfferResult result) => result.Outcome switch
     {
         MissionCourierOfferOutcome.Applied or MissionCourierOfferOutcome.Replayed
-            when result.Offer is not null => Results.Ok(new
-            {
-                offer = result.Offer,
-                mission_status = result.MissionStatus ??
-                    (result.Offer.Status == "OFFERED" ? "SEARCHING_COURIER" : null)
-            }),
+            when result.Offer is not null => Results.Ok(new { offer = result.Offer }),
         MissionCourierOfferOutcome.Conflict =>
             Results.Conflict(Error("IDEMPOTENCY_CONFLICT",
                 "The Idempotency-Key was used with a different request.")),
