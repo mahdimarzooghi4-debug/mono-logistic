@@ -24,7 +24,22 @@ public sealed class PostgresMissionLifecycleRepository(
         string idempotencyKey,
         CancellationToken cancellationToken = default) =>
         ApplyCoreAsync(missionId, eventType, reason, idempotencyKey, cancellationToken,
-            customerScopeId: null, actorType: "operations", externalReference: null);
+            customerScopeId: null, actorType: "operations", externalReference: null, courierScopeId: null);
+
+    public Task<MissionLifecycleResult> ApplyForCourierAsync(
+        string courierId, string missionId, string eventType, string reason, string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(courierId) || courierId.Length != 36 ||
+            !courierId.StartsWith("crr_", StringComparison.Ordinal) ||
+            courierId[4..].Any(character => !Uri.IsHexDigit(character) || char.IsUpper(character)))
+            throw new ArgumentException("Courier identity is invalid.", nameof(courierId));
+        if (eventType is not ("mission.arrived_pickup" or "mission.handed_to_courier" or
+            "mission.picked_up" or "mission.in_transit" or "mission.arrived_dropoff" or "mission.delivered"))
+            throw new ArgumentException("Courier mission event type is invalid.", nameof(eventType));
+        return ApplyCoreAsync(missionId, eventType, reason, idempotencyKey, cancellationToken,
+            customerScopeId: null, actorType: "courier", externalReference: null, courierScopeId: courierId);
+    }
 
     private async Task<MissionLifecycleResult> ApplyCoreAsync(
         string missionId,
@@ -34,7 +49,8 @@ public sealed class PostgresMissionLifecycleRepository(
         CancellationToken cancellationToken,
         string? customerScopeId,
         string actorType,
-        string? externalReference)
+        string? externalReference,
+        string? courierScopeId)
     {
         missionId = Required(missionId, nameof(missionId), 128);
         eventType = Required(eventType, nameof(eventType), 64);
@@ -45,9 +61,12 @@ public sealed class PostgresMissionLifecycleRepository(
         if (!MissionLifecycleTransitions.EventTypes.Contains(eventType, StringComparer.Ordinal))
             throw new ArgumentException("Mission event type is invalid.", nameof(eventType));
 
-        var actorId = actorType == "customer"
-            ? Required(customerScopeId, nameof(customerScopeId), 128)
-            : Required(operationsContext.ActorId, nameof(operationsContext.ActorId), 128);
+        var actorId = actorType switch
+        {
+            "customer" => Required(customerScopeId, nameof(customerScopeId), 128),
+            "courier" => Required(courierScopeId, nameof(courierScopeId), 128),
+            _ => Required(operationsContext.ActorId, nameof(operationsContext.ActorId), 128)
+        };
         var requestJson = actorType == "operations" && externalReference is null
             ? JsonSerializer.Serialize(new { mission_id = missionId, event_type = eventType, reason })
             : JsonSerializer.Serialize(new { mission_id = missionId, event_type = eventType, reason, external_reference = externalReference, actor_type = actorType });
@@ -62,6 +81,10 @@ public sealed class PostgresMissionLifecycleRepository(
             FROM missions
             WHERE mission_id = @mission_id
               AND (@customer_scope_id IS NULL OR customer_id = @customer_scope_id)
+              AND (@courier_scope_id IS NULL OR EXISTS (
+                  SELECT 1 FROM mission_courier_offers offer
+                  WHERE offer.mission_id = missions.mission_id
+                    AND offer.courier_id = @courier_scope_id AND offer.status = 'ACCEPTED'))
             FOR UPDATE;
             """;
         string? customerId = null;
@@ -72,6 +95,8 @@ public sealed class PostgresMissionLifecycleRepository(
             lockMission.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
             lockMission.Parameters.AddWithValue("customer_scope_id", NpgsqlDbType.Text,
                 (object?)customerScopeId ?? DBNull.Value);
+            lockMission.Parameters.AddWithValue("courier_scope_id", NpgsqlDbType.Text,
+                (object?)courierScopeId ?? DBNull.Value);
             await using var reader = await lockMission.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
@@ -246,7 +271,8 @@ public sealed class PostgresMissionLifecycleRepository(
             cancellationToken,
             customerId,
             "customer",
-            externalReference);
+            externalReference,
+            courierScopeId: null);
     }
 
     private static string Required(string? value, string parameterName, int maximumLength)
