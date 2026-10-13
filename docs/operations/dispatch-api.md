@@ -4,7 +4,7 @@ All operations routes require the Mono administrator authorization policy.
 
 ## Dispatch queue
 
-`GET /operations/v1/dispatch/queue?page_size=50&has_offer=true&deadline_passed=true&delivery_before=2026-10-13T18:00:00Z&last_attempt_before=2026-10-13T17:30:00Z&delivery_overdue=true&sort_by=delivery_due&min_attempt_count=2&max_attempt_count=4&latest_action=EXPIRED&query=mis_`
+`GET /operations/v1/dispatch/queue?page_size=50&has_offer=true&deadline_passed=true&delivery_after=2026-10-13T16:00:00Z&delivery_before=2026-10-13T18:00:00Z&last_attempt_before=2026-10-13T17:30:00Z&delivery_overdue=true&sort_by=delivery_due&min_attempt_count=2&max_attempt_count=4&latest_action=EXPIRED&query=mis_`
 
 The response contains the active offer (if any), the number of offers created for each Mission, and a summary of its latest attempt. An active offer includes `expires_at` and `deadline_passed`. The latter is computed against the API's UTC clock:
 
@@ -17,6 +17,8 @@ Use the optional `deadline_passed` query filter to return only Missions with an 
 Use the optional `latest_action` filter to focus on Missions by their most recent courier-offer action. Supported values are `OFFERED`, `ACCEPTED`, `DECLINED`, `WITHDRAWN`, `EXPIRED`, `RELEASED`, `CANCELLED`, and `COMPLETED`. The value is case-sensitive. Missions without an offer attempt do not match a supplied action. The filter is bound to cursor validation, so continue pagination with the same filters.
 
 Use the optional `delivery_before` filter to return Missions whose committed delivery time is at or before the supplied ISO 8601 timestamp. Send an explicit UTC timestamp (for example, `2026-10-13T18:00:00Z`); the comparison is inclusive. This highlights Missions with earlier committed delivery promises without changing their state. Cursor validation applies the same cutoff, so keep it unchanged when requesting later pages.
+
+Use the optional `delivery_after` filter to set an inclusive lower bound on committed delivery time. Combine it with `delivery_before` to select a delivery window; both values must be ISO 8601 timestamps, and `delivery_after` cannot be later than `delivery_before`. Cursor validation applies both bounds, so keep the complete window unchanged for every page.
 
 Use the optional `delivery_overdue` filter to focus on searching Missions whose committed delivery time has passed relative to one UTC timestamp captured for the request. The response includes `delivery_overdue` for every item; the cutoff is inclusive, so it becomes `true` at the exact committed delivery time. The same value is used for cursor validation and all rows in the page. This is an operational risk signal and does not change Mission state or automatically expire an offer.
 
