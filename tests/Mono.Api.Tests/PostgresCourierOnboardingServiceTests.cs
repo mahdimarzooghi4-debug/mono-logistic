@@ -187,6 +187,65 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         await Assert.ThrowsAsync<PostgresException>(() => deleteIdempotency.ExecuteNonQueryAsync());
     }
 
+
+    [Fact]
+    public async Task Live_presence_is_idempotent_zone_approved_and_event_maintained()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central", "zone-east");
+        var onboarding = new PostgresCourierOnboardingService(database.DataSource, new TestOperationsContext());
+        var registered = await onboarding.RegisterAsync("BIKE", ["zone-central"], "presence-register");
+        var courierId = registered.Snapshot!.CourierId;
+        var statuses = new[]
+        {
+            "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED",
+            "TRUST_REQUIREMENTS_VERIFIED", "MONO_APPROVED", "ACTIVE"
+        };
+        for (var index = 0; index < statuses.Length; index++)
+        {
+            var status = statuses[index];
+            await onboarding.AdvanceTrustAsync(
+                courierId, status,
+                status == "ACTIVE" ? ["zone-central"] : null,
+                status == "ACTIVE" ? "zone-central" : null,
+                "REVIEW_COMPLETED", $"presence:{status}", $"presence-transition-{index}");
+        }
+
+        var presence = new PostgresCourierLivePresenceService(database.DataSource);
+        var online = await presence.GoOnlineAsync(courierId, "zone-central", "presence-online");
+        Assert.Equal(CourierLivePresenceOutcome.Applied, online.Outcome);
+        Assert.Equal("ONLINE", online.Snapshot!.Status);
+        Assert.Equal("zone-central", online.Snapshot.ZoneId);
+
+        var replay = await presence.GoOnlineAsync(courierId, "zone-central", "presence-online");
+        Assert.Equal(CourierLivePresenceOutcome.Replayed, replay.Outcome);
+        Assert.Equal(online.Snapshot, replay.Snapshot);
+        var conflict = await presence.GoOnlineAsync(courierId, "zone-east", "presence-online");
+        Assert.Equal(CourierLivePresenceOutcome.Conflict, conflict.Outcome);
+
+        var offline = await presence.GoOfflineAsync(courierId, "presence-offline");
+        Assert.Equal(CourierLivePresenceOutcome.Applied, offline.Outcome);
+        Assert.Equal("OFFLINE", offline.Snapshot!.Status);
+        Assert.Null(offline.Snapshot.ZoneId);
+        var offlineReplay = await presence.GoOfflineAsync(courierId, "presence-offline");
+        Assert.Equal(CourierLivePresenceOutcome.Replayed, offlineReplay.Outcome);
+
+        var invalidZone = await presence.GoOnlineAsync(courierId, "zone-east", "presence-unapproved-zone");
+        Assert.Equal(CourierLivePresenceOutcome.InvalidZone, invalidZone.Outcome);
+        await using var connection = await database.DataSource.OpenConnectionAsync();
+        await using var mutation = new NpgsqlCommand(
+            "UPDATE courier_live_presence SET is_online = TRUE WHERE courier_id = @courier_id;", connection);
+        mutation.Parameters.AddWithValue("courier_id", courierId);
+        await Assert.ThrowsAsync<PostgresException>(() => mutation.ExecuteNonQueryAsync());
+    }
+
     private sealed class TestOperationsContext : IMonoOperationsContext
     {
         public string ActorId => "staff-operations-1";
@@ -857,6 +916,16 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var identityBindingConnection = await DataSource.OpenConnectionAsync();
             await using var identityBindingCommand = new NpgsqlCommand(identityBindingSql, identityBindingConnection);
             await identityBindingCommand.ExecuteNonQueryAsync();
+
+            const string livePresenceResourceName = "Mono.Api.Tests.Migrations.040_courier_live_presence.sql";
+            await using var livePresenceStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(livePresenceResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {livePresenceResourceName}.");
+            using var livePresenceReader = new StreamReader(livePresenceStream);
+            var livePresenceSql = await livePresenceReader.ReadToEndAsync();
+            await using var livePresenceConnection = await DataSource.OpenConnectionAsync();
+            await using var livePresenceCommand = new NpgsqlCommand(livePresenceSql, livePresenceConnection);
+            await livePresenceCommand.ExecuteNonQueryAsync();
         }
 
         public async ValueTask DisposeAsync()
