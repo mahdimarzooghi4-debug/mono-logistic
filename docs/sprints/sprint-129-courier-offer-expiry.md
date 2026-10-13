@@ -7,7 +7,7 @@ Make unanswered offers visible with a deadline and let Mono operations close the
 ## Behavior
 
 - Newly created offers receive a five-minute response window.
-- The deadline is returned by offer APIs and shown in the operations dispatch queue.
+- The deadline is returned by offer APIs and shown in the operations dispatch queue. The queue exposes `active_offer.deadline_passed` so operations can identify when the explicit expiry action is available.
 - Only an unanswered `OFFERED` record on a `SEARCHING_COURIER` mission can expire.
 - Expiry before the deadline, after courier acceptance, or after the mission leaves the dispatch queue is rejected.
 - An accepted expiry appends an `EXPIRED` event with fixed reason `OPERATIONS_EXPIRED_OFFER`; it never edits prior offer history.
