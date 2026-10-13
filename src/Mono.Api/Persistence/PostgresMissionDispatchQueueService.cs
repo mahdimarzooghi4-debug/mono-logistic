@@ -127,6 +127,7 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  AND (@delivery_after IS NULL OR m.committed_delivery_at >= @delivery_after)
                   {recencyPredicate}
               AND (@delivery_overdue IS NULL OR (m.committed_delivery_at <= @as_of) = @delivery_overdue)
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
@@ -173,6 +174,7 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  AND (@delivery_after IS NULL OR m.committed_delivery_at >= @delivery_after)
                   {recencyPredicate}
               AND (@delivery_overdue IS NULL OR (m.committed_delivery_at <= @as_of) = @delivery_overdue)
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
