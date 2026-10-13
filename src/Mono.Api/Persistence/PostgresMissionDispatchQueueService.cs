@@ -45,7 +45,7 @@ public sealed class PostgresMissionDispatchQueueService(
                     SELECT latest.action, latest.occurred_at
                     FROM mission_courier_offers previous
                     LEFT JOIN LATERAL (
-                        SELECT event.occurred_at
+                        SELECT event.action, event.occurred_at
                         FROM mission_courier_offer_events event
                         WHERE event.offer_id = previous.offer_id
                         ORDER BY event.event_sequence DESC
