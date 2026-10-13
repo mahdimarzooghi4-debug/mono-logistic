@@ -294,6 +294,25 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 Assert.Equal(courierId, reader.GetString(2));
             }
 
+            var released = await offers.ReleaseAssignmentAsync(
+                MissionId, finalOffer.Offer.OfferId, "release-before-handoff");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, released.Outcome);
+            Assert.Equal("RELEASED", released.Offer!.Status);
+            Assert.Equal("SEARCHING_COURIER", released.MissionStatus);
+            var releaseReplay = await offers.ReleaseAssignmentAsync(
+                MissionId, finalOffer.Offer.OfferId, "release-before-handoff");
+            Assert.Equal(MissionCourierOfferOutcome.Replayed, releaseReplay.Outcome);
+            Assert.Equal(released.Offer, releaseReplay.Offer);
+            Assert.Equal("SEARCHING_COURIER", await GetMissionStatusAsync(dataSource));
+
+            var reassignedOffer = await offers.CreateOfferAsync(
+                MissionId, courierId, "zone-central", "mission-offer-create-reassigned");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, reassignedOffer.Outcome);
+            var reassignedAcceptance = await offers.AcceptAsync(
+                reassignedOffer.Offer!.OfferId, courierId, "mission-offer-accept-reassigned");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, reassignedAcceptance.Outcome);
+            Assert.Equal("COURIER_ASSIGNED", reassignedAcceptance.MissionStatus);
+
             var unauthorizedCourier = await lifecycle.ApplyForCourierAsync(
                 "crr_11111111111111111111111111111111", MissionId,
                 "mission.arrived_pickup", "Wrong courier", "wrong-courier-progress");
@@ -315,6 +334,12 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                     courierId, MissionId, eventType, "Courier milestone " + index, "courier-progress-" + index);
                 Assert.Equal(MissionLifecycleOutcome.Applied, progress.Outcome);
                 Assert.Equal(expectedStatus, progress.Transition!.Status);
+                if (index == 1)
+                {
+                    var tooLateRelease = await offers.ReleaseAssignmentAsync(
+                        MissionId, reassignedOffer.Offer.OfferId, "release-after-handoff");
+                    Assert.Equal(MissionCourierOfferOutcome.InvalidState, tooLateRelease.Outcome);
+                }
                 if (index == 0)
                 {
                     var replayedProgress = await lifecycle.ApplyForCourierAsync(
@@ -326,7 +351,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal("DELIVERED", await GetMissionStatusAsync(dataSource));
             Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, created.Offer.OfferId));
             Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, replacementOffer.Offer.OfferId));
-            Assert.Equal("COMPLETED", await GetOfferStatusAsync(dataSource, finalOffer.Offer.OfferId));
+            Assert.Equal("RELEASED", await GetOfferStatusAsync(dataSource, finalOffer.Offer.OfferId));
+            Assert.Equal("COMPLETED", await GetOfferStatusAsync(dataSource, reassignedOffer.Offer.OfferId));
         }
         finally
         {
@@ -388,7 +414,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "043_courier_suspension_withdraws_offers.sql",
             "044_mission_courier_offer_history_audit.sql",
             "045_mission_courier_issue_reports.sql",
-            "046_mission_courier_issue_read_audit.sql"
+            "046_mission_courier_issue_read_audit.sql",
+            "047_mission_courier_assignment_release.sql"
         };
         foreach (var migrationName in migrationNames)
         {
