@@ -125,6 +125,7 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 134 — Batch overdue offer expiry](docs/sprints/sprint-134-batched-overdue-expiry.md)
 - [Sprint 135 — Batched dispatch offers](docs/sprints/sprint-135-batched-dispatch-offers.md)
 - [Sprint 136 — Dispatch outcome filter](docs/sprints/sprint-136-dispatch-outcome-filter.md)
+- [Sprint 137 — Dispatch delivery deadline filter](docs/sprints/sprint-137-dispatch-delivery-deadline-filter.md)
 - [Policy Draft Authoring API](docs/operations/policy-authoring-api.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)
