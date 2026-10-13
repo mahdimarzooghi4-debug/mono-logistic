@@ -11,7 +11,7 @@ public sealed class PostgresMissionDispatchQueueService(
     private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
     public async Task<MissionDispatchQueuePage?> ListAsync(
         int pageSize, bool? hasOffer, string? query, string? cursor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool? deadlinePassed = null)
     {
         if (pageSize is < 1 or > 100 ||
             !MissionOperationsInputValidator.IsValidQuery(query) ||
@@ -19,6 +19,7 @@ public sealed class PostgresMissionDispatchQueueService(
             throw new ArgumentException("Dispatch queue filters are invalid.");
 
         var normalizedQuery = query?.ToLowerInvariant();
+        var asOf = _timeProvider.GetUtcNow();
         DateTimeOffset? cursorCreatedAt = null;
         if (cursor is not null)
         {
@@ -28,6 +29,8 @@ public sealed class PostgresMissionDispatchQueueService(
                 LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
                 WHERE m.mission_id = @mission_id AND m.status = 'SEARCHING_COURIER'
                   AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
+                  AND (@deadline_passed IS NULL OR
+                       (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
                   AND (@query_pattern IS NULL
                        OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                        OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -35,7 +38,7 @@ public sealed class PostgresMissionDispatchQueueService(
                 """;
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(cursorSql, connection);
-            AddFilterParameters(command, hasOffer, normalizedQuery);
+            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, asOf);
             command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, cursor);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
@@ -72,6 +75,8 @@ public sealed class PostgresMissionDispatchQueueService(
             ) latest_attempt ON TRUE
             WHERE m.status = 'SEARCHING_COURIER'
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
+              AND (@deadline_passed IS NULL OR
+                   (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -108,6 +113,8 @@ public sealed class PostgresMissionDispatchQueueService(
             ) latest_attempt ON TRUE
             WHERE m.status = 'SEARCHING_COURIER'
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
+              AND (@deadline_passed IS NULL OR
+                   (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -120,7 +127,7 @@ public sealed class PostgresMissionDispatchQueueService(
 
         await using var pageConnection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var pageCommand = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, pageConnection);
-        AddFilterParameters(pageCommand, hasOffer, normalizedQuery);
+        AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, asOf);
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
@@ -163,11 +170,15 @@ public sealed class PostgresMissionDispatchQueueService(
         return new MissionDispatchQueuePage(items, nextCursor);
     }
 
-    private static void AddFilterParameters(NpgsqlCommand command, bool? hasOffer, string? query)
+    private static void AddFilterParameters(
+        NpgsqlCommand command, bool? hasOffer, string? query, bool? deadlinePassed, DateTimeOffset asOf)
     {
         command.Parameters.AddWithValue("has_offer", NpgsqlDbType.Boolean, (object?)hasOffer ?? DBNull.Value);
         command.Parameters.AddWithValue("query_pattern", NpgsqlDbType.Text,
             query is null ? DBNull.Value : BuildPrefixPattern(query));
+        command.Parameters.AddWithValue("deadline_passed", NpgsqlDbType.Boolean,
+            (object?)deadlinePassed ?? DBNull.Value);
+        command.Parameters.AddWithValue("as_of", NpgsqlDbType.TimestampTz, asOf);
     }
 
     private static string BuildPrefixPattern(string query) =>
