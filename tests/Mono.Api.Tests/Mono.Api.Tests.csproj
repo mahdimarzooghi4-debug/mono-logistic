@@ -57,5 +57,6 @@
     <EmbeddedResource Include="../../db/migrations/036_courier_planned_capacity_audit_action.sql" LogicalName="Mono.Api.Tests.Migrations.036_courier_planned_capacity_audit_action.sql" />
     <EmbeddedResource Include="../../db/migrations/037_courier_operational_suspension.sql" LogicalName="Mono.Api.Tests.Migrations.037_courier_operational_suspension.sql" />
     <EmbeddedResource Include="../../db/migrations/038_courier_planning_eligibility_audit_action.sql" LogicalName="Mono.Api.Tests.Migrations.038_courier_planning_eligibility_audit_action.sql" />
+    <EmbeddedResource Include="../../db/migrations/039_courier_identity_bindings.sql" LogicalName="Mono.Api.Tests.Migrations.039_courier_identity_bindings.sql" />
   </ItemGroup>
 </Project>

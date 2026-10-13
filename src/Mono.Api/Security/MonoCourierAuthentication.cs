@@ -67,54 +67,57 @@ public sealed class HttpMonoCourierContext(IHttpContextAccessor httpContextAcces
     }
 }
 
-/// <summary>
-/// Validates courier JWT identity claims against the current persisted courier state.
-/// The configured authority is trusted to issue mono/courier_id only after verified account binding.
-/// </summary>
+/// <summary>Resolves a validated issuer subject through Mono's current identity binding.</summary>
 public sealed class MonoCourierTokenValidator(NpgsqlDataSource dataSource)
 {
-    private static readonly Regex CourierIdPattern = new(
-        @"\Acrr_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
-
     public async Task<bool> ValidateAsync(
         ClaimsPrincipal? principal,
+        string? validatedIssuer,
         CancellationToken cancellationToken = default)
     {
         var identities = principal?.Identities.Where(identity => identity.IsAuthenticated).ToArray() ?? [];
-        if (identities.Length != 1)
+        if (identities.Length != 1 ||
+            !Uri.TryCreate(validatedIssuer, UriKind.Absolute, out var issuerUri) ||
+            !string.Equals(issuerUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
             return false;
 
         var identity = identities[0];
         var subjects = identity.FindAll(MonoCourierClaimTypes.Subject).ToArray();
-        var courierIds = identity.FindAll(MonoCourierClaimTypes.CourierId).ToArray();
         var roles = identity.FindAll(MonoCourierClaimTypes.Role).ToArray();
-        var domainClaims = identity.FindAll(MonoCourierClaimTypes.IdentityDomain).ToArray();
         if (subjects.Length != 1 || string.IsNullOrWhiteSpace(subjects[0].Value) ||
-            courierIds.Length != 1 || !CourierIdPattern.IsMatch(courierIds[0].Value) ||
+            subjects[0].Value.Length > 512 || subjects[0].Value.Any(char.IsControl) ||
             roles.Length != 1 || !string.Equals(roles[0].Value, MonoCourierDefaults.RoleValue, StringComparison.Ordinal) ||
-            domainClaims.Length != 0)
+            identity.FindAll(MonoCourierClaimTypes.CourierId).Any() ||
+            identity.FindAll(MonoCourierClaimTypes.IdentityDomain).Any())
             return false;
 
         const string sql = """
-            SELECT courier.status,
+            SELECT binding.courier_id, courier.status,
                 COALESCE(latest.action = 'SUSPENDED', FALSE)
-            FROM couriers courier
+            FROM courier_identity_bindings binding
+            JOIN couriers courier ON courier.courier_id = binding.courier_id
             LEFT JOIN LATERAL (
                 SELECT action FROM courier_operational_status_events
                 WHERE courier_id = courier.courier_id
                 ORDER BY event_sequence DESC LIMIT 1
             ) latest ON TRUE
-            WHERE courier.courier_id = @courier_id;
+            WHERE binding.issuer = @issuer
+              AND binding.subject = @subject
+              AND binding.status = 'BOUND';
             """;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierIds[0].Value);
+        command.Parameters.AddWithValue("issuer", NpgsqlDbType.Text, validatedIssuer);
+        command.Parameters.AddWithValue("subject", NpgsqlDbType.Text, subjects[0].Value);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken) ||
-            !string.Equals(reader.GetString(0), "ACTIVE", StringComparison.Ordinal) ||
-            reader.GetBoolean(1))
+            !string.Equals(reader.GetString(1), "ACTIVE", StringComparison.Ordinal) ||
+            reader.GetBoolean(2))
             return false;
 
+        identity.AddClaim(new Claim(
+            MonoCourierClaimTypes.CourierId, reader.GetString(0),
+            ClaimValueTypes.String, MonoCourierDefaults.Scheme));
         identity.AddClaim(new Claim(
             MonoCourierClaimTypes.IdentityDomain,
             MonoCourierDefaults.IdentityDomainValue,
@@ -180,7 +183,7 @@ public static class MonoCourierAuthenticationExtensions
                         var validator = context.HttpContext.RequestServices
                             .GetRequiredService<MonoCourierTokenValidator>();
                         if (!await validator.ValidateAsync(
-                                context.Principal, context.HttpContext.RequestAborted))
+                                context.Principal, context.SecurityToken.Issuer, context.HttpContext.RequestAborted))
                             context.Fail("The courier token is not bound to an active, unsuspended Mono courier.");
                     }
                 };

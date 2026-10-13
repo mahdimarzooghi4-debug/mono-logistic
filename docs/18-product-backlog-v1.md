@@ -353,6 +353,7 @@ REGISTERED
 ### E10.1 Candidate Generation
 - Sprint 115 adds an MFA-gated, audited planning-eligibility preview that explains per-courier inclusion or exclusion for a zone/time window using trust status, suspension, zone approval, and scheduled availability. It is planning-only and does not authorize assignment or dispatch.
 - Sprint 116 adds a separate, configurable OIDC/JWT courier authentication boundary and minimal self-session endpoint. Tokens are checked against current ACTIVE/unsuspended state; authority, verified mobile binding, and token provisioning remain unconfigured.
+- Sprint 117 adds MFA-gated, idempotent Mono-owned courier identity binding and revocation, append-only event history, and exact issuer+subject resolution during JWT validation. Provider setup, phone verification, OTP delivery, and token provisioning remain unconfigured.
 - available couriers
 - active routes
 - eligible modes
