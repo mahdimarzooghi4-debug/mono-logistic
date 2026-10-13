@@ -164,8 +164,40 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 (await lifecycle.ApplyAsync(MissionId, "mission.searching_courier",
                     "Dispatch initiated", "offer-searching")).Outcome);
 
+            const string secondaryMissionId = "mis_11111111111111111111111111111111";
+            await using (var seedSecondary = await dataSource.OpenConnectionAsync())
+            await using (var insertSecondary = new NpgsqlCommand("""
+                INSERT INTO missions (
+                    mission_id, customer_id, delivery_request_id, committed_delivery_at, created_at, status)
+                VALUES (
+                    @mission_id, @customer_id, 'drq_11111111111111111111111111111111',
+                    now() - interval '1 day', now() + interval '1 minute', 'SEARCHING_COURIER');
+                """, seedSecondary))
+            {
+                insertSecondary.Parameters.AddWithValue("mission_id", secondaryMissionId);
+                insertSecondary.Parameters.AddWithValue("customer_id", CustomerId);
+                await insertSecondary.ExecuteNonQueryAsync();
+            }
+
             var dispatchClock = new AdjustableTimeProvider(DateTimeOffset.UtcNow.AddDays(-1));
             var dispatchQueue = new PostgresMissionDispatchQueueService(dataSource, dispatchClock);
+            var dueFirstPage = await dispatchQueue.ListAsync(1, null, null, null, sortBy: "delivery_due");
+            Assert.Equal(secondaryMissionId, Assert.Single(dueFirstPage!.Items).MissionId);
+            Assert.Equal(secondaryMissionId, dueFirstPage.NextCursor);
+            var dueSecondPage = await dispatchQueue.ListAsync(
+                1, null, null, dueFirstPage.NextCursor, sortBy: "delivery_due");
+            Assert.Equal(MissionId, Assert.Single(dueSecondPage!.Items).MissionId);
+            Assert.Null(dueSecondPage.NextCursor);
+            var defaultFirstPage = await dispatchQueue.ListAsync(1, null, null, null);
+            Assert.Equal(secondaryMissionId, Assert.Single(defaultFirstPage!.Items).MissionId);
+            await using (var removeSecondary = await dataSource.OpenConnectionAsync())
+            await using (var deleteSecondary = new NpgsqlCommand(
+                "DELETE FROM missions WHERE mission_id = @mission_id;", removeSecondary))
+            {
+                deleteSecondary.Parameters.AddWithValue("mission_id", secondaryMissionId);
+                await deleteSecondary.ExecuteNonQueryAsync();
+            }
+
             var dispatchAudit = new PostgresMissionOperationsReadAuditService(dataSource, context);
             var pendingBeforeOffer = await dispatchQueue.ListAsync(20, false, null, null);
             Assert.Single(pendingBeforeOffer!.Items);
