@@ -213,7 +213,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 1, null, null, null, deliveryAfter: primaryDeliveryAt);
             var cursorRejectedByChangedDeliveryWindow = await dispatchQueue.ListAsync(
                 1, null, null, windowFirstPage!.NextCursor,
-                deliveryAfter: deliveryWindow.Items[1].CommittedDeliveryAt.AddMilliseconds(1));
+                deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt.AddMilliseconds(1));
             Assert.Null(cursorRejectedByChangedDeliveryWindow);
             await Assert.ThrowsAsync<ArgumentException>(() => dispatchQueue.ListAsync(
                 10, null, null, null,
