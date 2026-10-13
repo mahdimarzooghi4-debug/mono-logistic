@@ -54,6 +54,27 @@ Each command carries its own idempotency key. Duplicate offer IDs are rejected b
 
 The batch route returns HTTP 400 for an invalid command list. An item with `InvalidState` means it was not expired, for example because its deadline has not passed or it has already been answered. Use the single-offer route when one HTTP status per operation is preferable.
 
-## Attempt history
+## Create offers in a batch
+
+Operations can explicitly offer up to 20 distinct searching Missions to selected couriers in one request:
+
+```http
+POST /operations/v1/dispatch/offers/batch
+Content-Type: application/json
+
+{
+  "commands": [
+    {
+      "mission_id": "mis_...",
+      "courier_id": "crr_...",
+      "zone_id": "zone-central",
+      "idempotency_key": "offer-mission-..."
+    }
+  ]
+}
+```
+
+The full list is validated before execution. Duplicate Mission IDs are rejected, and each command requires its own Mission-scoped idempotency key. Items then use the regular offer rules and commit independently; the response contains one outcome per command, so partial success is possible. Retry with the original commands and keys. Couriers still explicitly accept or decline, and batch submission does not rank or select couriers.
+
 
 `GET /operations/v1/missions/{missionId}/dispatch-attempts` returns up to 100 offers newest first, with each offer's current status and latest event action, actor, reason, and timestamp. Successful reads are recorded as `MISSION_DISPATCH_ATTEMPT_HISTORY` audit events. The per-offer `/events` route returns the full event sequence.
