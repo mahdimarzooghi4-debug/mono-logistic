@@ -48,6 +48,7 @@ public static class MonoMissionOperationsEndpoints
                 [FromQuery(Name = "page_size")] int? pageSize,
                 [FromQuery(Name = "has_offer")] bool? hasOffer,
                 [FromQuery(Name = "deadline_passed")] bool? deadlinePassed,
+                [FromQuery(Name = "delivery_before")] DateTimeOffset? deliveryBefore,
                 [FromQuery(Name = "latest_action")] string? latestAction,
                 string? query,
                 string? cursor,
@@ -65,7 +66,7 @@ public static class MonoMissionOperationsEndpoints
                         new ApiError("INVALID_REQUEST", "Dispatch queue filters are invalid.")));
 
                 var page = await dispatchQueue.ListAsync(
-                    size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction);
+                    size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction, deliveryBefore);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));
