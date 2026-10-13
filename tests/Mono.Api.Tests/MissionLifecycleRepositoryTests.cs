@@ -228,6 +228,9 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             var atLeastTwoAttempts = await dispatchQueue.ListAsync(
                 20, null, null, null, minAttemptCount: 2);
             Assert.Empty(atLeastTwoAttempts!.Items);
+            var cursorRejectedByAttemptFilter = await dispatchQueue.ListAsync(
+                20, null, null, MissionId, minAttemptCount: 2);
+            Assert.Null(cursorRejectedByAttemptFilter);
             var atMostOneAttempt = await dispatchQueue.ListAsync(
                 20, null, null, null, maxAttemptCount: 1);
             Assert.Single(atMostOneAttempt!.Items);
