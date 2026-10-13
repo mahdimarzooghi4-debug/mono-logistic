@@ -120,6 +120,13 @@ public sealed class PostgresCourierIdentityBindingService(
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var lockIdempotency = new NpgsqlCommand(
+            "SELECT pg_advisory_xact_lock(hashtextextended(@lock_key, 0));", connection, transaction))
+        {
+            lockIdempotency.Parameters.AddWithValue("lock_key", NpgsqlDbType.Text,
+                string.Join("\\n", actorId, operation, idempotencyKey));
+            await lockIdempotency.ExecuteNonQueryAsync(cancellationToken);
+        }
         await using (var lockCourier = new NpgsqlCommand(
             "SELECT courier_id FROM couriers WHERE courier_id = @courier_id FOR UPDATE;", connection, transaction))
         {
