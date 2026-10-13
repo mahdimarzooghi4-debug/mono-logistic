@@ -164,13 +164,28 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 (await lifecycle.ApplyAsync(MissionId, "mission.searching_courier",
                     "Dispatch initiated", "offer-searching")).Outcome);
 
-            var dispatchQueue = new PostgresMissionDispatchQueueService(dataSource);
+            var dispatchClock = new AdjustableTimeProvider(DateTimeOffset.UtcNow.AddDays(-1));
+            var dispatchQueue = new PostgresMissionDispatchQueueService(dataSource, dispatchClock);
             var dispatchAudit = new PostgresMissionOperationsReadAuditService(dataSource, context);
             var pendingBeforeOffer = await dispatchQueue.ListAsync(20, false, null, null);
             Assert.Single(pendingBeforeOffer!.Items);
             Assert.Null(pendingBeforeOffer.Items[0].ActiveOffer);
             Assert.Equal(0, pendingBeforeOffer.Items[0].AttemptCount);
             Assert.Null(pendingBeforeOffer.Items[0].LatestAttempt);
+            Assert.False(pendingBeforeOffer.Items[0].DeliveryOverdue);
+            var committedDeliveryCutoff = pendingBeforeOffer.Items[0].CommittedDeliveryAt;
+            var nonOverdueQueue = await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryOverdue: false);
+            Assert.Single(nonOverdueQueue!.Items);
+            dispatchClock.Set(committedDeliveryCutoff);
+            var overdueAtExactDeadline = await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryOverdue: true);
+            Assert.Single(overdueAtExactDeadline!.Items);
+            Assert.True(overdueAtExactDeadline.Items[0].DeliveryOverdue);
+            dispatchClock.Set(committedDeliveryCutoff.AddTicks(-1));
+            var cursorRejectedByDeliveryOverdueFilter = await dispatchQueue.ListAsync(
+                20, null, null, MissionId, deliveryOverdue: true);
+            Assert.Null(cursorRejectedByDeliveryOverdueFilter);
             var noAttemptMatchesRecencyCutoff = await dispatchQueue.ListAsync(
                 20, null, null, null, lastAttemptBefore: DateTimeOffset.UtcNow.AddDays(1));
             Assert.Empty(noAttemptMatchesRecencyCutoff!.Items);
