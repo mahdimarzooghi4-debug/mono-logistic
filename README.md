@@ -126,6 +126,7 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 135 — Batched dispatch offers](docs/sprints/sprint-135-batched-dispatch-offers.md)
 - [Sprint 136 — Dispatch outcome filter](docs/sprints/sprint-136-dispatch-outcome-filter.md)
 - [Sprint 137 — Dispatch delivery deadline filter](docs/sprints/sprint-137-dispatch-delivery-deadline-filter.md)
+- [Sprint 138 — Dispatch attempt count filters](docs/sprints/sprint-138-dispatch-attempt-count-filters.md)
 - [Policy Draft Authoring API](docs/operations/policy-authoring-api.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)
