@@ -54,6 +54,30 @@ public static class MonoMissionCourierOfferEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapPost("/operations/v1/missions/{missionId}/courier-offers/{offerId}/withdraw", async (
+                string missionId,
+                string offerId,
+                HttpRequest request,
+                PostgresMissionCourierOfferService offers,
+                CancellationToken cancellationToken) =>
+            {
+                if (!TryReadIdempotencyKey(request, out var key))
+                    return Results.BadRequest(Error("INVALID_REQUEST",
+                        "Exactly one valid Idempotency-Key header is required."));
+                try
+                {
+                    var queue = await offers.ListForMissionAsync(missionId, cancellationToken);
+                    if (!queue.Any(offer => offer.OfferId == offerId))
+                        return Results.NotFound(Error("MISSION_OFFER_NOT_FOUND", "The mission offer was not found."));
+                    return Map(await offers.WithdrawAsync(offerId, key, cancellationToken));
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(Error("INVALID_REQUEST", "Mission or offer ID is invalid."));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapGet("/courier/v1/mission-offers", async (
                 IMonoCourierContext courier,
                 PostgresMissionCourierOfferService offers,
