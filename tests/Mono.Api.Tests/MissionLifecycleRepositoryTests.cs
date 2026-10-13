@@ -199,14 +199,27 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(MissionCourierOfferOutcome.Applied, replacementOffer.Outcome);
             Assert.Equal("OFFERED", replacementOffer.Offer!.Status);
 
+            var suspension = new PostgresCourierSuspensionService(dataSource, context);
+            var suspended = await suspension.SuspendAsync(courierId, "TEST_SUSPENSION", "offer-courier-suspend");
+            Assert.Equal(CourierOperationalStatusOutcome.Applied, suspended.Outcome);
+            Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, replacementOffer.Offer.OfferId));
+            Assert.Contains(suspended.Snapshot!.History, item => item.Action == "SUSPENDED");
+
+            var reinstated = await suspension.ReinstateAsync(courierId, "TEST_REINSTATEMENT", "offer-courier-reinstate");
+            Assert.Equal(CourierOperationalStatusOutcome.Applied, reinstated.Outcome);
+            var finalOffer = await offers.CreateOfferAsync(
+                MissionId, courierId, "zone-central", "mission-offer-create-after-reinstate");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, finalOffer.Outcome);
+            Assert.Equal("OFFERED", finalOffer.Offer!.Status);
+
             var accepted = await offers.AcceptAsync(
-                replacementOffer.Offer.OfferId, courierId, "mission-offer-accept");
+                finalOffer.Offer.OfferId, courierId, "mission-offer-accept");
             Assert.Equal(MissionCourierOfferOutcome.Applied, accepted.Outcome);
             Assert.Equal("ACCEPTED", accepted.Offer!.Status);
             Assert.Equal("COURIER_ASSIGNED", accepted.MissionStatus);
 
             var acceptedReplay = await offers.AcceptAsync(
-                replacementOffer.Offer.OfferId, courierId, "mission-offer-accept");
+                finalOffer.Offer.OfferId, courierId, "mission-offer-accept");
             Assert.Equal(MissionCourierOfferOutcome.Replayed, acceptedReplay.Outcome);
             Assert.Equal(accepted.Offer, acceptedReplay.Offer);
 
@@ -235,7 +248,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 MissionId, "mission.cancelled", "Cancellation before handoff", "offer-mission-cancel");
             Assert.Equal(MissionLifecycleOutcome.Applied, cancelled.Outcome);
             Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, created.Offer.OfferId));
-            Assert.Equal("CANCELLED", await GetOfferStatusAsync(dataSource, replacementOffer.Offer.OfferId));
+            Assert.Equal("WITHDRAWN", await GetOfferStatusAsync(dataSource, replacementOffer.Offer.OfferId));
+            Assert.Equal("CANCELLED", await GetOfferStatusAsync(dataSource, finalOffer.Offer.OfferId));
         }
         finally
         {
