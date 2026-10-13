@@ -844,7 +844,7 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var planningEligibilityCommand = new NpgsqlCommand(planningEligibilitySql, planningEligibilityConnection);
             await planningEligibilityCommand.ExecuteNonQueryAsync();
 
-            const identityBindingResourceName = "Mono.Api.Tests.Migrations.039_courier_identity_bindings.sql";
+            const string identityBindingResourceName = "Mono.Api.Tests.Migrations.039_courier_identity_bindings.sql";
             await using var identityBindingStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
                 .GetManifestResourceStream(identityBindingResourceName)
                 ?? throw new InvalidOperationException($"Missing embedded migration resource {identityBindingResourceName}.");
