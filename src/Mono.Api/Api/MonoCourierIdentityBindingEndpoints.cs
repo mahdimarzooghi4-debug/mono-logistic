@@ -26,7 +26,7 @@ public static class MonoCourierIdentityBindingEndpoints
                 return Results.BadRequest(Error("INVALID_REQUEST", "Exactly one valid Idempotency-Key header is required."));
             try
             {
-                var result = await bindings.BindAsync(courierId, input.Subject ?? string.Empty,
+                var result = await bindings.BindIdentityAsync(courierId, input.Subject ?? string.Empty,
                     input.ReasonCode ?? string.Empty, input.EvidenceReference ?? string.Empty, key, cancellationToken);
                 return Map(result);
             }
