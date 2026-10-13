@@ -269,6 +269,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             dispatchClock.Set(committedDeliveryCutoff.AddMilliseconds(1));
             Assert.Empty((await dispatchQueue.ListAsync(
                 20, null, null, null, deliveryDueWithinMinutes: 5))!.Items);
+            dispatchClock.Set(committedDeliveryCutoff.AddMilliseconds(-1));
             var nonOverdueQueue = await dispatchQueue.ListAsync(
                 20, null, null, null, deliveryOverdue: false);
             Assert.Single(nonOverdueQueue!.Items);
