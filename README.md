@@ -121,6 +121,7 @@ Business decisions should be documented here before they become product or imple
 
 - [Internal API Key Provisioning](docs/operations/api-key-provisioning.md)
 - [Dispatch Operations API](docs/operations/dispatch-api.md)
+- [Sprint 133 — Dispatch deadline filter](docs/sprints/sprint-133-dispatch-deadline-filter.md)
 - [Policy Draft Authoring API](docs/operations/policy-authoring-api.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)
