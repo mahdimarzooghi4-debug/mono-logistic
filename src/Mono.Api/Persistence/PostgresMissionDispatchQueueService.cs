@@ -14,7 +14,7 @@ public sealed class PostgresMissionDispatchQueueService(
         CancellationToken cancellationToken = default, bool? deadlinePassed = null, string? latestAction = null,
         DateTimeOffset? deliveryBefore = null, int? minAttemptCount = null, int? maxAttemptCount = null,
         DateTimeOffset? lastAttemptBefore = null, bool? deliveryOverdue = null, string? sortBy = null, DateTimeOffset? deliveryAfter = null, string? deliveryWindowState = null,
-        int? deliveryDueWithinMinutes = null)
+        int? deliveryDueWithinMinutes = null, string? customerId = null)
     {
         if (pageSize is < 1 or > 100 ||
             !MissionOperationsInputValidator.IsValidQuery(query) ||
@@ -22,6 +22,7 @@ public sealed class PostgresMissionDispatchQueueService(
             !IsValidLatestAction(latestAction) ||
             !IsValidSortBy(sortBy) ||
             !IsValidDeliveryWindowState(deliveryWindowState) ||
+            !IsValidCustomerId(customerId) ||
             (deliveryDueWithinMinutes.HasValue &&
              (deliveryDueWithinMinutes.Value < 1 || deliveryDueWithinMinutes.Value > 10080)) ||
             (deliveryAfter.HasValue && deliveryBefore.HasValue && deliveryAfter.Value > deliveryBefore.Value) ||
@@ -31,6 +32,7 @@ public sealed class PostgresMissionDispatchQueueService(
             throw new ArgumentException("Dispatch queue filters are invalid.");
 
         var normalizedQuery = query?.ToLowerInvariant();
+        var customerIdPredicate = customerId is null ? string.Empty : "AND m.customer_id = @customer_id";
         var asOf = _timeProvider.GetUtcNow();
         DateTimeOffset? deliveryDueThrough = deliveryDueWithinMinutes.HasValue
             ? asOf.AddMinutes(deliveryDueWithinMinutes.Value)
@@ -86,6 +88,7 @@ public sealed class PostgresMissionDispatchQueueService(
                     LIMIT 1
                 ) latest_attempt ON TRUE
                 WHERE m.mission_id = @mission_id AND m.status = 'SEARCHING_COURIER'
+                  {customerIdPredicate}
                   AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
                   AND (@deadline_passed IS NULL OR
                        (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
@@ -106,7 +109,7 @@ public sealed class PostgresMissionDispatchQueueService(
                 """;
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(cursorSql, connection);
-            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, deliveryAfter, deliveryWindowState, deliveryDueThrough, asOf);
+            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, deliveryAfter, deliveryWindowState, deliveryDueThrough, asOf, customerId);
             command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, cursor);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
@@ -145,6 +148,7 @@ public sealed class PostgresMissionDispatchQueueService(
                 LIMIT 1
             ) latest_attempt ON TRUE
             WHERE m.status = 'SEARCHING_COURIER'
+              {customerIdPredicate}
               AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
               AND (@deadline_passed IS NULL OR
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
@@ -221,7 +225,7 @@ public sealed class PostgresMissionDispatchQueueService(
         await using var pageCommand = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, pageConnection);
         AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction,
             deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore,
-            deliveryOverdue, deliveryAfter, deliveryWindowState, deliveryDueThrough, asOf);
+            deliveryOverdue, deliveryAfter, deliveryWindowState, deliveryDueThrough, asOf, customerId);
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
@@ -270,7 +274,7 @@ public sealed class PostgresMissionDispatchQueueService(
     private static void AddFilterParameters(
         NpgsqlCommand command, bool? hasOffer, string? query, bool? deadlinePassed,
         string? latestAction, DateTimeOffset? deliveryBefore, int? minAttemptCount, int? maxAttemptCount, DateTimeOffset? lastAttemptBefore, bool? deliveryOverdue, DateTimeOffset? deliveryAfter,
-        string? deliveryWindowState, DateTimeOffset? deliveryDueThrough, DateTimeOffset asOf)
+        string? deliveryWindowState, DateTimeOffset? deliveryDueThrough, DateTimeOffset asOf, string? customerId)
     {
         command.Parameters.AddWithValue("has_offer", NpgsqlDbType.Boolean, (object?)hasOffer ?? DBNull.Value);
         command.Parameters.AddWithValue("query_pattern", NpgsqlDbType.Text,
@@ -278,6 +282,8 @@ public sealed class PostgresMissionDispatchQueueService(
         command.Parameters.AddWithValue("deadline_passed", NpgsqlDbType.Boolean,
             (object?)deadlinePassed ?? DBNull.Value);
         command.Parameters.AddWithValue("as_of", NpgsqlDbType.TimestampTz, asOf);
+        if (customerId is not null)
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
         command.Parameters.AddWithValue("latest_action", NpgsqlDbType.Text,
             latestAction is null ? DBNull.Value : latestAction);
         command.Parameters.AddWithValue("delivery_before", NpgsqlDbType.TimestampTz,
@@ -298,6 +304,11 @@ public sealed class PostgresMissionDispatchQueueService(
             command.Parameters.AddWithValue(
                 "delivery_due_through", NpgsqlDbType.TimestampTz, deliveryDueThrough.Value);
     }
+
+    private static bool IsValidCustomerId(string? customerId) =>
+        customerId is null ||
+        (customerId.Length == 36 && customerId.StartsWith("cus_", StringComparison.Ordinal) &&
+         customerId.Skip(4).All(character => char.IsAsciiHexDigit(character) && !char.IsUpper(character)));
 
     private static bool IsValidDeliveryWindowState(string? state) =>
         state is null or "upcoming" or "due_now" or "overdue";
