@@ -142,3 +142,4 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 115 — Explainable courier planning eligibility](docs/sprints/sprint-115-courier-planning-eligibility-preview.md)
 - [Sprint 116 — Courier authentication boundary](docs/sprints/sprint-116-courier-authentication-boundary.md)
 - [Sprint 117 — Mono-managed courier identity binding](docs/sprints/sprint-117-courier-identity-binding.md)
+- [Sprint 118 — Courier live presence](docs/sprints/sprint-118-courier-live-presence.md)
