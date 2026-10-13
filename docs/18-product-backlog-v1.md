@@ -360,6 +360,7 @@ REGISTERED
 - approved zones
 
 ### E10.2 Offer Lifecycle
+- Sprint 135 adds an administrator-only bounded batch API for explicit offers to distinct Missions, validating all commands before execution and preserving independent idempotency and per-item outcomes.
 - offer
 - accept
 - reject
