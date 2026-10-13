@@ -4,9 +4,11 @@ All operations routes require the Mono administrator authorization policy.
 
 ## Dispatch queue
 
-`GET /operations/v1/dispatch/queue?page_size=50&has_offer=true&deadline_passed=true&delivery_after=2026-10-13T16:00:00Z&delivery_before=2026-10-13T18:00:00Z&delivery_window_state=upcoming&customer_id=cus_0123456789abcdef0123456789abcdef&last_attempt_before=2026-10-13T17:30:00Z&delivery_overdue=true&sort_by=delivery_due&min_attempt_count=2&max_attempt_count=4&latest_action=EXPIRED&query=mis_`
+`GET /operations/v1/dispatch/queue?page_size=50&has_offer=true&deadline_passed=true&delivery_after=2026-10-13T16:00:00Z&delivery_before=2026-10-13T18:00:00Z&delivery_window_state=upcoming&created_before=2026-10-13T17:00:00Z&customer_id=cus_0123456789abcdef0123456789abcdef&last_attempt_before=2026-10-13T17:30:00Z&delivery_overdue=true&sort_by=delivery_due&min_attempt_count=2&max_attempt_count=4&latest_action=EXPIRED&query=mis_`
 
 The response contains the active offer (if any), the number of offers created for each Mission, a summary of its latest attempt, and `delivery_window_state`, computed from the same UTC timestamp captured for the request. Its values are `upcoming` before the committed delivery time, `due_now` at the exact timestamp, and `overdue` after it. The existing `delivery_overdue` boolean remains inclusive and is `true` at the exact timestamp, so it is also true when `delivery_window_state` is `due_now`. Use the optional `delivery_window_state` query filter to return only one of these three states. It is evaluated against the same request timestamp and is applied during cursor validation; keep it unchanged throughout pagination.
+
+Use the optional `created_before` filter to find Missions created at or before an explicit ISO 8601 timestamp. Send an explicit UTC timestamp; the cutoff is inclusive and uses Mission creation time as queue waiting age. Cursor validation and all page queries apply the same cutoff, so keep it unchanged while paging.
 
 Use the optional `customer_id` filter to restrict the queue to one exact customer ID (for example, `cus_0123456789abcdef0123456789abcdef`). Omit it for the full Mono operations queue. The ID is validated and the exact customer scope is applied during cursor validation and every page query; keep it unchanged while paging.
 
