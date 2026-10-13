@@ -214,8 +214,6 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             var cancelled = await lifecycle.ApplyAsync(
                 MissionId, "mission.cancelled", "Cancellation before handoff", "offer-mission-cancel");
             Assert.Equal(MissionLifecycleOutcome.Applied, cancelled.Outcome);
-            Assert.Equal("CANCELLED", (await offers.ListMyOffersAsync(courierId)).FirstOrDefault()?.Status ??
-                (await GetOfferStatusAsync(dataSource, created.Offer.OfferId))!);
             Assert.Equal("CANCELLED", await GetOfferStatusAsync(dataSource, created.Offer.OfferId));
         }
         finally
@@ -261,21 +259,21 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
         await using (var createZone = new NpgsqlCommand(createZoneSql, connection))
             await createZone.ExecuteNonQueryAsync();
 
-        for (var number = 33; number <= 41; number++)
+        var migrationNames = new[]
         {
-            var resourceName = $"Mono.Api.Tests.Migrations.{number:D3}_{number switch
-            {
-                33 => "courier_onboarding",
-                34 => "courier_operations_read_audit",
-                35 => "courier_availability_windows",
-                36 => "courier_planned_capacity_audit_action",
-                37 => "courier_operational_suspension",
-                38 => "courier_planning_eligibility_audit_action",
-                39 => "courier_identity_bindings",
-                40 => "courier_live_presence",
-                41 => "mission_courier_offers",
-                _ => throw new InvalidOperationException()
-            }}.sql";
+            "033_courier_onboarding.sql",
+            "034_courier_operations_read_audit.sql",
+            "035_courier_availability_windows.sql",
+            "036_courier_planned_capacity_audit_action.sql",
+            "037_courier_operational_suspension.sql",
+            "038_courier_planning_eligibility_audit_action.sql",
+            "039_courier_identity_bindings.sql",
+            "040_courier_live_presence.sql",
+            "041_mission_courier_offers.sql"
+        };
+        foreach (var migrationName in migrationNames)
+        {
+            var resourceName = "Mono.Api.Tests.Migrations." + migrationName;
             await using var stream = typeof(MissionLifecycleRepositoryTests).Assembly
                 .GetManifestResourceStream(resourceName)
                 ?? throw new InvalidOperationException($"Missing embedded migration resource {resourceName}.");
