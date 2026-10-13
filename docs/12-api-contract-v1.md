@@ -811,7 +811,15 @@ The response is classified `PLANNED_CAPACITY_ONLY`. It is a staff planning expla
 
 Courier self-service APIs use a dedicated OIDC/JWT bearer scheme, isolated from customer API keys and Mono operations identities. The issuer and audience are configured as a pair using `MonoCourier:Authority` and `MonoCourier:Audience`; the authority must use HTTPS. With no configured authority, courier tokens fail closed.
 
-A validated token must contain exactly one non-empty `sub`, one canonical Mono Courier ID in `mono/courier_id`, and one `mono/role = COURIER` claim. The trusted issuer is responsible for issuing the Mono Courier ID claim only after completing the verified account binding. Mono also checks current PostgreSQL trust and operational status during token validation; unknown, inactive, or suspended couriers are rejected.
+A validated token must contain exactly one non-empty `sub` and one `mono/role = COURIER` claim. The JWT must not provide Mono-reserved `mono/courier_id` or `mono/identity_domain` claims. After issuer, audience, signature, and lifetime validation, Mono resolves the exact `(issuer, sub)` pair through its own active identity-binding record and adds the internal Courier ID. Current trust and operational status are checked on every token validation; unknown, inactive, suspended, or revoked bindings are rejected.
+
+Mono administrators with the MFA-gated operations identity manage this binding through:
+```
+POST /operations/v1/couriers/{courierId}/identity-binding
+POST /operations/v1/couriers/{courierId}/identity-binding/revoke
+GET  /operations/v1/couriers/{courierId}/identity-binding
+```
+Writes require an `Idempotency-Key`, reason code, and opaque evidence reference. Read/write responses omit issuer and subject values. Binding is restricted to the configured HTTPS authority; no phone verification, OTP delivery, issuer, or credential provisioning is configured by this contract.
 
 The initial self-service route is:
 
