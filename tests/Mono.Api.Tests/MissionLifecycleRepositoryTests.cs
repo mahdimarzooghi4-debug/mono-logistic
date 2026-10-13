@@ -234,6 +234,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(0, pendingBeforeOffer.Items[0].AttemptCount);
             Assert.Null(pendingBeforeOffer.Items[0].LatestAttempt);
             Assert.False(pendingBeforeOffer.Items[0].DeliveryOverdue);
+            Assert.Equal("upcoming", pendingBeforeOffer.Items[0].DeliveryWindowState);
             var committedDeliveryCutoff = pendingBeforeOffer.Items[0].CommittedDeliveryAt;
             var nonOverdueQueue = await dispatchQueue.ListAsync(
                 20, null, null, null, deliveryOverdue: false);
@@ -243,7 +244,12 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 20, null, null, null, deliveryOverdue: true);
             Assert.Single(overdueAtExactDeadline!.Items);
             Assert.True(overdueAtExactDeadline.Items[0].DeliveryOverdue);
-            dispatchClock.Set(committedDeliveryCutoff.AddTicks(-1));
+            Assert.Equal("due_now", overdueAtExactDeadline.Items[0].DeliveryWindowState);
+            dispatchClock.Set(committedDeliveryCutoff.AddMilliseconds(1));
+            var overdueAfterDeadline = await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryOverdue: true);
+            Assert.Equal("overdue", Assert.Single(overdueAfterDeadline!.Items).DeliveryWindowState);
+            dispatchClock.Set(committedDeliveryCutoff.AddMilliseconds(-1));
             var cursorRejectedByDeliveryOverdueFilter = await dispatchQueue.ListAsync(
                 20, null, null, MissionId, deliveryOverdue: true);
             Assert.Null(cursorRejectedByDeliveryOverdueFilter);
