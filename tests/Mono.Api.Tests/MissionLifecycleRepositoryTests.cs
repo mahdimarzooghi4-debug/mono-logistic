@@ -355,7 +355,9 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "041_mission_courier_offers.sql",
             "042_mission_courier_offer_withdrawal.sql",
             "043_courier_suspension_withdraws_offers.sql",
-            "044_mission_courier_offer_history_audit.sql"
+            "044_mission_courier_offer_history_audit.sql",
+            "045_mission_courier_issue_reports.sql",
+            "046_mission_courier_issue_read_audit.sql"
         };
         foreach (var migrationName in migrationNames)
         {
