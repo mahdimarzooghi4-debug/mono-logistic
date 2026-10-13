@@ -66,5 +66,6 @@
     <EmbeddedResource Include="../../db/migrations/045_mission_courier_issue_reports.sql" LogicalName="Mono.Api.Tests.Migrations.045_mission_courier_issue_reports.sql" />
     <EmbeddedResource Include="../../db/migrations/046_mission_courier_issue_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.046_mission_courier_issue_read_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/047_mission_courier_assignment_release.sql" LogicalName="Mono.Api.Tests.Migrations.047_mission_courier_assignment_release.sql" />
+    <EmbeddedResource Include="../../db/migrations/048_mission_dispatch_queue_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.048_mission_dispatch_queue_read_audit.sql" />
   </ItemGroup>
 </Project>

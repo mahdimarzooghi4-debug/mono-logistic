@@ -17,6 +17,7 @@ public sealed class PostgresMissionOperationsReadAuditService(
     public const string MissionAuditInspection = "MISSION_AUDIT_INSPECTION";
     public const string MissionCourierOfferHistory = "MISSION_COURIER_OFFER_HISTORY";
     public const string MissionCourierIssueSearch = "MISSION_COURIER_ISSUE_SEARCH";
+    public const string MissionDispatchQueue = "MISSION_DISPATCH_QUEUE";
 
     private static readonly Regex AuditIdPattern = new(
         @"\Amra_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -27,10 +28,10 @@ public sealed class PostgresMissionOperationsReadAuditService(
         int resultCount,
         CancellationToken cancellationToken = default)
     {
-        if (action is not (MissionSearch or MissionDetail or MissionTimeline or MissionAuditInspection or MissionCourierOfferHistory or MissionCourierIssueSearch))
+        if (action is not (MissionSearch or MissionDetail or MissionTimeline or MissionAuditInspection or MissionCourierOfferHistory or MissionCourierIssueSearch or MissionDispatchQueue))
             throw new ArgumentException("The Mission read audit action is invalid.", nameof(action));
         if (resultCount < 0 ||
-            ((action is MissionSearch or MissionAuditInspection) && missionId is not null) ||
+            ((action is MissionSearch or MissionAuditInspection or MissionDispatchQueue) && missionId is not null) ||
             ((action is MissionDetail or MissionTimeline or MissionCourierOfferHistory or MissionCourierIssueSearch) &&
              (missionId is null || !MissionHistoryInputValidator.IsValidMissionId(missionId))))
             throw new ArgumentException("The Mission read audit scope is invalid.");
