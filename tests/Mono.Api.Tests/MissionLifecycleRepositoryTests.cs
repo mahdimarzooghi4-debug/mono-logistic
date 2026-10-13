@@ -188,6 +188,14 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 1, null, null, dueFirstPage.NextCursor, sortBy: "delivery_due");
             Assert.Equal(secondaryMissionId, Assert.Single(dueSecondPage!.Items).MissionId);
             Assert.Null(dueSecondPage.NextCursor);
+            var upcomingFirstPage = await dispatchQueue.ListAsync(
+                1, null, null, null, deliveryWindowState: "upcoming");
+            Assert.Equal(secondaryMissionId, Assert.Single(upcomingFirstPage!.Items).MissionId);
+            var upcomingSecondPage = await dispatchQueue.ListAsync(
+                1, null, null, upcomingFirstPage.NextCursor, deliveryWindowState: "upcoming");
+            Assert.Equal(MissionId, Assert.Single(upcomingSecondPage!.Items).MissionId);
+            Assert.Null(await dispatchQueue.ListAsync(
+                1, null, null, upcomingFirstPage.NextCursor, deliveryWindowState: "overdue"));
             var defaultFirstPage = await dispatchQueue.ListAsync(1, null, null, null);
             Assert.Equal(secondaryMissionId, Assert.Single(defaultFirstPage!.Items).MissionId);
 
