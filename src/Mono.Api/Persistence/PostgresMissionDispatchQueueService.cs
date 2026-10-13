@@ -43,8 +43,8 @@ public sealed class PostgresMissionDispatchQueueService(
                        (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
                   AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
-                  AND (@min_attempt_count IS NULL OR attempts.attempt_count >= @min_attempt_count)
-                  AND (@max_attempt_count IS NULL OR attempts.attempt_count <= @max_attempt_count)
+                  AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
+                  AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
                   AND (@latest_action IS NULL OR (
                        SELECT latest.action
                        FROM mission_courier_offers previous
@@ -107,8 +107,8 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
-              AND (@min_attempt_count IS NULL OR attempts.attempt_count >= @min_attempt_count)
-              AND (@max_attempt_count IS NULL OR attempts.attempt_count <= @max_attempt_count)
+              AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
+              AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
               AND (@latest_action IS NULL OR (
                    SELECT latest.action
                    FROM mission_courier_offers previous
@@ -163,8 +163,8 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
-              AND (@min_attempt_count IS NULL OR attempts.attempt_count >= @min_attempt_count)
-              AND (@max_attempt_count IS NULL OR attempts.attempt_count <= @max_attempt_count)
+              AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
+              AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
               AND (@latest_action IS NULL OR (
                    SELECT latest.action
                    FROM mission_courier_offers previous
@@ -250,9 +250,9 @@ public sealed class PostgresMissionDispatchQueueService(
         command.Parameters.AddWithValue("delivery_before", NpgsqlDbType.TimestampTz,
             (object?)deliveryBefore ?? DBNull.Value);
         command.Parameters.AddWithValue("min_attempt_count", NpgsqlDbType.Integer,
-            (object?)minAttemptCount ?? DBNull.Value);
+            minAttemptCount ?? 0);
         command.Parameters.AddWithValue("max_attempt_count", NpgsqlDbType.Integer,
-            (object?)maxAttemptCount ?? DBNull.Value);
+            maxAttemptCount ?? int.MaxValue);
     }
 
     private static bool IsValidLatestAction(string? latestAction) =>
