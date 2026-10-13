@@ -154,3 +154,4 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 127 — Pre-handoff courier reassignment](docs/sprints/sprint-127-prehandoff-reassignment.md)
 - [Sprint 128 — Dispatch queue workbench](docs/sprints/sprint-128-dispatch-queue-workbench.md)
 - [Sprint 129 — Courier offer expiry](docs/sprints/sprint-129-courier-offer-expiry.md)
+- [Sprint 130 — Mission dispatch attempt history](docs/sprints/sprint-130-dispatch-attempt-history.md)

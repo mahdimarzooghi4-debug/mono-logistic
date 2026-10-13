@@ -342,6 +342,44 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
             Assert.Equal(MissionCourierOfferOutcome.Replayed, expiryReplay.Outcome);
             Assert.Equal(expiredOffer.Offer, expiryReplay.Offer);
+            var attemptHistoryService = new PostgresMissionDispatchAttemptHistoryService(dataSource);
+            var attemptHistory = await attemptHistoryService.FindAsync(MissionId);
+            Assert.NotNull(attemptHistory);
+            Assert.Equal(4, attemptHistory.Attempts.Count);
+            var expiredAttempt = Assert.Single(attemptHistory.Attempts,
+                item => item.OfferId == expiringOffer.Offer.OfferId);
+            Assert.Equal("EXPIRED", expiredAttempt.Status);
+            Assert.Equal("EXPIRED", expiredAttempt.LastAction);
+            Assert.Equal("OPERATIONS_EXPIRED_OFFER", expiredAttempt.LastReason);
+            Assert.NotNull(expiredAttempt.LastOccurredAt);
+            var withdrawnAttempt = Assert.Single(attemptHistory.Attempts,
+                item => item.OfferId == created.Offer.OfferId);
+            Assert.Equal("OPERATIONS_WITHDREW_OFFER", withdrawnAttempt.LastReason);
+            var suspendedAttempt = Assert.Single(attemptHistory.Attempts,
+                item => item.OfferId == replacementOffer.Offer!.OfferId);
+            Assert.Equal("COURIER_SUSPENDED", suspendedAttempt.LastReason);
+            var releasedAttempt = Assert.Single(attemptHistory.Attempts,
+                item => item.OfferId == finalOffer.Offer!.OfferId);
+            Assert.Equal("RELEASED", releasedAttempt.Status);
+            Assert.Equal("OPERATIONS_REASSIGNED_COURIER", releasedAttempt.LastReason);
+
+            var attemptReadAudit = new PostgresMissionOperationsReadAuditService(dataSource, context);
+            await attemptReadAudit.RecordAsync(
+                PostgresMissionOperationsReadAuditService.MissionDispatchAttemptHistory,
+                MissionId, attemptHistory.Attempts.Count);
+            await using (var auditConnection = await dataSource.OpenConnectionAsync())
+            await using (var auditCommand = new NpgsqlCommand("""
+                SELECT action, mission_id, result_count FROM mission_operations_read_audit
+                ORDER BY occurred_at DESC, audit_id DESC LIMIT 1;
+                """, auditConnection))
+            await using (var auditReader = await auditCommand.ExecuteReaderAsync())
+            {
+                Assert.True(await auditReader.ReadAsync());
+                Assert.Equal(PostgresMissionOperationsReadAuditService.MissionDispatchAttemptHistory, auditReader.GetString(0));
+                Assert.Equal(MissionId, auditReader.GetString(1));
+                Assert.Equal(4, auditReader.GetInt32(2));
+            }
+
             offerClock.Set(DateTimeOffset.UtcNow);
 
             var reassignedOffer = await offers.CreateOfferAsync(
@@ -457,7 +495,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "046_mission_courier_issue_read_audit.sql",
             "047_mission_courier_assignment_release.sql",
             "048_mission_dispatch_queue_read_audit.sql",
-            "049_mission_courier_offer_expiry.sql"
+            "049_mission_courier_offer_expiry.sql",
+            "050_mission_dispatch_attempt_history_audit.sql"
         };
         foreach (var migrationName in migrationNames)
         {
