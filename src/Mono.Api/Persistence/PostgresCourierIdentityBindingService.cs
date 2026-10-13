@@ -48,23 +48,27 @@ public sealed class PostgresCourierIdentityBindingService(
         string courierId, string subject, string reasonCode, string evidenceReference,
         string idempotencyKey, CancellationToken cancellationToken = default)
     {
+        var evidence = evidenceReference ?? string.Empty;
+        var key = idempotencyKey ?? string.Empty;
         if (!IsValidCourierId(courierId) || string.IsNullOrWhiteSpace(subject) || subject.Length > 512 ||
             subject.Any(char.IsControl) || !IsValidReason(reasonCode) ||
-            !EvidencePattern.IsMatch(evidenceReference ?? string.Empty) || !KeyPattern.IsMatch(idempotencyKey ?? string.Empty))
+            !EvidencePattern.IsMatch(evidence) || !KeyPattern.IsMatch(key))
             throw new ArgumentException("Courier identity binding fields are invalid.");
         if (!TryConfiguredAuthority(out var issuer))
             return new(CourierIdentityBindingOutcome.AuthorityNotConfigured, null);
 
-        return await WriteAsync("BIND", courierId, issuer, subject, reasonCode, evidenceReference,
-            idempotencyKey, cancellationToken);
+        return await WriteAsync("BIND", courierId, issuer, subject, reasonCode, evidence,
+            key, cancellationToken);
     }
 
     public async Task<CourierIdentityBindingWriteResult> RevokeAsync(
         string courierId, string reasonCode, string evidenceReference,
         string idempotencyKey, CancellationToken cancellationToken = default)
     {
+        var evidence = evidenceReference ?? string.Empty;
+        var key = idempotencyKey ?? string.Empty;
         if (!IsValidCourierId(courierId) || !IsValidReason(reasonCode) ||
-            !EvidencePattern.IsMatch(evidenceReference ?? string.Empty) || !KeyPattern.IsMatch(idempotencyKey ?? string.Empty))
+            !EvidencePattern.IsMatch(evidence) || !KeyPattern.IsMatch(key))
             throw new ArgumentException("Courier identity revocation fields are invalid.");
         if (!TryConfiguredAuthority(out var issuer))
             return new(CourierIdentityBindingOutcome.AuthorityNotConfigured, null);
@@ -81,8 +85,8 @@ public sealed class PostgresCourierIdentityBindingService(
         var subject = (string?)await command.ExecuteScalarAsync(cancellationToken);
         if (subject is null)
             return new(CourierIdentityBindingOutcome.InvalidState, null);
-        return await WriteAsync("REVOKE", courierId, issuer, subject, reasonCode, evidenceReference,
-            idempotencyKey, cancellationToken);
+        return await WriteAsync("REVOKE", courierId, issuer, subject, reasonCode, evidence,
+            key, cancellationToken);
     }
 
     public async Task<CourierIdentityBindingSummary?> FindAsync(
