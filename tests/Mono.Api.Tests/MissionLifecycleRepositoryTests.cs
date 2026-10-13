@@ -350,7 +350,7 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Single(overdueQueue!.Items);
             Assert.Equal("OFFERED", overdueQueue.Items[0].ActiveOffer!.Status);
             Assert.True(overdueQueue.Items[0].ActiveOffer.DeadlinePassed);
-            Assert.True(overdueQueue.Items[0].ActiveOffer.ExpiresAt <= offerClock.GetUtcNow());
+            Assert.True(overdueQueue.Items[0].ActiveOffer.ExpiresAt!.Value <= offerClock.GetUtcNow());
 
 
             var expiredOffer = await offers.ExpireAsync(
