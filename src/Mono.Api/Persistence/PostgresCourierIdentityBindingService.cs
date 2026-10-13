@@ -154,6 +154,7 @@ public sealed class PostgresCourierIdentityBindingService(
             {
                 if (!string.Equals(reader.GetString(0), requestHash, StringComparison.Ordinal))
                 {
+                    await reader.CloseAsync();
                     await transaction.RollbackAsync(cancellationToken);
                     return new(CourierIdentityBindingOutcome.Conflict, null);
                 }
