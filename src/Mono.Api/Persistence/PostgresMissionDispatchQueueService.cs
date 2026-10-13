@@ -98,7 +98,12 @@ public sealed class PostgresMissionDispatchQueueService(
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at,
                    attempts.attempt_count, latest_attempt.offer_id, latest_attempt.courier_id,
                    latest_attempt.status, latest_attempt.action, latest_attempt.reason, latest_attempt.occurred_at,
-                   (m.committed_delivery_at <= @as_of) AS delivery_overdue
+                   (m.committed_delivery_at <= @as_of) AS delivery_overdue,
+                   CASE
+                       WHEN m.committed_delivery_at < @as_of THEN 'overdue'
+                       WHEN m.committed_delivery_at = @as_of THEN 'due_now'
+                       ELSE 'upcoming'
+                   END AS delivery_window_state
             FROM missions m
             LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
             LEFT JOIN LATERAL (
@@ -145,7 +150,12 @@ public sealed class PostgresMissionDispatchQueueService(
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at,
                    attempts.attempt_count, latest_attempt.offer_id, latest_attempt.courier_id,
                    latest_attempt.status, latest_attempt.action, latest_attempt.reason, latest_attempt.occurred_at,
-                   (m.committed_delivery_at <= @as_of) AS delivery_overdue
+                   (m.committed_delivery_at <= @as_of) AS delivery_overdue,
+                   CASE
+                       WHEN m.committed_delivery_at < @as_of THEN 'overdue'
+                       WHEN m.committed_delivery_at = @as_of THEN 'due_now'
+                       ELSE 'upcoming'
+                   END AS delivery_window_state
             FROM missions m
             LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
             LEFT JOIN LATERAL (
@@ -225,7 +235,7 @@ public sealed class PostgresMissionDispatchQueueService(
                 items.Add(new MissionDispatchQueueItem(
                     reader.GetString(0), reader.GetString(1), reader.GetString(2),
                     reader.GetFieldValue<DateTimeOffset>(3), reader.GetFieldValue<DateTimeOffset>(4), activeOffer,
-                    reader.GetInt32(11), latestAttempt, reader.GetBoolean(18)));
+                    reader.GetInt32(11), latestAttempt, reader.GetBoolean(18), reader.GetString(19)));
             }
         }
 
