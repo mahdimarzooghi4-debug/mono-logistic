@@ -217,6 +217,40 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Null(await dispatchQueue.ListAsync(
                 10, null, null, defaultFirstPage.NextCursor, customerId: CustomerId));
 
+            await using (var ageQueueConnection = await dataSource.OpenConnectionAsync())
+            await using (var ageSecondaryMission = new NpgsqlCommand("""
+                UPDATE missions
+                SET created_at = (SELECT created_at FROM missions WHERE mission_id = @primary_id) - interval '1 minute'
+                WHERE mission_id = @secondary_id;
+                """, ageQueueConnection))
+            {
+                ageSecondaryMission.Parameters.AddWithValue("primary_id", MissionId);
+                ageSecondaryMission.Parameters.AddWithValue("secondary_id", secondaryMissionId);
+                await ageSecondaryMission.ExecuteNonQueryAsync();
+            }
+
+            var reorderedDefaultPage = await dispatchQueue.ListAsync(1, null, null, null);
+            Assert.Equal(MissionId, Assert.Single(reorderedDefaultPage!.Items).MissionId);
+            var customerScopedNextPage = await dispatchQueue.ListAsync(
+                1, null, null, reorderedDefaultPage.NextCursor, customerId: CustomerId);
+            Assert.Empty(customerScopedNextPage!.Items);
+
+            DateTimeOffset secondaryCreatedAt;
+            await using (var readAge = await dataSource.OpenConnectionAsync())
+            await using (var readAgeCommand = new NpgsqlCommand(
+                "SELECT created_at FROM missions WHERE mission_id = @mission_id;", readAge))
+            {
+                readAgeCommand.Parameters.AddWithValue("mission_id", secondaryMissionId);
+                var createdValue = (DateTime)(await readAgeCommand.ExecuteScalarAsync())!;
+                secondaryCreatedAt = new DateTimeOffset(DateTime.SpecifyKind(createdValue, DateTimeKind.Utc));
+            }
+
+            var waitingCutoffPage = await dispatchQueue.ListAsync(
+                10, null, null, null, createdBefore: secondaryCreatedAt);
+            Assert.Equal(secondaryMissionId, Assert.Single(waitingCutoffPage!.Items).MissionId);
+            Assert.Null(await dispatchQueue.ListAsync(
+                10, null, null, reorderedDefaultPage.NextCursor, createdBefore: secondaryCreatedAt));
+
             DateTimeOffset primaryDeliveryAt;
             await using (var readDue = await dataSource.OpenConnectionAsync())
             await using (var readDueCommand = new NpgsqlCommand(
