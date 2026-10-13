@@ -242,6 +242,37 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(MissionCourierOfferOutcome.Replayed, acceptedReplay.Outcome);
             Assert.Equal(accepted.Offer, acceptedReplay.Offer);
 
+            var issues = new PostgresMissionCourierIssueService(dataSource, context);
+            var wrongCourierReport = await issues.ReportAsync(
+                "crr_11111111111111111111111111111111", MissionId, "SAFETY_CONCERN", "wrong-courier-issue");
+            Assert.Equal(MissionCourierIssueOutcome.InvalidState, wrongCourierReport.Outcome);
+            var issue = await issues.ReportAsync(
+                courierId, MissionId, "SAFETY_CONCERN", "courier-issue-report");
+            Assert.Equal(MissionCourierIssueOutcome.Applied, issue.Outcome);
+            Assert.Equal("OPEN", issue.Report!.Status);
+            var issueReplay = await issues.ReportAsync(
+                courierId, MissionId, "SAFETY_CONCERN", "courier-issue-report");
+            Assert.Equal(MissionCourierIssueOutcome.Replayed, issueReplay.Outcome);
+            Assert.Equal(issue.Report, issueReplay.Report);
+            var changedIssueReplay = await issues.ReportAsync(
+                courierId, MissionId, "OTHER", "courier-issue-report");
+            Assert.Equal(MissionCourierIssueOutcome.Conflict, changedIssueReplay.Outcome);
+            var issueQueue = await issues.ListForMissionAsync(MissionId);
+            Assert.Single(issueQueue);
+            var issueReadAudit = new PostgresMissionOperationsReadAuditService(dataSource, context);
+            await issueReadAudit.RecordAsync(
+                PostgresMissionOperationsReadAuditService.MissionCourierIssueSearch,
+                MissionId, issueQueue.Count);
+            var resolvedIssue = await issues.ResolveAsync(
+                MissionId, issue.Report.ReportId, "operations-issue-resolve");
+            Assert.Equal(MissionCourierIssueOutcome.Applied, resolvedIssue.Outcome);
+            Assert.Equal("RESOLVED", resolvedIssue.Report!.Status);
+            var resolveReplay = await issues.ResolveAsync(
+                MissionId, issue.Report.ReportId, "operations-issue-resolve");
+            Assert.Equal(MissionCourierIssueOutcome.Replayed, resolveReplay.Outcome);
+            Assert.Equal(resolvedIssue.Report, resolveReplay.Report);
+            Assert.Equal("RESOLVED", (await issues.ListForMissionAsync(MissionId)).Single().Status);
+
             await using (var connection = await dataSource.OpenConnectionAsync())
             {
                 await using var state = new NpgsqlCommand(
@@ -355,7 +386,9 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "041_mission_courier_offers.sql",
             "042_mission_courier_offer_withdrawal.sql",
             "043_courier_suspension_withdraws_offers.sql",
-            "044_mission_courier_offer_history_audit.sql"
+            "044_mission_courier_offer_history_audit.sql",
+            "045_mission_courier_issue_reports.sql",
+            "046_mission_courier_issue_read_audit.sql"
         };
         foreach (var migrationName in migrationNames)
         {

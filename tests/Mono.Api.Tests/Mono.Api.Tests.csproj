@@ -63,5 +63,7 @@
     <EmbeddedResource Include="../../db/migrations/042_mission_courier_offer_withdrawal.sql" LogicalName="Mono.Api.Tests.Migrations.042_mission_courier_offer_withdrawal.sql" />
     <EmbeddedResource Include="../../db/migrations/043_courier_suspension_withdraws_offers.sql" LogicalName="Mono.Api.Tests.Migrations.043_courier_suspension_withdraws_offers.sql" />
     <EmbeddedResource Include="../../db/migrations/044_mission_courier_offer_history_audit.sql" LogicalName="Mono.Api.Tests.Migrations.044_mission_courier_offer_history_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/045_mission_courier_issue_reports.sql" LogicalName="Mono.Api.Tests.Migrations.045_mission_courier_issue_reports.sql" />
+    <EmbeddedResource Include="../../db/migrations/046_mission_courier_issue_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.046_mission_courier_issue_read_audit.sql" />
   </ItemGroup>
 </Project>
