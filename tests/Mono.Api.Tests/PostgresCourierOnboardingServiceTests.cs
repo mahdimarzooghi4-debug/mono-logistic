@@ -598,7 +598,7 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
     }
 
     [Fact]
-    public async Task Courier_tokens_require_unique_claims_and_current_active_unsuspended_binding()
+    public async Task Courier_tokens_resolve_Mono_binding_and_reject_revoked_or_inactive_accounts()
     {
         var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -607,6 +607,7 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             return;
         }
 
+        const string issuer = "https://issuer.example";
         var now = DateTimeOffset.UtcNow;
         await using var database = await TestDatabase.CreateAsync(connectionString);
         await database.SeedActiveZonesAsync("zone-central");
@@ -639,38 +640,87 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var suspendedCourierId = await RegisterActive("auth-suspended");
         var registered = await onboarding.RegisterAsync("WALK", ["zone-central"], "auth-registered");
         var registeredCourierId = registered.Snapshot!.CourierId;
-        var suspension = new PostgresCourierSuspensionService(database.DataSource, context, new FixedTimeProvider(now));
+        var bindings = new PostgresCourierIdentityBindingService(
+            database.DataSource, context, issuer, new FixedTimeProvider(now));
+
+        const string activeSubject = "opaque-provider-subject-active";
+        var bind = await bindings.BindAsync(activeCourierId, activeSubject,
+            "IDENTITY_VERIFIED", "test:evidence:active", "auth-bind-active");
+        Assert.Equal(CourierIdentityBindingOutcome.Applied, bind.Outcome);
+        Assert.Equal("BOUND", bind.Summary!.Status);
+        var replay = await bindings.BindAsync(activeCourierId, activeSubject,
+            "IDENTITY_VERIFIED", "test:evidence:active", "auth-bind-active");
+        Assert.Equal(CourierIdentityBindingOutcome.Replayed, replay.Outcome);
+        var conflict = await bindings.BindAsync(activeCourierId, activeSubject,
+            "IDENTITY_REVIEWED", "test:evidence:changed", "auth-bind-active");
+        Assert.Equal(CourierIdentityBindingOutcome.Conflict, conflict.Outcome);
+
+        var duplicateSubject = await bindings.BindAsync(suspendedCourierId, activeSubject,
+            "IDENTITY_VERIFIED", "test:evidence:duplicate", "auth-bind-duplicate");
+        Assert.Equal(CourierIdentityBindingOutcome.InvalidState, duplicateSubject.Outcome);
+        var suspendedSubject = "opaque-provider-subject-suspended";
+        Assert.Equal(CourierIdentityBindingOutcome.Applied,
+            (await bindings.BindAsync(suspendedCourierId, suspendedSubject,
+                "IDENTITY_VERIFIED", "test:evidence:suspended", "auth-bind-suspended")).Outcome);
+
+        var suspension = new PostgresCourierSuspensionService(
+            database.DataSource, context, new FixedTimeProvider(now));
         Assert.Equal(CourierOperationalStatusOutcome.Applied,
             (await suspension.SuspendAsync(suspendedCourierId, "SAFETY_REVIEW", "auth-suspend")).Outcome);
 
         var validator = new MonoCourierTokenValidator(database.DataSource);
-        static ClaimsPrincipal Token(string courierId) => new(new ClaimsIdentity(
+        static ClaimsPrincipal Token(string subject) => new(new ClaimsIdentity(
         [
-            new Claim(MonoCourierClaimTypes.Subject, "provider-subject-" + courierId),
-            new Claim(MonoCourierClaimTypes.CourierId, courierId),
+            new Claim(MonoCourierClaimTypes.Subject, subject),
             new Claim(MonoCourierClaimTypes.Role, MonoCourierDefaults.RoleValue)
         ], MonoCourierDefaults.Scheme));
 
-        var activeToken = Token(activeCourierId);
-        Assert.True(await validator.ValidateAsync(activeToken));
-        var httpContext = new DefaultHttpContext();
-        httpContext.User = activeToken;
+        var activeToken = Token(activeSubject);
+        Assert.True(await validator.ValidateAsync(activeToken, issuer));
+        Assert.Equal(activeCourierId,
+            activeToken.FindFirst(MonoCourierClaimTypes.CourierId)?.Value);
+        var httpContext = new DefaultHttpContext { User = activeToken };
         var courierContext = new HttpMonoCourierContext(new HttpContextAccessor { HttpContext = httpContext });
         Assert.Equal(activeCourierId, courierContext.CourierId);
 
-        Assert.False(await validator.ValidateAsync(Token(suspendedCourierId)));
-        Assert.False(await validator.ValidateAsync(Token(registeredCourierId)));
+        Assert.False(await validator.ValidateAsync(Token(activeSubject), "https://untrusted.example"));
+        Assert.False(await validator.ValidateAsync(Token(suspendedSubject), issuer));
+        Assert.False(await validator.ValidateAsync(Token("not-bound"), issuer));
+        Assert.False(await validator.ValidateAsync(Token("not-bound"), "http://issuer.example"));
+
+        var reservedClaimToken = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(MonoCourierClaimTypes.Subject, activeSubject),
+            new Claim(MonoCourierClaimTypes.Role, MonoCourierDefaults.RoleValue),
+            new Claim(MonoCourierClaimTypes.CourierId, activeCourierId)
+        ], MonoCourierDefaults.Scheme));
+        Assert.False(await validator.ValidateAsync(reservedClaimToken, issuer));
 
         var duplicateSubjectToken = new ClaimsPrincipal(new ClaimsIdentity(
         [
-            new Claim(MonoCourierClaimTypes.Subject, "first"),
+            new Claim(MonoCourierClaimTypes.Subject, activeSubject),
             new Claim(MonoCourierClaimTypes.Subject, "second"),
-            new Claim(MonoCourierClaimTypes.CourierId, activeCourierId),
             new Claim(MonoCourierClaimTypes.Role, MonoCourierDefaults.RoleValue)
         ], MonoCourierDefaults.Scheme));
-        Assert.False(await validator.ValidateAsync(duplicateSubjectToken));
-    }
+        Assert.False(await validator.ValidateAsync(duplicateSubjectToken, issuer));
 
+        Assert.Equal(CourierIdentityBindingOutcome.Applied,
+            (await bindings.RevokeAsync(activeCourierId, "ACCOUNT_CLOSED",
+                "test:evidence:revoke", "auth-revoke-active")).Outcome);
+        Assert.False(await validator.ValidateAsync(Token(activeSubject), issuer));
+        var revokeReplay = await bindings.RevokeAsync(activeCourierId, "ACCOUNT_CLOSED",
+            "test:evidence:revoke", "auth-revoke-active");
+        Assert.Equal(CourierIdentityBindingOutcome.Replayed, revokeReplay.Outcome);
+
+        var summary = await bindings.FindAsync(activeCourierId);
+        Assert.Equal("REVOKED", summary!.Status);
+        Assert.DoesNotContain("Subject", typeof(CourierIdentityBindingSummary).GetProperties()
+            .Select(property => property.Name));
+        Assert.DoesNotContain("Issuer", typeof(CourierIdentityBindingSummary).GetProperties()
+            .Select(property => property.Name));
+        Assert.False(await validator.ValidateAsync(Token("not-bound"), issuer));
+        Assert.NotEqual(activeCourierId, registeredCourierId);
+    }
 
 
     private sealed class TestDatabase : IAsyncDisposable
