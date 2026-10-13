@@ -604,6 +604,10 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var plannedCourier = await CreateActiveCourier("planning-has-window");
         var noWindowCourier = await CreateActiveCourier("planning-no-window");
         var suspendedCourier = await CreateActiveCourier("planning-suspended");
+        var livePresence = new PostgresCourierLivePresenceService(database.DataSource, new FixedTimeProvider(now));
+        var online = await livePresence.GoOnlineAsync(
+            plannedCourier, "zone-central", "planning-presence-online");
+        Assert.Equal(CourierLivePresenceOutcome.Applied, online.Outcome);
         var registered = await onboarding.RegisterAsync("WALK", ["zone-central"], "planning-registered");
         var registeredCourier = registered.Snapshot!.CourierId;
 
@@ -622,7 +626,7 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var firstPage = await eligibility.SearchAsync(
             "zone-central", now, now.AddHours(1), 2, null);
         Assert.NotNull(firstPage);
-        Assert.Equal("PLANNED_CAPACITY_ONLY", firstPage.Classification);
+        Assert.Equal("PLANNED_CAPACITY_AND_LIVE_PRESENCE_SIGNALS", firstPage.Classification);
         Assert.Equal(2, firstPage.Items.Count);
         Assert.NotNull(firstPage.NextCursor);
 
@@ -637,10 +641,18 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var items = firstPage.Items.Concat(secondPage.Items).ToDictionary(item => item.CourierId);
         Assert.True(items[plannedCourier].PlannedCapacityContributor);
         Assert.Empty(items[plannedCourier].ExclusionReasons);
+        Assert.True(items[plannedCourier].IsOnline);
+        Assert.Equal("zone-central", items[plannedCourier].LivePresenceZoneId);
+        Assert.True(items[plannedCourier].LivePresenceCandidate);
+        Assert.Empty(items[plannedCourier].LivePresenceExclusionReasons);
         Assert.False(items[noWindowCourier].PlannedCapacityContributor);
+        Assert.False(items[noWindowCourier].LivePresenceCandidate);
+        Assert.Contains("COURIER_NOT_ONLINE", items[noWindowCourier].LivePresenceExclusionReasons);
         Assert.Contains("NO_SCHEDULED_WINDOW", items[noWindowCourier].ExclusionReasons);
         Assert.Equal("SUSPENDED", items[suspendedCourier].OperationalStatus);
         Assert.Contains("COURIER_SUSPENDED", items[suspendedCourier].ExclusionReasons);
+        Assert.False(items[suspendedCourier].LivePresenceCandidate);
+        Assert.Contains("COURIER_SUSPENDED", items[suspendedCourier].LivePresenceExclusionReasons);
         Assert.False(items[suspendedCourier].HasScheduledWindow);
         Assert.Contains("COURIER_NOT_ACTIVE", items[registeredCourier].ExclusionReasons);
         Assert.Contains("ZONE_NOT_APPROVED", items[registeredCourier].ExclusionReasons);

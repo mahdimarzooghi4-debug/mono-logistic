@@ -50,6 +50,9 @@ public sealed class PostgresCourierPlanningEligibilityService(
                 SELECT courier.courier_id, courier.mode, courier.status AS trust_status,
                     courier.approved_zone_ids ? @zone_id AS zone_approved,
                     COALESCE(latest.action = 'SUSPENDED', FALSE) AS suspended,
+                    COALESCE(presence.is_online, FALSE) AS is_online,
+                    presence.zone_id AS live_presence_zone_id,
+                    presence.changed_at AS live_presence_updated_at,
                     EXISTS (
                         SELECT 1 FROM courier_availability_windows availability
                         WHERE availability.courier_id = courier.courier_id
@@ -59,6 +62,7 @@ public sealed class PostgresCourierPlanningEligibilityService(
                           AND availability.ends_at > @from
                     ) AS has_scheduled_window
                 FROM couriers courier
+                LEFT JOIN courier_live_presence presence ON presence.courier_id = courier.courier_id
                 LEFT JOIN LATERAL (
                     SELECT action FROM courier_operational_status_events
                     WHERE courier_id = courier.courier_id
@@ -76,7 +80,18 @@ public sealed class PostgresCourierPlanningEligibilityService(
                     CASE WHEN suspended THEN 'COURIER_SUSPENDED' END,
                     CASE WHEN NOT zone_approved THEN 'ZONE_NOT_APPROVED' END,
                     CASE WHEN NOT has_scheduled_window THEN 'NO_SCHEDULED_WINDOW' END
-                ]::text[], NULL::text) AS exclusion_reasons
+                ]::text[], NULL::text) AS exclusion_reasons,
+                is_online, live_presence_zone_id, live_presence_updated_at,
+                (trust_status = 'ACTIVE' AND NOT suspended AND zone_approved AND
+                    is_online AND live_presence_zone_id = @zone_id) AS live_presence_candidate,
+                array_remove(ARRAY[
+                    CASE WHEN trust_status <> 'ACTIVE' THEN 'COURIER_NOT_ACTIVE' END,
+                    CASE WHEN suspended THEN 'COURIER_SUSPENDED' END,
+                    CASE WHEN NOT zone_approved THEN 'ZONE_NOT_APPROVED' END,
+                    CASE WHEN NOT is_online THEN 'COURIER_NOT_ONLINE' END,
+                    CASE WHEN is_online AND live_presence_zone_id <> @zone_id
+                        THEN 'ONLINE_IN_DIFFERENT_ZONE' END
+                ]::text[], NULL::text) AS live_presence_exclusion_reasons
             FROM candidates
             WHERE @cursor IS NULL OR courier_id > @cursor
             ORDER BY courier_id
@@ -118,7 +133,12 @@ public sealed class PostgresCourierPlanningEligibilityService(
                     reader.GetBoolean(4),
                     reader.GetBoolean(5),
                     reader.GetBoolean(6),
-                    reader.GetFieldValue<string[]>(7)));
+                    reader.GetFieldValue<string[]>(7),
+                    reader.GetBoolean(8),
+                    reader.IsDBNull(9) ? null : reader.GetString(9),
+                    reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10),
+                    reader.GetBoolean(11),
+                    reader.GetFieldValue<string[]>(12)));
         }
 
         string? nextCursor = null;
@@ -132,7 +152,7 @@ public sealed class PostgresCourierPlanningEligibilityService(
             PostgresCourierOperationsReadAuditService.CourierPlanningEligibilitySearch,
             null, items.Count, cancellationToken);
         return new CourierPlanningEligibilityPage(
-            zoneId, from, to, "PLANNED_CAPACITY_ONLY", items, nextCursor);
+            zoneId, from, to, "PLANNED_CAPACITY_AND_LIVE_PRESENCE_SIGNALS", items, nextCursor);
     }
 
     private void RequireAdministrator()
