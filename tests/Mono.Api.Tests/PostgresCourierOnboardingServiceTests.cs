@@ -643,28 +643,28 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var bindings = new PostgresCourierIdentityBindingService(
             database.DataSource, context, issuer, new FixedTimeProvider(now));
 
-        var inactiveBinding = await bindings.BindAsync(registeredCourierId, "opaque-provider-subject-inactive",
+        var inactiveBinding = await bindings.BindIdentityAsync(registeredCourierId, "opaque-provider-subject-inactive",
             "IDENTITY_VERIFIED", "test:evidence:inactive", "auth-bind-inactive");
         Assert.Equal(CourierIdentityBindingOutcome.InvalidState, inactiveBinding.Outcome);
 
         const string activeSubject = "opaque-provider-subject-active";
-        var bind = await bindings.BindAsync(activeCourierId, activeSubject,
+        var bind = await bindings.BindIdentityAsync(activeCourierId, activeSubject,
             "IDENTITY_VERIFIED", "test:evidence:active", "auth-bind-active");
         Assert.Equal(CourierIdentityBindingOutcome.Applied, bind.Outcome);
         Assert.Equal("BOUND", bind.Summary!.Status);
-        var replay = await bindings.BindAsync(activeCourierId, activeSubject,
+        var replay = await bindings.BindIdentityAsync(activeCourierId, activeSubject,
             "IDENTITY_VERIFIED", "test:evidence:active", "auth-bind-active");
         Assert.Equal(CourierIdentityBindingOutcome.Replayed, replay.Outcome);
-        var conflict = await bindings.BindAsync(activeCourierId, activeSubject,
+        var conflict = await bindings.BindIdentityAsync(activeCourierId, activeSubject,
             "IDENTITY_REVIEWED", "test:evidence:changed", "auth-bind-active");
         Assert.Equal(CourierIdentityBindingOutcome.Conflict, conflict.Outcome);
 
-        var duplicateSubject = await bindings.BindAsync(suspendedCourierId, activeSubject,
+        var duplicateSubject = await bindings.BindIdentityAsync(suspendedCourierId, activeSubject,
             "IDENTITY_VERIFIED", "test:evidence:duplicate", "auth-bind-duplicate");
         Assert.Equal(CourierIdentityBindingOutcome.InvalidState, duplicateSubject.Outcome);
         var suspendedSubject = "opaque-provider-subject-suspended";
         Assert.Equal(CourierIdentityBindingOutcome.Applied,
-            (await bindings.BindAsync(suspendedCourierId, suspendedSubject,
+            (await bindings.BindIdentityAsync(suspendedCourierId, suspendedSubject,
                 "IDENTITY_VERIFIED", "test:evidence:suspended", "auth-bind-suspended")).Outcome);
 
         var suspension = new PostgresCourierSuspensionService(
