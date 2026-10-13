@@ -136,6 +136,28 @@ public sealed class PostgresMissionCourierOfferService(
         return offers;
     }
 
+    public async Task<IReadOnlyList<MissionCourierOffer>> ListForMissionAsync(
+        string missionId, CancellationToken cancellationToken = default)
+    {
+        RequireAdministrator();
+        Validate(MissionIdPattern, missionId, nameof(missionId));
+        const string sql = """
+            SELECT offer_id, mission_id, courier_id, zone_id, status, created_at, updated_at
+            FROM mission_courier_offers
+            WHERE mission_id = @mission_id
+            ORDER BY created_at DESC, offer_id DESC
+            LIMIT 100;
+            """;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+        var offers = new List<MissionCourierOffer>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            offers.Add(ReadOffer(reader));
+        return offers;
+    }
+
     public Task<MissionCourierOfferResult> AcceptAsync(
         string offerId, string courierId, string idempotencyKey,
         CancellationToken cancellationToken = default) =>
