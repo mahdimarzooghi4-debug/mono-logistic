@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json.Serialization;
 using Mono.Api.Security;
 using Npgsql;
 using NpgsqlTypes;
@@ -13,10 +14,10 @@ public enum CourierIdentityBindingOutcome
 }
 
 public sealed record CourierIdentityBindingSummary(
-    string CourierId,
-    string Status,
-    string ReasonCode,
-    DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("courier_id")] string CourierId,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("reason_code")] string ReasonCode,
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
 
 public sealed record CourierIdentityBindingWriteResult(
     CourierIdentityBindingOutcome Outcome,
