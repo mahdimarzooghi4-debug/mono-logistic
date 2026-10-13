@@ -9,6 +9,14 @@ public sealed record MissionCourierOfferInput(
     [property: JsonPropertyName("courier_id")] string? CourierId,
     [property: JsonPropertyName("zone_id")] string? ZoneId);
 
+public sealed record MissionCourierOfferExpiryBatchCommandInput(
+    [property: JsonPropertyName("mission_id")] string? MissionId,
+    [property: JsonPropertyName("offer_id")] string? OfferId,
+    [property: JsonPropertyName("idempotency_key")] string? IdempotencyKey);
+
+public sealed record MissionCourierOfferExpiryBatchInput(
+    [property: JsonPropertyName("commands")] IReadOnlyList<MissionCourierOfferExpiryBatchCommandInput?>? Commands);
+
 public static class MonoMissionCourierOfferEndpoints
 {
     public static IEndpointRouteBuilder MapMonoMissionCourierOfferEndpoints(
@@ -73,6 +81,35 @@ public static class MonoMissionCourierOfferEndpoints
                 catch (ArgumentException)
                 {
                     return Results.BadRequest(Error("INVALID_REQUEST", "Mission or offer ID is invalid."));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost("/operations/v1/dispatch/queue/expire-overdue", async (
+                MissionCourierOfferExpiryBatchInput input,
+                PostgresMissionCourierOfferService offers,
+                CancellationToken cancellationToken) =>
+            {
+                var submitted = input.Commands;
+                if (submitted is null || submitted.Count is < 1 or > PostgresMissionCourierOfferService.MaximumExpiryBatchSize ||
+                    submitted.Any(command => command is null ||
+                        string.IsNullOrWhiteSpace(command.MissionId) ||
+                        string.IsNullOrWhiteSpace(command.OfferId) ||
+                        string.IsNullOrWhiteSpace(command.IdempotencyKey)))
+                    return Results.BadRequest(Error("INVALID_REQUEST",
+                        $"Provide between 1 and {PostgresMissionCourierOfferService.MaximumExpiryBatchSize} complete expiry commands."));
+
+                var commands = submitted.Select(command => new MissionCourierOfferExpiryCommand(
+                    command!.MissionId!, command.OfferId!, command.IdempotencyKey!)).ToArray();
+                try
+                {
+                    var items = await offers.ExpireBatchAsync(commands, cancellationToken);
+                    return Results.Ok(new { items });
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(Error("INVALID_REQUEST",
+                        "Each command must contain valid mission and offer IDs, unique offers, and valid idempotency keys."));
                 }
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
