@@ -110,9 +110,10 @@ BEGIN
         IF NEW.actor_type <> 'OPERATIONS' THEN
             RAISE EXCEPTION 'only operations may create a courier offer';
         END IF;
-        SELECT status INTO mission_status FROM missions
+        SELECT status, customer_id INTO mission_status, offer_customer_id FROM missions
         WHERE mission_id = offer_mission_id FOR UPDATE;
-        IF mission_status <> 'SEARCHING_COURIER' THEN
+        IF mission_status <> 'SEARCHING_COURIER' OR
+           offer_customer_id IS DISTINCT FROM NEW.customer_id THEN
             RAISE EXCEPTION 'mission is not searching for a courier';
         END IF;
     ELSE
@@ -131,6 +132,12 @@ BEGIN
         END IF;
         SELECT status INTO mission_status FROM missions
         WHERE mission_id = offer_mission_id FOR UPDATE;
+        IF NEW.mission_id IS DISTINCT FROM offer_mission_id OR
+           NEW.customer_id IS DISTINCT FROM offer_customer_id OR
+           NEW.courier_id IS DISTINCT FROM offer_courier_id OR
+           NEW.zone_id IS DISTINCT FROM offer_zone_id THEN
+            RAISE EXCEPTION 'mission offer event identity does not match its offer';
+        END IF;
         IF NEW.action = 'ACCEPTED' AND mission_status <> 'SEARCHING_COURIER' THEN
             RAISE EXCEPTION 'mission is not searching for a courier';
         END IF;
