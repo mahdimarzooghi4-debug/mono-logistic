@@ -190,6 +190,35 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Null(dueSecondPage.NextCursor);
             var defaultFirstPage = await dispatchQueue.ListAsync(1, null, null, null);
             Assert.Equal(secondaryMissionId, Assert.Single(defaultFirstPage!.Items).MissionId);
+
+            DateTimeOffset primaryDeliveryAt;
+            await using (var readDue = await dataSource.OpenConnectionAsync())
+            await using (var readDueCommand = new NpgsqlCommand(
+                "SELECT committed_delivery_at FROM missions WHERE mission_id = @mission_id;", readDue))
+            {
+                readDueCommand.Parameters.AddWithValue("mission_id", MissionId);
+                var primaryDeliveryValue = (DateTime)(await readDueCommand.ExecuteScalarAsync())!;
+                primaryDeliveryAt = new DateTimeOffset(DateTime.SpecifyKind(primaryDeliveryValue, DateTimeKind.Utc));
+            }
+            var deliveryWindow = await dispatchQueue.ListAsync(
+                10, null, null, null, deliveryAfter: primaryDeliveryAt);
+            Assert.Equal(2, deliveryWindow!.Items.Count);
+            var exactLowerBound = await dispatchQueue.ListAsync(
+                10, null, null, null, deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt);
+            Assert.Equal(secondaryMissionId, Assert.Single(exactLowerBound!.Items).MissionId);
+            var noDeliveryAfterUpperBound = await dispatchQueue.ListAsync(
+                10, null, null, null, deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt.AddMilliseconds(1));
+            Assert.Empty(noDeliveryAfterUpperBound!.Items);
+            var windowFirstPage = await dispatchQueue.ListAsync(
+                1, null, null, null, deliveryAfter: primaryDeliveryAt);
+            var cursorRejectedByChangedDeliveryWindow = await dispatchQueue.ListAsync(
+                1, null, null, windowFirstPage!.NextCursor,
+                deliveryAfter: deliveryWindow.Items[0].CommittedDeliveryAt.AddMilliseconds(1));
+            Assert.Null(cursorRejectedByChangedDeliveryWindow);
+            await Assert.ThrowsAsync<ArgumentException>(() => dispatchQueue.ListAsync(
+                10, null, null, null,
+                deliveryBefore: primaryDeliveryAt.AddTicks(-1), deliveryAfter: primaryDeliveryAt));
+
             await using (var removeSecondary = await dataSource.OpenConnectionAsync())
             await using (var deleteSecondary = new NpgsqlCommand(
                 "DELETE FROM missions WHERE mission_id = @mission_id;", removeSecondary))

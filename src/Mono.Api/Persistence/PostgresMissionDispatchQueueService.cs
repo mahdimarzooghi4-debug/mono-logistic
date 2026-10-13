@@ -13,13 +13,14 @@ public sealed class PostgresMissionDispatchQueueService(
         int pageSize, bool? hasOffer, string? query, string? cursor,
         CancellationToken cancellationToken = default, bool? deadlinePassed = null, string? latestAction = null,
         DateTimeOffset? deliveryBefore = null, int? minAttemptCount = null, int? maxAttemptCount = null,
-        DateTimeOffset? lastAttemptBefore = null, bool? deliveryOverdue = null, string? sortBy = null)
+        DateTimeOffset? lastAttemptBefore = null, bool? deliveryOverdue = null, string? sortBy = null, DateTimeOffset? deliveryAfter = null)
     {
         if (pageSize is < 1 or > 100 ||
             !MissionOperationsInputValidator.IsValidQuery(query) ||
             !MissionOperationsInputValidator.IsValidCursor(cursor) ||
             !IsValidLatestAction(latestAction) ||
             !IsValidSortBy(sortBy) ||
+            (deliveryAfter.HasValue && deliveryBefore.HasValue && deliveryAfter.Value > deliveryBefore.Value) ||
             (minAttemptCount.HasValue && minAttemptCount.Value < 0) ||
             (maxAttemptCount.HasValue && maxAttemptCount.Value < 0) ||
             (minAttemptCount.HasValue && maxAttemptCount.HasValue && minAttemptCount.Value > maxAttemptCount.Value))
@@ -70,6 +71,7 @@ public sealed class PostgresMissionDispatchQueueService(
                        (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
                   AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  AND (@delivery_after IS NULL OR m.committed_delivery_at >= @delivery_after)
                   {recencyPredicate}
                   AND (@delivery_overdue IS NULL OR (m.committed_delivery_at <= @as_of) = @delivery_overdue)
                   AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
@@ -82,7 +84,7 @@ public sealed class PostgresMissionDispatchQueueService(
                 """;
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(cursorSql, connection);
-            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, asOf);
+            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, deliveryAfter, asOf);
             command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, cursor);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
@@ -125,6 +127,7 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  AND (@delivery_after IS NULL OR m.committed_delivery_at >= @delivery_after)
                   {recencyPredicate}
               AND (@delivery_overdue IS NULL OR (m.committed_delivery_at <= @as_of) = @delivery_overdue)
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
@@ -171,6 +174,7 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  AND (@delivery_after IS NULL OR m.committed_delivery_at >= @delivery_after)
                   {recencyPredicate}
               AND (@delivery_overdue IS NULL OR (m.committed_delivery_at <= @as_of) = @delivery_overdue)
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
@@ -188,7 +192,7 @@ public sealed class PostgresMissionDispatchQueueService(
         await using var pageConnection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var pageCommand = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, pageConnection);
         AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction,
-            deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, asOf);
+            deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, deliveryAfter, asOf);
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
@@ -236,7 +240,7 @@ public sealed class PostgresMissionDispatchQueueService(
 
     private static void AddFilterParameters(
         NpgsqlCommand command, bool? hasOffer, string? query, bool? deadlinePassed,
-        string? latestAction, DateTimeOffset? deliveryBefore, int? minAttemptCount, int? maxAttemptCount, DateTimeOffset? lastAttemptBefore, bool? deliveryOverdue,
+        string? latestAction, DateTimeOffset? deliveryBefore, int? minAttemptCount, int? maxAttemptCount, DateTimeOffset? lastAttemptBefore, bool? deliveryOverdue, DateTimeOffset? deliveryAfter,
         DateTimeOffset asOf)
     {
         command.Parameters.AddWithValue("has_offer", NpgsqlDbType.Boolean, (object?)hasOffer ?? DBNull.Value);
@@ -257,6 +261,8 @@ public sealed class PostgresMissionDispatchQueueService(
             command.Parameters.AddWithValue("last_attempt_before", NpgsqlDbType.TimestampTz, lastAttemptBefore.Value);
         command.Parameters.AddWithValue("delivery_overdue", NpgsqlDbType.Boolean,
             (object?)deliveryOverdue ?? DBNull.Value);
+        command.Parameters.AddWithValue("delivery_after", NpgsqlDbType.TimestampTz,
+            (object?)deliveryAfter ?? DBNull.Value);
     }
 
     private static bool IsValidSortBy(string? sortBy) => sortBy is null or "created_at" or "delivery_due";
