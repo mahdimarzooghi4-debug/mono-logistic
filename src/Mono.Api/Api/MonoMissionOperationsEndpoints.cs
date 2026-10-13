@@ -44,6 +44,34 @@ public static class MonoMissionOperationsEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/dispatch/queue", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                [FromQuery(Name = "has_offer")] bool? hasOffer,
+                string? query,
+                string? cursor,
+                PostgresMissionDispatchQueueService dispatchQueue,
+                PostgresMissionOperationsReadAuditService readAudit,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100 ||
+                    !MissionOperationsInputValidator.IsValidQuery(query) ||
+                    !MissionOperationsInputValidator.IsValidCursor(cursor))
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Dispatch queue filters are invalid.")));
+
+                var page = await dispatchQueue.ListAsync(size, hasOffer, query, cursor, cancellationToken);
+                if (page is null)
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));
+
+                await readAudit.RecordAsync(
+                    PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
+                    null, page.Items.Count, cancellationToken);
+                return Results.Ok(page);
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapGet("/operations/v1/missions/{missionId}", async (
                 string missionId,
                 PostgresMissionOperationsService missions,
