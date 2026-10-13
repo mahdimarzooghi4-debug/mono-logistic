@@ -31,6 +31,29 @@ The API rejects an early expiry, an already-answered offer, or an offer whose Mi
 
 Expiry remains an explicit operations action. No scheduled expiry worker is part of this API.
 
+## Expire overdue offers in a batch
+
+For a small set of overdue offers, operations can submit up to 20 commands in one request:
+
+```http
+POST /operations/v1/dispatch/queue/expire-overdue
+Content-Type: application/json
+
+{
+  "commands": [
+    {
+      "mission_id": "mis_...",
+      "offer_id": "mco_...",
+      "idempotency_key": "expire-mco-..."
+    }
+  ]
+}
+```
+
+Each command carries its own idempotency key. Duplicate offer IDs are rejected before any command runs. The API validates the complete batch first, then executes each command with the same expiry rules as the single-offer route. The response contains one outcome per command: `Applied`, `Replayed`, `OfferNotFound`, `MissionNotFound`, `Conflict`, or `InvalidState`. A batch may therefore contain successful and unsuccessful items; items are committed independently and are not rolled back as a group. Retry an interrupted request with the same commands and keys.
+
+The batch route returns HTTP 400 for an invalid command list. An item with `InvalidState` means it was not expired, for example because its deadline has not passed or it has already been answered. Use the single-offer route when one HTTP status per operation is preferable.
+
 ## Attempt history
 
 `GET /operations/v1/missions/{missionId}/dispatch-attempts` returns up to 100 offers newest first, with each offer's current status and latest event action, actor, reason, and timestamp. Successful reads are recorded as `MISSION_DISPATCH_ATTEMPT_HISTORY` audit events. The per-offer `/events` route returns the full event sequence.

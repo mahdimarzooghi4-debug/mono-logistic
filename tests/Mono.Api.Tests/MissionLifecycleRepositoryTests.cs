@@ -365,11 +365,34 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.True(overdueQueue.Items[0].ActiveOffer.ExpiresAt!.Value <= offerClock.GetUtcNow());
 
 
-            var expiredOffer = await offers.ExpireAsync(
-                MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
-            Assert.Equal(MissionCourierOfferOutcome.Applied, expiredOffer.Outcome);
+            var duplicateExpiryBatch = new[]
+            {
+                new MissionCourierOfferExpiryCommand(
+                    MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer"),
+                new MissionCourierOfferExpiryCommand(
+                    MissionId, expiringOffer.Offer.OfferId, "duplicate-expiry-key")
+            };
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => offers.ExpireBatchAsync(duplicateExpiryBatch));
+            Assert.Equal("OFFERED", await GetOfferStatusAsync(dataSource, expiringOffer.Offer.OfferId));
+
+            var expiryCommands = new[]
+            {
+                new MissionCourierOfferExpiryCommand(
+                    MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer"),
+                new MissionCourierOfferExpiryCommand(
+                    MissionId, "mco_22222222222222222222222222222222", "expire-missing-offer")
+            };
+            var expiryBatch = await offers.ExpireBatchAsync(expiryCommands);
+            var expiredOffer = expiryBatch[0];
+            Assert.Equal("Applied", expiredOffer.Outcome);
+            Assert.Equal("OfferNotFound", expiryBatch[1].Outcome);
+            Assert.Null(expiryBatch[1].Offer);
             Assert.Equal("EXPIRED", expiredOffer.Offer!.Status);
             Assert.Equal("SEARCHING_COURIER", expiredOffer.MissionStatus);
+            var expiryBatchReplay = await offers.ExpireBatchAsync(expiryCommands);
+            Assert.Equal("Replayed", expiryBatchReplay[0].Outcome);
+            Assert.Equal("OfferNotFound", expiryBatchReplay[1].Outcome);
             var expiryReplay = await offers.ExpireAsync(
                 MissionId, expiringOffer.Offer.OfferId, "expire-overdue-offer");
             Assert.Equal(MissionCourierOfferOutcome.Replayed, expiryReplay.Outcome);
