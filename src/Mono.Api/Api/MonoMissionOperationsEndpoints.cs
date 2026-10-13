@@ -57,6 +57,7 @@ public static class MonoMissionOperationsEndpoints
                 [FromQuery(Name = "delivery_window_state")] string? deliveryWindowState,
                 [FromQuery(Name = "delivery_due_within_minutes")] int? deliveryDueWithinMinutes,
                 [FromQuery(Name = "customer_id")] string? customerId,
+                [FromQuery(Name = "created_before")] DateTimeOffset? createdBefore,
                 [FromQuery(Name = "last_attempt_before")] DateTimeOffset? lastAttemptBefore,
                 [FromQuery(Name = "delivery_overdue")] bool? deliveryOverdue,
                 [FromQuery(Name = "sort_by")] string? sortBy,
@@ -90,7 +91,7 @@ public static class MonoMissionOperationsEndpoints
 
                 var page = await dispatchQueue.ListAsync(
                     size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction,
-                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, sortBy, deliveryAfter, deliveryWindowState, deliveryDueWithinMinutes, customerId);
+                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, sortBy, deliveryAfter, deliveryWindowState, deliveryDueWithinMinutes, customerId, createdBefore);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));
