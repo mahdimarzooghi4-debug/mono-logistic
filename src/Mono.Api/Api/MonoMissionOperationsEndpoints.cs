@@ -50,6 +50,8 @@ public static class MonoMissionOperationsEndpoints
                 [FromQuery(Name = "deadline_passed")] bool? deadlinePassed,
                 [FromQuery(Name = "delivery_before")] DateTimeOffset? deliveryBefore,
                 [FromQuery(Name = "last_attempt_before")] DateTimeOffset? lastAttemptBefore,
+                [FromQuery(Name = "delivery_overdue")] bool? deliveryOverdue,
+                [FromQuery(Name = "sort_by")] string? sortBy,
                 [FromQuery(Name = "min_attempt_count")] int? minAttemptCount,
                 [FromQuery(Name = "max_attempt_count")] int? maxAttemptCount,
                 [FromQuery(Name = "latest_action")] string? latestAction,
@@ -67,6 +69,7 @@ public static class MonoMissionOperationsEndpoints
                         "EXPIRED" or "RELEASED" or "CANCELLED" or "COMPLETED") ||
                     (minAttemptCount.HasValue && minAttemptCount.Value < 0) ||
                     (maxAttemptCount.HasValue && maxAttemptCount.Value < 0) ||
+                    sortBy is not (null or "created_at" or "delivery_due") ||
                     (minAttemptCount.HasValue && maxAttemptCount.HasValue &&
                      minAttemptCount.Value > maxAttemptCount.Value))
                     return Results.BadRequest(new ApiErrorResponse(
@@ -74,7 +77,7 @@ public static class MonoMissionOperationsEndpoints
 
                 var page = await dispatchQueue.ListAsync(
                     size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction,
-                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore);
+                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, sortBy);
                 if (page is null)
                     return Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));
