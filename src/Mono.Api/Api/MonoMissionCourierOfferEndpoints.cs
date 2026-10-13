@@ -9,6 +9,15 @@ public sealed record MissionCourierOfferInput(
     [property: JsonPropertyName("courier_id")] string? CourierId,
     [property: JsonPropertyName("zone_id")] string? ZoneId);
 
+public sealed record MissionCourierOfferBatchCommandInput(
+    [property: JsonPropertyName("mission_id")] string? MissionId,
+    [property: JsonPropertyName("courier_id")] string? CourierId,
+    [property: JsonPropertyName("zone_id")] string? ZoneId,
+    [property: JsonPropertyName("idempotency_key")] string? IdempotencyKey);
+
+public sealed record MissionCourierOfferBatchInput(
+    [property: JsonPropertyName("commands")] IReadOnlyList<MissionCourierOfferBatchCommandInput?>? Commands);
+
 public sealed record MissionCourierOfferExpiryBatchCommandInput(
     [property: JsonPropertyName("mission_id")] string? MissionId,
     [property: JsonPropertyName("offer_id")] string? OfferId,
@@ -42,6 +51,37 @@ public static class MonoMissionCourierOfferEndpoints
                 {
                     return Results.BadRequest(Error("INVALID_REQUEST",
                         "Mission, courier, zone, or idempotency fields are invalid."));
+                }
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost("/operations/v1/dispatch/offers/batch", async (
+                MissionCourierOfferBatchInput input,
+                PostgresMissionCourierOfferService offers,
+                CancellationToken cancellationToken) =>
+            {
+                var submitted = input.Commands;
+                if (submitted is null ||
+                    submitted.Count is < 1 or > PostgresMissionCourierOfferService.MaximumDispatchOfferBatchSize ||
+                    submitted.Any(command => command is null ||
+                        string.IsNullOrWhiteSpace(command.MissionId) ||
+                        string.IsNullOrWhiteSpace(command.CourierId) ||
+                        string.IsNullOrWhiteSpace(command.ZoneId) ||
+                        string.IsNullOrWhiteSpace(command.IdempotencyKey)))
+                    return Results.BadRequest(Error("INVALID_REQUEST",
+                        $"Provide between 1 and {PostgresMissionCourierOfferService.MaximumDispatchOfferBatchSize} complete offer commands."));
+
+                var commands = submitted.Select(command => new MissionCourierOfferBatchCommand(
+                    command!.MissionId!, command.CourierId!, command.ZoneId!, command.IdempotencyKey!)).ToArray();
+                try
+                {
+                    var items = await offers.CreateBatchAsync(commands, cancellationToken);
+                    return Results.Ok(new { items });
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(Error("INVALID_REQUEST",
+                        "Each command must contain valid IDs and keys, with no duplicate Missions."));
                 }
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
