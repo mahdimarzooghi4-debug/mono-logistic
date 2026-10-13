@@ -250,6 +250,25 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             await Assert.ThrowsAsync<ArgumentException>(() => dispatchQueue.ListAsync(
                 20, null, null, null, deliveryWindowState: "unknown"));
             var committedDeliveryCutoff = pendingBeforeOffer.Items[0].CommittedDeliveryAt;
+            dispatchClock.Set(committedDeliveryCutoff.AddMinutes(-5));
+            var dueWithinFiveMinutes = await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryDueWithinMinutes: 5);
+            Assert.Single(dueWithinFiveMinutes!.Items);
+            var outsideFourMinuteHorizon = await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryDueWithinMinutes: 4);
+            Assert.Empty(outsideFourMinuteHorizon!.Items);
+            Assert.Null(await dispatchQueue.ListAsync(
+                20, null, null, MissionId, deliveryDueWithinMinutes: 4));
+            await Assert.ThrowsAsync<ArgumentException>(() => dispatchQueue.ListAsync(
+                20, null, null, null, deliveryDueWithinMinutes: 0));
+            await Assert.ThrowsAsync<ArgumentException>(() => dispatchQueue.ListAsync(
+                20, null, null, null, deliveryDueWithinMinutes: 10081));
+            dispatchClock.Set(committedDeliveryCutoff);
+            Assert.Single((await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryDueWithinMinutes: 1))!.Items);
+            dispatchClock.Set(committedDeliveryCutoff.AddMilliseconds(1));
+            Assert.Empty((await dispatchQueue.ListAsync(
+                20, null, null, null, deliveryDueWithinMinutes: 5))!.Items);
             var nonOverdueQueue = await dispatchQueue.ListAsync(
                 20, null, null, null, deliveryOverdue: false);
             Assert.Single(nonOverdueQueue!.Items);
