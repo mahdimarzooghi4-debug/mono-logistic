@@ -170,6 +170,10 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Equal(MissionCourierOfferOutcome.Applied, created.Outcome);
             Assert.Equal("OFFERED", created.Offer!.Status);
             Assert.Single(await offers.ListMyOffersAsync(courierId));
+            var operationsQueue = await offers.ListForMissionAsync(MissionId);
+            Assert.Single(operationsQueue);
+            Assert.Equal(created.Offer.OfferId, operationsQueue[0].OfferId);
+            Assert.Equal("OFFERED", operationsQueue[0].Status);
 
             var replayedCreate = await offers.CreateOfferAsync(
                 MissionId, courierId, "zone-central", "mission-offer-create");
