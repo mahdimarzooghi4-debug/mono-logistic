@@ -17,7 +17,7 @@ public static class MonoMissionDispatchAttemptHistoryEndpoints
             {
                 if (!MissionHistoryInputValidator.IsValidMissionId(missionId))
                     return Results.BadRequest(new ApiErrorResponse(
-                        new ApiError("INVALID_REQUEST", "Mission ID is invalid."));
+                        new ApiError("INVALID_REQUEST", "Mission ID is invalid.")));
 
                 var result = await history.FindAsync(missionId, cancellationToken);
                 if (result is null)
