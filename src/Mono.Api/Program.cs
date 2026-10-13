@@ -96,6 +96,7 @@ app.MapMonoCourierSessionEndpoints();
 app.MapMonoCourierIdentityBindingEndpoints();
 app.MapMonoCourierLivePresenceEndpoints();
 app.MapMonoMissionCourierOfferEndpoints();
+app.MapMonoMissionCourierIssueEndpoints();
 app.MapCustomerServiceConfigurationInspectionEndpoints();
 app.MapCustomerServiceConfigurationAuthoringEndpoints();
 app.MapMonoCustomerOperationsEndpoints();
