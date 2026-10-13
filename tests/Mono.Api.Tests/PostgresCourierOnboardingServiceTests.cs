@@ -714,6 +714,14 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
 
         var summary = await bindings.FindAsync(activeCourierId);
         Assert.Equal("REVOKED", summary!.Status);
+        await using (var projectionConnection = await database.DataSource.OpenConnectionAsync())
+        {
+            await using var directProjectionWrite = new NpgsqlCommand(
+                "UPDATE courier_identity_bindings SET status = 'BOUND' WHERE courier_id = @courier_id;",
+                projectionConnection);
+            directProjectionWrite.Parameters.AddWithValue("courier_id", activeCourierId);
+            await Assert.ThrowsAsync<PostgresException>(() => directProjectionWrite.ExecuteNonQueryAsync());
+        }
         Assert.DoesNotContain("Subject", typeof(CourierIdentityBindingSummary).GetProperties()
             .Select(property => property.Name));
         Assert.DoesNotContain("Issuer", typeof(CourierIdentityBindingSummary).GetProperties()
