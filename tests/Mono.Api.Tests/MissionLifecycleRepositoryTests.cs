@@ -296,6 +296,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
 
         var migrationNames = new[]
         {
+            "024_mission_operations_read_audit.sql",
+            "025_mission_operations_read_audit_inspection.sql",
             "033_courier_onboarding.sql",
             "034_courier_operations_read_audit.sql",
             "035_courier_availability_windows.sql",
@@ -306,7 +308,8 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             "040_courier_live_presence.sql",
             "041_mission_courier_offers.sql",
             "042_mission_courier_offer_withdrawal.sql",
-            "043_courier_suspension_withdraws_offers.sql"
+            "043_courier_suspension_withdraws_offers.sql",
+            "044_mission_courier_offer_history_audit.sql"
         };
         foreach (var migrationName in migrationNames)
         {
