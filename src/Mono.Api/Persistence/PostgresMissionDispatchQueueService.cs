@@ -42,7 +42,7 @@ public sealed class PostgresMissionDispatchQueueService(
                     WHERE previous.mission_id = m.mission_id
                 ) attempts ON TRUE
                 LEFT JOIN LATERAL (
-                    SELECT latest.occurred_at
+                    SELECT latest.action, latest.occurred_at
                     FROM mission_courier_offers previous
                     LEFT JOIN LATERAL (
                         SELECT event.occurred_at
@@ -64,20 +64,7 @@ public sealed class PostgresMissionDispatchQueueService(
                   {recencyPredicate}
                   AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
                   AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
-                  AND (@latest_action IS NULL OR (
-                       SELECT latest.action
-                       FROM mission_courier_offers previous
-                       LEFT JOIN LATERAL (
-                           SELECT event.action
-                           FROM mission_courier_offer_events event
-                           WHERE event.offer_id = previous.offer_id
-                           ORDER BY event.event_sequence DESC
-                           LIMIT 1
-                       ) latest ON TRUE
-                       WHERE previous.mission_id = m.mission_id
-                       ORDER BY previous.created_at DESC, previous.offer_id DESC
-                       LIMIT 1
-                  ) = @latest_action)
+                  AND (@latest_action IS NULL OR latest_attempt.action = @latest_action)
                   AND (@query_pattern IS NULL
                        OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                        OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -129,20 +116,7 @@ public sealed class PostgresMissionDispatchQueueService(
                   {recencyPredicate}
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
               AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
-              AND (@latest_action IS NULL OR (
-                   SELECT latest.action
-                   FROM mission_courier_offers previous
-                   LEFT JOIN LATERAL (
-                       SELECT event.action
-                       FROM mission_courier_offer_events event
-                       WHERE event.offer_id = previous.offer_id
-                       ORDER BY event.event_sequence DESC
-                       LIMIT 1
-                   ) latest ON TRUE
-                   WHERE previous.mission_id = m.mission_id
-                   ORDER BY previous.created_at DESC, previous.offer_id DESC
-                   LIMIT 1
-              ) = @latest_action)
+              AND (@latest_action IS NULL OR latest_attempt.action = @latest_action)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -186,20 +160,7 @@ public sealed class PostgresMissionDispatchQueueService(
                   {recencyPredicate}
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
               AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
-              AND (@latest_action IS NULL OR (
-                   SELECT latest.action
-                   FROM mission_courier_offers previous
-                   LEFT JOIN LATERAL (
-                       SELECT event.action
-                       FROM mission_courier_offer_events event
-                       WHERE event.offer_id = previous.offer_id
-                       ORDER BY event.event_sequence DESC
-                       LIMIT 1
-                   ) latest ON TRUE
-                   WHERE previous.mission_id = m.mission_id
-                   ORDER BY previous.created_at DESC, previous.offer_id DESC
-                   LIMIT 1
-              ) = @latest_action)
+              AND (@latest_action IS NULL OR latest_attempt.action = @latest_action)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
