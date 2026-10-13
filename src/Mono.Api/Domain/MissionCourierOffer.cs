@@ -9,7 +9,8 @@ public sealed record MissionCourierOffer(
     [property: JsonPropertyName("zone_id")] string ZoneId,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
-    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt);
+    [property: JsonPropertyName("updated_at")] DateTimeOffset UpdatedAt,
+    [property: JsonPropertyName("expires_at")] DateTimeOffset? ExpiresAt = null);
 
 public enum MissionCourierOfferOutcome
 {
