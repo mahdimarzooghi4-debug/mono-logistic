@@ -12,7 +12,8 @@ public sealed class PostgresMissionDispatchQueueService(
     public async Task<MissionDispatchQueuePage?> ListAsync(
         int pageSize, bool? hasOffer, string? query, string? cursor,
         CancellationToken cancellationToken = default, bool? deadlinePassed = null, string? latestAction = null,
-        DateTimeOffset? deliveryBefore = null, int? minAttemptCount = null, int? maxAttemptCount = null)
+        DateTimeOffset? deliveryBefore = null, int? minAttemptCount = null, int? maxAttemptCount = null,
+        DateTimeOffset? lastAttemptBefore = null)
     {
         if (pageSize is < 1 or > 100 ||
             !MissionOperationsInputValidator.IsValidQuery(query) ||
@@ -25,10 +26,13 @@ public sealed class PostgresMissionDispatchQueueService(
 
         var normalizedQuery = query?.ToLowerInvariant();
         var asOf = _timeProvider.GetUtcNow();
+        var recencyPredicate = lastAttemptBefore.HasValue
+            ? "AND latest_attempt.occurred_at <= @last_attempt_before"
+            : string.Empty;
         DateTimeOffset? cursorCreatedAt = null;
         if (cursor is not null)
         {
-            const string cursorSql = """
+            var cursorSql = $"""
                 SELECT m.created_at, (o.offer_id IS NOT NULL)
                 FROM missions m
                 LEFT JOIN mission_courier_offers o ON o.mission_id = m.mission_id AND o.status = 'OFFERED'
@@ -37,28 +41,30 @@ public sealed class PostgresMissionDispatchQueueService(
                     FROM mission_courier_offers previous
                     WHERE previous.mission_id = m.mission_id
                 ) attempts ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT latest.action, latest.occurred_at
+                    FROM mission_courier_offers previous
+                    LEFT JOIN LATERAL (
+                        SELECT event.action, event.occurred_at
+                        FROM mission_courier_offer_events event
+                        WHERE event.offer_id = previous.offer_id
+                        ORDER BY event.event_sequence DESC
+                        LIMIT 1
+                    ) latest ON TRUE
+                    WHERE previous.mission_id = m.mission_id
+                    ORDER BY latest.occurred_at DESC NULLS LAST, previous.created_at DESC, previous.offer_id DESC
+                    LIMIT 1
+                ) latest_attempt ON TRUE
                 WHERE m.mission_id = @mission_id AND m.status = 'SEARCHING_COURIER'
                   AND (@has_offer IS NULL OR (o.offer_id IS NOT NULL) = @has_offer)
                   AND (@deadline_passed IS NULL OR
                        (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
                   AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  {recencyPredicate}
                   AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
                   AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
-                  AND (@latest_action IS NULL OR (
-                       SELECT latest.action
-                       FROM mission_courier_offers previous
-                       LEFT JOIN LATERAL (
-                           SELECT event.action
-                           FROM mission_courier_offer_events event
-                           WHERE event.offer_id = previous.offer_id
-                           ORDER BY event.event_sequence DESC
-                           LIMIT 1
-                       ) latest ON TRUE
-                       WHERE previous.mission_id = m.mission_id
-                       ORDER BY previous.created_at DESC, previous.offer_id DESC
-                       LIMIT 1
-                  ) = @latest_action)
+                  AND (@latest_action IS NULL OR latest_attempt.action = @latest_action)
                   AND (@query_pattern IS NULL
                        OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                        OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -66,7 +72,7 @@ public sealed class PostgresMissionDispatchQueueService(
                 """;
             await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
             await using var command = new NpgsqlCommand(cursorSql, connection);
-            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, asOf);
+            AddFilterParameters(command, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, asOf);
             command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, cursor);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
@@ -74,7 +80,7 @@ public sealed class PostgresMissionDispatchQueueService(
             cursorCreatedAt = reader.GetFieldValue<DateTimeOffset>(0);
         }
 
-        const string firstPageSql = """
+        var firstPageSql = $"""
             SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at,
                    attempts.attempt_count, latest_attempt.offer_id, latest_attempt.courier_id,
@@ -98,7 +104,7 @@ public sealed class PostgresMissionDispatchQueueService(
                     LIMIT 1
                 ) latest ON TRUE
                 WHERE previous.mission_id = m.mission_id
-                ORDER BY previous.created_at DESC, previous.offer_id DESC
+                ORDER BY latest.occurred_at DESC NULLS LAST, previous.created_at DESC, previous.offer_id DESC
                 LIMIT 1
             ) latest_attempt ON TRUE
             WHERE m.status = 'SEARCHING_COURIER'
@@ -107,22 +113,10 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  {recencyPredicate}
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
               AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
-              AND (@latest_action IS NULL OR (
-                   SELECT latest.action
-                   FROM mission_courier_offers previous
-                   LEFT JOIN LATERAL (
-                       SELECT event.action
-                       FROM mission_courier_offer_events event
-                       WHERE event.offer_id = previous.offer_id
-                       ORDER BY event.event_sequence DESC
-                       LIMIT 1
-                   ) latest ON TRUE
-                   WHERE previous.mission_id = m.mission_id
-                   ORDER BY previous.created_at DESC, previous.offer_id DESC
-                   LIMIT 1
-              ) = @latest_action)
+              AND (@latest_action IS NULL OR latest_attempt.action = @latest_action)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -130,7 +124,7 @@ public sealed class PostgresMissionDispatchQueueService(
             ORDER BY m.created_at DESC, m.mission_id DESC
             LIMIT @take;
             """;
-        const string nextPageSql = """
+        var nextPageSql = $"""
             SELECT m.mission_id, m.customer_id, m.delivery_request_id, m.committed_delivery_at, m.created_at,
                    o.offer_id, o.courier_id, o.zone_id, o.status, o.created_at, o.expires_at,
                    attempts.attempt_count, latest_attempt.offer_id, latest_attempt.courier_id,
@@ -154,7 +148,7 @@ public sealed class PostgresMissionDispatchQueueService(
                     LIMIT 1
                 ) latest ON TRUE
                 WHERE previous.mission_id = m.mission_id
-                ORDER BY previous.created_at DESC, previous.offer_id DESC
+                ORDER BY latest.occurred_at DESC NULLS LAST, previous.created_at DESC, previous.offer_id DESC
                 LIMIT 1
             ) latest_attempt ON TRUE
             WHERE m.status = 'SEARCHING_COURIER'
@@ -163,22 +157,10 @@ public sealed class PostgresMissionDispatchQueueService(
                    (o.offer_id IS NOT NULL AND COALESCE(o.expires_at <= @as_of, FALSE) = @deadline_passed))
 
               AND (@delivery_before IS NULL OR m.committed_delivery_at <= @delivery_before)
+                  {recencyPredicate}
               AND (@min_attempt_count = 0 OR attempts.attempt_count >= @min_attempt_count)
               AND (@max_attempt_count = 2147483647 OR attempts.attempt_count <= @max_attempt_count)
-              AND (@latest_action IS NULL OR (
-                   SELECT latest.action
-                   FROM mission_courier_offers previous
-                   LEFT JOIN LATERAL (
-                       SELECT event.action
-                       FROM mission_courier_offer_events event
-                       WHERE event.offer_id = previous.offer_id
-                       ORDER BY event.event_sequence DESC
-                       LIMIT 1
-                   ) latest ON TRUE
-                   WHERE previous.mission_id = m.mission_id
-                   ORDER BY previous.created_at DESC, previous.offer_id DESC
-                   LIMIT 1
-              ) = @latest_action)
+              AND (@latest_action IS NULL OR latest_attempt.action = @latest_action)
               AND (@query_pattern IS NULL
                    OR lower(m.mission_id) LIKE @query_pattern ESCAPE '!'
                    OR lower(m.delivery_request_id) LIKE @query_pattern ESCAPE '!')
@@ -191,7 +173,8 @@ public sealed class PostgresMissionDispatchQueueService(
 
         await using var pageConnection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var pageCommand = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, pageConnection);
-        AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction, deliveryBefore, minAttemptCount, maxAttemptCount, asOf);
+        AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction,
+            deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, asOf);
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
@@ -236,7 +219,7 @@ public sealed class PostgresMissionDispatchQueueService(
 
     private static void AddFilterParameters(
         NpgsqlCommand command, bool? hasOffer, string? query, bool? deadlinePassed,
-        string? latestAction, DateTimeOffset? deliveryBefore, int? minAttemptCount, int? maxAttemptCount,
+        string? latestAction, DateTimeOffset? deliveryBefore, int? minAttemptCount, int? maxAttemptCount, DateTimeOffset? lastAttemptBefore,
         DateTimeOffset asOf)
     {
         command.Parameters.AddWithValue("has_offer", NpgsqlDbType.Boolean, (object?)hasOffer ?? DBNull.Value);
@@ -253,6 +236,8 @@ public sealed class PostgresMissionDispatchQueueService(
             minAttemptCount ?? 0);
         command.Parameters.AddWithValue("max_attempt_count", NpgsqlDbType.Integer,
             maxAttemptCount ?? int.MaxValue);
+        if (lastAttemptBefore.HasValue)
+            command.Parameters.AddWithValue("last_attempt_before", NpgsqlDbType.TimestampTz, lastAttemptBefore.Value);
     }
 
     private static bool IsValidLatestAction(string? latestAction) =>

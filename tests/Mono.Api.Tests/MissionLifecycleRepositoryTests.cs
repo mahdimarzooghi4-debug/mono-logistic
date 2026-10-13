@@ -171,6 +171,9 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             Assert.Null(pendingBeforeOffer.Items[0].ActiveOffer);
             Assert.Equal(0, pendingBeforeOffer.Items[0].AttemptCount);
             Assert.Null(pendingBeforeOffer.Items[0].LatestAttempt);
+            var noAttemptMatchesRecencyCutoff = await dispatchQueue.ListAsync(
+                20, null, null, null, lastAttemptBefore: DateTimeOffset.UtcNow.AddDays(1));
+            Assert.Empty(noAttemptMatchesRecencyCutoff!.Items);
             await dispatchAudit.RecordAsync(
                 PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
                 null, pendingBeforeOffer.Items.Count);
@@ -222,6 +225,13 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
             var beforeCommittedDelivery = await dispatchQueue.ListAsync(
                 20, true, MissionId, null, deliveryBefore: committedDeliveryAt.AddTicks(-1));
             Assert.Empty(beforeCommittedDelivery!.Items);
+            var lastAttemptAt = pendingWithOffer.Items[0].LatestAttempt!.LastOccurredAt!.Value;
+            var attemptedByExactTime = await dispatchQueue.ListAsync(
+                20, null, null, null, lastAttemptBefore: lastAttemptAt);
+            Assert.Single(attemptedByExactTime!.Items);
+            var attemptedBeforeLastEvent = await dispatchQueue.ListAsync(
+                20, null, null, null, lastAttemptBefore: lastAttemptAt.AddTicks(-1));
+            Assert.Empty(attemptedBeforeLastEvent!.Items);
             var atLeastOneAttempt = await dispatchQueue.ListAsync(
                 20, null, null, null, minAttemptCount: 1);
             Assert.Single(atLeastOneAttempt!.Items);
