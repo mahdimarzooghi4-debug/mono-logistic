@@ -208,7 +208,8 @@ public sealed class PostgresMissionDispatchQueueService(
         await using var pageConnection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var pageCommand = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, pageConnection);
         AddFilterParameters(pageCommand, hasOffer, normalizedQuery, deadlinePassed, latestAction,
-            deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, deliveryAfter, asOf);
+            deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore,
+            deliveryOverdue, deliveryAfter, deliveryWindowState, asOf);
         pageCommand.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
         if (cursor is not null)
         {
