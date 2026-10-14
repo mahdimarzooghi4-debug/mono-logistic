@@ -132,6 +132,7 @@ export default function App() {
   function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setToken(tokenDraft.trim())
+    setTokenDraft('')
     setApiBase(apiBaseDraft.trim())
     setItems([])
     setCursorStack([null])
