@@ -413,7 +413,8 @@ max_missions_per_route = 5
 - Sprint 153 binds a matrix attestation to the exact route snapshot, candidate Mission, and directed cells, then verifies the signature through the existing source registry and freshness rules.
 - Sprint 154 adds a provider-neutral matrix acquisition service: it resolves stable route location IDs, requests a directed matrix for an explicit travel mode, and maps responses back to location IDs. Evidence v2 binds mode and coordinates in the source signature; acquisition remains unsigned and cannot independently authorize planning.
 - Sprint 155 adds a versioned Postgres coordinate catalog for route location IDs, with append-only history, expected-version writes, idempotent command replays, and current-coordinate batch resolution.
-- A registered maps provider and trusted signer, a controlled coordinate population workflow, route lifecycle APIs, capacity and Zone checks, broader feasibility-gate integration, Mission/Promise orchestration, and dispatch authorization remain open. This insertion path is not overall feasibility or dispatch authorization.
+- Sprint 156 binds accepted DeliveryRequest coordinate pairs to deterministic opaque pickup/drop-off route location IDs and seeds them into the catalog. Address-only inputs report pending coordinates without invoking an unconfigured geocoder.
+- A registered maps provider and trusted signer, an address geocoding workflow, route lifecycle APIs, capacity and Zone checks, broader feasibility-gate integration, Mission/Promise orchestration, and dispatch authorization remain open. This insertion path is not overall feasibility or dispatch authorization.
 
 ## 14. Epic E12 — Pickup & Handoff
 

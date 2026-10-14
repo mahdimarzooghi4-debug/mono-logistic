@@ -60,6 +60,7 @@ builder.Services.AddScoped<IRouteLocationCoordinateCatalog>(services =>
     services.GetRequiredService<PostgresRouteLocationCoordinateCatalog>());
 builder.Services.AddScoped<IRouteLocationCoordinateResolver>(services =>
     services.GetRequiredService<PostgresRouteLocationCoordinateCatalog>());
+builder.Services.AddScoped<DeliveryRequestRouteLocationRegistrar>();
 builder.Services.AddScoped<IRouteTravelTimeEvidenceVerifier, ConfiguredRouteTravelTimeEvidenceVerifier>();
 builder.Services.AddScoped<RoutePlanInsertionOrchestrationService>();
 builder.Services.AddScoped<PostgresZoneGeometryReviewService>();
