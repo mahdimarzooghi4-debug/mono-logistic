@@ -92,6 +92,21 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         Assert.Single(nextPage.Items);
         Assert.NotEqual(page.Items[0].CourierId, nextPage.Items[0].CourierId);
         Assert.Null(nextPage.NextCursor);
+
+        var activeMatches = await service.ListAsync(10, null, query: courierId[..12], status: "active");
+        Assert.NotNull(activeMatches);
+        Assert.Single(activeMatches.Items);
+        Assert.Equal(courierId, activeMatches.Items[0].CourierId);
+        Assert.Null(activeMatches.NextCursor);
+        var registeredMatches = await service.ListAsync(10, null, status: "REGISTERED");
+        Assert.NotNull(registeredMatches);
+        Assert.Single(registeredMatches.Items);
+        Assert.Equal(second.Snapshot!.CourierId, registeredMatches.Items[0].CourierId);
+        var noMatches = await service.ListAsync(10, null, query: "crr_000000000000000000000000");
+        Assert.NotNull(noMatches);
+        Assert.Empty(noMatches.Items);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.ListAsync(10, null, query: "crr_%"));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.ListAsync(10, null, status: "UNKNOWN"));
     }
 
     [Fact]
