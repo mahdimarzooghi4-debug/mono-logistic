@@ -63,6 +63,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Active Route Inventory Evidence v1](docs/39-active-route-inventory-evidence-v1.md)
 - [Route Insertion Feasibility Evidence v1](docs/40-route-insertion-feasibility-evidence-v1.md)
 - [Route Insertion Sequencing Core (Sprint 150)](docs/sprints/sprint-150-route-sequencing-core.md)
+- [Versioned Route Plan Storage (Sprint 151)](docs/sprints/sprint-151-route-versioned-storage.md)
 - [SLA Feasibility Criterion v1](docs/41-sla-feasibility-criterion-v1.md)
 - [Feasibility Outcome Evaluation v1](docs/42-feasibility-outcome-evaluation-v1.md)
 - [Promise Commit Contract v1](docs/43-promise-commit-contract-v1.md)
