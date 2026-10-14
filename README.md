@@ -136,6 +136,8 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 145 — Dispatch due horizon](docs/sprints/sprint-145-dispatch-due-horizon.md)
 - [Sprint 146 — Dispatch customer filter](docs/sprints/sprint-146-dispatch-customer-filter.md)
 - [Sprint 147 — Dispatch waiting cutoff](docs/sprints/sprint-147-dispatch-waiting-cutoff.md)
+- [Sprint 148 — Mono operations dispatch console](docs/sprints/sprint-148-operations-dispatch-console.md)
+- [Sprint 149 — Live-presence evidence in operations console](docs/sprints/sprint-149-live-presence-operations-console.md)
 - [Policy Draft Authoring API](docs/operations/policy-authoring-api.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)

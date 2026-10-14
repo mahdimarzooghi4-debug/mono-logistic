@@ -48,6 +48,8 @@ type CourierDetail = CourierSummary & { created_by: string; trust_transitions: A
 type CourierReadAudit = { items?: Array<{ audit_id: string; actor_id: string; action: string; courier_id: string | null; result_count: number; occurred_at: string }> }
 type CapacityProjection = { zone_id: string; bucket_minutes: number; buckets: Array<{ from: string; to: string; planned_courier_count: number }> }
 type AvailabilityPage = { items: Array<{ window_id: string; courier_id: string; zone_id: string; starts_at: string; ends_at: string; status: string; created_by: string; created_at: string }>; next_cursor: string | null }
+type PlanningEligibilityItem = { courier_id: string; mode: string; trust_status: string; operational_status: string; zone_approved: boolean; has_scheduled_window: boolean; planned_capacity_contributor: boolean; exclusion_reasons: string[]; is_online: boolean; live_presence_zone_id: string | null; live_presence_updated_at: string | null; live_presence_candidate: boolean; live_presence_exclusion_reasons: string[] }
+type PlanningEligibilityPage = { zone_id: string; from: string; to: string; classification: string; items: PlanningEligibilityItem[]; next_cursor: string | null }
 type ApiError = { error?: { code?: string; message?: string } }
 
 const fa = new Intl.NumberFormat('fa-IR')
@@ -66,6 +68,18 @@ function statusLabel(state: string) {
   if (state === 'overdue') return 'از موعد گذشته'
   if (state === 'due_now') return 'موعد همین حالا'
   return 'در بازه'
+}
+
+function planningReasonLabel(reason: string) {
+  const labels: Record<string, string> = {
+    COURIER_NOT_ACTIVE: 'پیک فعال نیست',
+    COURIER_SUSPENDED: 'تعلیق عملیاتی',
+    ZONE_NOT_APPROVED: 'زون تأیید نشده',
+    NO_SCHEDULED_WINDOW: 'بدون برنامهٔ کاری در بازه',
+    COURIER_NOT_ONLINE: 'حضور آنلاین گزارش نشده',
+    ONLINE_IN_DIFFERENT_ZONE: 'آنلاین در زون دیگر',
+  }
+  return labels[reason] || reason
 }
 
 async function readError(response: Response) {
@@ -108,6 +122,12 @@ export default function App() {
   const [bucketMinutes, setBucketMinutes] = useState('30')
   const [capacityProjection, setCapacityProjection] = useState<CapacityProjection | null>(null)
   const [availabilityPage, setAvailabilityPage] = useState<AvailabilityPage | null>(null)
+  const [planningPage, setPlanningPage] = useState<PlanningEligibilityPage | null>(null)
+  const [planningNextCursor, setPlanningNextCursor] = useState<string | null>(null)
+  const [planningCursorStack, setPlanningCursorStack] = useState<Array<string | null>>([null])
+  const [planningPageIndex, setPlanningPageIndex] = useState(0)
+  const [planningLoading, setPlanningLoading] = useState(false)
+  const [planningError, setPlanningError] = useState('')
   const [availabilityCourierId, setAvailabilityCourierId] = useState('')
   const [cancelWindowId, setCancelWindowId] = useState<string | null>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -130,6 +150,7 @@ export default function App() {
   const [timelineTitle, setTimelineTitle] = useState('')
   const [timelineLoading, setTimelineLoading] = useState(false)
   const detailRequestId = useRef(0)
+  const planningRequestId = useRef(0)
   const availabilityCreateKey = useRef<{ fingerprint: string; key: string } | null>(null)
   const availabilityCancelKey = useRef<{ fingerprint: string; key: string } | null>(null)
 
@@ -140,6 +161,35 @@ export default function App() {
     lateOffers: items.filter((item) => item.activeOffer?.deadlinePassed).length,
   }), [items])
   const capacityPeak = useMemo(() => Math.max(1, ...(capacityProjection?.buckets.map((bucket) => bucket.planned_courier_count) || [])), [capacityProjection])
+  const planningCounts = useMemo(() => ({
+    planned: planningPage?.items.filter((item) => item.planned_capacity_contributor).length || 0,
+    online: planningPage?.items.filter((item) => item.is_online).length || 0,
+    candidates: planningPage?.items.filter((item) => item.live_presence_candidate).length || 0,
+  }), [planningPage])
+
+  async function fetchPlanningEligibility(cursor: string | null, stack: Array<string | null> = [null]) {
+    if (!token || !zoneId.trim() || !capacityFrom || !capacityTo) return
+    const from = new Date(capacityFrom)
+    const to = new Date(capacityTo)
+    if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf()) || to <= from || to.getTime() - from.getTime() > 24 * 60 * 60 * 1000) return
+    const params = new URLSearchParams({ zone_id: zoneId.trim(), from: from.toISOString(), to: to.toISOString(), page_size: '50' })
+    if (cursor) params.set('cursor', cursor)
+    const requestId = ++planningRequestId.current
+    setPlanningLoading(true); setPlanningError('')
+    try {
+      const response = await fetch(`/operations/v1/courier-planning-eligibility?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+      if (!response.ok) throw new Error(await readError(response))
+      const page = await response.json() as PlanningEligibilityPage
+      if (!Array.isArray(page.items) || page.classification !== 'PLANNED_CAPACITY_AND_LIVE_PRESENCE_SIGNALS') throw new Error('ساختار پاسخ شواهد برنامه‌ریزی و حضور با قرارداد API سازگار نیست.')
+      if (requestId !== planningRequestId.current) return
+      setPlanningPage(page); setPlanningNextCursor(page.next_cursor || null)
+      setPlanningCursorStack(stack); setPlanningPageIndex(stack.length - 1)
+    } catch (cause) {
+      if (requestId !== planningRequestId.current) return
+      setPlanningPage(null); setPlanningNextCursor(null)
+      setPlanningError(cause instanceof Error ? cause.message : 'دریافت شواهد برنامه‌ریزی و حضور انجام نشد.')
+    } finally { if (requestId === planningRequestId.current) setPlanningLoading(false) }
+  }
 
   const fetchPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
     if (!token) {
@@ -369,6 +419,7 @@ export default function App() {
           catch (cause) { setCapacityError(cause instanceof Error ? cause.message : 'پاسخ ظرفیت نامعتبر است.'); setCapacityProjection(null) }
         } else { setCapacityError(await readError(projectionResult.value)); setCapacityProjection(null) }
       } else { setCapacityError('ارتباط با API ظرفیت برقرار نشد.'); setCapacityProjection(null) }
+      void fetchPlanningEligibility(null, [null])
     }
     setCursorStack(nextStack || [null]); setPageIndex((nextStack || [null]).length - 1)
     setConnected(true); setUpdatedAt(new Date().toISOString()); setLoading(false)
@@ -387,6 +438,7 @@ export default function App() {
     setAvailabilityNextCursor(null)
     setCapacityProjection(null)
     setAvailabilityPage(null)
+    planningRequestId.current += 1; setPlanningLoading(false); setPlanningPage(null); setPlanningNextCursor(null); setPlanningCursorStack([null]); setPlanningPageIndex(0); setPlanningError('')
     availabilityCreateKey.current = null; availabilityCancelKey.current = null
     setCancelWindowId(null); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
     setCursorStack([null])
@@ -477,7 +529,7 @@ export default function App() {
     else if (mode === 'missions') void fetchMissionPage(null, [null])
     else if (mode === 'couriers') void fetchCourierPage(null, [null])
     else if (mode === 'finance') void fetchFinancePage(null, [null])
-    else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
+    else { planningRequestId.current += 1; setPlanningLoading(false); setAvailabilityPage(null); setCapacityProjection(null); setPlanningPage(null); setPlanningNextCursor(null); setPlanningCursorStack([null]); setPlanningPageIndex(0); setPlanningError(''); setCapacityError(''); setAvailabilityError('') }
   }
 
   async function showCourierDetails(courierId: string) {
@@ -563,6 +615,7 @@ export default function App() {
     setAvailabilityNextCursor(null)
     setCapacityProjection(null)
     setAvailabilityPage(null)
+    planningRequestId.current += 1; setPlanningLoading(false); setPlanningPage(null); setPlanningNextCursor(null); setPlanningCursorStack([null]); setPlanningPageIndex(0); setPlanningError('')
     setCancelWindowId(null); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
     setNextCursor(null)
     setCursorStack([null])
@@ -663,6 +716,31 @@ export default function App() {
                 return <div className="capacity-bar-column" key={bucket.from} title={`${formatDate(bucket.from)} · ${fa.format(bucket.planned_courier_count)} پیک برنامه‌ریزی‌شده`}><strong>{fa.format(bucket.planned_courier_count)}</strong><span style={{ height: `${Math.max(4, bucket.planned_courier_count / capacityPeak * 76)}px` }} /><small>{new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(bucket.from))}</small></div>
               })}</div>
               <p className="data-note">این مقدار فقط از پنجره‌های برنامه‌ریزی‌شده محاسبه شده و نشان‌دهندهٔ حضور لحظه‌ای یا مجوز تخصیص نیست.</p>
+            </section>}
+            {(planningError || planningLoading || planningPage) && <section className="planning-presence-result" aria-label="شواهد برنامه‌ریزی و حضور پیک‌ها">
+              <div className="capacity-result-heading"><div><strong>شواهد برنامه‌ریزی و حضور گزارش‌شده</strong><small>زون {planningPage?.zone_id || zoneId || '—'} · بازهٔ انتخاب‌شده · فقط‌خواندنی</small></div><span>{planningPage ? `صفحه ${fa.format(planningPageIndex + 1)} · ${fa.format(planningPage.items.length)} پیک` : planningLoading ? 'در حال دریافت' : 'داده در دسترس نیست'}</span></div>
+              {planningError && <div className="detail-errors capacity-errors" role="alert"><p>{planningError}</p></div>}
+              {planningLoading && <p className="planning-state"><span className="spinner" />در حال دریافت شواهد پیک‌ها…</p>}
+              {planningPage && <>
+                <div className="planning-summary" aria-label="خلاصهٔ همین صفحه">
+                  <article><small>سهم در ظرفیت برنامه‌ریزی‌شده</small><strong>{fa.format(planningCounts.planned)}</strong></article>
+                  <article><small>وضعیت آنلاین گزارش‌شده</small><strong>{fa.format(planningCounts.online)}</strong></article>
+                  <article><small>آنلاین و تأییدشده در همین زون</small><strong>{fa.format(planningCounts.candidates)}</strong></article>
+                </div>
+                <div className="planning-table-wrap"><table className="planning-table"><thead><tr><th>پیک</th><th>اعتماد / عملیات</th><th>ظرفیت برنامه‌ریزی‌شده</th><th>حضور گزارش‌شده</th><th>زون حضور</th><th>آخرین تغییر حضور</th><th>دلایل عدم احراز</th></tr></thead><tbody>
+                  {planningPage.items.map((courier) => <tr key={courier.courier_id}>
+                    <td><strong className="mission-id" dir="ltr">{courier.courier_id}</strong><span className="cell-secondary" dir="ltr">{courier.mode}</span></td>
+                    <td><span className={`badge ${courier.trust_status === 'ACTIVE' ? 'success' : 'neutral'}`}>{courier.trust_status}</span><span className="cell-secondary">{courier.operational_status}</span></td>
+                    <td><span className={`badge ${courier.planned_capacity_contributor ? 'success' : 'neutral'}`}>{courier.planned_capacity_contributor ? 'مشارکت دارد' : 'مشارکت ندارد'}</span>{courier.exclusion_reasons.length > 0 && <span className="cell-secondary">{courier.exclusion_reasons.map(planningReasonLabel).join(' · ')}</span>}</td>
+                    <td><span className={`badge ${courier.is_online ? 'success' : 'neutral'}`}>{courier.is_online ? 'آنلاین گزارش‌شده' : 'آفلاین گزارش‌شده'}</span><span className="cell-secondary">{courier.live_presence_candidate ? 'تأییدشده در زون انتخاب‌شده' : 'کاندیدای حضور نیست'}</span></td>
+                    <td dir="ltr">{courier.live_presence_zone_id || '—'}</td><td>{formatDate(courier.live_presence_updated_at)}</td>
+                    <td>{courier.live_presence_exclusion_reasons.length ? <span className="cell-secondary">{courier.live_presence_exclusion_reasons.map(planningReasonLabel).join(' · ')}</span> : <span className="cell-secondary">—</span>}</td>
+                  </tr>)}
+                  {!planningPage.items.length && <tr><td colSpan={7} className="state-cell">برای این زون پیکی در نتیجهٔ جست‌وجو نیست.</td></tr>}
+                </tbody></table></div>
+                <div className="planning-pagination"><span>خلاصه‌ها فقط برای همین صفحهٔ نتایج هستند.</span><div><button type="button" onClick={() => { const stack = planningCursorStack.slice(0, -1); void fetchPlanningEligibility(stack.at(-1) || null, stack) }} disabled={planningLoading || planningPageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(planningPageIndex + 1)}</span><button type="button" onClick={() => { if (!planningNextCursor) return; const stack = [...planningCursorStack, planningNextCursor]; void fetchPlanningEligibility(planningNextCursor, stack) }} disabled={planningLoading || !planningNextCursor}>بعدی</button></div></div>
+                <p className="data-note">حضور بر اساس آخرین وضعیت گزارش‌شدهٔ پیک نمایش داده می‌شود؛ زمان آن را بررسی کنید. این شواهد به‌تنهایی حضور فیزیکی، ظرفیت قابل‌تخصیص یا مجوز اعزام را اثبات نمی‌کند.</p>
+              </>}
             </section>}
           </>}
 
