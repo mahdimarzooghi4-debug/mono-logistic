@@ -290,6 +290,8 @@ export default function App() {
     setItems([])
     setMissionItems([])
     setCourierItems([])
+    setFinanceItems([])
+    setFinanceNextCursor(null)
     setCourierNextCursor(null)
     setAvailabilityNextCursor(null)
     setCapacityProjection(null)
@@ -461,6 +463,8 @@ export default function App() {
     setItems([])
     setMissionItems([])
     setCourierItems([])
+    setFinanceItems([])
+    setFinanceNextCursor(null)
     setCourierNextCursor(null)
     setAvailabilityNextCursor(null)
     setCapacityProjection(null)
@@ -562,11 +566,11 @@ export default function App() {
           </>}
 
           <div className="table-wrap">
-            <table>
+            <table className={viewMode === 'finance' ? 'finance-table' : undefined}>
               <thead>{viewMode === 'dispatch' ? <tr><th>شناسه مأموریت</th><th>مشتری / شعبه</th><th>زمان ایجاد</th><th>موعد تحویل</th><th>تلاش / آخرین اقدام</th><th>پیشنهاد فعال</th><th>سوابق</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : viewMode === 'couriers' ? <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr> : viewMode === 'finance' ? <tr><th>مأموریت</th><th>وضعیت</th><th>نرخ ثبت‌شده</th><th>مسافت</th><th>کرایه</th><th>سهم خریدار</th><th>سهم فروشنده</th><th>کمیسیون مونو (برآورد)</th><th>مالیات کمیسیون</th><th>خالص پیک (برآورد)</th></tr> : <tr><th>شناسه پنجره</th><th>شناسه پیک</th><th>زون</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>ثبت‌کننده</th><th>زمان ثبت</th></tr>}</thead>
               <tbody>
-                {loading && <tr><td colSpan={8} className="state-cell"><span className="spinner" />در حال دریافت اطلاعات…</td></tr>}
-                {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : viewMode === 'finance' ? financeItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
+                {loading && <tr><td colSpan={viewMode === 'finance' ? 10 : 8} className="state-cell"><span className="spinner" />در حال دریافت اطلاعات…</td></tr>}
+                {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : viewMode === 'finance' ? financeItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={viewMode === 'finance' ? 10 : 8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
                 {!loading && viewMode === 'dispatch' && items.map((mission) => <tr key={mission.missionId}>
                   <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong>{mission.deliveryOverdue && <span className="badge danger">موعد گذشته</span>}</td>
                   <td><span className="cell-primary" dir="ltr">{mission.customerId}</span><span className="cell-secondary" dir="ltr">{mission.branchId}</span></td>
