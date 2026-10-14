@@ -81,7 +81,8 @@ input:focus,select:focus { border-color: #00a8c6; box-shadow: 0 0 0 3px rgba(0,1
 .advanced-grid { display: flex; gap: 10px; max-width: 600px; padding-top: 10px; }
 .advanced-grid label { max-width: 290px; }
 .table-wrap { width: 100%; overflow-x: auto; border-top: 1px solid #edf1f2; }
-table { width: 100%; min-width: 970px; border-collapse: collapse; text-align: right; }
+table { width: 100%; min-width: 970px;
+.finance-table { min-width: 1350px; } border-collapse: collapse; text-align: right; }
 th { padding: 11px 13px; background: #f7fafb; color: #718087; font-size: 10px; font-weight: 600; white-space: nowrap; }
 td { padding: 12px 13px; border-top: 1px solid #edf1f2; color: #38484e; font-size: 10px; white-space: nowrap; vertical-align: middle; }
 tbody tr:hover { background: #fbfdfd; }
