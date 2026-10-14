@@ -106,6 +106,12 @@ export default function App() {
   const [bucketMinutes, setBucketMinutes] = useState('30')
   const [capacityProjection, setCapacityProjection] = useState<CapacityProjection | null>(null)
   const [availabilityPage, setAvailabilityPage] = useState<AvailabilityPage | null>(null)
+  const [availabilityCourierId, setAvailabilityCourierId] = useState('')
+  const [cancelWindowId, setCancelWindowId] = useState<string | null>(null)
+  const [cancelReason, setCancelReason] = useState('')
+  const [availabilityWriteLoading, setAvailabilityWriteLoading] = useState(false)
+  const [availabilityWriteError, setAvailabilityWriteError] = useState('')
+  const [availabilityWriteMessage, setAvailabilityWriteMessage] = useState('')
   const [capacityError, setCapacityError] = useState('')
   const [availabilityError, setAvailabilityError] = useState('')
   const [sortBy, setSortBy] = useState('delivery_due')
@@ -239,6 +245,78 @@ export default function App() {
     finally { setLoading(false) }
   }, [token, financeQuery, financeStatus])
 
+  async function submitAvailabilityWindow() {
+    if (!token) { setAvailabilityWriteError('ابتدا با توکن مدیر عملیات متصل شوید.'); return }
+    const courier = availabilityCourierId.trim()
+    if (!/^crr_[0-9a-f]{32}$/.test(courier)) {
+      setAvailabilityWriteError('شناسهٔ پیک باید با قالب crr_ و ۳۲ رقم هگزادسیمال وارد شود.')
+      return
+    }
+    if (!zoneId.trim() || !capacityFrom || !capacityTo) {
+      setAvailabilityWriteError('زون و زمان شروع و پایان را کامل کنید.')
+      return
+    }
+    const from = new Date(capacityFrom)
+    const to = new Date(capacityTo)
+    const now = Date.now()
+    if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf()) ||
+        from.getTime() < now || from.getTime() > now + 30 * 24 * 60 * 60 * 1000 ||
+        to <= from || to.getTime() - from.getTime() > 16 * 60 * 60 * 1000) {
+      setAvailabilityWriteError('پنجره باید در ۳۰ روز آینده باشد و حداکثر ۱۶ ساعت طول بکشد.')
+      return
+    }
+    setAvailabilityWriteLoading(true); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
+    try {
+      const response = await fetch(`/operations/v1/couriers/${encodeURIComponent(courier)}/availability-windows`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify({ zone_id: zoneId.trim(), starts_at: from.toISOString(), ends_at: to.toISOString() }),
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const window = await response.json() as AvailabilityPage['items'][number]
+      if (!window?.window_id || window.status !== 'SCHEDULED') throw new Error('ساختار پاسخ ثبت پنجرهٔ کاری معتبر نیست.')
+      setAvailabilityWriteMessage('پنجرهٔ کاری با موفقیت ثبت شد. این برنامه‌ریزی به معنی حضور لحظه‌ای یا تخصیص پیک نیست.')
+      setAvailabilityPage((current) => {
+        if (!current || (zoneId.trim() && window.zone_id !== zoneId.trim()) ||
+            new Date(window.starts_at) >= new Date(capacityTo) || new Date(window.ends_at) <= new Date(capacityFrom)) return current
+        const rows = [...current.items.filter((item) => item.window_id !== window.window_id), window]
+          .sort((left, right) => left.starts_at.localeCompare(right.starts_at) || left.window_id.localeCompare(right.window_id))
+        return { ...current, items: rows.slice(0, 50) }
+      })
+      setAvailabilityCourierId('')
+    } catch (cause) {
+      setAvailabilityWriteError(cause instanceof Error ? cause.message : 'ثبت پنجرهٔ کاری انجام نشد.')
+    } finally { setAvailabilityWriteLoading(false) }
+  }
+
+  async function cancelAvailabilityWindow(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token || !cancelWindowId) return
+    const reason = cancelReason.trim()
+    if (reason.length < 2 || reason.length > 128 || /[\\u0000-\\u001f\\u007f]/.test(reason)) {
+      setAvailabilityWriteError('دلیل لغو باید ۲ تا ۱۲۸ نویسه و بدون نویسهٔ کنترلی باشد.')
+      return
+    }
+    setAvailabilityWriteLoading(true); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
+    try {
+      const response = await fetch(`/operations/v1/courier-availability-windows/${encodeURIComponent(cancelWindowId)}/cancel`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify({ reason }),
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const window = await response.json() as AvailabilityPage['items'][number]
+      if (window?.window_id !== cancelWindowId || window.status !== 'CANCELLED') throw new Error('ساختار پاسخ لغو پنجرهٔ کاری معتبر نیست.')
+      setAvailabilityPage((current) => current ? { ...current, items: current.items.map((item) => item.window_id === window.window_id ? window : item) } : current)
+      setAvailabilityWriteMessage('پنجرهٔ کاری لغو شد و دلیل در سابقهٔ آن ثبت شد.')
+      setCancelWindowId(null); setCancelReason('')
+    } catch (cause) {
+      setAvailabilityWriteError(cause instanceof Error ? cause.message : 'لغو پنجرهٔ کاری انجام نشد.')
+    } finally { setAvailabilityWriteLoading(false) }
+  }
+
   const fetchZoneCapacity = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, refreshProjection = true) => {
     if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
     if (!zoneId.trim() || !capacityFrom || !capacityTo) { setError('شناسهٔ زون و بازهٔ زمانی را کامل کنید.'); return }
@@ -296,6 +374,7 @@ export default function App() {
     setAvailabilityNextCursor(null)
     setCapacityProjection(null)
     setAvailabilityPage(null)
+    setCancelWindowId(null); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
     setCursorStack([null])
     setPageIndex(0)
     setConnected(false)
@@ -469,6 +548,7 @@ export default function App() {
     setAvailabilityNextCursor(null)
     setCapacityProjection(null)
     setAvailabilityPage(null)
+    setCancelWindowId(null); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
     setNextCursor(null)
     setCursorStack([null])
     setPageIndex(0)
@@ -546,9 +626,11 @@ export default function App() {
             <label>از زمان<input type="datetime-local" value={capacityFrom} onChange={(event) => setCapacityFrom(event.target.value)} /></label>
             <label>تا زمان<input type="datetime-local" value={capacityTo} onChange={(event) => setCapacityTo(event.target.value)} /></label>
             <label>گام زمانی<select value={bucketMinutes} onChange={(event) => setBucketMinutes(event.target.value)}><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60">۶۰ دقیقه</option></select></label>
-            <button className="secondary-button" type="submit" disabled={!token || loading}>محاسبهٔ ظرفیت</button>
+            <label>شناسهٔ پیک برای برنامه‌ریزی<input value={availabilityCourierId} onChange={(event) => setAvailabilityCourierId(event.target.value)} placeholder="crr_…" dir="ltr" autoComplete="off" /></label>
+            <div className="capacity-actions"><button className="secondary-button" type="submit" disabled={!token || loading}>محاسبهٔ ظرفیت</button><button className="primary-button" type="button" onClick={() => void submitAvailabilityWindow()} disabled={!token || loading || availabilityWriteLoading}>ثبت پنجرهٔ کاری</button></div>
           </form>}
-          {viewMode === 'zones' && <p className="courier-list-note">زمان‌های ورودی بر اساس منطقهٔ زمانی مرورگر به UTC تبدیل می‌شوند؛ زون باید شناسهٔ زون عملیاتی فعال باشد و بازه حداکثر ۲۴ ساعت باشد.</p>}
+          {viewMode === 'zones' && <p className="courier-list-note">زمان‌های ورودی بر اساس منطقهٔ زمانی مرورگر به UTC تبدیل می‌شوند؛ زون باید شناسهٔ زون عملیاتی فعال باشد. ثبت پنجره تا ۳۰ روز آینده و حداکثر ۱۶ ساعت مجاز است.</p>}
+          {viewMode === 'zones' && (availabilityWriteError || availabilityWriteMessage) && <div className={availabilityWriteError ? 'detail-errors capacity-errors' : 'availability-write-success'} role={availabilityWriteError ? 'alert' : 'status'}>{availabilityWriteError || availabilityWriteMessage}</div>}
           {viewMode === 'dispatch' && <details className="advanced-filters"><summary>فیلترهای بیشتر</summary><div className="advanced-grid">
             <label>شناسهٔ مشتری<input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="cus_…" dir="ltr" /></label>
             <label>ایجادشده تا تاریخ<input type="datetime-local" value={createdBefore} onChange={(event) => setCreatedBefore(event.target.value)} /></label>
@@ -567,7 +649,7 @@ export default function App() {
 
           <div className="table-wrap">
             <table className={viewMode === 'finance' ? 'finance-table' : undefined}>
-              <thead>{viewMode === 'dispatch' ? <tr><th>شناسه مأموریت</th><th>مشتری / شعبه</th><th>زمان ایجاد</th><th>موعد تحویل</th><th>تلاش / آخرین اقدام</th><th>پیشنهاد فعال</th><th>سوابق</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : viewMode === 'couriers' ? <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr> : viewMode === 'finance' ? <tr><th>مأموریت</th><th>وضعیت</th><th>نرخ ثبت‌شده</th><th>مسافت</th><th>کرایه</th><th>سهم خریدار</th><th>سهم فروشنده</th><th>کمیسیون مونو (برآورد)</th><th>مالیات کمیسیون</th><th>خالص پیک (برآورد)</th></tr> : <tr><th>شناسه پنجره</th><th>شناسه پیک</th><th>زون</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>ثبت‌کننده</th><th>زمان ثبت</th></tr>}</thead>
+              <thead>{viewMode === 'dispatch' ? <tr><th>شناسه مأموریت</th><th>مشتری / شعبه</th><th>زمان ایجاد</th><th>موعد تحویل</th><th>تلاش / آخرین اقدام</th><th>پیشنهاد فعال</th><th>سوابق</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : viewMode === 'couriers' ? <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr> : viewMode === 'finance' ? <tr><th>مأموریت</th><th>وضعیت</th><th>نرخ ثبت‌شده</th><th>مسافت</th><th>کرایه</th><th>سهم خریدار</th><th>سهم فروشنده</th><th>کمیسیون مونو (برآورد)</th><th>مالیات کمیسیون</th><th>خالص پیک (برآورد)</th></tr> : <tr><th>شناسه پنجره</th><th>شناسه پیک</th><th>زون</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>ثبت‌کننده</th><th>زمان ثبت</th><th>عملیات</th></tr>}</thead>
               <tbody>
                 {loading && <tr><td colSpan={viewMode === 'finance' ? 10 : 8} className="state-cell"><span className="spinner" />در حال دریافت اطلاعات…</td></tr>}
                 {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : viewMode === 'finance' ? financeItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={viewMode === 'finance' ? 10 : 8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
@@ -608,7 +690,12 @@ export default function App() {
                 {!loading && viewMode === 'zones' && availabilityPage?.items.map((window) => <tr key={window.window_id}>
                   <td><strong className="mission-id" dir="ltr">{window.window_id}</strong></td><td dir="ltr">{window.courier_id}</td><td dir="ltr">{window.zone_id}</td>
                   <td>{formatDate(window.starts_at)}</td><td>{formatDate(window.ends_at)}</td><td><span className={`badge ${window.status === 'SCHEDULED' ? 'success' : 'neutral'}`}>{window.status}</span></td><td dir="ltr">{window.created_by}</td><td>{formatDate(window.created_at)}</td>
+                  <td>{window.status === 'SCHEDULED' ? <button className="history-button" onClick={() => { setCancelWindowId(window.window_id); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('') }}>لغو</button> : <span className="cell-secondary">—</span>}</td>
                 </tr>)}
+                {!loading && viewMode === 'zones' && cancelWindowId && <tr><td colSpan={9}><form className="cancel-window-form" onSubmit={cancelAvailabilityWindow}>
+                  <strong>لغو پنجرهٔ {cancelWindowId}</strong><input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} maxLength={128} placeholder="دلیل الزامی لغو (۲ تا ۱۲۸ نویسه)" aria-label="دلیل لغو" />
+                  <button className="primary-button" type="submit" disabled={availabilityWriteLoading || !token}>تأیید لغو</button><button className="secondary-button" type="button" onClick={() => { setCancelWindowId(null); setCancelReason('') }} disabled={availabilityWriteLoading}>انصراف</button>
+                </form></td></tr>}
               </tbody>
             </table>
           </div>
