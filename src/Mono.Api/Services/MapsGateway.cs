@@ -54,6 +54,8 @@ public sealed class MapsGateway(IMapsProvider provider) : IMapsGateway
         RouteQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
+        if (!Enum.IsDefined(query.Mode))
+            throw new ArgumentException("A supported route travel mode is required.", nameof(query));
         EnsureCoordinate(query.Origin, "Route origin must be a valid WGS84 coordinate.");
         EnsureCoordinate(query.Destination, "Route destination must be a valid WGS84 coordinate.");
         foreach (var waypoint in query.Waypoints ?? [])
@@ -69,6 +71,8 @@ public sealed class MapsGateway(IMapsProvider provider) : IMapsGateway
         RouteMatrixQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
+        if (!Enum.IsDefined(query.Mode))
+            throw new ArgumentException("A supported route matrix travel mode is required.", nameof(query));
         if (query.Origins is null || query.Origins.Count == 0 ||
             query.Destinations is null || query.Destinations.Count == 0)
             throw new ArgumentException("Route matrix needs at least one origin and one destination.", nameof(query));

@@ -8,7 +8,9 @@ public sealed record RouteTravelTimeEvidence(
     string EvidenceId,
     DateTimeOffset CapturedAt,
     string Attestation,
-    RouteTravelTimeMatrix Matrix);
+    RouteTravelTimeMatrix Matrix,
+    RouteTravelMode? TravelMode = null,
+    IReadOnlyDictionary<string, GeoCoordinate>? LocationCoordinates = null);
 
 public sealed record RouteTravelTimeEvidenceVerificationRequest(
     string RouteId,

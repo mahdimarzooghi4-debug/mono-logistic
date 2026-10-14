@@ -98,7 +98,8 @@ public sealed class RoutePlanInsertionOrchestrationServiceTests
                 "mission-2", "P2", "D2", StartedAt.AddMinutes(5), StartedAt.AddHours(2), 15, 30),
             new RouteTravelTimeEvidence(
                 "provider-test", "evidence-2", StartedAt, "signed-test-attestation",
-                new RouteTravelTimeMatrix(true, true, matrix)));
+                new RouteTravelTimeMatrix(true, true, matrix), RouteTravelMode.Car,
+                ids.ToDictionary(id => id, id => new GeoCoordinate(35.7, 51.4), StringComparer.Ordinal)));
     }
 
     private static RoutePlanVersion CurrentPlan() => new(

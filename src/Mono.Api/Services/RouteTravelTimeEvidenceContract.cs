@@ -34,6 +34,8 @@ public static class RouteTravelTimeEvidenceContract
             request.Candidate.PickupServiceSeconds is < 0 or > RouteInsertionTimeWindowPlanner.MaximumPickupDwellSeconds ||
             request.Candidate.DropoffServiceSeconds < 0 ||
             request.Evidence.CapturedAt == default || request.Evidence.CapturedAt.Offset != TimeSpan.Zero ||
+            request.Evidence.TravelMode is null || !Enum.IsDefined(request.Evidence.TravelMode.Value) ||
+            request.Evidence.LocationCoordinates is null ||
             request.Evidence.Matrix is not { IsComplete: true, TravelTimeSeconds: not null })
             return false;
 
@@ -54,6 +56,10 @@ public static class RouteTravelTimeEvidenceContract
             .Append(request.Candidate.DropoffLocationId)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        if (request.Evidence.LocationCoordinates.Count != locationIds.Length ||
+            locationIds.Any(id => !request.Evidence.LocationCoordinates.TryGetValue(id, out var coordinate) ||
+                                  coordinate is null || !coordinate.IsValid))
+            return false;
         var matrix = request.Evidence.Matrix.TravelTimeSeconds;
         if (matrix.Any(origin => origin.Value is null ||
                                  origin.Value.Any(destination => destination.Value is < 0)))
@@ -85,7 +91,7 @@ public static class RouteTravelTimeEvidenceContract
         var matrix = evidence.Matrix.TravelTimeSeconds;
         var canonical = JsonSerializer.Serialize(new
         {
-            contract = "mono-route-travel-time-evidence.v1",
+            contract = "mono-route-travel-time-evidence.v2",
             route_id = request.RouteId,
             route_version = request.RouteVersion,
             route_snapshot_sha256 = RoutePlanSnapshotValidator.ComputeSha256(request.ExistingPlan),
@@ -102,6 +108,16 @@ public static class RouteTravelTimeEvidenceContract
             evidence_id = evidence.EvidenceId,
             captured_at = Utc(evidence.CapturedAt),
             source_id = evidence.SourceId,
+            travel_mode = evidence.TravelMode.Value.ToString(),
+            locations = evidence.LocationCoordinates!
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => new
+                {
+                    location = pair.Key,
+                    latitude = pair.Value.Latitude.ToString("R", CultureInfo.InvariantCulture),
+                    longitude = pair.Value.Longitude.ToString("R", CultureInfo.InvariantCulture)
+                })
+                .ToArray(),
             matrix_complete = evidence.Matrix.IsComplete,
             cells = matrix.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(origin => new

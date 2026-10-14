@@ -54,6 +54,29 @@ public sealed class ConfiguredRouteTravelTimeEvidenceVerifierTests
     }
 
     [Fact]
+    public async Task Rejects_changed_travel_mode_or_location_coordinate_after_source_attestation()
+    {
+        var signed = CreateSignedRequest(Now.AddSeconds(-15));
+        var verifier = CreateVerifier();
+
+        var modeResult = await verifier.VerifyAsync(signed with
+        {
+            Evidence = signed.Evidence with { TravelMode = RouteTravelMode.Walk }
+        });
+
+        var changedCoordinates = signed.Evidence.LocationCoordinates!
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        changedCoordinates["A"] = new GeoCoordinate(35.99, 51.41);
+        var locationResult = await verifier.VerifyAsync(signed with
+        {
+            Evidence = signed.Evidence with { LocationCoordinates = changedCoordinates }
+        });
+
+        Assert.Equal(RouteTravelTimeEvidenceVerificationStatus.Unverified, modeResult.Status);
+        Assert.Equal(RouteTravelTimeEvidenceVerificationStatus.Unverified, locationResult.Status);
+    }
+
+    [Fact]
     public async Task Rejects_reuse_of_evidence_for_a_different_route_version()
     {
         var signed = CreateSignedRequest(Now.AddSeconds(-15));
@@ -156,7 +179,13 @@ public sealed class ConfiguredRouteTravelTimeEvidenceVerifierTests
                 .ToDictionary(destination => destination, _ => (int?)45, StringComparer.Ordinal),
             StringComparer.Ordinal);
         var evidence = new RouteTravelTimeEvidence(
-            SourceId, "matrix-evidence-1", capturedAt, "", new RouteTravelTimeMatrix(true, false, matrix));
+            SourceId, "matrix-evidence-1", capturedAt, "", new RouteTravelTimeMatrix(true, false, matrix),
+            RouteTravelMode.Bike,
+            new Dictionary<string, GeoCoordinate>(StringComparer.Ordinal)
+            {
+                ["start"] = new(35.70, 51.40), ["A"] = new(35.71, 51.41),
+                ["B"] = new(35.72, 51.42), ["P2"] = new(35.73, 51.43), ["D2"] = new(35.74, 51.44)
+            });
         var unsigned = new RouteTravelTimeEvidenceVerificationRequest(
             "route-1",
             3,
