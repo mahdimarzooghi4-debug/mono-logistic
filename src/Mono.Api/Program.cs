@@ -52,6 +52,7 @@ builder.Services.AddScoped<PostgresDeliveryRequestOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresPromiseCommitRepository>();
 builder.Services.AddScoped<PostgresDeliveryQuoteRepository>();
 builder.Services.AddScoped<PostgresZoneGeometryRepository>();
+builder.Services.AddScoped<PostgresRoutePlanVersionRepository>();
 builder.Services.AddScoped<PostgresZoneGeometryReviewService>();
 builder.Services.AddScoped<PostgresZoneGeometryActivationService>();
 builder.Services.AddScoped<MonoZoneCoveragePreviewService>();

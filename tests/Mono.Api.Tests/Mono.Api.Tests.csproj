@@ -70,5 +70,6 @@
     <EmbeddedResource Include="../../db/migrations/049_mission_courier_offer_expiry.sql" LogicalName="Mono.Api.Tests.Migrations.049_mission_courier_offer_expiry.sql" />
     <EmbeddedResource Include="../../db/migrations/050_mission_dispatch_attempt_history_audit.sql" LogicalName="Mono.Api.Tests.Migrations.050_mission_dispatch_attempt_history_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/051_mission_fare_review_audit.sql" LogicalName="Mono.Api.Tests.Migrations.051_mission_fare_review_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/052_route_plan_versions.sql" LogicalName="Mono.Api.Tests.Migrations.052_route_plan_versions.sql" />
   </ItemGroup>
 </Project>
