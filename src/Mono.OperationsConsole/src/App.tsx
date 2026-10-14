@@ -84,6 +84,8 @@ export default function App() {
   const [items, setItems] = useState<Mission[]>([])
   const [missionItems, setMissionItems] = useState<MissionRecord[]>([])
   const [courierItems, setCourierItems] = useState<CourierSummary[]>([])
+  const [courierQuery, setCourierQuery] = useState('')
+  const [courierStatus, setCourierStatus] = useState('')
   const [financeItems, setFinanceItems] = useState<MissionFare[]>([])
   const [financeNextCursor, setFinanceNextCursor] = useState<string | null>(null)
   const [financeQuery, setFinanceQuery] = useState('')
@@ -215,6 +217,8 @@ export default function App() {
     if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
     setLoading(true); setError(''); setCourierItems([])
     const params = new URLSearchParams({ page_size: '25' })
+    if (courierQuery.trim()) params.set('query', courierQuery.trim())
+    if (courierStatus) params.set('status', courierStatus)
     if (cursor) params.set('cursor', cursor)
     try {
       const response = await fetch(`/operations/v1/couriers?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
@@ -226,7 +230,7 @@ export default function App() {
       setConnected(true); setUpdatedAt(new Date().toISOString())
     } catch (cause) { setConnected(false); setError(cause instanceof Error ? cause.message : 'ارتباط با API برقرار نشد.') }
     finally { setLoading(false) }
-  }, [token])
+  }, [token, courierQuery, courierStatus])
 
   const fetchFinancePage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
     if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
@@ -628,7 +632,11 @@ export default function App() {
             <label>از تاریخ<input type="datetime-local" value={createdAfter} onChange={(event) => setCreatedAfter(event.target.value)} /></label>
             <label>تا تاریخ<input type="datetime-local" value={createdBefore} onChange={(event) => setCreatedBefore(event.target.value)} /></label>
             <button className="secondary-button" type="submit" disabled={!token || loading}>جست‌وجو</button>
-          </form>  : viewMode === 'couriers' ? <div className="courier-list-note">جست‌وجو در API فهرست پیک‌ها ارائه نشده است؛ این فهرست با صفحه‌بندی API دریافت می‌شود.</div> : viewMode === 'finance' ? <form className="filters" onSubmit={applyFilters}>
+          </form>  : viewMode === 'couriers' ? <form className="filters" onSubmit={applyFilters}>
+            <label className="search-field"><span>⌕</span><input value={courierQuery} onChange={(event) => setCourierQuery(event.target.value)} placeholder="پیشوند شناسهٔ پیک (crr_…)" dir="ltr" autoComplete="off" /></label>
+            <label><span className="sr-only">وضعیت اعتماد پیک</span><select value={courierStatus} onChange={(event) => setCourierStatus(event.target.value)}><option value="">همهٔ وضعیت‌ها</option><option value="REGISTERED">ثبت‌شده</option><option value="IDENTITY_VERIFIED">هویت تأییدشده</option><option value="DOCUMENTS_SUBMITTED">مدارک ارسال‌شده</option><option value="TRUST_REQUIREMENTS_VERIFIED">شرایط اعتماد تأییدشده</option><option value="MONO_APPROVED">تأییدشده توسط مونو</option><option value="ACTIVE">فعال</option></select></label>
+            <button className="secondary-button" type="submit" disabled={!token || loading}>جست‌وجو</button>
+          </form> : viewMode === 'finance' ? <form className="filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={financeQuery} onChange={(event) => setFinanceQuery(event.target.value)} placeholder="شناسهٔ مأموریت، درخواست یا مرجع سفارش" /></label>
             <label><span className="sr-only">وضعیت مأموریت</span><select value={financeStatus} onChange={(event) => setFinanceStatus(event.target.value)}><option value="">همهٔ وضعیت‌ها</option><option value="DELIVERED">تحویل‌شده</option><option value="FAILED">ناموفق</option><option value="CANCELLED">لغوشده</option></select></label>
             <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال فیلتر</button>
