@@ -34,7 +34,7 @@ public static class RouteTravelTimeEvidenceContract
             request.Candidate.PickupServiceSeconds is < 0 or > RouteInsertionTimeWindowPlanner.MaximumPickupDwellSeconds ||
             request.Candidate.DropoffServiceSeconds < 0 ||
             request.Evidence.CapturedAt == default || request.Evidence.CapturedAt.Offset != TimeSpan.Zero ||
-            request.Evidence.TravelMode is not { } travelMode || !Enum.IsDefined(travelMode) ||
+            request.Evidence.TravelMode is null || !Enum.IsDefined(request.Evidence.TravelMode.Value) ||
             request.Evidence.LocationCoordinates is null ||
             request.Evidence.Matrix is not { IsComplete: true, TravelTimeSeconds: not null })
             return false;
@@ -108,7 +108,7 @@ public static class RouteTravelTimeEvidenceContract
             evidence_id = evidence.EvidenceId,
             captured_at = Utc(evidence.CapturedAt),
             source_id = evidence.SourceId,
-            travel_mode = evidence.TravelMode!.Value.ToString(),
+            travel_mode = evidence.TravelMode.Value.ToString(),
             locations = evidence.LocationCoordinates!
                 .OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => new

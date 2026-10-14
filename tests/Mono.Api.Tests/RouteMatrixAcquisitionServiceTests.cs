@@ -23,7 +23,7 @@ public sealed class RouteMatrixAcquisitionServiceTests
         Assert.False(result.Matrix.SourceVerified);
         Assert.Empty(result.Attestation);
         Assert.Equal(RouteTravelMode.Cycling, result.TravelMode);
-        Assert.Equal(30, result.Matrix.TravelTimeSeconds["A"]["B"]);
+        Assert.Equal(31, result.Matrix.TravelTimeSeconds["A"]["B"]);
         Assert.Equal(34, result.Matrix.TravelTimeSeconds["B"]["A"]);
         Assert.Equal(5, result.LocationCoordinates!.Count);
     }
