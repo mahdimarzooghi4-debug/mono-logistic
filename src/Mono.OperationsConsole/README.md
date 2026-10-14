@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-The Vite development server listens on `127.0.0.1:5173` and proxies `/operations/*` to `http://localhost:5000`. Start `Mono.Api` on that address first, then open the console and paste a valid Mono operations bearer token. To connect to another API host, enter its base URL in the connection form; that host must allow the browser origin through its CORS policy.
+The Vite development server listens on `127.0.0.1:5173` and proxies `/operations/*` to `http://localhost:5000`. Start `Mono.Api` on that address first, then open the console and paste a valid Mono operations bearer token. For a different local API port, update the development proxy in `vite.config.ts`; the browser always sends the token to its own origin.
 
 ## Implemented in this slice
 
