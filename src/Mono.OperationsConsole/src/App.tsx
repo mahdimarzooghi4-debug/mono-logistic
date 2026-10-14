@@ -128,6 +128,8 @@ export default function App() {
   const [timelineTitle, setTimelineTitle] = useState('')
   const [timelineLoading, setTimelineLoading] = useState(false)
   const detailRequestId = useRef(0)
+  const availabilityCreateKey = useRef<{ fingerprint: string; key: string } | null>(null)
+  const availabilityCancelKey = useRef<{ fingerprint: string; key: string } | null>(null)
 
   const totals = useMemo(() => ({
     rows: items.length,
@@ -265,17 +267,20 @@ export default function App() {
       setAvailabilityWriteError('پنجره باید در ۳۰ روز آینده باشد و حداکثر ۱۶ ساعت طول بکشد.')
       return
     }
+    const createFingerprint = JSON.stringify({ courier, zone_id: zoneId.trim(), starts_at: from.toISOString(), ends_at: to.toISOString() })
+    if (availabilityCreateKey.current?.fingerprint !== createFingerprint) availabilityCreateKey.current = { fingerprint: createFingerprint, key: crypto.randomUUID() }
     setAvailabilityWriteLoading(true); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
     try {
       const response = await fetch(`/operations/v1/couriers/${encodeURIComponent(courier)}/availability-windows`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': availabilityCreateKey.current.key },
         body: JSON.stringify({ zone_id: zoneId.trim(), starts_at: from.toISOString(), ends_at: to.toISOString() }),
         cache: 'no-store',
       })
       if (!response.ok) throw new Error(await readError(response))
       const window = await response.json() as AvailabilityPage['items'][number]
       if (!window?.window_id || window.status !== 'SCHEDULED') throw new Error('ساختار پاسخ ثبت پنجرهٔ کاری معتبر نیست.')
+      availabilityCreateKey.current = null
       setAvailabilityWriteMessage('پنجرهٔ کاری با موفقیت ثبت شد. این برنامه‌ریزی به معنی حضور لحظه‌ای یا تخصیص پیک نیست.')
       setAvailabilityPage((current) => {
         if (!current || (zoneId.trim() && window.zone_id !== zoneId.trim()) ||
@@ -294,15 +299,17 @@ export default function App() {
     event.preventDefault()
     if (!token || !cancelWindowId) return
     const reason = cancelReason.trim()
-    if (reason.length < 2 || reason.length > 128 || /[\\u0000-\\u001f\\u007f]/.test(reason)) {
+    if (reason.length < 2 || reason.length > 128 || /[\u0000-\u001f\u007f]/.test(reason)) {
       setAvailabilityWriteError('دلیل لغو باید ۲ تا ۱۲۸ نویسه و بدون نویسهٔ کنترلی باشد.')
       return
     }
+    const cancelFingerprint = JSON.stringify({ window_id: cancelWindowId, reason })
+    if (availabilityCancelKey.current?.fingerprint !== cancelFingerprint) availabilityCancelKey.current = { fingerprint: cancelFingerprint, key: crypto.randomUUID() }
     setAvailabilityWriteLoading(true); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
     try {
       const response = await fetch(`/operations/v1/courier-availability-windows/${encodeURIComponent(cancelWindowId)}/cancel`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': availabilityCancelKey.current.key },
         body: JSON.stringify({ reason }),
         cache: 'no-store',
       })
@@ -310,6 +317,7 @@ export default function App() {
       const window = await response.json() as AvailabilityPage['items'][number]
       if (window?.window_id !== cancelWindowId || window.status !== 'CANCELLED') throw new Error('ساختار پاسخ لغو پنجرهٔ کاری معتبر نیست.')
       setAvailabilityPage((current) => current ? { ...current, items: current.items.map((item) => item.window_id === window.window_id ? window : item) } : current)
+      availabilityCancelKey.current = null
       setAvailabilityWriteMessage('پنجرهٔ کاری لغو شد و دلیل در سابقهٔ آن ثبت شد.')
       setCancelWindowId(null); setCancelReason('')
     } catch (cause) {
