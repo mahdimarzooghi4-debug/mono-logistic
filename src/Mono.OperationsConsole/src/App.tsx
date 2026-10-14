@@ -71,8 +71,6 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'dispatch' | 'missions'>('dispatch')
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
-  const [apiBase, setApiBase] = useState('')
-  const [apiBaseDraft, setApiBaseDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
   const [missionItems, setMissionItems] = useState<MissionRecord[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -101,11 +99,6 @@ export default function App() {
     lateOffers: items.filter((item) => item.activeOffer?.deadlinePassed).length,
   }), [items])
 
-  const requestUrl = useCallback((path: string) => {
-    const base = apiBase.replace(/\/$/, '')
-    return `${base}${path}`
-  }, [apiBase])
-
   const fetchPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
     if (!token) {
       setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
@@ -122,7 +115,7 @@ export default function App() {
     if (createdBefore) params.set('created_before', new Date(createdBefore).toISOString())
     if (cursor) params.set('cursor', cursor)
     try {
-      const response = await fetch(requestUrl(`/operations/v1/dispatch/queue?${params}`), {
+      const response = await fetch(`/operations/v1/dispatch/queue?${params}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         cache: 'no-store',
       })
@@ -141,7 +134,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [token, sortBy, query, customerId, hasOffer, deliveryWindow, createdBefore, requestUrl])
+  }, [token, sortBy, query, customerId, hasOffer, deliveryWindow, createdBefore])
 
   const fetchMissionPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
     if (!token) {
@@ -157,7 +150,7 @@ export default function App() {
     if (createdBefore) params.set('created_before', new Date(createdBefore).toISOString())
     if (cursor) params.set('cursor', cursor)
     try {
-      const response = await fetch(requestUrl(`/operations/v1/missions?${params}`), {
+      const response = await fetch(`/operations/v1/missions?${params}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         cache: 'no-store',
       })
@@ -176,13 +169,12 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [token, query, createdAfter, createdBefore, requestUrl])
+  }, [token, query, createdAfter, createdBefore])
 
   function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setToken(tokenDraft.trim())
     setTokenDraft('')
-    setApiBase(apiBaseDraft.trim())
     setItems([])
     setMissionItems([])
     setCursorStack([null])
@@ -194,12 +186,11 @@ export default function App() {
       return
     }
     // State updates are asynchronous; use the submitted values for the first request.
-    void requestWithCredentials(tokenDraft.trim(), apiBaseDraft.trim(), null, [null])
+    void requestWithCredentials(tokenDraft.trim(), null, [null])
   }
 
   async function requestWithCredentials(
     submittedToken: string,
-    submittedBase: string,
     cursor: string | null,
     stack: Array<string | null>,
   ) {
@@ -212,7 +203,7 @@ export default function App() {
     if (createdBefore) params.set('created_before', new Date(createdBefore).toISOString())
     if (cursor) params.set('cursor', cursor)
     try {
-      const response = await fetch(`${submittedBase.replace(/\/$/, '')}/operations/v1/dispatch/queue?${params}`, {
+      const response = await fetch(`/operations/v1/dispatch/queue?${params}`, {
         headers: { Authorization: `Bearer ${submittedToken}`, Accept: 'application/json' },
         cache: 'no-store',
       })
@@ -270,7 +261,7 @@ export default function App() {
     setTimeline(null)
     setTimelineLoading(true)
     try {
-      const response = await fetch(requestUrl(`/operations/v1/missions/${encodeURIComponent(missionId)}/timeline`), {
+      const response = await fetch(`/operations/v1/missions/${encodeURIComponent(missionId)}/timeline`, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         cache: 'no-store',
       })
@@ -325,7 +316,6 @@ export default function App() {
         {!token && <section className="connect-card">
           <div><span className="eyebrow">دسترسی امن</span><h2>اتصال به API عملیات</h2><p>توکن معتبر مدیر عملیات را وارد کنید. توکن فقط در حافظهٔ همین صفحه نگهداری می‌شود.</p></div>
           <form className="connect-form" onSubmit={connect}>
-            <label>نشانی پایهٔ API <input value={apiBaseDraft} onChange={(event) => setApiBaseDraft(event.target.value)} placeholder="خالی = همین میزبان" dir="ltr" /></label>
             <label>توکن Bearer <input type="password" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} placeholder="توکن دسترسی عملیات" dir="ltr" autoComplete="off" /></label>
             <button className="primary-button" disabled={loading}>اتصال و دریافت صف</button>
           </form>
