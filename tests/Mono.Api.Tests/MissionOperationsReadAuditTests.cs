@@ -29,7 +29,6 @@ public sealed class MissionOperationsReadAuditTests
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionSearch, null, 2);
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionDetail, missionId, 1);
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionTimeline, missionId, 0);
-        await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionFareReview, null, 3);
 
         var firstPage = await service.ListAsync(2, null, actorId, null, null, null);
         Assert.NotNull(firstPage);
@@ -48,6 +47,8 @@ public sealed class MissionOperationsReadAuditTests
         Assert.All(missionHistory.Items, item => Assert.Equal(missionId, item.MissionId));
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.ListAsync(10, null, actorId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(-1), null));
+
+        await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionFareReview, null, 3);
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using (var select = new NpgsqlCommand("""
