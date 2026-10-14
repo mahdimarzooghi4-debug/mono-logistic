@@ -48,6 +48,39 @@ public static class MonoMissionOperationsEndpoints
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/finance/mission-fares", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                string? status,
+                string? query,
+                [FromQuery(Name = "created_after")] DateTimeOffset? createdAfter,
+                [FromQuery(Name = "created_before")] DateTimeOffset? createdBefore,
+                string? cursor,
+                PostgresMissionOperationsService missions,
+                PostgresMissionOperationsReadAuditService readAudit,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100 ||
+                    !MissionOperationsInputValidator.IsValidStatus(status) ||
+                    !MissionOperationsInputValidator.IsValidQuery(query) ||
+                    !MissionOperationsInputValidator.IsValidDateRange(createdAfter, createdBefore) ||
+                    !MissionOperationsInputValidator.IsValidCursor(cursor))
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Mission fare review filters are invalid.")));
+
+                var page = await missions.ListFareReviewAsync(
+                    size, status, query, createdAfter, createdBefore, cursor, cancellationToken);
+                if (page is null)
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The Mission fare review cursor is invalid for these filters.")));
+
+                await readAudit.RecordAsync(
+                    PostgresMissionOperationsReadAuditService.MissionFareReview,
+                    null, page.Items.Count, cancellationToken);
+                return Results.Ok(page);
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapGet("/operations/v1/dispatch/queue", async (
                 [FromQuery(Name = "page_size")] int? pageSize,
                 [FromQuery(Name = "has_offer")] bool? hasOffer,

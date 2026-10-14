@@ -71,6 +71,8 @@ public static class MonoCourierOperationsEndpoints
         endpoints.MapGet("/operations/v1/couriers", async (
                 [FromQuery(Name = "page_size")] int? pageSize,
                 string? cursor,
+                string? query,
+                string? status,
                 PostgresCourierOnboardingService couriers,
                 PostgresCourierOperationsReadAuditService readAudit,
                 CancellationToken cancellationToken) =>
@@ -81,7 +83,7 @@ public static class MonoCourierOperationsEndpoints
 
                 try
                 {
-                    var page = await couriers.ListAsync(size, cursor, cancellationToken);
+                    var page = await couriers.ListAsync(size, cursor, cancellationToken, query, status);
                     if (page is null)
                         return Results.BadRequest(Error("INVALID_CURSOR", "The courier cursor is not valid."));
                     await readAudit.RecordAsync(

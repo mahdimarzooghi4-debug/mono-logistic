@@ -269,11 +269,16 @@ public sealed class PostgresCourierOnboardingService(
     public async Task<CourierOperationsPage?> ListAsync(
         int pageSize,
         string? cursor,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? query = null,
+        string? status = null)
     {
         RequireActor();
         if (pageSize is < 1 or > 100 || (cursor is not null && !CourierIdPattern.IsMatch(cursor)))
             throw new ArgumentException("Courier page filters are invalid.");
+
+        query = NormalizeSearchQuery(query);
+        status = NormalizeSearchStatus(status);
 
         DateTimeOffset? cursorCreatedAt = null;
         if (cursor is not null)
@@ -292,6 +297,8 @@ public sealed class PostgresCourierOnboardingService(
             SELECT courier_id, mode, status, preferred_zone_ids::text, approved_zone_ids::text,
                    primary_zone_id, created_at, updated_at
             FROM couriers
+            WHERE (@query_pattern IS NULL OR lower(courier_id) LIKE @query_pattern ESCAPE '!')
+              AND (@status IS NULL OR status = @status)
             ORDER BY created_at DESC, courier_id DESC
             LIMIT @take;
             """;
@@ -299,14 +306,19 @@ public sealed class PostgresCourierOnboardingService(
             SELECT courier_id, mode, status, preferred_zone_ids::text, approved_zone_ids::text,
                    primary_zone_id, created_at, updated_at
             FROM couriers
-            WHERE created_at < @cursor_created_at
-               OR (created_at = @cursor_created_at AND courier_id < @cursor_id)
+            WHERE (@query_pattern IS NULL OR lower(courier_id) LIKE @query_pattern ESCAPE '!')
+              AND (@status IS NULL OR status = @status)
+              AND (created_at < @cursor_created_at
+                   OR (created_at = @cursor_created_at AND courier_id < @cursor_id))
             ORDER BY created_at DESC, courier_id DESC
             LIMIT @take;
             """;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(cursor is null ? firstPageSql : nextPageSql, connection);
         command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, pageSize + 1);
+        command.Parameters.AddWithValue("query_pattern", NpgsqlDbType.Text,
+            query is null ? DBNull.Value : EscapeLikePrefix(query) + "%");
+        command.Parameters.AddWithValue("status", NpgsqlDbType.Text, status is null ? DBNull.Value : status);
         if (cursor is not null)
         {
             command.Parameters.AddWithValue("cursor_created_at", NpgsqlDbType.TimestampTz, cursorCreatedAt!.Value);
@@ -334,6 +346,32 @@ public sealed class PostgresCourierOnboardingService(
         return new CourierOperationsPage(summaries, hasMore ? summaries[^1].CourierId : null);
     }
 
+    private static string? NormalizeSearchQuery(string? query)
+    {
+        if (query is null)
+            return null;
+        query = query.Trim().ToLowerInvariant();
+        if (query.Length is < 1 or > 36 ||
+            query.Any(character => !(character is >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-')))
+            throw new ArgumentException("Courier query must be an ID prefix.", nameof(query));
+        return query;
+    }
+
+    private static string? NormalizeSearchStatus(string? status)
+    {
+        if (status is null || string.IsNullOrWhiteSpace(status))
+            return null;
+        status = status.Trim().ToUpperInvariant();
+        if (status is not ("REGISTERED" or "IDENTITY_VERIFIED" or "DOCUMENTS_SUBMITTED" or
+            "TRUST_REQUIREMENTS_VERIFIED" or "MONO_APPROVED" or "ACTIVE"))
+            throw new ArgumentException("Courier status is invalid.", nameof(status));
+        return status;
+    }
+
+    private static string EscapeLikePrefix(string value) =>
+        value.Replace("!", "!!", StringComparison.Ordinal)
+            .Replace("%", "!%", StringComparison.Ordinal)
+            .Replace("_", "!_", StringComparison.Ordinal);
     public async Task<CourierOperationsSnapshot?> FindAsync(
         string courierId,
         CancellationToken cancellationToken = default)
