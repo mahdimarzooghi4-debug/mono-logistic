@@ -44,6 +44,8 @@ type CourierSummary = { courier_id: string; mode: string; status: string; prefer
 type CourierPage = { items: CourierSummary[]; next_cursor: string | null }
 type CourierDetail = CourierSummary & { created_by: string; trust_transitions: Array<{ transition_id: string; from_status: string; to_status: string; actor_id: string; reason_code: string; evidence_reference: string; occurred_at: string }> }
 type CourierReadAudit = { items?: Array<{ audit_id: string; actor_id: string; action: string; courier_id: string | null; result_count: number; occurred_at: string }> }
+type CapacityProjection = { zone_id: string; bucket_minutes: number; buckets: Array<{ from: string; to: string; planned_courier_count: number }> }
+type AvailabilityPage = { items: Array<{ window_id: string; courier_id: string; zone_id: string; starts_at: string; ends_at: string; status: string; created_by: string; created_at: string }>; next_cursor: string | null }
 type ApiError = { error?: { code?: string; message?: string } }
 
 const fa = new Intl.NumberFormat('fa-IR')
@@ -74,7 +76,7 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers'>('dispatch')
+  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones'>('dispatch')
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
@@ -83,6 +85,7 @@ export default function App() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [missionNextCursor, setMissionNextCursor] = useState<string | null>(null)
   const [courierNextCursor, setCourierNextCursor] = useState<string | null>(null)
+  const [availabilityNextCursor, setAvailabilityNextCursor] = useState<string | null>(null)
   const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
   const [pageIndex, setPageIndex] = useState(0)
   const [query, setQuery] = useState('')
@@ -91,6 +94,14 @@ export default function App() {
   const [deliveryWindow, setDeliveryWindow] = useState('')
   const [createdBefore, setCreatedBefore] = useState('')
   const [createdAfter, setCreatedAfter] = useState('')
+  const [zoneId, setZoneId] = useState('')
+  const [capacityFrom, setCapacityFrom] = useState('')
+  const [capacityTo, setCapacityTo] = useState('')
+  const [bucketMinutes, setBucketMinutes] = useState('30')
+  const [capacityProjection, setCapacityProjection] = useState<CapacityProjection | null>(null)
+  const [availabilityPage, setAvailabilityPage] = useState<AvailabilityPage | null>(null)
+  const [capacityError, setCapacityError] = useState('')
+  const [availabilityError, setAvailabilityError] = useState('')
   const [sortBy, setSortBy] = useState('delivery_due')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -112,6 +123,7 @@ export default function App() {
     overdue: items.filter((item) => item.deliveryOverdue).length,
     lateOffers: items.filter((item) => item.activeOffer?.deadlinePassed).length,
   }), [items])
+  const capacityPeak = useMemo(() => Math.max(1, ...(capacityProjection?.buckets.map((bucket) => bucket.planned_courier_count) || [])), [capacityProjection])
 
   const fetchPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
     if (!token) {
@@ -202,6 +214,50 @@ export default function App() {
     finally { setLoading(false) }
   }, [token])
 
+  const fetchZoneCapacity = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, refreshProjection = true) => {
+    if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
+    if (!zoneId.trim() || !capacityFrom || !capacityTo) { setError('شناسهٔ زون و بازهٔ زمانی را کامل کنید.'); return }
+    const from = new Date(capacityFrom)
+    const to = new Date(capacityTo)
+    if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf()) || to <= from || to.getTime() - from.getTime() > 24 * 60 * 60 * 1000) {
+      setError('بازهٔ زمانی باید معتبر، مثبت و حداکثر ۲۴ ساعت باشد.'); return
+    }
+    const bucket = Number(bucketMinutes)
+    const fromUtc = from.toISOString()
+    const toUtc = to.toISOString()
+    if (![15, 30, 60].includes(bucket) || new Date(fromUtc).getUTCMinutes() % bucket !== 0 || new Date(toUtc).getUTCMinutes() % bucket !== 0 || (to.getTime() - from.getTime()) / 60000 % bucket !== 0) {
+      setError('زمان شروع و پایان در UTC باید با گام انتخاب‌شده هم‌تراز باشند.'); return
+    }
+    setLoading(true); setError(''); setCapacityError(''); setAvailabilityError('')
+    const params = new URLSearchParams({ zone_id: zoneId.trim(), from: fromUtc, to: toUtc, page_size: '50' })
+    if (cursor) params.set('cursor', cursor)
+    const availabilityRequest = fetch(`/operations/v1/courier-availability-windows?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+    const projectionParams = new URLSearchParams({ zone_id: zoneId.trim(), from: fromUtc, to: toUtc, bucket_minutes: String(bucket) })
+    const projectionRequest = refreshProjection
+      ? fetch(`/operations/v1/courier-capacity-projection?${projectionParams}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+      : Promise.resolve(null)
+    const [availabilityResult, projectionResult] = await Promise.allSettled([availabilityRequest, projectionRequest])
+    if (availabilityResult.status === 'fulfilled') {
+      if (availabilityResult.value.ok) {
+        try {
+          const page = await availabilityResult.value.json() as AvailabilityPage
+          if (!Array.isArray(page.items)) throw new Error('ساختار پاسخ فهرست پنجره‌های برنامه‌ریزی نامعتبر است.')
+          setAvailabilityPage(page); setAvailabilityNextCursor(page.next_cursor || null)
+        } catch (cause) { setAvailabilityError(cause instanceof Error ? cause.message : 'پاسخ فهرست پنجره‌های برنامه‌ریزی نامعتبر است.'); setAvailabilityPage(null); setAvailabilityNextCursor(null) }
+      } else { setAvailabilityError(await readError(availabilityResult.value)); setAvailabilityPage(null); setAvailabilityNextCursor(null) }
+    } else { setAvailabilityError('ارتباط با API فهرست پنجره‌های برنامه‌ریزی برقرار نشد.'); setAvailabilityPage(null); setAvailabilityNextCursor(null) }
+    if (refreshProjection) {
+      if (projectionResult.status === 'fulfilled' && projectionResult.value) {
+        if (projectionResult.value.ok) {
+          try { const projection = await projectionResult.value.json() as CapacityProjection; if (!Array.isArray(projection.buckets)) throw new Error('ساختار پاسخ ظرفیت نامعتبر است.'); setCapacityProjection(projection) }
+          catch (cause) { setCapacityError(cause instanceof Error ? cause.message : 'پاسخ ظرفیت نامعتبر است.'); setCapacityProjection(null) }
+        } else { setCapacityError(await readError(projectionResult.value)); setCapacityProjection(null) }
+      } else { setCapacityError('ارتباط با API ظرفیت برقرار نشد.'); setCapacityProjection(null) }
+    }
+    setCursorStack(nextStack || [null]); setPageIndex((nextStack || [null]).length - 1)
+    setConnected(true); setUpdatedAt(new Date().toISOString()); setLoading(false)
+  }, [token, zoneId, capacityFrom, capacityTo, bucketMinutes])
+
   function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setToken(tokenDraft.trim())
@@ -210,6 +266,9 @@ export default function App() {
     setMissionItems([])
     setCourierItems([])
     setCourierNextCursor(null)
+    setAvailabilityNextCursor(null)
+    setCapacityProjection(null)
+    setAvailabilityPage(null)
     setCursorStack([null])
     setPageIndex(0)
     setConnected(false)
@@ -262,16 +321,18 @@ export default function App() {
     event.preventDefault()
     if (viewMode === 'dispatch') void fetchPage(null, [null])
     else if (viewMode === 'missions') void fetchMissionPage(null, [null])
-    else void fetchCourierPage(null, [null])
+    else if (viewMode === 'couriers') void fetchCourierPage(null, [null])
+    else void fetchZoneCapacity(null, [null], true)
   }
 
   function goNext() {
-    const cursor = viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : courierNextCursor
+    const cursor = viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : availabilityNextCursor
     if (!cursor) return
     const nextStack = [...cursorStack, cursor]
     if (viewMode === 'dispatch') void fetchPage(cursor, nextStack)
     else if (viewMode === 'missions') void fetchMissionPage(cursor, nextStack)
-    else void fetchCourierPage(cursor, nextStack)
+    else if (viewMode === 'couriers') void fetchCourierPage(cursor, nextStack)
+    else void fetchZoneCapacity(cursor, nextStack, false)
   }
 
   function goPrevious() {
@@ -280,17 +341,19 @@ export default function App() {
     const cursor = previousStack[previousStack.length - 1] || null
     if (viewMode === 'dispatch') void fetchPage(cursor, previousStack)
     else if (viewMode === 'missions') void fetchMissionPage(cursor, previousStack)
-    else void fetchCourierPage(cursor, previousStack)
+    else if (viewMode === 'couriers') void fetchCourierPage(cursor, previousStack)
+    else void fetchZoneCapacity(cursor, previousStack, false)
   }
 
-  function switchView(mode: 'dispatch' | 'missions' | 'couriers') {
+  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
     setError('')
     if (mode === 'dispatch') void fetchPage(null, [null])
     else if (mode === 'missions') void fetchMissionPage(null, [null])
-    else void fetchCourierPage(null, [null])
+    else if (mode === 'couriers') void fetchCourierPage(null, [null])
+    else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
   }
 
   async function showCourierDetails(courierId: string) {
@@ -370,6 +433,9 @@ export default function App() {
     setMissionItems([])
     setCourierItems([])
     setCourierNextCursor(null)
+    setAvailabilityNextCursor(null)
+    setCapacityProjection(null)
+    setAvailabilityPage(null)
     setNextCursor(null)
     setCursorStack([null])
     setPageIndex(0)
@@ -392,7 +458,7 @@ export default function App() {
           <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon">▦</span>صف dispatch</button>
           <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon">↗</span>همهٔ مأموریت‌ها</button>
           <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon">⌁</span>پیک‌ها</button>
-          <button className="nav-item" disabled title="این بخش در بسته‌های بعدی فعال می‌شود"><span className="nav-icon">◉</span>زون‌ها و ظرفیت</button>
+          <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>زون‌ها و ظرفیت</button>
           <button className="nav-item" disabled title="این بخش در بسته‌های بعدی فعال می‌شود"><span className="nav-icon">▤</span>مالی</button>
         </nav>
         <div className="sidebar-footer"><span className="online-dot" />نسخهٔ عملیاتی داخلی</div>
@@ -401,11 +467,11 @@ export default function App() {
       <main className="workspace">
         <header className="topbar">
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : void fetchCourierPage(cursorStack[pageIndex] || null)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
-          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : 'فهرست و سوابق اعتماد پیک‌ها'}</p></div>
+          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
         </header>
 
         {!token && <section className="connect-card">
@@ -426,7 +492,7 @@ export default function App() {
         </section>}
 
         <section className="queue-panel">
-          <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : 'فهرست پیک‌ها'}</h2></div><div className="panel-meta">{updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
+          <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
           {viewMode === 'dispatch' ? <form className="filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجوی شناسهٔ مأموریت" /></label>
             <label><span className="sr-only">وضعیت موعد</span><select value={deliveryWindow} onChange={(event) => setDeliveryWindow(event.target.value)}><option value="">همهٔ موعدها</option><option value="upcoming">در پیش</option><option value="due_now">موعد همین حالا</option><option value="overdue">از موعد گذشته</option></select></label>
@@ -438,18 +504,36 @@ export default function App() {
             <label>از تاریخ<input type="datetime-local" value={createdAfter} onChange={(event) => setCreatedAfter(event.target.value)} /></label>
             <label>تا تاریخ<input type="datetime-local" value={createdBefore} onChange={(event) => setCreatedBefore(event.target.value)} /></label>
             <button className="secondary-button" type="submit" disabled={!token || loading}>جست‌وجو</button>
-          </form> : <div className="courier-list-note">جست‌وجو در API فهرست پیک‌ها ارائه نشده است؛ این فهرست با صفحه‌بندی API دریافت می‌شود.</div>}
+          </form> : viewMode === 'couriers' ? <div className="courier-list-note">جست‌وجو در API فهرست پیک‌ها ارائه نشده است؛ این فهرست با صفحه‌بندی API دریافت می‌شود.</div> : <form className="filters capacity-filters" onSubmit={applyFilters}>
+            <label>شناسهٔ زون<input value={zoneId} onChange={(event) => setZoneId(event.target.value)} placeholder="شناسهٔ زون عملیاتی فعال" dir="ltr" /></label>
+            <label>از زمان<input type="datetime-local" value={capacityFrom} onChange={(event) => setCapacityFrom(event.target.value)} /></label>
+            <label>تا زمان<input type="datetime-local" value={capacityTo} onChange={(event) => setCapacityTo(event.target.value)} /></label>
+            <label>گام زمانی<select value={bucketMinutes} onChange={(event) => setBucketMinutes(event.target.value)}><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60">۶۰ دقیقه</option></select></label>
+            <button className="secondary-button" type="submit" disabled={!token || loading}>محاسبهٔ ظرفیت</button>
+          </form>}
+          {viewMode === 'zones' && <p className="courier-list-note">زمان‌های ورودی بر اساس منطقهٔ زمانی مرورگر به UTC تبدیل می‌شوند؛ زون باید شناسهٔ زون عملیاتی فعال باشد و بازه حداکثر ۲۴ ساعت باشد.</p>}
           {viewMode === 'dispatch' && <details className="advanced-filters"><summary>فیلترهای بیشتر</summary><div className="advanced-grid">
             <label>شناسهٔ مشتری<input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="cus_…" dir="ltr" /></label>
             <label>ایجادشده تا تاریخ<input type="datetime-local" value={createdBefore} onChange={(event) => setCreatedBefore(event.target.value)} /></label>
           </div></details>}
 
+          {viewMode === 'zones' && <>
+            {(capacityError || availabilityError) && <div className="detail-errors capacity-errors">{capacityError && <p>ظرفیت برنامه‌ریزی‌شده: {capacityError}</p>}{availabilityError && <p>پنجره‌های برنامه‌ریزی: {availabilityError}</p>}</div>}
+            {capacityProjection && <section className="capacity-result" aria-label="ظرفیت برنامه‌ریزی‌شده">
+              <div className="capacity-result-heading"><div><strong>ظرفیت برنامه‌ریزی‌شده</strong><small>زون {capacityProjection.zone_id} · هر بازه {fa.format(capacityProjection.bucket_minutes)} دقیقه</small></div><span>{fa.format(capacityProjection.buckets.length)} بازه</span></div>
+              <div className="capacity-bars">{capacityProjection.buckets.map((bucket) => {
+                return <div className="capacity-bar-column" key={bucket.from} title={`${formatDate(bucket.from)} · ${fa.format(bucket.planned_courier_count)} پیک برنامه‌ریزی‌شده`}><strong>{fa.format(bucket.planned_courier_count)}</strong><span style={{ height: `${Math.max(4, bucket.planned_courier_count / capacityPeak * 76)}px` }} /><small>{new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(bucket.from))}</small></div>
+              })}</div>
+              <p className="data-note">این مقدار فقط از پنجره‌های برنامه‌ریزی‌شده محاسبه شده و نشان‌دهندهٔ حضور لحظه‌ای یا مجوز تخصیص نیست.</p>
+            </section>}
+          </>}
+
           <div className="table-wrap">
             <table>
-              <thead>{viewMode === 'dispatch' ? <tr><th>شناسه مأموریت</th><th>مشتری / شعبه</th><th>زمان ایجاد</th><th>موعد تحویل</th><th>تلاش / آخرین اقدام</th><th>پیشنهاد فعال</th><th>سوابق</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr>}</thead>
+              <thead>{viewMode === 'dispatch' ? <tr><th>شناسه مأموریت</th><th>مشتری / شعبه</th><th>زمان ایجاد</th><th>موعد تحویل</th><th>تلاش / آخرین اقدام</th><th>پیشنهاد فعال</th><th>سوابق</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : viewMode === 'couriers' ? <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr> : <tr><th>شناسه پنجره</th><th>شناسه پیک</th><th>زون</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>ثبت‌کننده</th><th>زمان ثبت</th></tr>}</thead>
               <tbody>
                 {loading && <tr><td colSpan={8} className="state-cell"><span className="spinner" />در حال دریافت اطلاعات…</td></tr>}
-                {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : courierItems.length === 0) && <tr><td colSpan={8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
+                {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
                 {!loading && viewMode === 'dispatch' && items.map((mission) => <tr key={mission.missionId}>
                   <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong>{mission.deliveryOverdue && <span className="badge danger">موعد گذشته</span>}</td>
                   <td><span className="cell-primary" dir="ltr">{mission.customerId}</span><span className="cell-secondary" dir="ltr">{mission.branchId}</span></td>
@@ -476,12 +560,17 @@ export default function App() {
                   <td dir="ltr">{courier.primary_zone_id || '—'}</td><td>{formatDate(courier.updated_at)}</td>
                   <td><button className="history-button" onClick={() => void showCourierDetails(courier.courier_id)}>جزئیات</button></td>
                 </tr>)}
+                {!loading && viewMode === 'zones' && availabilityPage?.items.map((window) => <tr key={window.window_id}>
+                  <td><strong className="mission-id" dir="ltr">{window.window_id}</strong></td><td dir="ltr">{window.courier_id}</td><td dir="ltr">{window.zone_id}</td>
+                  <td>{formatDate(window.starts_at)}</td><td>{formatDate(window.ends_at)}</td><td><span className={`badge ${window.status === 'SCHEDULED' ? 'success' : 'neutral'}`}>{window.status}</span></td><td dir="ltr">{window.created_by}</td><td>{formatDate(window.created_at)}</td>
+                </tr>)}
               </tbody>
             </table>
           </div>
-          <footer className="table-footer"><span>{fa.format(viewMode === 'dispatch' ? items.length : viewMode === 'missions' ? missionItems.length : courierItems.length)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !(viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : courierNextCursor)}>بعدی</button></div></footer>
+          <footer className="table-footer"><span>{fa.format(viewMode === 'dispatch' ? items.length : viewMode === 'missions' ? missionItems.length : viewMode === 'couriers' ? courierItems.length : availabilityPage?.items.length || 0)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !(viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : availabilityNextCursor)}>بعدی</button></div></footer>
         </section>
         {viewMode === 'dispatch' && <p className="data-note">آمار بالا فقط از ردیف‌های صفحهٔ جاری محاسبه شده است؛ API فعلاً شمار کل صف را برنمی‌گرداند.</p>}
+        {viewMode === 'zones' && <p className="data-note">این داده‌ها پنجره‌های کاری ثبت‌شده‌اند؛ حضور زنده، ظرفیت لحظه‌ای یا اختیار تخصیص از آن‌ها نتیجه نمی‌شود.</p>}
       </main>
 
       {timelineTitle && <div className="modal-backdrop" role="presentation" onClick={closeDetails}><section className="timeline-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}><header><div><span className="eyebrow">جزئیات و سوابق عملیاتی</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></header>{timelineLoading ? <p className="modal-state">در حال دریافت اطلاعات…</p> : viewMode === 'couriers' ? <>
