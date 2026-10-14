@@ -173,3 +173,4 @@ tbody tr:hover { background: #fbfdfd; }
   .detail-grid { grid-template-columns: 1fr; }
   .audit-list article { grid-template-columns: 1fr; gap: 4px; }
 }
+.courier-list-note { padding: 0 19px 12px; color: #7a898f; font-size: 10px; }
