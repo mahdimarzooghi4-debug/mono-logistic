@@ -175,7 +175,9 @@ public static class RouteInsertionTimeWindowPlanner
 
         foreach (var stop in stops)
         {
-            var travelSeconds = matrix.TravelTimeSeconds[currentLocationId][stop.LocationId];
+            var travelSeconds = StringComparer.Ordinal.Equals(currentLocationId, stop.LocationId)
+                ? 0
+                : matrix.TravelTimeSeconds[currentLocationId][stop.LocationId];
             if (travelSeconds is null)
                 return (false, deliveryTimes, ["TRAVEL_MATRIX_INCOMPLETE"]);
 

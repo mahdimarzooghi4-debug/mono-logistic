@@ -50,6 +50,17 @@ public sealed class RouteInsertionTimeWindowPlannerTests
     }
 
     [Fact]
+    public void SameLocationLegUsesZeroTravelTimeWithoutMatrixDiagonal()
+    {
+        var result = RouteInsertionTimeWindowPlanner.Evaluate(Request(
+            [], [], Candidate("new", "A", "B", Start, Start.AddMinutes(2)), Matrix("A", "B")));
+
+        Assert.Equal(RouteInsertionTimeWindowDisposition.CandidatePositionsFound, result.Disposition);
+        Assert.All(result.CandidatePositions, position =>
+            Assert.Equal(Start.AddMinutes(1), position.DeliveryTimes["new"]));
+    }
+
+    [Fact]
     public void PickupReadyWaitMustFitInsideThreeMinuteDwellLimit()
     {
         var atLimit = RouteInsertionTimeWindowPlanner.Evaluate(Request(
