@@ -55,6 +55,7 @@ public sealed class MapsGatewayTests
         var query = new RouteQuery(
             new GeoCoordinate(35.7, 51.4),
             new GeoCoordinate(35.8, 51.5),
+            RouteTravelMode.Driving,
             [new GeoCoordinate(double.NaN, 51.6)]);
 
         await Assert.ThrowsAsync<ArgumentException>(() => gateway.GetRouteAsync(query));
@@ -73,7 +74,7 @@ public sealed class MapsGatewayTests
 
         await Assert.ThrowsAsync<MapsProviderContractException>(() =>
             gateway.GetRouteAsync(new RouteQuery(
-                new GeoCoordinate(35.7, 51.4), new GeoCoordinate(35.8, 51.5))));
+                new GeoCoordinate(35.7, 51.4), new GeoCoordinate(35.8, 51.5), RouteTravelMode.Cycling)));
     }
 
     [Fact]
@@ -93,7 +94,8 @@ public sealed class MapsGatewayTests
 
         var result = await gateway.GetRouteMatrixAsync(new RouteMatrixQuery(
             [new GeoCoordinate(35.7, 51.4)],
-            [new GeoCoordinate(35.8, 51.5), new GeoCoordinate(35.9, 51.6)]));
+            [new GeoCoordinate(35.8, 51.5), new GeoCoordinate(35.9, 51.6)],
+            RouteTravelMode.Walking));
 
         Assert.Single(result);
         Assert.Equal(2, result[0].Count);
@@ -109,7 +111,7 @@ public sealed class MapsGatewayTests
         await Assert.ThrowsAsync<MapsProviderContractException>(() =>
             gateway.GetRouteMatrixAsync(new RouteMatrixQuery(
                 [new GeoCoordinate(35.7, 51.4)],
-                [new GeoCoordinate(35.8, 51.5)])));
+                [new GeoCoordinate(35.8, 51.5)], RouteTravelMode.Driving)));
     }
 
     private sealed class StubMapsProvider : IMapsProvider

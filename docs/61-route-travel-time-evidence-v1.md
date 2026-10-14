@@ -1,4 +1,6 @@
-# Route Travel-Time Evidence v1
+# Route Travel-Time Evidence v1 (superseded)
+
+This version is retained as the original payload definition. New attestations must use [Route Travel-Time Evidence v2](62-route-travel-time-evidence-v2.md), which binds the requested travel mode and the resolved coordinates for every route location.
 
 ## Purpose
 
