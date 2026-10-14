@@ -55,6 +55,11 @@ builder.Services.AddScoped<PostgresZoneGeometryRepository>();
 builder.Services.AddScoped<PostgresRoutePlanVersionRepository>();
 builder.Services.AddScoped<IRoutePlanVersionStore>(services =>
     services.GetRequiredService<PostgresRoutePlanVersionRepository>());
+builder.Services.AddScoped<PostgresRouteLocationCoordinateCatalog>();
+builder.Services.AddScoped<IRouteLocationCoordinateCatalog>(services =>
+    services.GetRequiredService<PostgresRouteLocationCoordinateCatalog>());
+builder.Services.AddScoped<IRouteLocationCoordinateResolver>(services =>
+    services.GetRequiredService<PostgresRouteLocationCoordinateCatalog>());
 builder.Services.AddScoped<IRouteTravelTimeEvidenceVerifier, ConfiguredRouteTravelTimeEvidenceVerifier>();
 builder.Services.AddScoped<RoutePlanInsertionOrchestrationService>();
 builder.Services.AddScoped<PostgresZoneGeometryReviewService>();
