@@ -9,7 +9,7 @@ namespace Mono.Api.Persistence;
 /// Persists immutable planning snapshots with optimistic route-version checks.
 /// This repository does not run simulation or authorize dispatch.
 /// </summary>
-public sealed class PostgresRoutePlanVersionRepository
+public sealed class PostgresRoutePlanVersionRepository : IRoutePlanVersionStore
 {
     private readonly NpgsqlDataSource _dataSource;
     private readonly TimeProvider _timeProvider;
