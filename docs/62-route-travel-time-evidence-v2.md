@@ -27,4 +27,4 @@ The source signs the digest using the existing HMAC-SHA256 v1 attestation contra
 
 ## Limits and integration
 
-The location resolver, maps provider, trusted source, and signing key must be provided by deployment integration. This module selects no vendor, host, credential, or operating mode. Evidence v1 signatures do not verify under v2. No route matrix provider or coordinate catalog is enabled by this change.
+The versioned Postgres location catalog is described in [Route Location Coordinate Catalog v1](63-route-location-coordinate-catalog-v1.md). Apply its migration and populate it through an authorized integration before acquisition. A maps provider, trusted source, and signing key also require deployment integration. This module selects no vendor, host, credential, or operating mode. Evidence v1 signatures do not verify under v2.

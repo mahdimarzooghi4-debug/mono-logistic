@@ -10,6 +10,18 @@ public interface IRouteLocationCoordinateResolver
         CancellationToken cancellationToken = default);
 }
 
+public interface IRouteLocationCoordinateCatalog : IRouteLocationCoordinateResolver
+{
+    Task<RouteLocationCoordinateWriteResult> WriteAsync(
+        RouteLocationCoordinateWriteCommand command,
+        CancellationToken cancellationToken = default);
+
+    Task<RouteLocationCoordinateVersion?> FindVersionAsync(
+        string locationId,
+        int version,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed record RouteMatrixAcquisitionRequest(
     string RouteId,
     int RouteVersion,

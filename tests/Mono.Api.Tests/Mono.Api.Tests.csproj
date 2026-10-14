@@ -71,5 +71,6 @@
     <EmbeddedResource Include="../../db/migrations/050_mission_dispatch_attempt_history_audit.sql" LogicalName="Mono.Api.Tests.Migrations.050_mission_dispatch_attempt_history_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/051_mission_fare_review_audit.sql" LogicalName="Mono.Api.Tests.Migrations.051_mission_fare_review_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/052_route_plan_versions.sql" LogicalName="Mono.Api.Tests.Migrations.052_route_plan_versions.sql" />
+    <EmbeddedResource Include="../../db/migrations/053_route_location_coordinate_catalog.sql" LogicalName="Mono.Api.Tests.Migrations.053_route_location_coordinate_catalog.sql" />
   </ItemGroup>
 </Project>
