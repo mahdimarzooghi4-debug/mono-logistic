@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 
 type Offer = {
@@ -38,6 +38,8 @@ type MissionRecord = {
   createdAt: string
 }
 type MissionPage = { items: MissionRecord[]; nextCursor: string | null }
+type MissionTimeline = { events?: Array<{ eventId: string; eventType: string; sequence: number; occurredAt: string }> }
+type MissionReadAudit = { items?: Array<{ auditId: string; actorId: string; action: string; missionId: string | null; resultCount: number; occurredAt: string }> }
 type ApiError = { error?: { code?: string; message?: string } }
 
 const fa = new Intl.NumberFormat('fa-IR')
@@ -88,9 +90,13 @@ export default function App() {
   const [error, setError] = useState('')
   const [connected, setConnected] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
-  const [timeline, setTimeline] = useState<unknown[] | null>(null)
+  const [missionDetail, setMissionDetail] = useState<MissionRecord | null>(null)
+  const [missionTimeline, setMissionTimeline] = useState<NonNullable<MissionTimeline['events']>>([])
+  const [missionAudit, setMissionAudit] = useState<NonNullable<MissionReadAudit['items']>>([])
+  const [detailErrors, setDetailErrors] = useState<string[]>([])
   const [timelineTitle, setTimelineTitle] = useState('')
   const [timelineLoading, setTimelineLoading] = useState(false)
+  const detailRequestId = useRef(0)
 
   const totals = useMemo(() => ({
     rows: items.length,
@@ -256,23 +262,52 @@ export default function App() {
     else void fetchMissionPage(null, [null])
   }
 
-  async function showTimeline(missionId: string) {
+  async function showMissionDetails(missionId: string) {
+    const requestId = ++detailRequestId.current
     setTimelineTitle(missionId)
-    setTimeline(null)
+    setMissionDetail(null)
+    setMissionTimeline([])
+    setMissionAudit([])
+    setDetailErrors([])
     setTimelineLoading(true)
-    try {
-      const response = await fetch(`/operations/v1/missions/${encodeURIComponent(missionId)}/timeline`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-        cache: 'no-store',
-      })
-      if (!response.ok) throw new Error(await readError(response))
-      const result = (await response.json()) as { events?: unknown[] }
-      setTimeline(Array.isArray(result.events) ? result.events : [])
-    } catch (cause) {
-      setTimeline([{ error: cause instanceof Error ? cause.message : 'دریافت سوابق ناموفق بود.' }])
-    } finally {
-      setTimelineLoading(false)
+    const missionPath = `/operations/v1/missions/${encodeURIComponent(missionId)}`
+    const requests = await Promise.allSettled([
+      fetch(missionPath, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+      fetch(`${missionPath}/timeline`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+      fetch(`/operations/v1/mission-read-audit?page_size=25&mission_id=${encodeURIComponent(missionId)}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store',
+      }),
+    ])
+    const errors: string[] = []
+    const readResponse = async <T,>(result: PromiseSettledResult<Response>, label: string): Promise<T | null> => {
+      if (result.status === 'rejected') {
+        errors.push(`${label}: ${result.reason instanceof Error ? result.reason.message : 'خطای ارتباط'}`)
+        return null
+      }
+      if (!result.value.ok) {
+        errors.push(`${label}: ${await readError(result.value)}`)
+        return null
+      }
+      try { return await result.value.json() as T }
+      catch { errors.push(`${label}: قالب پاسخ معتبر نیست.`); return null }
     }
+    const [detail, timelineResult, auditResult] = await Promise.all([
+      readResponse<MissionRecord>(requests[0], 'جزئیات مأموریت'),
+      readResponse<MissionTimeline>(requests[1], 'timeline'),
+      readResponse<MissionReadAudit>(requests[2], 'گزارش دسترسی'),
+    ])
+    if (requestId !== detailRequestId.current) return
+    setMissionDetail(detail)
+    setMissionTimeline(Array.isArray(timelineResult?.events) ? timelineResult.events : [])
+    setMissionAudit(Array.isArray(auditResult?.items) ? auditResult.items : [])
+    setDetailErrors(errors)
+    setTimelineLoading(false)
+  }
+
+  function closeDetails() {
+    detailRequestId.current += 1
+    setTimelineTitle('')
+    setTimelineLoading(false)
   }
 
   function disconnect() {
@@ -284,7 +319,10 @@ export default function App() {
     setCursorStack([null])
     setPageIndex(0)
     setConnected(false)
-    setTimeline(null)
+    setMissionDetail(null)
+    setMissionTimeline([])
+    setMissionAudit([])
+    closeDetails()
     setError('')
   }
 
@@ -362,7 +400,7 @@ export default function App() {
                   <td><span className="cell-primary">{formatDate(mission.committedDeliveryAt)}</span><span className={`badge ${mission.deliveryWindowState === 'overdue' ? 'danger' : mission.deliveryWindowState === 'due_now' ? 'warning' : 'neutral'}`}>{statusLabel(mission.deliveryWindowState)}</span></td>
                   <td><span className="cell-primary">{fa.format(mission.attemptCount)} تلاش</span><span className="cell-secondary">{mission.latestAttempt?.action || mission.latestAttempt?.outcome || 'بدون تلاش ثبت‌شده'}</span></td>
                   <td>{mission.activeOffer ? <><span className="cell-primary" dir="ltr">{mission.activeOffer.courierId || mission.activeOffer.offerId || 'پیشنهاد فعال'}</span><span className={`badge ${mission.activeOffer.deadlinePassed ? 'danger' : 'success'}`}>{mission.activeOffer.deadlinePassed ? 'مهلت پاسخ گذشته' : `مهلت ${formatDate(mission.activeOffer.expiresAt)}`}</span></> : <span className="cell-secondary">پیشنهادی فعال ندارد</span>}</td>
-                  <td><button className="history-button" onClick={() => void showTimeline(mission.missionId)}>مشاهده</button></td>
+                  <td><button className="history-button" onClick={() => void showMissionDetails(mission.missionId)}>جزئیات</button></td>
                 </tr>)}
                 {!loading && viewMode === 'missions' && missionItems.map((mission) => <tr key={mission.missionId}>
                   <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong></td>
@@ -371,7 +409,7 @@ export default function App() {
                   <td><span className="badge neutral">{mission.status}</span></td>
                   <td>{formatDate(mission.committedDeliveryAt)}</td>
                   <td>{formatDate(mission.createdAt)}</td>
-                  <td><button className="history-button" onClick={() => void showTimeline(mission.missionId)}>مشاهده</button></td>
+                  <td><button className="history-button" onClick={() => void showMissionDetails(mission.missionId)}>جزئیات</button></td>
                 </tr>)}
               </tbody>
             </table>
@@ -381,7 +419,18 @@ export default function App() {
         {viewMode === 'dispatch' && <p className="data-note">آمار بالا فقط از ردیف‌های صفحهٔ جاری محاسبه شده است؛ API فعلاً شمار کل صف را برنمی‌گرداند.</p>}
       </main>
 
-      {timeline !== null && <div className="modal-backdrop" role="presentation" onClick={() => setTimeline(null)}><section className="timeline-modal" role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}><header><div><span className="eyebrow">سوابق ثبت‌شده</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={() => setTimeline(null)} aria-label="بستن">×</button></header>{timelineLoading ? <p className="modal-state">در حال دریافت سوابق…</p> : <pre>{JSON.stringify(timeline, null, 2)}</pre>}</section></div>}
+      {timelineTitle && <div className="modal-backdrop" role="presentation" onClick={closeDetails}><section className="timeline-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}><header><div><span className="eyebrow">جزئیات و سوابق عملیاتی</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></header>{timelineLoading ? <p className="modal-state">در حال دریافت اطلاعات…</p> : <>
+        {detailErrors.length > 0 && <div className="detail-errors">{detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
+        <section className="detail-section"><h3>مشخصات مأموریت</h3>{missionDetail ? <dl className="detail-grid">
+          <div><dt>وضعیت</dt><dd><span className="badge neutral">{missionDetail.status}</span></dd></div>
+          <div><dt>مشتری</dt><dd dir="ltr">{missionDetail.customerId}</dd></div>
+          <div><dt>درخواست تحویل</dt><dd dir="ltr">{missionDetail.deliveryRequestId}</dd></div>
+          <div><dt>ایجاد</dt><dd>{formatDate(missionDetail.createdAt)}</dd></div>
+          <div><dt>موعد تحویل متعهدشده</dt><dd>{formatDate(missionDetail.committedDeliveryAt)}</dd></div>
+        </dl> : <p className="modal-state">جزئیات مأموریت در دسترس نیست.</p>}</section>
+        <section className="detail-section"><h3>رویدادهای مأموریت</h3>{missionTimeline.length ? <ol className="event-list">{missionTimeline.map((event) => <li key={event.eventId}><span className="event-dot"/><div><strong>{event.eventType}</strong><small>{formatDate(event.occurredAt)} · {fa.format(event.sequence)}</small></div></li>)}</ol> : <p className="modal-state">رویدادی در timeline ثبت نشده است.</p>}</section>
+        <section className="detail-section"><h3>سوابق دسترسی عملیات</h3>{missionAudit.length ? <div className="audit-list">{missionAudit.map((record) => <article key={record.auditId}><div><strong>{record.action}</strong><small>{record.actorId}</small></div><span>{formatDate(record.occurredAt)}</span><em>{fa.format(record.resultCount)} نتیجه</em></article>)}</div> : <p className="modal-state">سابقه‌ای برای نمایش برنگشت.</p>}</section>
+      </>}</section></div>}
     </div>
   )
 }
