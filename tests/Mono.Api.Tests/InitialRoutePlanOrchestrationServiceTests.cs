@@ -56,6 +56,20 @@ public sealed class InitialRoutePlanOrchestrationServiceTests
     }
 
     [Fact]
+    public void Classifies_a_ready_time_after_the_committed_deadline_as_infeasible()
+    {
+        var request = Request(Matrix(sourceVerified: true)) with
+        {
+            Mission = Mission() with { CommittedDeliveryAt = Start.AddMinutes(1) }
+        };
+
+        var result = InitialRoutePlanEvaluator.Evaluate(request);
+
+        Assert.Equal(InitialRoutePlanDisposition.Infeasible, result.Disposition);
+        Assert.Contains("MISSION_PROMISE_DEADLINE_MISSED", result.ReasonCodes);
+    }
+
+    [Fact]
     public async Task Persists_only_when_source_verification_and_initial_simulation_pass()
     {
         var store = new FakeRoutePlanStore();

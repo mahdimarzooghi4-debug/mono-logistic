@@ -38,6 +38,9 @@ public static class InitialRoutePlanEvaluator
             return Unresolved(reasons);
         }
 
+        if (request.Mission.CommittedDeliveryAt <= request.Mission.PickupReadyAt)
+            return Infeasible("MISSION_PROMISE_DEADLINE_MISSED", request.Mission.PickupReadyAt);
+
         if (!TryDuration(request.StartLocationId, request.Mission.PickupLocationId, out var toPickup) ||
             !TryDuration(request.Mission.PickupLocationId, request.Mission.DropoffLocationId, out var toDropoff))
             return Unresolved(["TRAVEL_MATRIX_INCOMPLETE"]);
@@ -111,7 +114,6 @@ public static class InitialRoutePlanEvaluator
             request.Mission.PickupReadyAt.UtcDateTime.Ticks % 10 != 0 ||
             request.Mission.CommittedDeliveryAt == default || request.Mission.CommittedDeliveryAt.Offset != TimeSpan.Zero ||
             request.Mission.CommittedDeliveryAt.UtcDateTime.Ticks % 10 != 0 ||
-            request.Mission.CommittedDeliveryAt <= request.Mission.PickupReadyAt ||
             request.Mission.PickupServiceSeconds is < 0 or > RouteInsertionTimeWindowPlanner.MaximumPickupDwellSeconds ||
             request.Mission.DropoffServiceSeconds < 0 || request.TravelMatrix is null ||
             request.TravelMatrix.TravelTimeSeconds is null)

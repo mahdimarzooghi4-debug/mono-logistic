@@ -69,7 +69,8 @@ public sealed class PostgresInitialRouteMissionCandidateSource(NpgsqlDataSource 
                 value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                 return fallback;
             if (value.ValueKind != JsonValueKind.String ||
-                !value.TryGetDateTimeOffset(out var readyAt) || readyAt == default)
+                !value.TryGetDateTimeOffset(out var readyAt) || readyAt == default ||
+                readyAt.ToUniversalTime().UtcDateTime.Ticks % 10 != 0)
                 return null;
             return readyAt.ToUniversalTime();
         }
