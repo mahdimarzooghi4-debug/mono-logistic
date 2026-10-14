@@ -585,6 +585,8 @@ Dashboard must use the same application/core rules as API customers.
 - Sprint 145 adds an inclusive 1–10,080 minute relative delivery due horizon filter, applied consistently to queue pages and cursor validation.
 - Sprint 146 adds an optional exact `customer_id` scope to the dispatch queue, validates customer ID shape, and binds the scope to cursor validation and every page query.
 - Sprint 147 adds an inclusive `created_before` dispatch cutoff to find Missions waiting since before a UTC timestamp, consistently applied to cursor validation and all page queries; it also covers filtered keyset continuation across customer-owned Mission data.
+- Sprint 148 adds the Persian RTL Mono Operations Console over existing operations APIs, with dispatch, Mission, courier, zone-capacity, availability-window, and quote-derived fare review workspaces.
+- Sprint 149 brings the existing paginated courier planning and live-presence evidence into the zone workspace, keeping planned capacity and self-reported online state visibly independent and non-authoritative for dispatch.
 - Mission timeline
 - Route inspection
 - courier state
