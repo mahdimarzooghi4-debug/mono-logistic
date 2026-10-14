@@ -547,6 +547,7 @@ export default function App() {
   }
 
   function disconnect() {
+    availabilityCreateKey.current = null; availabilityCancelKey.current = null
     setToken('')
     setTokenDraft('')
     setItems([])
