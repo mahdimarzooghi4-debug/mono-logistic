@@ -15,6 +15,7 @@ public static class DeliveryRequestEndpoints
                 HttpRequest request,
                 CustomerBranchRepository branches,
                 PostgresDeliveryRequestRepository deliveryRequests,
+                DeliveryRequestRouteLocationRegistrar locationRegistrar,
                 CancellationToken cancellationToken) =>
             {
                 var idempotencyValues = request.Headers["Idempotency-Key"];
@@ -54,7 +55,14 @@ public static class DeliveryRequestEndpoints
                             "The Idempotency-Key was already used with a different request.")));
                 }
 
-                return Results.Ok(new DeliveryRequestResponse(result.DeliveryRequestId, result.Status));
+                var locations = await locationRegistrar.RegisterAsync(
+                    result.DeliveryRequestId, normalized, cancellationToken);
+                return Results.Ok(new DeliveryRequestResponse(
+                    result.DeliveryRequestId,
+                    result.Status,
+                    locations.PickupLocationId,
+                    locations.DropoffLocationId,
+                    locations.Status.ToString()));
             })
             .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsWrite);
 

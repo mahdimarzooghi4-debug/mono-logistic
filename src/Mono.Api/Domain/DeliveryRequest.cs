@@ -236,7 +236,10 @@ public static class DeliveryRequestInputValidator
 
 public sealed record DeliveryRequestResponse(
     [property: JsonPropertyName("delivery_request_id")] string DeliveryRequestId,
-    [property: JsonPropertyName("status")] string Status);
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("pickup_location_id")] string PickupLocationId,
+    [property: JsonPropertyName("dropoff_location_id")] string DropoffLocationId,
+    [property: JsonPropertyName("route_location_coordinates_status")] string RouteLocationCoordinatesStatus);
 
 
 public sealed record DeliveryRequestStatusResponse(
