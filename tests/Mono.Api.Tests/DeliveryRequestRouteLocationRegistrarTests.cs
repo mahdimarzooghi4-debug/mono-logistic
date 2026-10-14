@@ -21,7 +21,9 @@ public sealed class DeliveryRequestRouteLocationRegistrarTests
         Assert.Equal("loc_0123456789abcdef0123456789abcdef_dropoff", first.DropoffLocationId);
         Assert.Equal(DeliveryRequestRouteLocationStatus.Registered, first.Status);
         Assert.Equal(first.PickupLocationId, replay.PickupLocationId);
-        Assert.Equal(2, catalog.Commands.Count);
+        Assert.Equal(4, catalog.Commands.Count);
+        Assert.Equal(catalog.Commands[0].CommandId, catalog.Commands[2].CommandId);
+        Assert.Equal(catalog.Commands[1].CommandId, catalog.Commands[3].CommandId);
         Assert.Equal(0, catalog.Commands[0].ExpectedVersion);
         Assert.Equal("route-location-seed:drq_0123456789abcdef0123456789abcdef:pickup", catalog.Commands[0].CommandId);
         Assert.Equal(new GeoCoordinate(35.7, 51.4), catalog.Coordinates[first.PickupLocationId]);
