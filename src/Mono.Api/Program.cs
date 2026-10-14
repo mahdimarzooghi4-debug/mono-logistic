@@ -55,9 +55,7 @@ builder.Services.AddScoped<PostgresZoneGeometryRepository>();
 builder.Services.AddScoped<PostgresRoutePlanVersionRepository>();
 builder.Services.AddScoped<IRoutePlanVersionStore>(services =>
     services.GetRequiredService<PostgresRoutePlanVersionRepository>());
-builder.Services.AddSingleton<UnconfiguredRouteTravelTimeEvidenceVerifier>();
-builder.Services.AddScoped<IRouteTravelTimeEvidenceVerifier>(services =>
-    services.GetRequiredService<UnconfiguredRouteTravelTimeEvidenceVerifier>());
+builder.Services.AddScoped<IRouteTravelTimeEvidenceVerifier, ConfiguredRouteTravelTimeEvidenceVerifier>();
 builder.Services.AddScoped<RoutePlanInsertionOrchestrationService>();
 builder.Services.AddScoped<PostgresZoneGeometryReviewService>();
 builder.Services.AddScoped<PostgresZoneGeometryActivationService>();

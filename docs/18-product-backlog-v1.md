@@ -408,9 +408,10 @@ max_missions_per_route = 5
 ### Progress — Sprint 150
 - A pure route insertion time-window planner now enumerates pickup/drop-off positions while preserving existing stop order and checking every active Mission's committed delivery deadline.
 - The first core module requires a complete, verified directed travel-time matrix, applies the five-Mission cap and three-minute pickup dwell, and returns `Unresolved` when routing evidence is incomplete or unverified.
-- Route lifecycle and version persistence, provider-backed matrix acquisition/provenance verification, capacity and zone checks, API integration, and dispatch authorization remain open work. This planner's result alone is not a feasibility-gate pass or dispatch authorization.
 - Sprint 151 adds an immutable PostgreSQL route-plan version store with idempotent commands, expected-version concurrency checks, snapshot integrity, and insertion invariants that preserve existing Missions, committed delivery times, and stop order. Simulation, provider evidence, route lifecycle, and dispatch remain separate gates.
-- Route simulation and verified evidence are not yet coupled to route-version writes; E11 is still in progress until persistence is behind the full fail-closed feasibility path.
+- Sprint 152 couples simulation to version writes: it loads the expected snapshot, requires verified evidence and an explicit feasible position, then persists through the optimistic/idempotent store.
+- Sprint 153 binds a matrix attestation to the exact route snapshot, candidate Mission, and directed cells, then verifies the signature through the existing source registry and freshness rules.
+- Provider-backed matrix acquisition, route lifecycle APIs, capacity and Zone checks, broader feasibility-gate integration, Mission/Promise orchestration, and dispatch authorization remain open. This insertion path is not overall feasibility or dispatch authorization.
 
 ## 14. Epic E12 — Pickup & Handoff
 

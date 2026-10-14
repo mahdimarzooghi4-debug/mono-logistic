@@ -5,6 +5,7 @@ namespace Mono.Api.Services;
 
 public sealed record RouteTravelTimeEvidence(
     string SourceId,
+    string EvidenceId,
     DateTimeOffset CapturedAt,
     string Attestation,
     RouteTravelTimeMatrix Matrix);
@@ -36,17 +37,6 @@ public interface IRouteTravelTimeEvidenceVerifier
     Task<RouteTravelTimeEvidenceVerification> VerifyAsync(
         RouteTravelTimeEvidenceVerificationRequest request,
         CancellationToken cancellationToken = default);
-}
-
-/// <summary>Fails closed until a route-time source and its attestation rules are configured.</summary>
-public sealed class UnconfiguredRouteTravelTimeEvidenceVerifier : IRouteTravelTimeEvidenceVerifier
-{
-    public Task<RouteTravelTimeEvidenceVerification> VerifyAsync(
-        RouteTravelTimeEvidenceVerificationRequest request,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(new RouteTravelTimeEvidenceVerification(
-            RouteTravelTimeEvidenceVerificationStatus.VerifierNotConfigured,
-            "ROUTE_TRAVEL_TIME_VERIFIER_NOT_CONFIGURED"));
 }
 
 public enum RoutePlanInsertionOutcome
