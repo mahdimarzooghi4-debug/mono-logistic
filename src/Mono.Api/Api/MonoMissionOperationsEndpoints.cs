@@ -66,7 +66,7 @@ public static class MonoMissionOperationsEndpoints
                     !MissionOperationsInputValidator.IsValidDateRange(createdAfter, createdBefore) ||
                     !MissionOperationsInputValidator.IsValidCursor(cursor))
                     return Results.BadRequest(new ApiErrorResponse(
-                        new ApiError("INVALID_REQUEST", "Mission fare review filters are invalid."));
+                        new ApiError("INVALID_REQUEST", "Mission fare review filters are invalid.")));
 
                 var page = await missions.ListFareReviewAsync(
                     size, status, query, createdAfter, createdBefore, cursor, cancellationToken);
