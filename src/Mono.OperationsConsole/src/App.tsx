@@ -283,8 +283,9 @@ export default function App() {
       availabilityCreateKey.current = null
       setAvailabilityWriteMessage('پنجرهٔ کاری با موفقیت ثبت شد. این برنامه‌ریزی به معنی حضور لحظه‌ای یا تخصیص پیک نیست.')
       setAvailabilityPage((current) => {
-        if (!current || (zoneId.trim() && window.zone_id !== zoneId.trim()) ||
+        if ((zoneId.trim() && window.zone_id !== zoneId.trim()) ||
             new Date(window.starts_at) >= new Date(capacityTo) || new Date(window.ends_at) <= new Date(capacityFrom)) return current
+        if (!current) return { items: [window], next_cursor: null }
         const rows = [...current.items.filter((item) => item.window_id !== window.window_id), window]
           .sort((left, right) => left.starts_at.localeCompare(right.starts_at) || left.window_id.localeCompare(right.window_id))
         return { ...current, items: rows.slice(0, 50) }
@@ -382,6 +383,7 @@ export default function App() {
     setAvailabilityNextCursor(null)
     setCapacityProjection(null)
     setAvailabilityPage(null)
+    availabilityCreateKey.current = null; availabilityCancelKey.current = null
     setCancelWindowId(null); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
     setCursorStack([null])
     setPageIndex(0)
