@@ -56,12 +56,18 @@ builder.Services.AddScoped<PostgresRoutePlanVersionRepository>();
 builder.Services.AddScoped<IRoutePlanVersionStore>(services =>
     services.GetRequiredService<PostgresRoutePlanVersionRepository>());
 builder.Services.AddScoped<PostgresRouteLocationCoordinateCatalog>();
+builder.Services.AddScoped<IInitialRouteMissionCandidateSource, PostgresInitialRouteMissionCandidateSource>();
 builder.Services.AddScoped<IRouteLocationCoordinateCatalog>(services =>
     services.GetRequiredService<PostgresRouteLocationCoordinateCatalog>());
 builder.Services.AddScoped<IRouteLocationCoordinateResolver>(services =>
     services.GetRequiredService<PostgresRouteLocationCoordinateCatalog>());
 builder.Services.AddScoped<DeliveryRequestRouteLocationRegistrar>();
+builder.Services.AddScoped<IMapsProvider, UnconfiguredMapsProvider>();
+builder.Services.AddScoped<IMapsGateway, MapsGateway>();
 builder.Services.AddScoped<IRouteTravelTimeEvidenceVerifier, ConfiguredRouteTravelTimeEvidenceVerifier>();
+builder.Services.AddScoped<IInitialRoutePlanEvidenceVerifier, ConfiguredInitialRoutePlanEvidenceVerifier>();
+builder.Services.AddScoped<InitialRouteMatrixAcquisitionService>();
+builder.Services.AddScoped<InitialRoutePlanOrchestrationService>();
 builder.Services.AddScoped<RoutePlanInsertionOrchestrationService>();
 builder.Services.AddScoped<PostgresZoneGeometryReviewService>();
 builder.Services.AddScoped<PostgresZoneGeometryActivationService>();
