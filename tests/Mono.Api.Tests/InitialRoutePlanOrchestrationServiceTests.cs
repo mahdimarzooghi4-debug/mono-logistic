@@ -101,7 +101,7 @@ public sealed class InitialRoutePlanOrchestrationServiceTests
             feasibleVerifier);
         var late = await initializer.InitializeAsync(Command());
         Assert.Equal(InitialRoutePlanWriteOutcome.Infeasible, late.Outcome);
-        Assert.Equal(1, store.PersistCount);
+        Assert.Equal(0, store.PersistCount);
     }
 
     [Fact]
