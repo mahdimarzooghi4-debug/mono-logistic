@@ -15,14 +15,14 @@ public sealed class RouteMatrixAcquisitionServiceTests
         var maps = new StubMapsGateway();
         var service = new RouteMatrixAcquisitionService(maps, resolver);
 
-        var result = await service.AcquireAsync(Request(RouteTravelMode.Cycling));
+        var result = await service.AcquireAsync(Request(RouteTravelMode.Bike));
 
         Assert.Equal(new[] { "A", "B", "D2", "P2", "start" }, resolver.RequestedIds);
-        Assert.Equal(RouteTravelMode.Cycling, maps.LastMatrixQuery!.Mode);
+        Assert.Equal(RouteTravelMode.Bike, maps.LastMatrixQuery!.Mode);
         Assert.Equal(5, maps.LastMatrixQuery.Origins.Count);
         Assert.False(result.Matrix.SourceVerified);
         Assert.Empty(result.Attestation);
-        Assert.Equal(RouteTravelMode.Cycling, result.TravelMode);
+        Assert.Equal(RouteTravelMode.Bike, result.TravelMode);
         Assert.Equal(31, result.Matrix.TravelTimeSeconds["A"]["B"]);
         Assert.Equal(34, result.Matrix.TravelTimeSeconds["B"]["A"]);
         Assert.Equal(5, result.LocationCoordinates!.Count);
@@ -35,7 +35,7 @@ public sealed class RouteMatrixAcquisitionServiceTests
             new StubMapsGateway(), new StubCoordinateResolver(omitDropoff: true));
 
         await Assert.ThrowsAsync<RouteLocationResolutionException>(() =>
-            service.AcquireAsync(Request(RouteTravelMode.Walking)));
+            service.AcquireAsync(Request(RouteTravelMode.Walk)));
     }
 
     private static RouteMatrixAcquisitionRequest Request(RouteTravelMode mode) => new(

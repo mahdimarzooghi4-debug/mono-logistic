@@ -21,9 +21,9 @@ public sealed record RouteQuery(
 /// <summary>Travel profile requested from a maps provider.</summary>
 public enum RouteTravelMode
 {
-    Driving = 1,
-    Cycling = 2,
-    Walking = 3
+    Walk = 1,
+    Bike = 2,
+    Car = 3
 }
 
 /// <summary>Provider route estimate. Distance is in metres; duration is in whole seconds.</summary>

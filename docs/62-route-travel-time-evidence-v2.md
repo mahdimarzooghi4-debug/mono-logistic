@@ -18,7 +18,7 @@ Evidence v2 computes lowercase SHA-256 over compact UTF-8 JSON serialized with `
 6. `evidence_id`
 7. `captured_at`
 8. `source_id`
-9. `travel_mode` — `Driving`, `Cycling`, or `Walking`
+9. `travel_mode` — `Car`, `Bike`, or `Walk`
 10. `locations` — exact route location IDs sorted ordinally, with latitude and longitude encoded using invariant round-trip (`R`) formatting
 11. `matrix_complete`
 12. `cells` — all supplied origin rows and destination cells, sorted ordinally, with nullable duration seconds

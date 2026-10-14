@@ -61,7 +61,7 @@ public sealed class ConfiguredRouteTravelTimeEvidenceVerifierTests
 
         var modeResult = await verifier.VerifyAsync(signed with
         {
-            Evidence = signed.Evidence with { TravelMode = RouteTravelMode.Walking }
+            Evidence = signed.Evidence with { TravelMode = RouteTravelMode.Walk }
         });
 
         var changedCoordinates = signed.Evidence.LocationCoordinates!
@@ -180,7 +180,7 @@ public sealed class ConfiguredRouteTravelTimeEvidenceVerifierTests
             StringComparer.Ordinal);
         var evidence = new RouteTravelTimeEvidence(
             SourceId, "matrix-evidence-1", capturedAt, "", new RouteTravelTimeMatrix(true, false, matrix),
-            RouteTravelMode.Cycling,
+            RouteTravelMode.Bike,
             new Dictionary<string, GeoCoordinate>(StringComparer.Ordinal)
             {
                 ["start"] = new(35.70, 51.40), ["A"] = new(35.71, 51.41),
