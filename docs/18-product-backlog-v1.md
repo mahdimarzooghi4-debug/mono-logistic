@@ -405,6 +405,11 @@ max_missions_per_route = 5
 - Adding a Mission reruns route simulation.
 - No existing Mission promise can be broken.
 
+### Progress — Sprint 150
+- A pure route insertion time-window planner now enumerates pickup/drop-off positions while preserving existing stop order and checking every active Mission's committed delivery deadline.
+- The first core module requires a complete, verified directed travel-time matrix, applies the five-Mission cap and three-minute pickup dwell, and returns `Unresolved` when routing evidence is incomplete or unverified.
+- Route lifecycle and version persistence, provider-backed matrix acquisition/provenance verification, capacity and zone checks, API integration, and dispatch authorization remain open work. This planner's result alone is not a feasibility-gate pass or dispatch authorization.
+
 ## 14. Epic E12 — Pickup & Handoff
 
 ### E12.1 Arrival
