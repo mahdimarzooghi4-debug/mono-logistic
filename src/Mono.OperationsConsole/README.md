@@ -16,9 +16,10 @@ The Vite development server listens on `127.0.0.1:5173` and proxies `/operations
 ## Implemented in this slice
 
 - MFA-protected dispatch queue read via `GET /operations/v1/dispatch/queue`.
+- Searchable, date-filtered Mission directory via `GET /operations/v1/missions`.
 - Prefix search, exact customer scope, active-offer filter, delivery-window filter, created-before filter, due/creation ordering, and cursor pagination.
 - Per-page summaries calculated only from the current response page.
-- Read-only Mission timeline via `GET /operations/v1/missions/{missionId}/timeline`.
+- Read-only Mission timeline via `GET /operations/v1/missions/{missionId}/timeline` from either view.
 - Loading, empty, invalid-response, authentication, and API error states.
 
 The bearer token remains in React memory and is cleared on reload or when the operator disconnects. No token is written to local storage, cookies, analytics, or logs. Use only a trusted local machine and HTTPS for any non-local API. Production login/session issuance is intentionally not included because the operations identity provider has not been selected or configured.
