@@ -8,6 +8,8 @@ ALTER TABLE ledger_accounts
         'CUSTOMER_RECEIVABLE', 'COURIER_AVAILABLE', 'MONO_COMMISSION_REVENUE',
         'VAT_PAYABLE', 'MONO_PAYOUT_CLEARING'));
 ALTER TABLE ledger_accounts
+    DROP CONSTRAINT IF EXISTS ledger_accounts_owner_account_check;
+ALTER TABLE ledger_accounts
     ADD CONSTRAINT ledger_accounts_owner_account_check CHECK (
         (owner_type = 'CUSTOMER' AND account_code = 'CUSTOMER_RECEIVABLE') OR
         (owner_type = 'COURIER' AND account_code = 'COURIER_AVAILABLE') OR
