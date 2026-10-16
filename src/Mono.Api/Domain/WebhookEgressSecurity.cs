@@ -59,7 +59,7 @@ public static class WebhookPublicAddressPolicy
         if (bytes.Length == 4)
             return !NonPublicV4.Any(range => IsInPrefix(bytes, range.Network, range.PrefixLength));
 
-        if (bytes.Length != 16 || address.IsIPv6Any || address.IsIPv6Loopback ||
+        if (bytes.Length != 16 || address.Equals(IPAddress.IPv6Any) || address.Equals(IPAddress.IPv6Loopback) ||
             address.IsIPv6LinkLocal || address.IsIPv6Multicast ||
             (bytes[0] & 0xfe) == 0xfc)
             return false;
