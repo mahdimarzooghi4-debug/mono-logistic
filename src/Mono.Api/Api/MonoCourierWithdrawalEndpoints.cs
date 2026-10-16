@@ -69,6 +69,31 @@ public static class MonoCourierWithdrawalEndpoints
                 })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapGet("/operations/v1/couriers/{courierId}/payout-destination",
+                async Task<IResult> (
+                    string courierId,
+                    PostgresCourierWithdrawalService service,
+                    TimeProvider timeProvider,
+                    CancellationToken cancellationToken) =>
+                {
+                    var result = await service.ReadDestinationForOperationsAsync(
+                        courierId, timeProvider.GetUtcNow(), cancellationToken);
+                    return result.OutcomeCode switch
+                    {
+                        "ACCESS_GRANTED" => Results.Ok(new
+                        {
+                            destination_status = "VERIFIED",
+                            iban = result.Iban,
+                            masked_iban = result.MaskedIban
+                        }),
+                        "NOT_FOUND" => Results.NotFound(new { error_code = result.OutcomeCode }),
+                        _ => Results.Problem(statusCode: 503,
+                            title: "Payout destination read is unavailable.",
+                            detail: result.OutcomeCode)
+                    };
+                })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapPost("/courier/v1/finance/withdrawals",
                 async Task<IResult> (
                     CourierWithdrawalCreateInput input,
