@@ -17,11 +17,25 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
         string courierId, DateTimeOffset observedAt, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT COALESCE(SUM(entry.credit_amount - entry.debit_amount), 0)::bigint
-            FROM ledger_accounts account
-            LEFT JOIN ledger_entries entry ON entry.ledger_account_id = account.ledger_account_id
-            WHERE account.owner_type = 'COURIER' AND account.owner_id = @courier_id
-              AND account.account_code = 'COURIER_AVAILABLE' AND account.currency = 'TOMAN';
+            WITH posted AS (
+                SELECT COALESCE(SUM(entry.credit_amount - entry.debit_amount), 0)::bigint AS amount
+                FROM ledger_accounts account
+                LEFT JOIN ledger_entries entry ON entry.ledger_account_id = account.ledger_account_id
+                WHERE account.owner_type = 'COURIER' AND account.owner_id = @courier_id
+                  AND account.account_code = 'COURIER_AVAILABLE' AND account.currency = 'TOMAN'
+            ), latest AS (
+                SELECT DISTINCT ON (event.withdrawal_id) event.withdrawal_id, event.action
+                FROM courier_withdrawal_events event
+                JOIN courier_withdrawal_requests request USING (withdrawal_id)
+                WHERE request.courier_id = @courier_id
+                ORDER BY event.withdrawal_id, event.withdrawal_event_sequence DESC
+            ), reserved AS (
+                SELECT COALESCE(SUM(request.amount_toman), 0)::bigint AS amount
+                FROM courier_withdrawal_requests request
+                JOIN latest ON latest.withdrawal_id = request.withdrawal_id
+                WHERE request.courier_id = @courier_id AND latest.action IN ('REQUESTED', 'PROCESSING')
+            )
+            SELECT posted.amount - reserved.amount FROM posted CROSS JOIN reserved;
             """;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
