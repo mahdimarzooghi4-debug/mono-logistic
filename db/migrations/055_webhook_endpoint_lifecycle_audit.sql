@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS webhook_endpoint_events (
 CREATE INDEX IF NOT EXISTS webhook_endpoint_events_history_idx
     ON webhook_endpoint_events (customer_id, endpoint_id, occurred_at DESC, event_id DESC);
 
+CREATE INDEX IF NOT EXISTS webhook_endpoints_customer_page_idx
+    ON webhook_endpoints (customer_id, created_at DESC, endpoint_id DESC);
+
 CREATE OR REPLACE FUNCTION reject_webhook_endpoint_event_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
