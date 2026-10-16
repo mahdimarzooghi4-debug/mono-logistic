@@ -11,10 +11,11 @@ public static class WebhookDeliveryHistoryCursor
         string deliveryId,
         string? endpointId,
         string? eventType,
-        string? status)
+        string? status,
+        string? customerId = null)
     {
         var value = string.Join('|', createdAt.ToString("O", CultureInfo.InvariantCulture),
-            deliveryId, FilterFingerprint(endpointId, eventType, status));
+            deliveryId, FilterFingerprint(endpointId, eventType, status, customerId));
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
     }
 
@@ -24,7 +25,8 @@ public static class WebhookDeliveryHistoryCursor
         string? eventType,
         string? status,
         out DateTimeOffset createdAt,
-        out string deliveryId)
+        out string deliveryId,
+        string? customerId = null)
     {
         createdAt = default;
         deliveryId = string.Empty;
@@ -36,7 +38,7 @@ public static class WebhookDeliveryHistoryCursor
                 parts[1][4..].Any(ch => !char.IsAsciiHexDigit(ch) || char.IsUpper(ch)) ||
                 !DateTimeOffset.TryParseExact(parts[0], "O", CultureInfo.InvariantCulture,
                     DateTimeStyles.None, out var parsedAt) ||
-                !string.Equals(parts[2], FilterFingerprint(endpointId, eventType, status), StringComparison.Ordinal))
+                !string.Equals(parts[2], FilterFingerprint(endpointId, eventType, status, customerId), StringComparison.Ordinal))
                 return false;
             createdAt = parsedAt;
             deliveryId = parts[1];
@@ -48,9 +50,12 @@ public static class WebhookDeliveryHistoryCursor
         }
     }
 
-    private static string FilterFingerprint(string? endpointId, string? eventType, string? status)
+    private static string FilterFingerprint(string? endpointId, string? eventType, string? status, string? customerId)
     {
-        var input = string.Join('\n', endpointId ?? string.Empty, eventType ?? string.Empty, status ?? string.Empty);
+        var input = customerId is null
+            ? string.Join('\n', endpointId ?? string.Empty, eventType ?? string.Empty, status ?? string.Empty)
+            : string.Join('\n', endpointId ?? string.Empty, eventType ?? string.Empty,
+                status ?? string.Empty, customerId);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(input))).ToLowerInvariant()[..16];
     }
 }

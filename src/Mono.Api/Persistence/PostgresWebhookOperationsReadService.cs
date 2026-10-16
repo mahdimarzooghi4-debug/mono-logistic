@@ -21,7 +21,8 @@ public sealed record WebhookOperationsQueueSummary(
 
 public sealed class PostgresWebhookOperationsReadService(
     NpgsqlDataSource dataSource,
-    IMonoOperationsContext operationsContext)
+    IMonoOperationsContext operationsContext,
+    PostgresWebhookDeliveryHistoryRepository deliveryHistory)
 {
     public async Task<WebhookOperationsQueueSummary> GetQueueSummaryAsync(
         DateTimeOffset now,
@@ -57,20 +58,48 @@ public sealed class PostgresWebhookOperationsReadService(
                 reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10), now);
         }
 
-        const string auditSql = """
-            INSERT INTO webhook_operations_read_audit (audit_id, actor_id, action, result_count, occurred_at)
-            VALUES (@audit_id, @actor_id, 'QUEUE_SUMMARY', @result_count, @occurred_at);
-            """;
-        await using (var connection = await dataSource.OpenConnectionAsync(cancellationToken))
-        await using (var command = new NpgsqlCommand(auditSql, connection))
-        {
-            command.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, "woa_" + Guid.NewGuid().ToString("N"));
-            command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
-            command.Parameters.AddWithValue("result_count", NpgsqlDbType.Bigint, summary.TotalCount);
-            command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
+        await WriteAuditAsync(actorId, "QUEUE_SUMMARY", summary.TotalCount, null, now, cancellationToken);
         return summary;
+    }
+
+    public async Task<WebhookDeliveryHistoryPage> SearchDeliveriesAsync(
+        int limit, string? customerId, string? endpointId, string? eventType, string? status,
+        DateTimeOffset? beforeCreatedAt, string? beforeDeliveryId, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var actorId = RequireAdministrator();
+        var page = await deliveryHistory.ListForOperationsAsync(limit, customerId, endpointId, eventType, status,
+            beforeCreatedAt, beforeDeliveryId, cancellationToken);
+        await WriteAuditAsync(actorId, "QUEUE_SEARCH", page.Items.Count, null, now, cancellationToken);
+        return page;
+    }
+
+    public async Task<WebhookDeliveryHistoryDetail?> GetDeliveryDetailAsync(
+        string deliveryId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var actorId = RequireAdministrator();
+        var detail = await deliveryHistory.FindForOperationsAsync(deliveryId, cancellationToken);
+        await WriteAuditAsync(actorId, "DELIVERY_DETAIL", detail is null ? 0 : 1, deliveryId, now, cancellationToken);
+        return detail;
+    }
+
+    private async Task WriteAuditAsync(string actorId, string action, long resultCount, string? resourceId,
+        DateTimeOffset occurredAt, CancellationToken cancellationToken)
+    {
+        const string auditSql = """
+            INSERT INTO webhook_operations_read_audit
+                (audit_id, actor_id, action, result_count, resource_id, occurred_at)
+            VALUES (@audit_id, @actor_id, @action, @result_count, @resource_id, @occurred_at);
+            """;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(auditSql, connection);
+        command.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, "woa_" + Guid.NewGuid().ToString("N"));
+        command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+        command.Parameters.AddWithValue("action", NpgsqlDbType.Text, action);
+        command.Parameters.AddWithValue("result_count", NpgsqlDbType.Bigint, resultCount);
+        command.Parameters.AddWithValue("resource_id", NpgsqlDbType.Text, (object?)resourceId ?? DBNull.Value);
+        command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, occurredAt);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private string RequireAdministrator()

@@ -105,6 +105,15 @@ public sealed class WebhookEndpointContractTests
         Assert.Equal(deliveryId, decodedId);
         Assert.False(WebhookDeliveryHistoryCursor.TryDecode(cursor,
             "whk_0123456789abcdef0123456789abcdef", "promise.committed", "RETRYING", out _, out _));
+        var customerBoundCursor = WebhookDeliveryHistoryCursor.Encode(createdAt, deliveryId,
+            "whk_0123456789abcdef0123456789abcdef", "promise.committed", "SUCCEEDED",
+            "cus_0123456789abcdef0123456789abcdef");
+        Assert.True(WebhookDeliveryHistoryCursor.TryDecode(customerBoundCursor,
+            "whk_0123456789abcdef0123456789abcdef", "promise.committed", "SUCCEEDED",
+            out _, out _, "cus_0123456789abcdef0123456789abcdef"));
+        Assert.False(WebhookDeliveryHistoryCursor.TryDecode(customerBoundCursor,
+            "whk_0123456789abcdef0123456789abcdef", "promise.committed", "SUCCEEDED",
+            out _, out _, "cus_ffffffffffffffffffffffffffffffff"));
         Assert.False(WebhookDeliveryHistoryCursor.TryDecode("not-a-cursor", null, null, null, out _, out _));
     }
 
