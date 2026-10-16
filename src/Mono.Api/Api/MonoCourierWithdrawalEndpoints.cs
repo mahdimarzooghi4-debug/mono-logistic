@@ -72,10 +72,12 @@ public static class MonoCourierWithdrawalEndpoints
         endpoints.MapGet("/operations/v1/couriers/{courierId}/payout-destination",
                 async Task<IResult> (
                     string courierId,
+                    HttpContext httpContext,
                     PostgresCourierWithdrawalService service,
                     TimeProvider timeProvider,
                     CancellationToken cancellationToken) =>
                 {
+                    httpContext.Response.Headers.CacheControl = "no-store";
                     var result = await service.ReadDestinationForOperationsAsync(
                         courierId, timeProvider.GetUtcNow(), cancellationToken);
                     return result.OutcomeCode switch
