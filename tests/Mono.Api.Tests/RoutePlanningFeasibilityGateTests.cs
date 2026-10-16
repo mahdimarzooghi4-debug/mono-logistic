@@ -23,6 +23,7 @@ public sealed class RoutePlanningFeasibilityGateTests
     {
         var request = Request() with
         {
+            ZoneRegistry = ZoneRegistry("zone-1", "zone-2", "zone-3"),
             Capacity = Capacity("zone-2"),
             ActiveRoutes = Inventory("zone-3")
         };
@@ -144,8 +145,8 @@ public sealed class RoutePlanningFeasibilityGateTests
             "evaluation-1", ObservedAt, RouteInsertionEvidenceCompleteness.Complete,
             RouteInsertionFeasibility.Feasible, [], "zone-1"));
 
-    private static IReadOnlyCollection<ZoneDefinition> ZoneRegistry(string zoneId) =>
-        [new ZoneDefinition { ZoneId = zoneId, Name = "Test Zone" }];
+    private static IReadOnlyCollection<ZoneDefinition> ZoneRegistry(params string[] zoneIds) =>
+        zoneIds.Select(zoneId => new ZoneDefinition { ZoneId = zoneId, Name = "Test Zone" }).ToArray();
 
     private static ZoneCapacitySnapshot Capacity(string zoneId, int effective = 1) => new()
     {
