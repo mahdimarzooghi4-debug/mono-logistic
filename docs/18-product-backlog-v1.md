@@ -565,6 +565,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 182 breaks the live courier balance into posted ledger funds, active withdrawal reservations, and spendable funds.
 - Sprint 183 verifies concurrent withdrawal requests serialize against one courier balance, so simultaneous reservations cannot exceed available ledger funds.
 - Sprint 184 verifies the existing three-withdrawals-per-Tehran-day limit resets at local midnight and exact retries do not consume another daily slot.
+- Sprint 185 gives couriers an owner-scoped withdrawal event timeline with safe lifecycle fields, while keeping actor identities and idempotency keys private to operations.
 
 ### E17.1 Event Envelope
 - event ID

@@ -11,9 +11,47 @@ public sealed record CourierWithdrawalHistoryEvent(
 public sealed record CourierWithdrawalHistoryReadResult(
     string OutcomeCode, string WithdrawalId, IReadOnlyList<CourierWithdrawalHistoryEvent> Events);
 
+public sealed record CourierWithdrawalTimelineEvent(
+    string Action, DateTimeOffset OccurredAt, string? ReasonCode, string? BankReference);
+
+public sealed record CourierWithdrawalTimelineReadResult(
+    string OutcomeCode, string WithdrawalId, IReadOnlyList<CourierWithdrawalTimelineEvent> Events);
+
 public sealed class PostgresCourierWithdrawalHistoryReadService(
     NpgsqlDataSource dataSource, IMonoOperationsContext operationsContext)
 {
+    public async Task<CourierWithdrawalTimelineReadResult> ReadForCourierAsync(
+        string courierId, string withdrawalId, CancellationToken cancellationToken)
+    {
+        if (!IsValidCourierId(courierId) || !IsValidWithdrawalId(withdrawalId))
+            return new CourierWithdrawalTimelineReadResult("NOT_FOUND", withdrawalId, []);
+
+        const string sql = """
+            SELECT event.action, event.occurred_at, event.reason_code, event.bank_reference
+            FROM courier_withdrawal_requests request
+            JOIN courier_withdrawal_events event USING (withdrawal_id)
+            WHERE request.courier_id = @courier_id
+              AND request.withdrawal_id = @withdrawal_id
+            ORDER BY event.withdrawal_event_sequence ASC;
+            """;
+        var events = new List<CourierWithdrawalTimelineEvent>();
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using (var command = new NpgsqlCommand(sql, connection))
+        {
+            command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+            command.Parameters.AddWithValue("withdrawal_id", NpgsqlDbType.Text, withdrawalId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                events.Add(new CourierWithdrawalTimelineEvent(
+                    reader.GetString(0), reader.GetFieldValue<DateTimeOffset>(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetString(3)));
+        }
+        return events.Count == 0
+            ? new CourierWithdrawalTimelineReadResult("NOT_FOUND", withdrawalId, [])
+            : new CourierWithdrawalTimelineReadResult("FOUND", withdrawalId, events);
+    }
+
     public async Task<CourierWithdrawalHistoryReadResult> ReadAsync(
         string withdrawalId, DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -73,4 +111,7 @@ public sealed class PostgresCourierWithdrawalHistoryReadService(
 
     private static bool IsValidWithdrawalId(string value) => value.Length == 36 &&
         value.StartsWith("wdr_", StringComparison.Ordinal) && Guid.TryParseExact(value.AsSpan(4), "N", out _);
+
+    private static bool IsValidCourierId(string value) => value.Length == 36 &&
+        value.StartsWith("crr_", StringComparison.Ordinal) && Guid.TryParseExact(value.AsSpan(4), "N", out _);
 }

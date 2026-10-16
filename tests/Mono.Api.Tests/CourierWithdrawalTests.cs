@@ -304,6 +304,21 @@ public sealed class CourierWithdrawalTests
             Assert.Equal("bank:trace-001", paidHistory.Events[^1].BankReference);
             Assert.Equal("pay-001", paidHistory.Events[^1].IdempotencyKey);
 
+            var courierTimeline = await historyReader.ReadForCourierAsync(
+                courierId, request.Withdrawal.WithdrawalId, CancellationToken.None);
+            Assert.Equal("FOUND", courierTimeline.OutcomeCode);
+            Assert.Equal(new[] { "REQUESTED", "PROCESSING", "PAID" },
+                courierTimeline.Events.Select(item => item.Action));
+            Assert.Equal("bank:trace-001", courierTimeline.Events[^1].BankReference);
+            Assert.Null(courierTimeline.Events[0].ReasonCode);
+            Assert.Null(courierTimeline.Events[0].BankReference);
+
+            var otherCourierTimeline = await historyReader.ReadForCourierAsync(
+                "crr_22222222222222222222222222222222",
+                request.Withdrawal.WithdrawalId, CancellationToken.None);
+            Assert.Equal("NOT_FOUND", otherCourierTimeline.OutcomeCode);
+            Assert.Empty(otherCourierTimeline.Events);
+
             const string missingWithdrawalId = "wdr_99999999999999999999999999999999";
             var missingHistory = await historyReader.ReadAsync(
                 missingWithdrawalId, now.AddMinutes(9), CancellationToken.None);
