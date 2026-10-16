@@ -10,6 +10,8 @@ namespace Mono.Api.Persistence;
 
 public sealed record CourierPayoutDestination(string DestinationId, string MaskedIban);
 public sealed record CourierPayoutDestinationStatus(string OutcomeCode, string? MaskedIban);
+public sealed record CourierDailyWithdrawalQuota(
+    long DailyLimit, long UsedToday, long RemainingToday, DateTimeOffset ResetsAt);
 public sealed record CourierPayoutDestinationSecretResult(string OutcomeCode, string? Iban, string? MaskedIban);
 public sealed record CourierWithdrawalItem(
     string WithdrawalId,
@@ -34,6 +36,7 @@ public sealed class PostgresCourierWithdrawalService(
     IMonoOperationsContext operationsContext,
     CourierPayoutIbanProtector ibanProtector)
 {
+    private const int MaxWithdrawalsPerTehranDay = 3;
     public async Task<CourierPayoutDestinationStatus> GetDestinationStatusAsync(
         string courierId, CancellationToken cancellationToken)
     {
@@ -228,6 +231,27 @@ public sealed class PostgresCourierWithdrawalService(
         return new CourierPayoutDestinationSecretResult("ACCESS_GRANTED", iban, maskedIban);
     }
 
+    public async Task<CourierDailyWithdrawalQuota> GetDailyWithdrawalQuotaAsync(
+        string courierId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var (dayStart, nextDayStart) = TehranDayBounds(now);
+        const string sql = """
+            SELECT COUNT(*) FROM courier_withdrawal_requests
+            WHERE courier_id = @courier_id
+              AND created_at >= @day_start AND created_at < @next_day_start;
+            """;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+        command.Parameters.AddWithValue("day_start", NpgsqlDbType.TimestampTz, dayStart);
+        command.Parameters.AddWithValue("next_day_start", NpgsqlDbType.TimestampTz, nextDayStart);
+        var usedToday = (long)(await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException("Courier daily withdrawal count could not be resolved."));
+        return new CourierDailyWithdrawalQuota(
+            MaxWithdrawalsPerTehranDay, usedToday,
+            Math.Max(0, MaxWithdrawalsPerTehranDay - usedToday), nextDayStart);
+    }
+
     public async Task<CourierWithdrawalWriteResult> CreateWithdrawalAsync(
         string courierId, long amountToman, string idempotencyKey, DateTimeOffset now,
         CancellationToken cancellationToken)
@@ -292,7 +316,7 @@ public sealed class PostgresCourierWithdrawalService(
             command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
             command.Parameters.AddWithValue("day_start", NpgsqlDbType.TimestampTz, dayStart);
             command.Parameters.AddWithValue("next_day_start", NpgsqlDbType.TimestampTz, nextDayStart);
-            if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) >= 3)
+            if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) >= MaxWithdrawalsPerTehranDay)
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return new CourierWithdrawalWriteResult("DAILY_LIMIT_REACHED", null, false);
