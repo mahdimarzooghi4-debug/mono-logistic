@@ -382,17 +382,141 @@ public sealed class CourierWithdrawalTests
         }
     }
 
-    private static async Task ApplyMigrationAsync(NpgsqlDataSource dataSource)
+    [Fact]
+    public async Task Payout_integrity_migration_fails_closed_on_legacy_mismatched_payout()
     {
-        foreach (var resourceName in new[]
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return;
+
+        var schemaName = "legacy_payout_integrity_" + Guid.NewGuid().ToString("N");
+        await using (var admin = new NpgsqlConnection(connectionString))
+        {
+            await admin.OpenAsync();
+            await using var createSchema = new NpgsqlCommand($"CREATE SCHEMA {schemaName};", admin);
+            await createSchema.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            var scoped = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schemaName };
+            await using var dataSource = NpgsqlDataSource.Create(scoped.ConnectionString);
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var setup = new NpgsqlCommand("""
+                CREATE TABLE couriers (courier_id text PRIMARY KEY);
+                CREATE TABLE missions (
+                    mission_id text PRIMARY KEY, customer_id text NOT NULL,
+                    delivery_request_id text NOT NULL, quote_id text NOT NULL,
+                    quote_version integer NOT NULL, status text NOT NULL);
+                CREATE TABLE delivery_quote_versions (
+                    customer_id text NOT NULL, delivery_request_id text NOT NULL,
+                    quote_id text NOT NULL, version integer NOT NULL, snapshot jsonb NOT NULL);
+                CREATE TABLE mission_courier_offer_events (
+                    event_sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    mission_id text NOT NULL, customer_id text NOT NULL,
+                    courier_id text NOT NULL, action text NOT NULL);
+                INSERT INTO couriers VALUES ('crr_22222222222222222222222222222222');
+                INSERT INTO missions VALUES
+                    ('mis_22222222222222222222222222222222', 'cus_22222222222222222222222222222222',
+                     'drq_2', 'quo_2', 1, 'DELIVERED');
+                INSERT INTO delivery_quote_versions VALUES
+                    ('cus_22222222222222222222222222222222', 'drq_2', 'quo_2', 1,
+                     '{"fare":{"fare_toman":10000}}'::jsonb);
+                INSERT INTO mission_courier_offer_events (mission_id, customer_id, courier_id, action)
+                VALUES ('mis_22222222222222222222222222222222', 'cus_22222222222222222222222222222222',
+                        'crr_22222222222222222222222222222222', 'COMPLETED');
+                """, connection))
+                await setup.ExecuteNonQueryAsync();
+
+            await ApplyMigrationAsync(dataSource, includePayoutIntegrity: false);
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var transaction = await connection.BeginTransactionAsync())
+            await using (var seed = new NpgsqlCommand("""
+                INSERT INTO courier_payout_destinations
+                    (destination_id, courier_id, encrypted_iban, iban_fingerprint, masked_iban, created_at)
+                VALUES ('cpd_22222222222222222222222222222222',
+                        'crr_22222222222222222222222222222222',
+                        'v1:YWJj:ZGVm:Z2hp', repeat('a', 64), 'IR********************2222', @now);
+                INSERT INTO courier_payout_destination_events
+                    (destination_id, courier_id, action, actor_id, idempotency_key, request_hash,
+                     evidence_reference, occurred_at)
+                VALUES ('cpd_22222222222222222222222222222222',
+                        'crr_22222222222222222222222222222222', 'VERIFIED', 'ops_legacy',
+                        'legacy-verify', repeat('b', 64), 'case:legacy-proof', @now);
+                INSERT INTO courier_withdrawal_requests
+                    (withdrawal_id, courier_id, destination_id, amount_toman,
+                     idempotency_key, request_hash, created_at)
+                VALUES ('wdr_22222222222222222222222222222222',
+                        'crr_22222222222222222222222222222222',
+                        'cpd_22222222222222222222222222222222', 1000,
+                        'legacy-request', repeat('c', 64), @now);
+                INSERT INTO courier_withdrawal_events
+                    (withdrawal_id, action, actor_type, actor_id, idempotency_key, request_hash, occurred_at)
+                VALUES ('wdr_22222222222222222222222222222222', 'REQUESTED', 'COURIER',
+                        'crr_22222222222222222222222222222222', 'legacy-request-event', repeat('d', 64), @now);
+                INSERT INTO courier_withdrawal_events
+                    (withdrawal_id, action, actor_type, actor_id, idempotency_key, request_hash, occurred_at)
+                VALUES ('wdr_22222222222222222222222222222222', 'PROCESSING', 'OPERATIONS',
+                        'ops_legacy', 'legacy-processing', repeat('e', 64), @now);
+                INSERT INTO courier_withdrawal_events
+                    (withdrawal_id, action, actor_type, actor_id, idempotency_key, request_hash,
+                     bank_reference, occurred_at)
+                VALUES ('wdr_22222222222222222222222222222222', 'PAID', 'OPERATIONS',
+                        'ops_legacy', 'legacy-paid', repeat('f', 64), 'bank:legacy-222', @now);
+                INSERT INTO ledger_accounts
+                    (ledger_account_id, owner_type, owner_id, account_code, currency, created_at)
+                VALUES ('lac_22222222222222222222222222222222', 'COURIER',
+                        'crr_22222222222222222222222222222222', 'COURIER_AVAILABLE', 'TOMAN', @now),
+                       ('lac_33333333333333333333333333333333', 'MONO',
+                        'mono', 'MONO_PAYOUT_CLEARING', 'TOMAN', @now);
+                INSERT INTO ledger_transactions
+                    (ledger_transaction_id, reference_type, reference_id, idempotency_key,
+                     currency, occurred_at, created_at)
+                VALUES ('ltx_22222222222222222222222222222222', 'WITHDRAWAL_PAYOUT',
+                        'wdr_22222222222222222222222222222222', 'legacy-payout:222',
+                        'TOMAN', @now, @now);
+                INSERT INTO ledger_entries
+                    (ledger_transaction_id, ledger_account_id, debit_amount, credit_amount, created_at)
+                VALUES ('ltx_22222222222222222222222222222222',
+                        'lac_22222222222222222222222222222222', 999, 0, @now),
+                       ('ltx_22222222222222222222222222222222',
+                        'lac_33333333333333333333333333333333', 0, 999, @now);
+                """, connection, transaction))
+            {
+                seed.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz,
+                    new DateTimeOffset(2026, 10, 16, 10, 0, 0, TimeSpan.Zero));
+                await seed.ExecuteNonQueryAsync();
+                await transaction.CommitAsync();
+            }
+
+            var exception = await Assert.ThrowsAsync<PostgresException>(
+                () => ApplyMigrationAsync(dataSource));
+            Assert.Contains("pre-existing payout ledger transaction violates courier payout integrity",
+                exception.MessageText, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await using var admin = new NpgsqlConnection(connectionString);
+            await admin.OpenAsync();
+            await using var dropSchema = new NpgsqlCommand($"DROP SCHEMA {schemaName} CASCADE;", admin);
+            await dropSchema.ExecuteNonQueryAsync();
+        }
+    }
+
+    private static async Task ApplyMigrationAsync(
+        NpgsqlDataSource dataSource, bool includePayoutIntegrity = true)
+    {
+        var resources = new[]
         {
             "Mono.Api.Tests.Migrations.064_courier_earning_ledger.sql",
             "Mono.Api.Tests.Migrations.065_courier_manual_withdrawals.sql",
             "Mono.Api.Tests.Migrations.066_courier_withdrawal_history_read_audit.sql",
             "Mono.Api.Tests.Migrations.067_courier_payout_destination_history_read_audit.sql",
             "Mono.Api.Tests.Migrations.068_courier_withdrawal_operations_search_audit.sql",
-            "Mono.Api.Tests.Migrations.069_courier_payout_ledger_integrity.sql"
-        })
+            "Mono.Api.Tests.Migrations.069_courier_payout_ledger_integrity.sql",
+            "Mono.Api.Tests.Migrations.070_courier_payout_legacy_integrity_preflight.sql"
+        };
+        foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {
             await using var stream = typeof(CourierWithdrawalTests).Assembly.GetManifestResourceStream(resourceName)
                 ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
