@@ -24,8 +24,9 @@ public sealed class WebhookDeliveryRepositoryTests
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ApplyMigrationsAsync(dataSource);
         var actorId = "ops_" + Guid.NewGuid().ToString("N");
+        var historyRepository = new PostgresWebhookDeliveryHistoryRepository(dataSource);
         var service = new PostgresWebhookOperationsReadService(dataSource,
-            new TestOperationsContext(actorId, [MonoOperationsRoles.Administrator]));
+            new TestOperationsContext(actorId, [MonoOperationsRoles.Administrator]), historyRepository);
         var summary = await service.GetQueueSummaryAsync(DateTimeOffset.UtcNow, CancellationToken.None);
         Assert.Equal(summary.TotalCount,
             summary.PendingCount + summary.InProgressCount + summary.RetryingCount + summary.SucceededCount +
@@ -46,6 +47,29 @@ public sealed class WebhookDeliveryRepositoryTests
             Assert.False(await reader.ReadAsync());
         }
 
+        var page = await service.SearchDeliveriesAsync(10, null, null, null, null,
+            null, null, DateTimeOffset.UtcNow, CancellationToken.None);
+        Assert.True(page.Items.Count <= 10);
+        var missingId = "whd_" + Guid.NewGuid().ToString("N");
+        Assert.Null(await service.GetDeliveryDetailAsync(missingId, DateTimeOffset.UtcNow, CancellationToken.None));
+        await using (var auditedReads = new NpgsqlCommand("""
+            SELECT action, result_count, resource_id FROM webhook_operations_read_audit
+            WHERE actor_id = @actor_id ORDER BY occurred_at, audit_id;
+            """, connection))
+        {
+            auditedReads.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            await using var reader = await auditedReads.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("QUEUE_SUMMARY", reader.GetString(0));
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("QUEUE_SEARCH", reader.GetString(0));
+            Assert.Equal(DBNull.Value, reader.IsDBNull(2) ? DBNull.Value : reader.GetValue(2));
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("DELIVERY_DETAIL", reader.GetString(0));
+            Assert.Equal(missingId, reader.GetString(2));
+            Assert.False(await reader.ReadAsync());
+        }
+
         await using var mutate = new NpgsqlCommand("""
             UPDATE webhook_operations_read_audit SET action = 'QUEUE_SUMMARY' WHERE actor_id = @actor_id;
             """, connection);
@@ -53,9 +77,11 @@ public sealed class WebhookDeliveryRepositoryTests
         await Assert.ThrowsAsync<PostgresException>(() => mutate.ExecuteNonQueryAsync());
 
         var denied = new PostgresWebhookOperationsReadService(dataSource,
-            new TestOperationsContext(actorId, []));
+            new TestOperationsContext(actorId, []), historyRepository);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             denied.GetQueueSummaryAsync(DateTimeOffset.UtcNow, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => denied.SearchDeliveriesAsync(10,
+            null, null, null, null, null, null, DateTimeOffset.UtcNow, CancellationToken.None));
     }
 
     [Fact]
@@ -140,6 +166,16 @@ public sealed class WebhookDeliveryRepositoryTests
         Assert.NotNull(detail);
         Assert.Equal(new[] { "STARTED", "RETRY_SCHEDULED", "STARTED", "SUCCEEDED" },
             detail.Attempts.Select(attempt => attempt.Action));
+        var operationsService = new PostgresWebhookOperationsReadService(dataSource,
+            new TestOperationsContext("ops_" + Guid.NewGuid().ToString("N"), [MonoOperationsRoles.Administrator]),
+            historyRepository);
+        var operationsPage = await operationsService.SearchDeliveriesAsync(10, customer.CustomerId, endpointId,
+            "promise.committed", "SUCCEEDED", null, null, now.AddSeconds(31), CancellationToken.None);
+        Assert.Contains(operationsPage.Items, item => item.DeliveryId == first.DeliveryId);
+        var operationsDetail = await operationsService.GetDeliveryDetailAsync(first.DeliveryId,
+            now.AddSeconds(32), CancellationToken.None);
+        Assert.NotNull(operationsDetail);
+        Assert.Equal(detail.Attempts, operationsDetail.Attempts);
         Assert.Null(await historyRepository.FindAsync("cus_ffffffffffffffffffffffffffffffff", first.DeliveryId,
             CancellationToken.None));
 
@@ -237,7 +273,8 @@ public sealed class WebhookDeliveryRepositoryTests
                      "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql",
                      "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql",
                      "Mono.Api.Tests.Migrations.058_webhook_delivery_replay.sql",
-                     "Mono.Api.Tests.Migrations.059_webhook_operations_read_audit.sql"
+                     "Mono.Api.Tests.Migrations.059_webhook_operations_read_audit.sql",
+                     "Mono.Api.Tests.Migrations.060_webhook_operations_delivery_search.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
