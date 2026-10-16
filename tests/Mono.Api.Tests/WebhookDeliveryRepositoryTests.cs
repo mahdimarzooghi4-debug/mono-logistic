@@ -264,6 +264,7 @@ public sealed class WebhookDeliveryRepositoryTests
         Assert.Equal("REPLAY_LIMIT_REACHED", beyondLimit.ErrorCode);
         Assert.Null(await historyRepository.FindAsync("cus_ffffffffffffffffffffffffffffffff", first.DeliveryId,
             CancellationToken.None));
+        await ApplyMigrationsAsync(dataSource);
     }
 
     [Fact]
