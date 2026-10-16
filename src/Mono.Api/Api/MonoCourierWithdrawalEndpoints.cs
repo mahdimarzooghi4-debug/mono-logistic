@@ -182,17 +182,25 @@ public static class MonoCourierWithdrawalEndpoints
                 PostgresCourierWithdrawalService service,
                 int? limit,
                 string? cursor,
+                DateTimeOffset? from_at,
+                DateTimeOffset? to_at,
                 CancellationToken cancellationToken) =>
             {
                 var pageSize = limit ?? 50;
                 if (pageSize is < 1 or > 100)
                     return Results.BadRequest(new { error_code = "INVALID_LIMIT" });
-                if (!TryDecodeCursor(cursor, out var before))
+                if (from_at.HasValue != to_at.HasValue ||
+                    (from_at.HasValue && from_at.Value >= to_at!.Value))
+                    return Results.BadRequest(new { error_code = "INVALID_DATE_RANGE" });
+                var fromAt = from_at?.ToUniversalTime();
+                var toAt = to_at?.ToUniversalTime();
+                if (!TryDecodeCourierCursor(cursor, fromAt, toAt, out var before))
                     return Results.BadRequest(new { error_code = "INVALID_CURSOR" });
-                var page = await service.ListForCourierAsync(courier.CourierId, pageSize, before, cancellationToken);
+                var page = await service.ListForCourierAsync(
+                    courier.CourierId, pageSize, before, cancellationToken, fromAt, toAt);
                 return Results.Ok(new CourierWithdrawalPageResponse<CourierWithdrawalItemResponse>(
                     page.Items.Select(ToCourierResponse).ToArray(),
-                    page.NextBeforeSequence is long next ? EncodeCursor(next) : null));
+                    page.NextBeforeSequence is long next ? EncodeCourierCursor(next, fromAt, toAt) : null));
             })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
@@ -259,6 +267,45 @@ public static class MonoCourierWithdrawalEndpoints
     private static string EncodeCursor(long sequence) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(sequence.ToString(CultureInfo.InvariantCulture)))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static string EncodeCourierCursor(
+        long sequence, DateTimeOffset? fromAt, DateTimeOffset? toAt)
+    {
+        var value = string.Join("|", "withdrawals-v1",
+            fromAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*",
+            toAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*",
+            sequence.ToString(CultureInfo.InvariantCulture));
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static bool TryDecodeCourierCursor(
+        string? cursor, DateTimeOffset? fromAt, DateTimeOffset? toAt, out long? sequence)
+    {
+        sequence = null;
+        if (cursor is null)
+            return true;
+        if (cursor.Length is 0 or > 512)
+            return false;
+        try
+        {
+            var value = cursor.Replace('-', '+').Replace('_', '/');
+            value += new string('=', (4 - value.Length % 4) % 4);
+            var parts = Encoding.UTF8.GetString(Convert.FromBase64String(value)).Split('|');
+            if (parts.Length != 4 || parts[0] != "withdrawals-v1" ||
+                parts[1] != (fromAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*") ||
+                parts[2] != (toAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*") ||
+                !long.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                parsed <= 0)
+                return false;
+            sequence = parsed;
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
 
     private static bool TryDecodeCursor(string? cursor, out long? sequence)
     {
