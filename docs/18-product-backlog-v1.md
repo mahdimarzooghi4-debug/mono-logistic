@@ -554,6 +554,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 171 adds a double-entry, append-only courier earning ledger, atomic delivery-completion posting under the approved 89% rule, and a courier-scoped available-balance API.
 - Sprint 172 exposes the authenticated courier's immutable mission earning history with bounded keyset pagination over ledger entries; withdrawal and payout remain separate policy-backed work.
 - Sprint 173 adds MFA-gated manual payout destination verification, encrypted courier IBAN storage, daily-limited idempotent withdrawal requests with reserved-balance accounting, and audited operator processing, rejection, and balanced payout posting.
+- Sprint 174 exposes the operator-only append-only withdrawal lifecycle timeline and records every history read, including not-found probes, without exposing payout IBANs.
 
 ### E17.1 Event Envelope
 - event ID

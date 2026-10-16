@@ -154,6 +154,47 @@ public sealed class CourierWithdrawalTests
             var dailyLimit = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
                 "withdraw-004", now.AddMinutes(7), CancellationToken.None);
             Assert.Equal("DAILY_LIMIT_REACHED", dailyLimit.OutcomeCode);
+
+            var historyReader = new PostgresCourierWithdrawalHistoryReadService(dataSource, operations);
+            var paidHistory = await historyReader.ReadAsync(
+                request.Withdrawal.WithdrawalId, now.AddMinutes(8), CancellationToken.None);
+            Assert.Equal("FOUND", paidHistory.OutcomeCode);
+            Assert.Equal(new[] { "REQUESTED", "PROCESSING", "PAID" },
+                paidHistory.Events.Select(item => item.Action));
+            Assert.Equal("COURIER", paidHistory.Events[0].ActorType);
+            Assert.Equal(courierId, paidHistory.Events[0].ActorId);
+            Assert.All(paidHistory.Events.Skip(1), item =>
+            {
+                Assert.Equal("OPERATIONS", item.ActorType);
+                Assert.Equal(operations.ActorId, item.ActorId);
+            });
+            Assert.Equal("bank:trace-001", paidHistory.Events[^1].BankReference);
+            Assert.Equal("pay-001", paidHistory.Events[^1].IdempotencyKey);
+
+            const string missingWithdrawalId = "wdr_99999999999999999999999999999999";
+            var missingHistory = await historyReader.ReadAsync(
+                missingWithdrawalId, now.AddMinutes(9), CancellationToken.None);
+            Assert.Equal("NOT_FOUND", missingHistory.OutcomeCode);
+            Assert.Empty(missingHistory.Events);
+
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT outcome_code, event_count, actor_id
+                FROM courier_withdrawal_history_read_audit
+                ORDER BY occurred_at, read_audit_id;
+                """, connection))
+            await using (var reader = await audit.ExecuteReaderAsync())
+            {
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("FOUND", reader.GetString(0));
+                Assert.Equal(3, reader.GetInt32(1));
+                Assert.Equal(operations.ActorId, reader.GetString(2));
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("NOT_FOUND", reader.GetString(0));
+                Assert.Equal(0, reader.GetInt32(1));
+                Assert.Equal(operations.ActorId, reader.GetString(2));
+                Assert.False(await reader.ReadAsync());
+            }
         }
         finally
         {
@@ -169,7 +210,8 @@ public sealed class CourierWithdrawalTests
         foreach (var resourceName in new[]
         {
             "Mono.Api.Tests.Migrations.064_courier_earning_ledger.sql",
-            "Mono.Api.Tests.Migrations.065_courier_manual_withdrawals.sql"
+            "Mono.Api.Tests.Migrations.065_courier_manual_withdrawals.sql",
+            "Mono.Api.Tests.Migrations.066_courier_withdrawal_history_read_audit.sql"
         })
         {
             await using var stream = typeof(CourierWithdrawalTests).Assembly.GetManifestResourceStream(resourceName)
