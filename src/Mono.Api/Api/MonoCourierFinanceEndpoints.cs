@@ -7,6 +7,8 @@ using Mono.Api.Security;
 namespace Mono.Api.Api;
 
 public sealed record MonoCourierAvailableBalanceResponse(
+    [property: JsonPropertyName("posted_balance_toman")] long PostedBalanceToman,
+    [property: JsonPropertyName("reserved_withdrawal_toman")] long ReservedWithdrawalToman,
     [property: JsonPropertyName("available_balance_toman")] long AvailableBalanceToman,
     [property: JsonPropertyName("currency")] string Currency,
     [property: JsonPropertyName("observed_at")] DateTimeOffset ObservedAt);
@@ -52,7 +54,8 @@ public static class MonoCourierFinanceEndpoints
                 var balance = await ledger.GetAvailableBalanceAsync(courier.CourierId,
                     timeProvider.GetUtcNow(), cancellationToken);
                 return Results.Ok(new MonoCourierAvailableBalanceResponse(
-                    balance.AmountToman, "TOMAN", balance.ObservedAt));
+                    balance.PostedAmountToman, balance.ReservedWithdrawalAmountToman,
+                    balance.AvailableAmountToman, "TOMAN", balance.ObservedAt));
             })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
