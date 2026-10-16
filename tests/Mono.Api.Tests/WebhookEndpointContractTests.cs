@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Net;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
@@ -11,6 +12,7 @@ public sealed class WebhookEndpointContractTests
     [Theory]
     [InlineData("https://hooks.customer.com/mono", true)]
     [InlineData("http://hooks.customer.com/mono", false)]
+    [InlineData("https://hooks.customer.com:8443/mono", false)]
     [InlineData("https://localhost/mono", false)]
     [InlineData("https://127.0.0.1/hook", false)]
     [InlineData("https://service.internal/hook", false)]
@@ -86,5 +88,26 @@ public sealed class WebhookEndpointContractTests
         Assert.Equal(endpointId, decodedId);
         Assert.False(WebhookEndpointCursor.TryDecode("not-a-cursor", out _, out _));
         Assert.False(WebhookEndpointCursor.TryDecode(Convert.ToBase64String("1|invalid"u8.ToArray()), out _, out _));
+    }
+
+    [Theory]
+    [InlineData("1.1.1.1", true)]
+    [InlineData("10.1.2.3", false)]
+    [InlineData("100.64.0.1", false)]
+    [InlineData("169.254.169.254", false)]
+    [InlineData("192.0.2.15", false)]
+    [InlineData("198.19.0.1", false)]
+    [InlineData("224.0.0.1", false)]
+    [InlineData("::1", false)]
+    [InlineData("fd00::1", false)]
+    [InlineData("fe80::1", false)]
+    [InlineData("2001:db8::1", false)]
+    [InlineData("64:ff9b::a00:1", false)]
+    [InlineData("5f00::1", false)]
+    [InlineData("2001:4860:4860::8888", true)]
+    [InlineData("::ffff:127.0.0.1", false)]
+    public void Egress_policy_accepts_only_public_unicast_addresses(string address, bool expected)
+    {
+        Assert.Equal(expected, WebhookPublicAddressPolicy.IsPublicInternetAddress(IPAddress.Parse(address)));
     }
 }
