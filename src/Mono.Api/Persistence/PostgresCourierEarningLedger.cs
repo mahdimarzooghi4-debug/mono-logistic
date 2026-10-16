@@ -11,6 +11,13 @@ public sealed record CourierEarningHistoryItem(
 public sealed record CourierEarningHistoryPage(
     IReadOnlyList<CourierEarningHistoryItem> Items, long? NextBeforeEntryId);
 
+public sealed record CourierLedgerHistoryItem(
+    string ReferenceType, string ReferenceId, long DebitAmountToman, long CreditAmountToman,
+    DateTimeOffset OccurredAt, long LedgerEntryId);
+
+public sealed record CourierLedgerHistoryPage(
+    IReadOnlyList<CourierLedgerHistoryItem> Items, long? NextBeforeEntryId);
+
 public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
 {
     public async Task<CourierAvailableBalance> GetAvailableBalanceAsync(
@@ -83,6 +90,43 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
         if (hasMore)
             items.RemoveAt(limit);
         return new CourierEarningHistoryPage(items, hasMore ? items[^1].LedgerEntryId : null);
+    }
+
+    public async Task<CourierLedgerHistoryPage> GetLedgerHistoryAsync(
+        string courierId, int limit, long? beforeEntryId, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT ledger_tx.reference_type, ledger_tx.reference_id,
+                   entry.debit_amount, entry.credit_amount, ledger_tx.occurred_at,
+                   entry.ledger_entry_id
+            FROM ledger_accounts account
+            JOIN ledger_entries entry ON entry.ledger_account_id = account.ledger_account_id
+            JOIN ledger_transactions ledger_tx
+              ON ledger_tx.ledger_transaction_id = entry.ledger_transaction_id
+            WHERE account.owner_type = 'COURIER' AND account.owner_id = @courier_id
+              AND account.account_code = 'COURIER_AVAILABLE' AND account.currency = 'TOMAN'
+              AND (@before_entry_id IS NULL OR entry.ledger_entry_id < @before_entry_id)
+            ORDER BY entry.ledger_entry_id DESC
+            LIMIT @take;
+            """;
+        var items = new List<CourierLedgerHistoryItem>();
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+        command.Parameters.AddWithValue("before_entry_id", NpgsqlDbType.Bigint,
+            beforeEntryId.HasValue ? beforeEntryId.Value : DBNull.Value);
+        command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, checked(limit + 1));
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+                items.Add(new CourierLedgerHistoryItem(
+                    reader.GetString(0), reader.GetString(1), reader.GetInt64(2), reader.GetInt64(3),
+                    reader.GetFieldValue<DateTimeOffset>(4), reader.GetInt64(5)));
+        }
+        var hasMore = items.Count > limit;
+        if (hasMore)
+            items.RemoveAt(limit);
+        return new CourierLedgerHistoryPage(items, hasMore ? items[^1].LedgerEntryId : null);
     }
 
     public static async Task<bool> PostMissionEarningAsync(

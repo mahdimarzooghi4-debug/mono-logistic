@@ -135,6 +135,21 @@ public sealed class CourierWithdrawalTests
             var paidBalance = await ledger.GetAvailableBalanceAsync(courierId, now, CancellationToken.None);
             Assert.Equal(14_500L, paidBalance.AmountToman);
 
+            var ledgerPage = await ledger.GetLedgerHistoryAsync(courierId, 1, null, CancellationToken.None);
+            Assert.Single(ledgerPage.Items);
+            Assert.Equal("WITHDRAWAL_PAYOUT", ledgerPage.Items[0].ReferenceType);
+            Assert.Equal(request.Withdrawal.WithdrawalId, ledgerPage.Items[0].ReferenceId);
+            Assert.Equal(30_000L, ledgerPage.Items[0].DebitAmountToman);
+            Assert.Equal(0L, ledgerPage.Items[0].CreditAmountToman);
+            Assert.NotNull(ledgerPage.NextBeforeEntryId);
+            var earlierLedgerPage = await ledger.GetLedgerHistoryAsync(
+                courierId, 1, ledgerPage.NextBeforeEntryId, CancellationToken.None);
+            Assert.Single(earlierLedgerPage.Items);
+            Assert.Equal("MISSION_EARNING", earlierLedgerPage.Items[0].ReferenceType);
+            Assert.Equal(missionId, earlierLedgerPage.Items[0].ReferenceId);
+            Assert.Equal(44_500L, earlierLedgerPage.Items[0].CreditAmountToman);
+            Assert.Null(earlierLedgerPage.NextBeforeEntryId);
+
             var second = await withdrawals.CreateWithdrawalAsync(courierId, 10_000,
                 "withdraw-002", now.AddMinutes(4), CancellationToken.None);
             Assert.Equal("REQUESTED", second.OutcomeCode);
