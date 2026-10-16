@@ -870,7 +870,7 @@ POST /operations/v1/couriers/{courierId}/payout-destination/verify
 Idempotency-Key: <unique key>
 {"iban":"IR…","evidence_reference":"case:bank-proof-001"}
 ```
-The API validates the Iranian IBAN format and checksum, encrypts it with AES-256-GCM using `MonoCourier:PayoutIbanEncryptionKey` (32-byte key encoded as Base64), and stores a keyed fingerprint and masked form for safe reads. The full IBAN is never returned. The active destination is captured by each withdrawal so later destination rotation does not redirect an existing request. Verification is unavailable until the dedicated encryption key is configured.
+The API validates the Iranian IBAN format and checksum, encrypts it with AES-256-GCM using `MonoCourier:PayoutIbanEncryptionKey` (32-byte key encoded as Base64), and stores a keyed fingerprint and masked form for safe reads. The courier-facing APIs never return the full IBAN. The active destination is captured by each withdrawal so later destination rotation does not redirect an existing request. Verification is unavailable until the dedicated encryption key is configured. MFA-verified operations staff can retrieve the full destination for manual transfer only through `GET /operations/v1/couriers/{courierId}/payout-destination`; every access outcome is written to an append-only audit table in the same transaction.
 
 Withdrawal status sequence:
 ```
