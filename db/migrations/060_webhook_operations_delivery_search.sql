@@ -13,10 +13,10 @@ ALTER TABLE webhook_operations_read_audit
 
 ALTER TABLE webhook_operations_read_audit
     ADD CONSTRAINT webhook_operations_read_audit_action_check
-        CHECK (action IN ('QUEUE_SUMMARY', 'QUEUE_SEARCH', 'DELIVERY_DETAIL'));
+        CHECK (action IN ('QUEUE_SUMMARY', 'QUEUE_SEARCH', 'DELIVERY_DETAIL', 'DELIVERY_REPLAY'));
 
 ALTER TABLE webhook_operations_read_audit
     ADD CONSTRAINT webhook_operations_read_audit_resource_id_check
-        CHECK ((action = 'DELIVERY_DETAIL' AND resource_id IS NOT NULL AND
+        CHECK ((action IN ('DELIVERY_DETAIL', 'DELIVERY_REPLAY') AND resource_id IS NOT NULL AND
                 resource_id ~ '^whd_[0-9a-f]{32}$') OR
-               (action <> 'DELIVERY_DETAIL' AND resource_id IS NULL));
+               (action NOT IN ('DELIVERY_DETAIL', 'DELIVERY_REPLAY') AND resource_id IS NULL));
