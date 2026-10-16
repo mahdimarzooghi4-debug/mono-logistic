@@ -58,7 +58,19 @@ CREATE INDEX IF NOT EXISTS courier_payout_destination_current_idx
     ON courier_payout_destination_events (courier_id, destination_event_sequence DESC);
 
 CREATE TABLE IF NOT EXISTS courier_payout_destination_access_audit (
-    access_audit_id text PRIMARY KEY CHECK (access_audit_id ~ '^cpa_[0-9a-f]{32}    withdrawal_id text PRIMARY KEY CHECK (withdrawal_id ~ '^wdr_[0-9a-f]{32}$'),
+    access_audit_id text PRIMARY KEY CHECK (access_audit_id ~ '^cpa_[0-9a-f]{32}$'),
+    courier_id text NOT NULL REFERENCES couriers(courier_id),
+    destination_id text NULL REFERENCES courier_payout_destinations(destination_id),
+    actor_id text NOT NULL CHECK (length(btrim(actor_id)) BETWEEN 1 AND 128),
+    outcome_code text NOT NULL CHECK (outcome_code IN ('ACCESS_GRANTED', 'NOT_FOUND', 'KEY_UNAVAILABLE', 'DECRYPTION_FAILED')),
+    occurred_at timestamp with time zone NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS courier_payout_destination_access_audit_history_idx
+    ON courier_payout_destination_access_audit (courier_id, occurred_at DESC, access_audit_id DESC);
+
+CREATE TABLE IF NOT EXISTS courier_withdrawal_requests (
+    withdrawal_id text PRIMARY KEY CHECK (withdrawal_id ~ '^wdr_[0-9a-f]{32}$'),
     courier_id text NOT NULL REFERENCES couriers(courier_id),
     destination_id text NOT NULL REFERENCES courier_payout_destinations(destination_id),
     amount_toman bigint NOT NULL CHECK (amount_toman > 0),
