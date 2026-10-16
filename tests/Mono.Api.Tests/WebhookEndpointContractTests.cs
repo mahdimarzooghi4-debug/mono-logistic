@@ -117,6 +117,24 @@ public sealed class WebhookEndpointContractTests
         Assert.False(WebhookDeliveryHistoryCursor.TryDecode("not-a-cursor", null, null, null, out _, out _));
     }
 
+    [Fact]
+    public void Operations_audit_cursor_round_trips_and_is_bound_to_filters()
+    {
+        var occurredAt = new DateTimeOffset(2026, 10, 16, 10, 20, 30, TimeSpan.Zero);
+        const string auditId = "woa_0123456789abcdef0123456789abcdef";
+        var cursor = WebhookOperationsAuditCursor.Encode(occurredAt, auditId, "ops-admin", "DELIVERY_REPLAY");
+
+        Assert.True(WebhookOperationsAuditCursor.TryDecode(cursor, "ops-admin", "DELIVERY_REPLAY",
+            out var decodedAt, out var decodedId));
+        Assert.Equal(occurredAt, decodedAt);
+        Assert.Equal(auditId, decodedId);
+        Assert.False(WebhookOperationsAuditCursor.TryDecode(cursor, "other-admin", "DELIVERY_REPLAY",
+            out _, out _));
+        Assert.False(WebhookOperationsAuditCursor.TryDecode(cursor, "ops-admin", "QUEUE_SEARCH",
+            out _, out _));
+        Assert.False(WebhookOperationsAuditCursor.TryDecode("bad-cursor", null, null, out _, out _));
+    }
+
     [Theory]
     [InlineData("1.1.1.1", true)]
     [InlineData("10.1.2.3", false)]
