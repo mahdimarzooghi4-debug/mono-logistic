@@ -49,12 +49,12 @@ public sealed class RoutePlanningFeasibilityGateTests
     }
 
     [Fact]
-    public void Missing_zone_context_keeps_capacity_and_inventory_unresolved()
+    public void Missing_zone_context_keeps_all_zone_evidence_unresolved()
     {
         var result = RoutePlanningFeasibilityGate.Evaluate(Request() with { ExpectedZoneId = null });
 
         Assert.Equal(FeasibilityGateStatus.Unresolved, result.Status);
-        Assert.Equal(2, result.Criteria.Count(item =>
+        Assert.Equal(3, result.Criteria.Count(item =>
             item.Status == FeasibilityCriterionStatus.Unresolved &&
             item.ReasonCodes.Contains("PLANNING_ZONE_UNAVAILABLE")));
     }
