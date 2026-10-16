@@ -109,7 +109,9 @@ public sealed class CourierEarningLedgerTests
 
             var ledger = new PostgresCourierEarningLedger(dataSource);
             var balance = await ledger.GetAvailableBalanceAsync(courierId, occurredAt, CancellationToken.None);
-            Assert.Equal(44_500L, balance.AmountToman);
+            Assert.Equal(44_500L, balance.PostedAmountToman);
+            Assert.Equal(0L, balance.ReservedWithdrawalAmountToman);
+            Assert.Equal(44_500L, balance.AvailableAmountToman);
             Assert.Equal(occurredAt, balance.ObservedAt);
 
             const string secondMissionId = "mis_22222222222222222222222222222222";
