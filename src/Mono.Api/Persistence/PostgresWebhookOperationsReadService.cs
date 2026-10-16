@@ -83,13 +83,21 @@ public sealed class PostgresWebhookOperationsReadService(
         return detail;
     }
 
+    public async Task<WebhookDeliveryReplayResult> ReplayDeliveryAsync(
+        string deliveryId, string idempotencyKey, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var actorId = RequireAdministrator();
+        return await deliveryHistory.ReplayForOperationsAsync(deliveryId, idempotencyKey, actorId, now,
+            cancellationToken);
+    }
+
     private async Task WriteAuditAsync(string actorId, string action, long resultCount, string? resourceId,
         DateTimeOffset occurredAt, CancellationToken cancellationToken)
     {
         const string auditSql = """
             INSERT INTO webhook_operations_read_audit
-                (audit_id, actor_id, action, result_count, resource_id, occurred_at)
-            VALUES (@audit_id, @actor_id, @action, @result_count, @resource_id, @occurred_at);
+                (audit_id, actor_id, action, result_count, resource_id, outcome_code, occurred_at)
+            VALUES (@audit_id, @actor_id, @action, @result_count, @resource_id, NULL, @occurred_at);
             """;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(auditSql, connection);

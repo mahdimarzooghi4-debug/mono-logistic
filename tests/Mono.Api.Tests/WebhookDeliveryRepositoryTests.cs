@@ -214,11 +214,40 @@ public sealed class WebhookDeliveryRepositoryTests
             await markDeadLetter.ExecuteNonQueryAsync();
         }
 
+        var operationsReplayService = new PostgresWebhookOperationsReadService(dataSource,
+            new TestOperationsContext("ops_" + Guid.NewGuid().ToString("N"), [MonoOperationsRoles.Administrator]),
+            historyRepository);
+        var operationsReplay = await operationsReplayService.ReplayDeliveryAsync(first.DeliveryId,
+            "operations-retry-1", now.AddMinutes(1), CancellationToken.None);
+        Assert.Null(operationsReplay.ErrorCode);
+        Assert.Equal(1, operationsReplay.Delivery!.ReplayGeneration);
+        var duplicateOperationsReplay = await operationsReplayService.ReplayDeliveryAsync(first.DeliveryId,
+            "operations-retry-1", now.AddMinutes(2), CancellationToken.None);
+        Assert.True(duplicateOperationsReplay.AlreadyRequested);
+        Assert.Equal(operationsReplay.Delivery.DeliveryId, duplicateOperationsReplay.Delivery!.DeliveryId);
+        await using (var replayAuditConnection = await dataSource.OpenConnectionAsync())
+        await using (var replayAudit = new NpgsqlCommand("""
+            SELECT outcome_code, result_count FROM webhook_operations_read_audit
+            WHERE action = 'DELIVERY_REPLAY' AND resource_id = @delivery_id
+            ORDER BY occurred_at, audit_id;
+            """, replayAuditConnection))
+        {
+            replayAudit.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, first.DeliveryId);
+            await using var reader = await replayAudit.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("QUEUED", reader.GetString(0));
+            Assert.Equal(1, reader.GetInt64(1));
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("ALREADY_REQUESTED", reader.GetString(0));
+            Assert.Equal(1, reader.GetInt64(1));
+            Assert.False(await reader.ReadAsync());
+        }
+
         var firstReplay = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
             "retry-request-1", now.AddMinutes(1), CancellationToken.None);
         Assert.Null(firstReplay.ErrorCode);
         Assert.False(firstReplay.AlreadyRequested);
-        Assert.Equal(1, firstReplay.Delivery!.ReplayGeneration);
+        Assert.Equal(2, firstReplay.Delivery!.ReplayGeneration);
         Assert.Equal("PENDING", firstReplay.Delivery.Status);
         var idempotentReplay = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
             "retry-request-1", now.AddMinutes(2), CancellationToken.None);
@@ -228,13 +257,14 @@ public sealed class WebhookDeliveryRepositoryTests
             "retry-request-2", now.AddMinutes(3), CancellationToken.None);
         var thirdReplay = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
             "retry-request-3", now.AddMinutes(4), CancellationToken.None);
-        Assert.Equal(2, secondReplay.Delivery!.ReplayGeneration);
-        Assert.Equal(3, thirdReplay.Delivery!.ReplayGeneration);
+        Assert.Equal(3, secondReplay.Delivery!.ReplayGeneration);
+        Assert.Equal("REPLAY_LIMIT_REACHED", thirdReplay.ErrorCode);
         var beyondLimit = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
             "retry-request-4", now.AddMinutes(5), CancellationToken.None);
         Assert.Equal("REPLAY_LIMIT_REACHED", beyondLimit.ErrorCode);
         Assert.Null(await historyRepository.FindAsync("cus_ffffffffffffffffffffffffffffffff", first.DeliveryId,
             CancellationToken.None));
+        await ApplyMigrationsAsync(dataSource);
     }
 
     [Fact]
@@ -274,7 +304,8 @@ public sealed class WebhookDeliveryRepositoryTests
                      "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql",
                      "Mono.Api.Tests.Migrations.058_webhook_delivery_replay.sql",
                      "Mono.Api.Tests.Migrations.059_webhook_operations_read_audit.sql",
-                     "Mono.Api.Tests.Migrations.060_webhook_operations_delivery_search.sql"
+                     "Mono.Api.Tests.Migrations.060_webhook_operations_delivery_search.sql",
+                     "Mono.Api.Tests.Migrations.061_webhook_operations_delivery_replay.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
