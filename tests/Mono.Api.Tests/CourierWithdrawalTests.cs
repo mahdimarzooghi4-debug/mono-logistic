@@ -411,12 +411,12 @@ public sealed class CourierWithdrawalTests
             var courierWithdrawalPage1 = await withdrawals.ListForCourierAsync(
                 courierId, 1, null, CancellationToken.None, fromAt, toAt);
             Assert.Single(courierWithdrawalPage1.Items);
-            Assert.Equal(second.Withdrawal.WithdrawalId, courierWithdrawalPage1.Items[0].WithdrawalId);
+            Assert.Equal(third.Withdrawal!.WithdrawalId, courierWithdrawalPage1.Items[0].WithdrawalId);
             Assert.NotNull(courierWithdrawalPage1.NextBeforeSequence);
             var courierWithdrawalPage2 = await withdrawals.ListForCourierAsync(
                 courierId, 1, courierWithdrawalPage1.NextBeforeSequence, CancellationToken.None, fromAt, toAt);
             Assert.Single(courierWithdrawalPage2.Items);
-            Assert.Equal(third.Withdrawal!.WithdrawalId, courierWithdrawalPage2.Items[0].WithdrawalId);
+            Assert.Equal(second.Withdrawal.WithdrawalId, courierWithdrawalPage2.Items[0].WithdrawalId);
             Assert.Null(courierWithdrawalPage2.NextBeforeSequence);
             var emptyCourierWithdrawalWindow = await withdrawals.ListForCourierAsync(
                 courierId, 50, null, CancellationToken.None, now.AddMinutes(7), now.AddMinutes(9));
