@@ -430,6 +430,8 @@ Example:
 
 Webhook URLs must be validated and secrets generated securely.
 
+Endpoint registration requires the `webhooks.manage` customer API-key scope. Mono returns the generated signing secret only in the creation response; persistence stores an AES-256-GCM encrypted value under a separately configured `Mono:WebhookEncryptionKey` (base64-encoded 32-byte key). Registration fails with `503` if that key is not configured. Only HTTPS DNS hostnames are accepted; IP literals, local-only hostnames, URL credentials, query strings, fragments, unsupported events, and duplicate event names are rejected. The eventual sender must validate resolved addresses and disable redirects at connection time.
+
 ## 17. Webhook Security
 
 Recommended:

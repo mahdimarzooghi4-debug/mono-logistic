@@ -32,6 +32,8 @@ builder.Services.AddScoped<PostgresDeliveryRequestRepository>();
 builder.Services.AddScoped<PostgresMissionConfirmationRepository>();
 builder.Services.AddScoped<PostgresMissionLifecycleRepository>();
 builder.Services.AddScoped<PostgresCourierOnboardingService>();
+builder.Services.AddScoped<PostgresWebhookEndpointRepository>();
+builder.Services.AddSingleton(_ => new WebhookSecretProtector(builder.Configuration["Mono:WebhookEncryptionKey"]));
 builder.Services.AddScoped<PostgresCourierOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresCourierAvailabilityService>();
 builder.Services.AddScoped<PostgresCourierCapacityProjectionService>();
@@ -106,6 +108,7 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => fa
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
+app.MapWebhookEndpointEndpoints();
 app.MapMissionConfirmationEndpoints();
 app.MapMonoMissionLifecycleEndpoints();
 app.MapMissionCancellationEndpoints();
