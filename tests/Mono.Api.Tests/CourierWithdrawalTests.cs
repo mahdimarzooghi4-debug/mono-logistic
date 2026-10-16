@@ -116,7 +116,9 @@ public sealed class CourierWithdrawalTests
 
             var ledger = new PostgresCourierEarningLedger(dataSource);
             var reservedBalance = await ledger.GetAvailableBalanceAsync(courierId, now, CancellationToken.None);
-            Assert.Equal(14_500L, reservedBalance.AmountToman);
+            Assert.Equal(44_500L, reservedBalance.PostedAmountToman);
+            Assert.Equal(30_000L, reservedBalance.ReservedWithdrawalAmountToman);
+            Assert.Equal(14_500L, reservedBalance.AvailableAmountToman);
 
             var replay = await withdrawals.CreateWithdrawalAsync(courierId, 30_000,
                 "withdraw-001", now.AddMinutes(1), CancellationToken.None);
@@ -133,7 +135,9 @@ public sealed class CourierWithdrawalTests
                 "PAID", null, "bank:trace-001", "pay-001", now.AddMinutes(3), CancellationToken.None);
             Assert.Equal("PAID", paid.OutcomeCode);
             var paidBalance = await ledger.GetAvailableBalanceAsync(courierId, now, CancellationToken.None);
-            Assert.Equal(14_500L, paidBalance.AmountToman);
+            Assert.Equal(14_500L, paidBalance.PostedAmountToman);
+            Assert.Equal(0L, paidBalance.ReservedWithdrawalAmountToman);
+            Assert.Equal(14_500L, paidBalance.AvailableAmountToman);
 
             var ledgerPage = await ledger.GetLedgerHistoryAsync(courierId, 1, null, CancellationToken.None);
             Assert.Single(ledgerPage.Items);
@@ -186,7 +190,9 @@ public sealed class CourierWithdrawalTests
                 "withdraw-002", now.AddMinutes(4), CancellationToken.None);
             Assert.Equal("REQUESTED", second.OutcomeCode);
             var releasedBalance = await ledger.GetAvailableBalanceAsync(courierId, now, CancellationToken.None);
-            Assert.Equal(4_500L, releasedBalance.AmountToman);
+            Assert.Equal(14_500L, releasedBalance.PostedAmountToman);
+            Assert.Equal(10_000L, releasedBalance.ReservedWithdrawalAmountToman);
+            Assert.Equal(4_500L, releasedBalance.AvailableAmountToman);
 
             var secondProcessing = await withdrawals.TransitionAsync(second.Withdrawal!.WithdrawalId,
                 "PROCESSING", null, null, "process-002", now.AddMinutes(5), CancellationToken.None);
@@ -264,7 +270,9 @@ public sealed class CourierWithdrawalTests
                 now.AddMinutes(7), CancellationToken.None);
             Assert.Equal("REJECTED", rejected.OutcomeCode);
             var restoredBalance = await ledger.GetAvailableBalanceAsync(courierId, now, CancellationToken.None);
-            Assert.Equal(14_500L, restoredBalance.AmountToman);
+            Assert.Equal(14_500L, restoredBalance.PostedAmountToman);
+            Assert.Equal(0L, restoredBalance.ReservedWithdrawalAmountToman);
+            Assert.Equal(14_500L, restoredBalance.AvailableAmountToman);
 
             var third = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
                 "withdraw-003", now.AddMinutes(6), CancellationToken.None);

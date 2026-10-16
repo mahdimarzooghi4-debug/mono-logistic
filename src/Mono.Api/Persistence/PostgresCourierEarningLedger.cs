@@ -5,7 +5,9 @@ using NpgsqlTypes;
 
 namespace Mono.Api.Persistence;
 
-public sealed record CourierAvailableBalance(long AmountToman, DateTimeOffset ObservedAt);
+public sealed record CourierAvailableBalance(
+    long PostedAmountToman, long ReservedWithdrawalAmountToman,
+    long AvailableAmountToman, DateTimeOffset ObservedAt);
 
 public sealed record CourierEarningHistoryItem(
     string MissionId, long AmountToman, DateTimeOffset OccurredAt, long LedgerEntryId);
@@ -46,14 +48,17 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
                 JOIN latest ON latest.withdrawal_id = request.withdrawal_id
                 WHERE request.courier_id = @courier_id AND latest.action IN ('REQUESTED', 'PROCESSING')
             )
-            SELECT posted.amount - reserved.amount FROM posted CROSS JOIN reserved;
+            SELECT posted.amount, reserved.amount, posted.amount - reserved.amount
+            FROM posted CROSS JOIN reserved;
             """;
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
-        var amount = (long)(await command.ExecuteScalarAsync(cancellationToken)
-            ?? throw new InvalidOperationException("Courier balance query returned no result."));
-        return new CourierAvailableBalance(amount, observedAt);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            throw new InvalidOperationException("Courier balance query returned no result.");
+        return new CourierAvailableBalance(
+            reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), observedAt);
     }
 
     public async Task<CourierEarningHistoryPage> GetEarningHistoryAsync(
