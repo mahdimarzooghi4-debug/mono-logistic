@@ -46,7 +46,7 @@ public sealed class PostgresCourierWithdrawalService(
             return new CourierWithdrawalWriteResult("ENCRYPTION_UNAVAILABLE", null, false);
 
         var actorId = operationsContext.ActorId;
-        var fingerprint = CourierPayoutIbanProtector.Fingerprint(courierId, iban);
+        var fingerprint = ibanProtector.Fingerprint(courierId, iban);
         var requestHash = Hash("VERIFY\n" + courierId + "\n" + fingerprint + "\n" + evidenceReference);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -89,7 +89,7 @@ public sealed class PostgresCourierWithdrawalService(
         if (current is not null && current.Value.Fingerprint != fingerprint)
         {
             await InsertDestinationEventAsync(connection, transaction, current.Value.DestinationId, courierId,
-                "REVOKED", actorId, "rotate:" + current.Value.DestinationId,
+                "REVOKED", actorId, "rotate:" + Guid.NewGuid().ToString("N"),
                 Hash("REVOKED\n" + current.Value.DestinationId), evidenceReference, now, cancellationToken);
         }
 
@@ -633,7 +633,7 @@ public sealed class PostgresCourierWithdrawalService(
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private static async Task<(DateTimeOffset Start, DateTimeOffset End)> TehranDayBounds(DateTimeOffset now)
+    private static (DateTimeOffset Start, DateTimeOffset End) TehranDayBounds(DateTimeOffset now)
     {
         var zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
         var local = TimeZoneInfo.ConvertTime(now, zone);
