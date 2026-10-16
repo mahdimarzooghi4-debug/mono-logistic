@@ -67,6 +67,31 @@ public sealed class CourierPayoutIbanProtector
         return $"v1:{Convert.ToBase64String(nonce)}:{Convert.ToBase64String(tag)}:{Convert.ToBase64String(ciphertext)}";
     }
 
+    public string Unprotect(string courierId, string protectedValue)
+    {
+        if (!IsConfigured)
+            throw new InvalidOperationException("Courier payout IBAN encryption is not configured.");
+        var parts = protectedValue.Split(':');
+        if (parts.Length != 4 || parts[0] != "v1")
+            throw new CryptographicException("The protected payout IBAN format is invalid.");
+        var nonce = Convert.FromBase64String(parts[1]);
+        var tag = Convert.FromBase64String(parts[2]);
+        var ciphertext = Convert.FromBase64String(parts[3]);
+        if (nonce.Length != 12 || tag.Length != 16 || ciphertext.Length != 26)
+            throw new CryptographicException("The protected payout IBAN dimensions are invalid.");
+        var plaintext = new byte[ciphertext.Length];
+        using var aes = new AesGcm(_key, tag.Length);
+        try
+        {
+            aes.Decrypt(nonce, ciphertext, tag, plaintext, Encoding.UTF8.GetBytes(courierId));
+            return new UTF8Encoding(false, true).GetString(plaintext);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plaintext);
+        }
+    }
+
     public string Fingerprint(string courierId, string iban)
     {
         if (!IsConfigured)
