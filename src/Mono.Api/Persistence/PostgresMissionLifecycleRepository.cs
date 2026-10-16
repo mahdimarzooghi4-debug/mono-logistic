@@ -197,6 +197,10 @@ public sealed class PostgresMissionLifecycleRepository(
                 throw new InvalidOperationException("Locked Mission disappeared during transition.");
         }
 
+        if (eventType == "mission.delivered")
+            await PostgresCourierEarningLedger.PostMissionEarningAsync(connection, transaction,
+                customerId, missionId, occurredAt, cancellationToken);
+
         const string insertEventSql = """
             INSERT INTO outbox_events (
                 event_id, event_type, event_version, occurred_at, producer, correlation_id,
