@@ -74,7 +74,7 @@ public sealed class PostgresWebhookDeliveryRepository(NpgsqlDataSource dataSourc
             VALUES (
                 @delivery_id, @endpoint_id, @customer_id, @event_id, @event_type, @payload,
                 'PENDING', 0, @next_attempt_at, @created_at)
-            ON CONFLICT (endpoint_id, event_id) DO NOTHING;
+            ON CONFLICT DO NOTHING;
             """;
         var queued = 0;
         foreach (var candidate in candidates)
