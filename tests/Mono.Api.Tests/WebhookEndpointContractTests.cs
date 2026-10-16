@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Mono.Api.Domain;
 using Mono.Api.Security;
+using Xunit;
 
 namespace Mono.Api.Tests;
 
