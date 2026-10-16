@@ -10,6 +10,9 @@ namespace Mono.Api.Api;
 public sealed record CourierPayoutDestinationVerificationInput(
     [property: JsonPropertyName("iban")] string? Iban,
     [property: JsonPropertyName("evidence_reference")] string? EvidenceReference);
+public sealed record CourierPayoutDestinationStatusResponse(
+    [property: JsonPropertyName("destination_status")] string DestinationStatus,
+    [property: JsonPropertyName("masked_iban")] string? MaskedIban);
 public sealed record CourierWithdrawalCreateInput(
     [property: JsonPropertyName("amount_toman")] long AmountToman);
 public sealed record CourierWithdrawalDecisionInput(
@@ -95,6 +98,21 @@ public static class MonoCourierWithdrawalEndpoints
                     };
                 })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet("/courier/v1/finance/payout-destination",
+                async Task<IResult> (
+                    IMonoCourierContext courier,
+                    HttpContext httpContext,
+                    PostgresCourierWithdrawalService service,
+                    CancellationToken cancellationToken) =>
+                {
+                    httpContext.Response.Headers.CacheControl = "no-store";
+                    var result = await service.GetDestinationStatusAsync(
+                        courier.CourierId, cancellationToken);
+                    return Results.Ok(new CourierPayoutDestinationStatusResponse(
+                        result.OutcomeCode, result.MaskedIban));
+                })
+            .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
         endpoints.MapPost("/courier/v1/finance/withdrawals",
                 async Task<IResult> (

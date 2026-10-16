@@ -80,6 +80,15 @@ public sealed class CourierWithdrawalTests
                 "case:bank-proof-001", "verify-iban-001", now, CancellationToken.None);
             Assert.Equal("VERIFIED", verification.OutcomeCode);
 
+            var destinationStatus = await withdrawals.GetDestinationStatusAsync(
+                courierId, CancellationToken.None);
+            Assert.Equal("VERIFIED", destinationStatus.OutcomeCode);
+            Assert.Equal("IR********************9012", destinationStatus.MaskedIban);
+            var unverifiedDestination = await withdrawals.GetDestinationStatusAsync(
+                "crr_22222222222222222222222222222222", CancellationToken.None);
+            Assert.Equal("NOT_VERIFIED", unverifiedDestination.OutcomeCode);
+            Assert.Null(unverifiedDestination.MaskedIban);
+
             await using (var connection = await dataSource.OpenConnectionAsync())
             await using (var command = new NpgsqlCommand("""
                 SELECT masked_iban, encrypted_iban FROM courier_payout_destinations;

@@ -9,6 +9,7 @@ using NpgsqlTypes;
 namespace Mono.Api.Persistence;
 
 public sealed record CourierPayoutDestination(string DestinationId, string MaskedIban);
+public sealed record CourierPayoutDestinationStatus(string OutcomeCode, string? MaskedIban);
 public sealed record CourierPayoutDestinationSecretResult(string OutcomeCode, string? Iban, string? MaskedIban);
 public sealed record CourierWithdrawalItem(
     string WithdrawalId,
@@ -33,6 +34,30 @@ public sealed class PostgresCourierWithdrawalService(
     IMonoOperationsContext operationsContext,
     CourierPayoutIbanProtector ibanProtector)
 {
+    public async Task<CourierPayoutDestinationStatus> GetDestinationStatusAsync(
+        string courierId, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT destination.masked_iban
+            FROM courier_payout_destinations destination
+            JOIN LATERAL (
+                SELECT action FROM courier_payout_destination_events
+                WHERE destination_id = destination.destination_id
+                ORDER BY destination_event_sequence DESC LIMIT 1
+            ) latest ON latest.action = 'VERIFIED'
+            WHERE destination.courier_id = @courier_id
+            ORDER BY destination.created_at DESC, destination.destination_id DESC
+            LIMIT 1;
+            """;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+        var maskedIban = (string?)await command.ExecuteScalarAsync(cancellationToken);
+        return maskedIban is null
+            ? new CourierPayoutDestinationStatus("NOT_VERIFIED", null)
+            : new CourierPayoutDestinationStatus("VERIFIED", maskedIban);
+    }
+
     public async Task<CourierWithdrawalWriteResult> VerifyDestinationAsync(
         string courierId, string ibanInput, string evidenceReference, string idempotencyKey,
         DateTimeOffset now, CancellationToken cancellationToken)

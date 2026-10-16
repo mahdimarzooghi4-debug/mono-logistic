@@ -566,6 +566,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 183 verifies concurrent withdrawal requests serialize against one courier balance, so simultaneous reservations cannot exceed available ledger funds.
 - Sprint 184 verifies the existing three-withdrawals-per-Tehran-day limit resets at local midnight and exact retries do not consume another daily slot.
 - Sprint 185 gives couriers an owner-scoped withdrawal event timeline with safe lifecycle fields, while keeping actor identities and idempotency keys private to operations.
+- Sprint 186 adds an authenticated, no-store courier read for the current payout-destination verification status and masked IBAN; full account data and verification writes remain operations-only.
 
 ### E17.1 Event Envelope
 - event ID
