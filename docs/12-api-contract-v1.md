@@ -853,3 +853,29 @@ Authorization: Bearer <courier access token>
 
 It returns only the authenticated caller's internal Courier ID and identity domain. It exposes no identity, contact, financial, location, or trust-history fields. No identity provider, mobile verification or OTP delivery, credential provisioning, or deployment is configured by this contract. Authentication remains unavailable until those trusted issuer settings and account-binding controls exist.
 
+## Courier earnings and manual withdrawal
+
+Courier finance endpoints derive identity from the validated courier token. Clients cannot supply a Courier ID.
+
+- `GET /courier/v1/finance/balance` returns ledger-posted available earnings less withdrawals in `REQUESTED` or `PROCESSING`.
+- `GET /courier/v1/finance/earnings?limit=50&cursor=...` returns newest-first immutable Mission earning credits. Limit is 1–100; default is 50.
+- `POST /courier/v1/finance/withdrawals` accepts `{"amount_toman": 30000}` and requires `Idempotency-Key`. Amount must be a positive integer not exceeding the available balance. At most three withdrawal requests may be created per Asia/Tehran calendar day; rejected and paid requests count toward this cap. An exact idempotent retry returns the original request.
+- `GET /courier/v1/finance/withdrawals?limit=50&cursor=...` returns only the authenticated courier's withdrawal history, including status, masked destination, and any recorded rejection reason or bank reference.
+- `GET /operations/v1/courier-withdrawals?limit=50&cursor=...` lists open requests for MFA-verified Mono administrators.
+- `POST /operations/v1/courier-withdrawals/{withdrawalId}/processing`, `/paid`, and `/reject` append operator-attributed status events. Every write requires `Idempotency-Key`. The paid action also requires a bank reference; rejection requires a reason code. A paid status and its balanced ledger payout entry commit together.
+
+A payout destination is manually checked outside Mono by a Mono administrator with MFA, then registered with:
+```
+POST /operations/v1/couriers/{courierId}/payout-destination/verify
+Idempotency-Key: <unique key>
+{"iban":"IR…","evidence_reference":"case:bank-proof-001"}
+```
+The API validates the Iranian IBAN format and checksum, encrypts it with AES-256-GCM using `MonoCourier:PayoutIbanEncryptionKey` (32-byte key encoded as Base64), and stores a keyed fingerprint and masked form for safe reads. The full IBAN is never returned. The active destination is captured by each withdrawal so later destination rotation does not redirect an existing request. Verification is unavailable until the dedicated encryption key is configured.
+
+Withdrawal status sequence:
+```
+REQUESTED -> PROCESSING -> PAID
+     |             |
+     +-> REJECTED <-+
+```
+Only Mono's manual operations workflow records payment completion. No bank API, transfer initiation, withdrawal fee, or minimum amount is configured. A rejected request releases its reserved amount; a paid request posts a debit from courier available earnings and a credit to Mono payout clearing in the same transaction.
