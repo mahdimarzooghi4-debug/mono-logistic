@@ -161,7 +161,13 @@ public sealed class CourierWithdrawalTests
             Assert.Equal("FOUND", paidHistory.OutcomeCode);
             Assert.Equal(new[] { "REQUESTED", "PROCESSING", "PAID" },
                 paidHistory.Events.Select(item => item.Action));
-            Assert.All(paidHistory.Events, item => Assert.Equal(operations.ActorId, item.ActorId));
+            Assert.Equal("COURIER", paidHistory.Events[0].ActorType);
+            Assert.Equal(courierId, paidHistory.Events[0].ActorId);
+            Assert.All(paidHistory.Events.Skip(1), item =>
+            {
+                Assert.Equal("OPERATIONS", item.ActorType);
+                Assert.Equal(operations.ActorId, item.ActorId);
+            });
             Assert.Equal("bank:trace-001", paidHistory.Events[^1].BankReference);
             Assert.Equal("pay-001", paidHistory.Events[^1].IdempotencyKey);
 
