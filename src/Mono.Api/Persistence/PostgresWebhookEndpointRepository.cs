@@ -245,8 +245,8 @@ public static class WebhookEndpointCursor
             var value = cursor.Replace('-', '+').Replace('_', '/');
             value += new string('=', (4 - value.Length % 4) % 4);
             var parts = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(value)).Split('|');
-            if (parts.Length != 2 || !DateTimeOffset.TryParse(parts[0], System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.RoundtripKind, out var parsed) ||
+            if (parts.Length != 2 || !DateTimeOffset.TryParseExact(parts[0], "O",
+                    System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsed) ||
                 !System.Text.RegularExpressions.Regex.IsMatch(parts[1], @"\Awhk_[0-9a-f]{32}\z"))
                 return false;
             createdAt = parsed;
