@@ -39,6 +39,7 @@ builder.Services.AddSingleton(services => WebhookDeliveryHttpClientFactory.Creat
     services.GetRequiredService<IWebhookDnsResolver>()));
 builder.Services.AddSingleton<IWebhookDeliveryTransport, WebhookHttpDeliveryTransport>();
 builder.Services.AddScoped<PostgresWebhookDeliveryRepository>();
+builder.Services.AddScoped<PostgresWebhookDeliveryHistoryRepository>();
 builder.Services.AddScoped<WebhookDeliveryDispatcher>();
 builder.Services.AddHostedService<WebhookDeliveryBackgroundService>();
 builder.Services.AddScoped<PostgresCourierOperationsReadAuditService>();
@@ -116,6 +117,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check 
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapWebhookEndpointEndpoints();
+app.MapWebhookDeliveryHistoryEndpoints();
 app.MapMissionConfirmationEndpoints();
 app.MapMonoMissionLifecycleEndpoints();
 app.MapMissionCancellationEndpoints();

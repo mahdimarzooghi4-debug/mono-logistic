@@ -85,6 +85,19 @@ public sealed class WebhookDeliveryRepositoryTests
         await repository.CompleteAttemptAsync(second, new WebhookDeliveryResult((int)HttpStatusCode.OK, null),
             now.AddSeconds(30), CancellationToken.None);
 
+        var historyRepository = new PostgresWebhookDeliveryHistoryRepository(dataSource);
+        var history = await historyRepository.ListAsync(customer.CustomerId, 1, endpointId,
+            "promise.committed", "SUCCEEDED", null, null, CancellationToken.None);
+        var historyItem = Assert.Single(history.Items);
+        Assert.Equal(first.DeliveryId, historyItem.DeliveryId);
+        Assert.Null(history.NextCursor);
+        var detail = await historyRepository.FindAsync(customer.CustomerId, first.DeliveryId, CancellationToken.None);
+        Assert.NotNull(detail);
+        Assert.Equal(new[] { "STARTED", "RETRY_SCHEDULED", "STARTED", "SUCCEEDED" },
+            detail.Attempts.Select(attempt => attempt.Action));
+        Assert.Null(await historyRepository.FindAsync("cus_ffffffffffffffffffffffffffffffff", first.DeliveryId,
+            CancellationToken.None));
+
         await using (var connection = await dataSource.OpenConnectionAsync())
         {
             await using var status = new NpgsqlCommand("""
@@ -147,7 +160,8 @@ public sealed class WebhookDeliveryRepositoryTests
                      "Mono.Api.Tests.Migrations.018_promise_commit.sql",
                      "Mono.Api.Tests.Migrations.054_webhook_endpoint_registry.sql",
                      "Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql",
-                     "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql"
+                     "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql",
+                     "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)

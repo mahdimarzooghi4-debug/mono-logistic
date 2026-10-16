@@ -479,7 +479,12 @@ GET /v1/webhook-deliveries/{id}
 POST /v1/webhook-deliveries/{id}/retry
 ```
 
-The retry endpoint may be restricted to authorized customer/admin users.
+Delivery history is now available to customer API keys with `webhooks.manage`:
+
+- `GET /v1/webhook-deliveries?limit=50&endpoint_id=...&event_type=...&status=...&cursor=...` — tenant-scoped, keyset-paginated list (1–100 items). Cursors are bound to the active filters.
+- `GET /v1/webhook-deliveries/{delivery_id}` — tenant-scoped status and immutable attempt history. Responses omit destination URLs, payloads, and signing-secret material.
+
+Manual replay remains deferred until attempt-generation and duplicate-delivery semantics are specified.
 
 ## 19. Branches
 
