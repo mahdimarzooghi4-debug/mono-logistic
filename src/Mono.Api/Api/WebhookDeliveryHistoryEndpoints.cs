@@ -75,6 +75,40 @@ public static class WebhookDeliveryHistoryEndpoints
             })
             .RequireAuthorization(MonoAuthorizationPolicies.WebhooksManage);
 
+        endpoints.MapPost("/v1/webhook-deliveries/{deliveryId}/retry", async Task<IResult> (
+                string deliveryId,
+                HttpRequest request,
+                ICustomerContext customer,
+                PostgresWebhookDeliveryHistoryRepository repository,
+                TimeProvider timeProvider,
+                CancellationToken cancellationToken) =>
+            {
+                if (!IsDeliveryId(deliveryId))
+                    return Results.NotFound();
+                var idempotencyValues = request.Headers["Idempotency-Key"];
+                var idempotencyKey = idempotencyValues.Count == 1 ? idempotencyValues[0] : null;
+                if (idempotencyKey is null || !IsValidIdempotencyKey(idempotencyKey))
+                    return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                        "INVALID_IDEMPOTENCY_KEY", "A valid Idempotency-Key header is required.")));
+
+                var result = await repository.ReplayAsync(customer.CustomerId, deliveryId,
+                    idempotencyKey, timeProvider.GetUtcNow(), cancellationToken);
+                if (result.Delivery is not null)
+                    return Results.Accepted($"/v1/webhook-deliveries/{result.Delivery.DeliveryId}", result.Delivery);
+                return result.ErrorCode switch
+                {
+                    "NOT_FOUND" => Results.NotFound(),
+                    "NOT_REPLAYABLE" => Results.Conflict(new ApiErrorResponse(new ApiError(
+                        "WEBHOOK_DELIVERY_NOT_REPLAYABLE", "Only dead-lettered deliveries can be retried."))),
+                    "ENDPOINT_DISABLED" => Results.Conflict(new ApiErrorResponse(new ApiError(
+                        "WEBHOOK_ENDPOINT_DISABLED", "The webhook endpoint must be active to retry a delivery."))),
+                    "REPLAY_LIMIT_REACHED" => Results.Conflict(new ApiErrorResponse(new ApiError(
+                        "WEBHOOK_REPLAY_LIMIT_REACHED", "The delivery has reached its manual replay limit."))),
+                    _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+                };
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.WebhooksManage);
+
         return endpoints;
     }
 
@@ -85,4 +119,7 @@ public static class WebhookDeliveryHistoryEndpoints
     private static bool IsDeliveryId(string value) => value.Length == 36 &&
         value.StartsWith("whd_", StringComparison.Ordinal) &&
         value[4..].All(ch => char.IsAsciiHexDigit(ch) && !char.IsUpper(ch));
+
+    private static bool IsValidIdempotencyKey(string value) => value.Length is > 0 and <= 128 &&
+        value.All(character => character is >= '!' and <= '~');
 }

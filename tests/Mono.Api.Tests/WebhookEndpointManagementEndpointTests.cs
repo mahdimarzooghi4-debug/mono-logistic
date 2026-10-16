@@ -49,6 +49,14 @@ public sealed class WebhookEndpointManagementEndpointTests
         Assert.Contains("\"items\":[]", await deliveryHistory.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         using var invalidDeliveryHistory = await ownerClient.GetAsync("/v1/webhook-deliveries?status=unknown");
         Assert.Equal(HttpStatusCode.BadRequest, invalidDeliveryHistory.StatusCode);
+        using var invalidRetry = await ownerClient.PostAsync(
+            "/v1/webhook-deliveries/whd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/retry", content: null);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidRetry.StatusCode);
+        using var unknownRetryRequest = new HttpRequestMessage(HttpMethod.Post,
+            "/v1/webhook-deliveries/whd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/retry");
+        unknownRetryRequest.Headers.Add("Idempotency-Key", "retry-test-1");
+        using var unknownRetry = await ownerClient.SendAsync(unknownRetryRequest);
+        Assert.Equal(HttpStatusCode.NotFound, unknownRetry.StatusCode);
 
         using var createdResponse = await ownerClient.PostAsJsonAsync("/v1/webhook-endpoints", new
         {
@@ -169,7 +177,8 @@ public sealed class WebhookEndpointManagementEndpointTests
                      "Mono.Api.Tests.Migrations.054_webhook_endpoint_registry.sql",
                      "Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql",
                      "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql",
-                     "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql"
+                     "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql",
+                     "Mono.Api.Tests.Migrations.058_webhook_delivery_replay.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)

@@ -483,8 +483,9 @@ Delivery history is now available to customer API keys with `webhooks.manage`:
 
 - `GET /v1/webhook-deliveries?limit=50&endpoint_id=...&event_type=...&status=...&cursor=...` — tenant-scoped, keyset-paginated list (1–100 items). Cursors are bound to the active filters.
 - `GET /v1/webhook-deliveries/{delivery_id}` — tenant-scoped status and immutable attempt history. Responses omit destination URLs, payloads, and signing-secret material.
+- `POST /v1/webhook-deliveries/{delivery_id}/retry` — queues a new delivery generation for a dead-lettered delivery; requires a stable `Idempotency-Key` header and returns the queued generation. At most three manual replays are allowed while the endpoint remains active.
 
-Manual replay remains deferred until attempt-generation and duplicate-delivery semantics are specified.
+Each manual replay has a distinct delivery ID and preserves the previous generation's status and attempts. Repeating a request with the same idempotency key returns the same generation.
 
 ## 19. Branches
 
