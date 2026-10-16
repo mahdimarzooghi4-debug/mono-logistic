@@ -60,6 +60,8 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Eligible Modes Feasibility Criterion v1](docs/36-eligible-modes-feasibility-criterion-v1.md)
 - [Eligible Courier Feasibility Criterion v1](docs/37-eligible-courier-feasibility-criterion-v1.md)
 - [Effective Zone Capacity Criterion v1](docs/38-effective-zone-capacity-criterion-v1.md)
+- [Route Planning Feasibility Gate v1](docs/66-route-planning-feasibility-gate-v1.md)
+- [Route Planning Feasibility Gate (Sprint 159)](docs/sprints/sprint-159-route-planning-feasibility-gate.md)
 - [Active Route Inventory Evidence v1](docs/39-active-route-inventory-evidence-v1.md)
 - [Route Insertion Feasibility Evidence v1](docs/40-route-insertion-feasibility-evidence-v1.md)
 - [Route Travel-Time Evidence v1](docs/61-route-travel-time-evidence-v1.md)
