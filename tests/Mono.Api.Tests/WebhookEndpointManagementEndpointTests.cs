@@ -44,6 +44,12 @@ public sealed class WebhookEndpointManagementEndpointTests
         ownerClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
         otherClient.DefaultRequestHeaders.Add(MonoApiKeyDefaults.HeaderName, ApiKey);
 
+        using var deliveryHistory = await ownerClient.GetAsync("/v1/webhook-deliveries?limit=10");
+        Assert.Equal(HttpStatusCode.OK, deliveryHistory.StatusCode);
+        Assert.Contains("\"items\":[]", await deliveryHistory.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        using var invalidDeliveryHistory = await ownerClient.GetAsync("/v1/webhook-deliveries?status=unknown");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidDeliveryHistory.StatusCode);
+
         using var createdResponse = await ownerClient.PostAsJsonAsync("/v1/webhook-endpoints", new
         {
             url = "https://hooks.customer.com/mono",
@@ -162,7 +168,8 @@ public sealed class WebhookEndpointManagementEndpointTests
                      "Mono.Api.Tests.Migrations.018_promise_commit.sql",
                      "Mono.Api.Tests.Migrations.054_webhook_endpoint_registry.sql",
                      "Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql",
-                     "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql"
+                     "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql",
+                     "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
