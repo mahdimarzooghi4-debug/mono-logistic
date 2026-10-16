@@ -63,7 +63,7 @@ public sealed class WebhookDeliveryRepositoryTests
             Assert.Equal("QUEUE_SUMMARY", reader.GetString(0));
             Assert.True(await reader.ReadAsync());
             Assert.Equal("QUEUE_SEARCH", reader.GetString(0));
-            Assert.Equal(DBNull.Value, reader.IsDBNull(2) ? DBNull.Value : reader.GetValue(2));
+            Assert.True(reader.IsDBNull(2));
             Assert.True(await reader.ReadAsync());
             Assert.Equal("DELIVERY_DETAIL", reader.GetString(0));
             Assert.Equal(missingId, reader.GetString(2));
