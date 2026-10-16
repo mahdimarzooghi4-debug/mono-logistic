@@ -19,7 +19,8 @@ public sealed record CourierLedgerHistoryItem(
 
 public sealed record CourierLedgerHistoryPage(
     IReadOnlyList<CourierLedgerHistoryItem> Items, long? NextBeforeEntryId,
-    long TotalDebitAmountToman, long TotalCreditAmountToman);
+    long TotalDebitAmountToman, long TotalCreditAmountToman,
+    long OpeningPostedBalanceToman, long ClosingPostedBalanceToman);
 
 public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
 {
@@ -121,16 +122,22 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
             LIMIT @take;
             """;
         const string summarySql = """
-            SELECT COALESCE(SUM(entry.debit_amount), 0)::bigint,
-                   COALESCE(SUM(entry.credit_amount), 0)::bigint
+            SELECT COALESCE(SUM(entry.credit_amount - entry.debit_amount) FILTER (
+                       WHERE @from_at IS NOT NULL AND ledger_tx.occurred_at < @from_at), 0)::bigint,
+                   COALESCE(SUM(entry.debit_amount) FILTER (
+                       WHERE (@from_at IS NULL OR ledger_tx.occurred_at >= @from_at)
+                         AND (@to_at IS NULL OR ledger_tx.occurred_at < @to_at)), 0)::bigint,
+                   COALESCE(SUM(entry.credit_amount) FILTER (
+                       WHERE (@from_at IS NULL OR ledger_tx.occurred_at >= @from_at)
+                         AND (@to_at IS NULL OR ledger_tx.occurred_at < @to_at)), 0)::bigint,
+                   COALESCE(SUM(entry.credit_amount - entry.debit_amount) FILTER (
+                       WHERE @to_at IS NULL OR ledger_tx.occurred_at < @to_at), 0)::bigint
             FROM ledger_accounts account
             JOIN ledger_entries entry ON entry.ledger_account_id = account.ledger_account_id
             JOIN ledger_transactions ledger_tx
               ON ledger_tx.ledger_transaction_id = entry.ledger_transaction_id
             WHERE account.owner_type = 'COURIER' AND account.owner_id = @courier_id
-              AND account.account_code = 'COURIER_AVAILABLE' AND account.currency = 'TOMAN'
-              AND (@from_at IS NULL OR ledger_tx.occurred_at >= @from_at)
-              AND (@to_at IS NULL OR ledger_tx.occurred_at < @to_at);
+              AND account.account_code = 'COURIER_AVAILABLE' AND account.currency = 'TOMAN';
             """;
         var items = new List<CourierLedgerHistoryItem>();
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -153,8 +160,10 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
                     reader.GetFieldValue<DateTimeOffset>(4), reader.GetInt64(5)));
         }
 
+        long openingPostedBalance;
         long totalDebit;
         long totalCredit;
+        long closingPostedBalance;
         await using (var command = new NpgsqlCommand(summarySql, connection, transaction))
         {
             command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
@@ -165,8 +174,10 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
                 throw new InvalidOperationException("Courier ledger summary query returned no result.");
-            totalDebit = reader.GetInt64(0);
-            totalCredit = reader.GetInt64(1);
+            openingPostedBalance = reader.GetInt64(0);
+            totalDebit = reader.GetInt64(1);
+            totalCredit = reader.GetInt64(2);
+            closingPostedBalance = reader.GetInt64(3);
         }
 
         var hasMore = items.Count > limit;
@@ -174,7 +185,8 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
             items.RemoveAt(limit);
         await transaction.CommitAsync(cancellationToken);
         return new CourierLedgerHistoryPage(
-            items, hasMore ? items[^1].LedgerEntryId : null, totalDebit, totalCredit);
+            items, hasMore ? items[^1].LedgerEntryId : null, totalDebit, totalCredit,
+            openingPostedBalance, closingPostedBalance);
     }
 
     public static async Task<bool> PostMissionEarningAsync(

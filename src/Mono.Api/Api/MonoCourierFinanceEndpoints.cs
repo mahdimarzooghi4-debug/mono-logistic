@@ -33,6 +33,8 @@ public sealed record MonoCourierLedgerHistoryResponse(
     [property: JsonPropertyName("next_cursor")] string? NextCursor,
     [property: JsonPropertyName("total_debit_toman")] long TotalDebitAmountToman,
     [property: JsonPropertyName("total_credit_toman")] long TotalCreditAmountToman,
+    [property: JsonPropertyName("opening_posted_balance_toman")] long OpeningPostedBalanceToman,
+    [property: JsonPropertyName("closing_posted_balance_toman")] long ClosingPostedBalanceToman,
     [property: JsonPropertyName("from_at")] DateTimeOffset? FromAt,
     [property: JsonPropertyName("to_at_exclusive")] DateTimeOffset? ToAtExclusive);
 
@@ -104,7 +106,8 @@ public static class MonoCourierFinanceEndpoints
                     item.OccurredAt)).ToArray();
                 return Results.Ok(new MonoCourierLedgerHistoryResponse(items,
                     page.NextBeforeEntryId is long next ? EncodeLedgerCursor(next, fromAt, toAt) : null,
-                    page.TotalDebitAmountToman, page.TotalCreditAmountToman, fromAt, toAt));
+                    page.TotalDebitAmountToman, page.TotalCreditAmountToman,
+                    page.OpeningPostedBalanceToman, page.ClosingPostedBalanceToman, fromAt, toAt));
             })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 

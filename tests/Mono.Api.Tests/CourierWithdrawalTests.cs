@@ -143,6 +143,8 @@ public sealed class CourierWithdrawalTests
             Assert.Equal(0L, ledgerPage.Items[0].CreditAmountToman);
             Assert.Equal(30_000L, ledgerPage.TotalDebitAmountToman);
             Assert.Equal(44_500L, ledgerPage.TotalCreditAmountToman);
+            Assert.Equal(0L, ledgerPage.OpeningPostedBalanceToman);
+            Assert.Equal(14_500L, ledgerPage.ClosingPostedBalanceToman);
             Assert.NotNull(ledgerPage.NextBeforeEntryId);
 
             var rangedLedgerPage1 = await ledger.GetLedgerHistoryAsync(
@@ -151,6 +153,8 @@ public sealed class CourierWithdrawalTests
             Assert.Equal("WITHDRAWAL_PAYOUT", rangedLedgerPage1.Items[0].ReferenceType);
             Assert.Equal(30_000L, rangedLedgerPage1.TotalDebitAmountToman);
             Assert.Equal(44_500L, rangedLedgerPage1.TotalCreditAmountToman);
+            Assert.Equal(0L, rangedLedgerPage1.OpeningPostedBalanceToman);
+            Assert.Equal(14_500L, rangedLedgerPage1.ClosingPostedBalanceToman);
             Assert.NotNull(rangedLedgerPage1.NextBeforeEntryId);
             var rangedLedgerPage2 = await ledger.GetLedgerHistoryAsync(
                 courierId, 1, rangedLedgerPage1.NextBeforeEntryId, CancellationToken.None,
@@ -159,6 +163,8 @@ public sealed class CourierWithdrawalTests
             Assert.Equal("MISSION_EARNING", rangedLedgerPage2.Items[0].ReferenceType);
             Assert.Equal(rangedLedgerPage1.TotalDebitAmountToman, rangedLedgerPage2.TotalDebitAmountToman);
             Assert.Equal(rangedLedgerPage1.TotalCreditAmountToman, rangedLedgerPage2.TotalCreditAmountToman);
+            Assert.Equal(rangedLedgerPage1.OpeningPostedBalanceToman, rangedLedgerPage2.OpeningPostedBalanceToman);
+            Assert.Equal(rangedLedgerPage1.ClosingPostedBalanceToman, rangedLedgerPage2.ClosingPostedBalanceToman);
             Assert.Null(rangedLedgerPage2.NextBeforeEntryId);
 
             var payoutWindow = await ledger.GetLedgerHistoryAsync(
@@ -166,6 +172,8 @@ public sealed class CourierWithdrawalTests
             Assert.Single(payoutWindow.Items);
             Assert.Equal(30_000L, payoutWindow.TotalDebitAmountToman);
             Assert.Equal(0L, payoutWindow.TotalCreditAmountToman);
+            Assert.Equal(44_500L, payoutWindow.OpeningPostedBalanceToman);
+            Assert.Equal(14_500L, payoutWindow.ClosingPostedBalanceToman);
             var earlierLedgerPage = await ledger.GetLedgerHistoryAsync(
                 courierId, 1, ledgerPage.NextBeforeEntryId, CancellationToken.None);
             Assert.Single(earlierLedgerPage.Items);
