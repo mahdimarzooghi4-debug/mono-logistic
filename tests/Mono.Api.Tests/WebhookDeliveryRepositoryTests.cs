@@ -1,0 +1,162 @@
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Mono.Api.Domain;
+using Mono.Api.Persistence;
+using Npgsql;
+using NpgsqlTypes;
+using Xunit;
+
+namespace Mono.Api.Tests;
+
+[Collection("Mono PostgreSQL")]
+public sealed class WebhookDeliveryRepositoryTests
+{
+    [Fact]
+    public async Task Outbox_fanout_is_idempotent_payloads_are_redacted_and_retry_history_is_append_only()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return;
+
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ApplyMigrationsAsync(dataSource);
+        var customer = Customer.Create("Webhook Delivery Test", "ACTIVE");
+        await InsertCustomerAsync(dataSource, customer);
+        var now = DateTimeOffset.UtcNow;
+        const string endpointId = "whk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var eventId = "evt_" + Guid.NewGuid().ToString("N");
+        var protector = new WebhookSecretProtector(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+        var secret = protector.Protect("whsec_delivery-test");
+
+        await using (var connection = await dataSource.OpenConnectionAsync())
+        {
+            await using var endpoint = new NpgsqlCommand("""
+                INSERT INTO webhook_endpoints (endpoint_id, customer_id, url, events, secret_ciphertext, status, created_at)
+                VALUES (@endpoint_id, @customer_id, 'https://hooks.customer.com/mono',
+                        ARRAY['promise.committed']::text[], @secret, 'ACTIVE', @created_at);
+                """, connection);
+            endpoint.Parameters.AddWithValue("endpoint_id", NpgsqlDbType.Text, endpointId);
+            endpoint.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customer.CustomerId);
+            endpoint.Parameters.AddWithValue("secret", NpgsqlDbType.Text, secret);
+            endpoint.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, now.AddMinutes(-1));
+            await endpoint.ExecuteNonQueryAsync();
+
+            await using var outbox = new NpgsqlCommand("""
+                INSERT INTO outbox_events (
+                    event_id, event_type, event_version, occurred_at, producer, correlation_id,
+                    customer_id, aggregate_type, aggregate_id, sequence, data, created_at)
+                VALUES (
+                    @event_id, 'promise.committed', 1, @occurred_at, 'mono-api', 'delivery-test',
+                    @customer_id, 'promise', 'prm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 1, @data, @created_at);
+                """, connection);
+            outbox.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, eventId);
+            outbox.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
+            outbox.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customer.CustomerId);
+            outbox.Parameters.AddWithValue("data", NpgsqlDbType.Jsonb,
+                """{"promise_id":"prm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","delivery_request_id":"drq_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","version":1,"decision_id":"private-decision","outcome":"ACCEPTED","actor_id":"private-actor","reason_codes":["INTERNAL_ONLY"]}""");
+            outbox.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, now);
+            await outbox.ExecuteNonQueryAsync();
+        }
+
+        var repository = new PostgresWebhookDeliveryRepository(dataSource);
+        Assert.Equal(1, await repository.EnqueueAsync(WebhookEventCatalog.All, 20, now, CancellationToken.None));
+        Assert.Equal(0, await repository.EnqueueAsync(WebhookEventCatalog.All, 20, now, CancellationToken.None));
+
+        var firstClaims = await repository.ClaimDueAsync(20, now, TimeSpan.FromMinutes(2), CancellationToken.None);
+        var first = Assert.Single(firstClaims);
+        Assert.Equal(1, first.AttemptNumber);
+        using (var payload = JsonDocument.Parse(first.Payload))
+        {
+            var json = first.Payload;
+            Assert.Equal("promise.committed", payload.RootElement.GetProperty("event_type").GetString());
+            Assert.Equal("ACCEPTED", payload.RootElement.GetProperty("data").GetProperty("outcome").GetString());
+            Assert.DoesNotContain("decision_id", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("actor_id", json, StringComparison.Ordinal);
+            Assert.DoesNotContain("reason_codes", json, StringComparison.Ordinal);
+        }
+
+        await repository.CompleteAttemptAsync(first, new WebhookDeliveryResult(503, null), now, CancellationToken.None);
+        Assert.Empty(await repository.ClaimDueAsync(20, now.AddSeconds(29), TimeSpan.FromMinutes(2), CancellationToken.None));
+        var second = Assert.Single(await repository.ClaimDueAsync(
+            20, now.AddSeconds(30), TimeSpan.FromMinutes(2), CancellationToken.None));
+        Assert.Equal(2, second.AttemptNumber);
+        await repository.CompleteAttemptAsync(second, new WebhookDeliveryResult((int)HttpStatusCode.OK, null),
+            now.AddSeconds(30), CancellationToken.None);
+
+        await using (var connection = await dataSource.OpenConnectionAsync())
+        {
+            await using var status = new NpgsqlCommand("""
+                SELECT status, attempt_count FROM webhook_deliveries WHERE delivery_id = @delivery_id;
+                """, connection);
+            status.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, first.DeliveryId);
+            await using var reader = await status.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("SUCCEEDED", reader.GetString(0));
+            Assert.Equal(2, reader.GetInt32(1));
+            await reader.CloseAsync();
+
+            await using var attempts = new NpgsqlCommand("""
+                SELECT array_agg(action ORDER BY attempt_event_id)
+                FROM webhook_delivery_attempt_events WHERE delivery_id = @delivery_id;
+                """, connection);
+            attempts.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, first.DeliveryId);
+            Assert.Equal(new[] { "STARTED", "RETRY_SCHEDULED", "STARTED", "SUCCEEDED" },
+                await attempts.ExecuteScalarAsync() as string[]);
+
+            await using var mutate = new NpgsqlCommand("""
+                UPDATE webhook_delivery_attempt_events SET action = 'STARTED'
+                WHERE delivery_id = @delivery_id;
+                """, connection);
+            mutate.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, first.DeliveryId);
+            await Assert.ThrowsAsync<PostgresException>(() => mutate.ExecuteNonQueryAsync());
+        }
+    }
+
+    [Fact]
+    public void Webhook_signature_is_sha256_hmac_over_exact_payload_bytes()
+    {
+        var secret = Encoding.UTF8.GetBytes("whsec_test");
+        var payload = Encoding.UTF8.GetBytes("{\"event_id\":\"evt_test\"}");
+        var expected = "sha256=" + Convert.ToHexString(HMACSHA256.HashData(secret, payload)).ToLowerInvariant();
+        Assert.Equal(expected, WebhookDeliverySignature.Compute(secret, payload));
+    }
+
+    private static async Task InsertCustomerAsync(NpgsqlDataSource dataSource, Customer customer)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand("""
+            INSERT INTO customers (customer_id, legal_name, status, created_at)
+            VALUES (@customer_id, @legal_name, @status, @created_at);
+            """, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customer.CustomerId);
+        command.Parameters.AddWithValue("legal_name", NpgsqlDbType.Text, customer.LegalName);
+        command.Parameters.AddWithValue("status", NpgsqlDbType.Text, customer.Status);
+        command.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, customer.CreatedAt);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ApplyMigrationsAsync(NpgsqlDataSource dataSource)
+    {
+        var assembly = typeof(WebhookDeliveryRepositoryTests).Assembly;
+        foreach (var resourceName in new[]
+                 {
+                     "Mono.Api.Tests.Migrations.001_customer_branch.sql",
+                     "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql",
+                     "Mono.Api.Tests.Migrations.018_promise_commit.sql",
+                     "Mono.Api.Tests.Migrations.054_webhook_endpoint_registry.sql",
+                     "Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql",
+                     "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql"
+                 })
+        {
+            await using var stream = assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
+            using var reader = new StreamReader(stream);
+            var sql = await reader.ReadToEndAsync();
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+}
