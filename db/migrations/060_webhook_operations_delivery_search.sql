@@ -14,5 +14,6 @@ ALTER TABLE webhook_operations_read_audit
 
 ALTER TABLE webhook_operations_read_audit
     ADD CONSTRAINT webhook_operations_read_audit_resource_id_check
-        CHECK ((action = 'DELIVERY_DETAIL' AND resource_id ~ '^whd_[0-9a-f]{32}$') OR
+        CHECK ((action = 'DELIVERY_DETAIL' AND resource_id IS NOT NULL AND
+                resource_id ~ '^whd_[0-9a-f]{32}$') OR
                (action <> 'DELIVERY_DETAIL' AND resource_id IS NULL));
