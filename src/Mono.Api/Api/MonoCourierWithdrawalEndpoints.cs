@@ -49,6 +49,11 @@ public sealed record CourierWithdrawalCreatedResponse(
 
 public static class MonoCourierWithdrawalEndpoints
 {
+    private static readonly HashSet<string> CourierWithdrawalStatuses = new(StringComparer.Ordinal)
+    {
+        "REQUESTED", "PROCESSING", "PAID", "REJECTED"
+    };
+
     public static IEndpointRouteBuilder MapMonoCourierWithdrawalEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/operations/v1/couriers/{courierId}/payout-destination/verify",
@@ -184,6 +189,7 @@ public static class MonoCourierWithdrawalEndpoints
                 string? cursor,
                 DateTimeOffset? from_at,
                 DateTimeOffset? to_at,
+                string? status,
                 CancellationToken cancellationToken) =>
             {
                 var pageSize = limit ?? 50;
@@ -192,15 +198,18 @@ public static class MonoCourierWithdrawalEndpoints
                 if (from_at.HasValue != to_at.HasValue ||
                     (from_at.HasValue && from_at.Value >= to_at!.Value))
                     return Results.BadRequest(new { error_code = "INVALID_DATE_RANGE" });
+                var normalizedStatus = string.IsNullOrWhiteSpace(status) ? null : status.Trim().ToUpperInvariant();
+                if (normalizedStatus is not null && !CourierWithdrawalStatuses.Contains(normalizedStatus))
+                    return Results.BadRequest(new { error_code = "INVALID_STATUS" });
                 var fromAt = from_at?.ToUniversalTime();
                 var toAt = to_at?.ToUniversalTime();
-                if (!TryDecodeCourierCursor(cursor, fromAt, toAt, out var before))
+                if (!TryDecodeCourierCursor(cursor, fromAt, toAt, normalizedStatus, out var before))
                     return Results.BadRequest(new { error_code = "INVALID_CURSOR" });
                 var page = await service.ListForCourierAsync(
-                    courier.CourierId, pageSize, before, cancellationToken, fromAt, toAt);
+                    courier.CourierId, pageSize, before, cancellationToken, fromAt, toAt, normalizedStatus);
                 return Results.Ok(new CourierWithdrawalPageResponse<CourierWithdrawalItemResponse>(
                     page.Items.Select(ToCourierResponse).ToArray(),
-                    page.NextBeforeSequence is long next ? EncodeCourierCursor(next, fromAt, toAt) : null));
+                    page.NextBeforeSequence is long next ? EncodeCourierCursor(next, fromAt, toAt, normalizedStatus) : null));
             })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
@@ -269,18 +278,19 @@ public static class MonoCourierWithdrawalEndpoints
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private static string EncodeCourierCursor(
-        long sequence, DateTimeOffset? fromAt, DateTimeOffset? toAt)
+        long sequence, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status)
     {
-        var value = string.Join("|", "withdrawals-v1",
+        var value = string.Join("|", "withdrawals-v2",
             fromAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*",
             toAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*",
+            status ?? "*",
             sequence.ToString(CultureInfo.InvariantCulture));
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 
     private static bool TryDecodeCourierCursor(
-        string? cursor, DateTimeOffset? fromAt, DateTimeOffset? toAt, out long? sequence)
+        string? cursor, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status, out long? sequence)
     {
         sequence = null;
         if (cursor is null)
@@ -292,10 +302,11 @@ public static class MonoCourierWithdrawalEndpoints
             var value = cursor.Replace('-', '+').Replace('_', '/');
             value += new string('=', (4 - value.Length % 4) % 4);
             var parts = Encoding.UTF8.GetString(Convert.FromBase64String(value)).Split('|');
-            if (parts.Length != 4 || parts[0] != "withdrawals-v1" ||
+            if (parts.Length != 5 || parts[0] != "withdrawals-v2" ||
                 parts[1] != (fromAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*") ||
                 parts[2] != (toAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*") ||
-                !long.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                parts[3] != (status ?? "*") ||
+                !long.TryParse(parts[4], NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
                 parsed <= 0)
                 return false;
             sequence = parsed;
