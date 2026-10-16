@@ -111,6 +111,50 @@ public sealed class CourierEarningLedgerTests
             Assert.Equal(44_500L, balance.AmountToman);
             Assert.Equal(occurredAt, balance.ObservedAt);
 
+            const string secondMissionId = "mis_22222222222222222222222222222222";
+            var secondOccurredAt = occurredAt.AddMinutes(2);
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            {
+                await using var seedMission = new NpgsqlCommand("""
+                    INSERT INTO missions VALUES (@mission_id, @customer_id, 'drq_2', 'quo_2', 1, 'DELIVERED');
+                    """, connection);
+                seedMission.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, secondMissionId);
+                seedMission.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+                await seedMission.ExecuteNonQueryAsync();
+                await using var seedQuote = new NpgsqlCommand("""
+                    INSERT INTO delivery_quote_versions VALUES
+                        (@customer_id, 'drq_2', 'quo_2', 1, '{"fare":{"fare_toman":75000}}'::jsonb);
+                    """, connection);
+                seedQuote.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+                await seedQuote.ExecuteNonQueryAsync();
+                await using var seedOffer = new NpgsqlCommand("""
+                    INSERT INTO mission_courier_offer_events (mission_id, customer_id, courier_id, action)
+                    VALUES (@mission_id, @customer_id, @courier_id, 'COMPLETED');
+                    """, connection);
+                seedOffer.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, secondMissionId);
+                seedOffer.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+                seedOffer.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+                await seedOffer.ExecuteNonQueryAsync();
+            }
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var transaction = await connection.BeginTransactionAsync())
+            {
+                Assert.True(await PostgresCourierEarningLedger.PostMissionEarningAsync(connection,
+                    transaction, customerId, secondMissionId, secondOccurredAt, CancellationToken.None));
+                await transaction.CommitAsync();
+            }
+
+            var firstPage = await ledger.GetEarningHistoryAsync(courierId, 1, null, CancellationToken.None);
+            Assert.Single(firstPage.Items);
+            Assert.Equal(secondMissionId, firstPage.Items[0].MissionId);
+            Assert.Equal(66_750L, firstPage.Items[0].AmountToman);
+            Assert.NotNull(firstPage.NextBeforeEntryId);
+            var secondPage = await ledger.GetEarningHistoryAsync(courierId, 1,
+                firstPage.NextBeforeEntryId, CancellationToken.None);
+            Assert.Single(secondPage.Items);
+            Assert.Equal(missionId, secondPage.Items[0].MissionId);
+            Assert.Null(secondPage.NextBeforeEntryId);
+
             await using (var connection = await dataSource.OpenConnectionAsync())
             await using (var mutation = new NpgsqlCommand("UPDATE ledger_entries SET credit_amount = 1;", connection))
                 await Assert.ThrowsAsync<PostgresException>(() => mutation.ExecuteNonQueryAsync());
