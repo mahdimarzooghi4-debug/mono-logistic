@@ -156,9 +156,80 @@ public sealed class CourierWithdrawalTests
             var releasedBalance = await ledger.GetAvailableBalanceAsync(courierId, now, CancellationToken.None);
             Assert.Equal(4_500L, releasedBalance.AmountToman);
 
-            var rejected = await withdrawals.TransitionAsync(second.Withdrawal!.WithdrawalId,
+            var secondProcessing = await withdrawals.TransitionAsync(second.Withdrawal!.WithdrawalId,
+                "PROCESSING", null, null, "process-002", now.AddMinutes(5), CancellationToken.None);
+            Assert.Equal("PROCESSING", secondProcessing.OutcomeCode);
+
+            // A balanced payout with the wrong amount must fail the deferred database invariant.
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var invalidPayout = await connection.BeginTransactionAsync())
+            {
+                var nowPayout = now.AddMinutes(6);
+                await using (var eventCommand = new NpgsqlCommand("""
+                    INSERT INTO courier_withdrawal_events
+                        (withdrawal_id, action, actor_type, actor_id, idempotency_key, request_hash,
+                         reason_code, bank_reference, occurred_at)
+                    VALUES (@withdrawal_id, 'PAID', 'OPERATIONS', 'ops_test_actor',
+                            'forged-pay-002', repeat('a', 64), NULL, 'bank:forged-002', @occurred_at);
+                    """, connection, invalidPayout))
+                {
+                    eventCommand.Parameters.AddWithValue("withdrawal_id", second.Withdrawal.WithdrawalId);
+                    eventCommand.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, nowPayout);
+                    await eventCommand.ExecuteNonQueryAsync();
+                }
+
+                var invalidTransactionId = "ltx_" + Guid.NewGuid().ToString("N");
+                await using (var transactionCommand = new NpgsqlCommand("""
+                    INSERT INTO ledger_transactions
+                        (ledger_transaction_id, reference_type, reference_id, idempotency_key,
+                         currency, occurred_at, created_at)
+                    VALUES (@transaction_id, 'WITHDRAWAL_PAYOUT', @withdrawal_id,
+                            'forged-payout:' || @withdrawal_id, 'TOMAN', @occurred_at, @created_at);
+                    """, connection, invalidPayout))
+                {
+                    transactionCommand.Parameters.AddWithValue("transaction_id", invalidTransactionId);
+                    transactionCommand.Parameters.AddWithValue("withdrawal_id", second.Withdrawal.WithdrawalId);
+                    transactionCommand.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, nowPayout);
+                    transactionCommand.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, nowPayout);
+                    await transactionCommand.ExecuteNonQueryAsync();
+                }
+
+                await using (var courierEntry = new NpgsqlCommand("""
+                    INSERT INTO ledger_entries
+                        (ledger_transaction_id, ledger_account_id, debit_amount, credit_amount, created_at)
+                    SELECT @transaction_id, ledger_account_id, 9_999, 0, @created_at
+                    FROM ledger_accounts
+                    WHERE owner_type = 'COURIER' AND owner_id = @courier_id
+                      AND account_code = 'COURIER_AVAILABLE' AND currency = 'TOMAN';
+                    """, connection, invalidPayout))
+                {
+                    courierEntry.Parameters.AddWithValue("transaction_id", invalidTransactionId);
+                    courierEntry.Parameters.AddWithValue("courier_id", courierId);
+                    courierEntry.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, nowPayout);
+                    Assert.Equal(1, await courierEntry.ExecuteNonQueryAsync());
+                }
+
+                await using (var clearingEntry = new NpgsqlCommand("""
+                    INSERT INTO ledger_entries
+                        (ledger_transaction_id, ledger_account_id, debit_amount, credit_amount, created_at)
+                    SELECT @transaction_id, ledger_account_id, 0, 9_999, @created_at
+                    FROM ledger_accounts
+                    WHERE owner_type = 'MONO' AND owner_id = 'mono'
+                      AND account_code = 'MONO_PAYOUT_CLEARING' AND currency = 'TOMAN';
+                    """, connection, invalidPayout))
+                {
+                    clearingEntry.Parameters.AddWithValue("transaction_id", invalidTransactionId);
+                    clearingEntry.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, nowPayout);
+                    Assert.Equal(1, await clearingEntry.ExecuteNonQueryAsync());
+                }
+
+                await Assert.ThrowsAsync<PostgresException>(async () =>
+                    await invalidPayout.CommitAsync());
+            }
+
+            var rejected = await withdrawals.TransitionAsync(second.Withdrawal.WithdrawalId,
                 "REJECTED", "MANUAL_REVIEW_REJECTED", null, "reject-002",
-                now.AddMinutes(5), CancellationToken.None);
+                now.AddMinutes(7), CancellationToken.None);
             Assert.Equal("REJECTED", rejected.OutcomeCode);
             var restoredBalance = await ledger.GetAvailableBalanceAsync(courierId, now, CancellationToken.None);
             Assert.Equal(14_500L, restoredBalance.AmountToman);
@@ -319,7 +390,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.065_courier_manual_withdrawals.sql",
             "Mono.Api.Tests.Migrations.066_courier_withdrawal_history_read_audit.sql",
             "Mono.Api.Tests.Migrations.067_courier_payout_destination_history_read_audit.sql",
-            "Mono.Api.Tests.Migrations.068_courier_withdrawal_operations_search_audit.sql"
+            "Mono.Api.Tests.Migrations.068_courier_withdrawal_operations_search_audit.sql",
+            "Mono.Api.Tests.Migrations.069_courier_payout_ledger_integrity.sql"
         })
         {
             await using var stream = typeof(CourierWithdrawalTests).Assembly.GetManifestResourceStream(resourceName)

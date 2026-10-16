@@ -558,6 +558,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 175 provides an audited, cursor-paginated operations view of payout destination verification/revocation and secret-access events, returning only masked IBANs.
 - Sprint 176 adds a courier-scoped, keyset-paginated read of posted available-ledger entries, covering both mission earning credits and completed payout debits.
 - Sprint 177 adds an audited operations search across all withdrawal states, with optional status/courier filters and filter-bound keyset cursors.
+- Sprint 178 makes PostgreSQL verify that a payout references a paid withdrawal and contains exactly the requested courier debit and matching Mono clearing credit.
 
 ### E17.1 Event Envelope
 - event ID
