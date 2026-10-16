@@ -3,6 +3,7 @@ using Npgsql;
 using NpgsqlTypes;
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Mono.Api.Persistence;
@@ -125,7 +126,7 @@ public sealed class PostgresWebhookDeliveryHistoryRepository(NpgsqlDataSource da
         {
             await transaction.CommitAsync(cancellationToken);
             return new WebhookDeliveryReplayResult(
-                await FindAsync(customerId, priorReplayId, cancellationToken), null, true);
+                (await FindAsync(customerId, priorReplayId, cancellationToken))?.Delivery, null, true);
         }
 
         if (status != "DEAD_LETTERED")
@@ -195,7 +196,7 @@ public sealed class PostgresWebhookDeliveryHistoryRepository(NpgsqlDataSource da
         }
         await transaction.CommitAsync(cancellationToken);
         return new WebhookDeliveryReplayResult(
-            await FindAsync(customerId, replayDeliveryId, cancellationToken), null, false);
+            (await FindAsync(customerId, replayDeliveryId, cancellationToken))?.Delivery, null, false);
     }
 
     public async Task<WebhookDeliveryHistoryPage> ListAsync(
