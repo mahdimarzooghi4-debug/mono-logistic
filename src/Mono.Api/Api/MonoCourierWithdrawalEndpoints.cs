@@ -13,6 +13,11 @@ public sealed record CourierPayoutDestinationVerificationInput(
 public sealed record CourierPayoutDestinationStatusResponse(
     [property: JsonPropertyName("destination_status")] string DestinationStatus,
     [property: JsonPropertyName("masked_iban")] string? MaskedIban);
+public sealed record CourierDailyWithdrawalQuotaResponse(
+    [property: JsonPropertyName("daily_limit")] long DailyLimit,
+    [property: JsonPropertyName("used_today")] long UsedToday,
+    [property: JsonPropertyName("remaining_today")] long RemainingToday,
+    [property: JsonPropertyName("resets_at")] DateTimeOffset ResetsAt);
 public sealed record CourierWithdrawalCreateInput(
     [property: JsonPropertyName("amount_toman")] long AmountToman);
 public sealed record CourierWithdrawalDecisionInput(
@@ -111,6 +116,22 @@ public static class MonoCourierWithdrawalEndpoints
                         courier.CourierId, cancellationToken);
                     return Results.Ok(new CourierPayoutDestinationStatusResponse(
                         result.OutcomeCode, result.MaskedIban));
+                })
+            .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
+
+        endpoints.MapGet("/courier/v1/finance/withdrawal-quota",
+                async Task<IResult> (
+                    IMonoCourierContext courier,
+                    HttpContext httpContext,
+                    PostgresCourierWithdrawalService service,
+                    TimeProvider timeProvider,
+                    CancellationToken cancellationToken) =>
+                {
+                    httpContext.Response.Headers.CacheControl = "no-store";
+                    var quota = await service.GetDailyWithdrawalQuotaAsync(
+                        courier.CourierId, timeProvider.GetUtcNow(), cancellationToken);
+                    return Results.Ok(new CourierDailyWithdrawalQuotaResponse(
+                        quota.DailyLimit, quota.UsedToday, quota.RemainingToday, quota.ResetsAt));
                 })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 

@@ -296,6 +296,11 @@ public sealed class CourierWithdrawalTests
             var dailyLimit = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
                 "withdraw-004", now.AddMinutes(7), CancellationToken.None);
             Assert.Equal("DAILY_LIMIT_REACHED", dailyLimit.OutcomeCode);
+            var todayQuota = await withdrawals.GetDailyWithdrawalQuotaAsync(
+                courierId, now.AddMinutes(7), CancellationToken.None);
+            Assert.Equal(3L, todayQuota.DailyLimit);
+            Assert.Equal(3L, todayQuota.UsedToday);
+            Assert.Equal(0L, todayQuota.RemainingToday);
 
             var historyReader = new PostgresCourierWithdrawalHistoryReadService(dataSource, operations);
             var paidHistory = await historyReader.ReadAsync(
@@ -458,6 +463,16 @@ public sealed class CourierWithdrawalTests
             Assert.Equal("REQUESTED", boundaryOne.OutcomeCode);
             Assert.Equal("REQUESTED", boundaryTwo.OutcomeCode);
             Assert.Equal("REQUESTED", boundaryThree.OutcomeCode);
+            var newDayQuota = await withdrawals.GetDailyWithdrawalQuotaAsync(
+                courierId, nextTehranDayStart.AddMinutes(3), CancellationToken.None);
+            Assert.Equal(3L, newDayQuota.DailyLimit);
+            Assert.Equal(3L, newDayQuota.UsedToday);
+            Assert.Equal(0L, newDayQuota.RemainingToday);
+            var followingLocalMidnight = DateTime.SpecifyKind(
+                new DateTime(2026, 10, 18, 0, 0, 0), DateTimeKind.Unspecified);
+            var expectedReset = new DateTimeOffset(
+                TimeZoneInfo.ConvertTimeToUtc(followingLocalMidnight, tehran));
+            Assert.Equal(expectedReset, newDayQuota.ResetsAt);
 
             var boundaryReplay = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
                 "boundary-001", nextTehranDayStart.AddMinutes(3), CancellationToken.None);
