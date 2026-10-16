@@ -541,6 +541,8 @@ Courier Net = 89% of Mission Fare
 
 ## 19. Epic E17 — Webhooks & Events
 
+- Sprint 161 adds tenant-scoped webhook endpoint registration through `POST /v1/webhook-endpoints`, HTTPS/event validation, a dedicated `webhooks.manage` API-key scope, and AES-256-GCM protected signing secrets. Outbound delivery, retry history, endpoint disablement, and connection-time DNS/SSRF controls remain follow-on work.
+
 ### E17.1 Event Envelope
 - event ID
 - version
