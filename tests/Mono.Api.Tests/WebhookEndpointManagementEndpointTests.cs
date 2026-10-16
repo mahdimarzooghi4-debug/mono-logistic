@@ -158,8 +158,11 @@ public sealed class WebhookEndpointManagementEndpointTests
                  {
                      "Mono.Api.Tests.Migrations.001_customer_branch.sql",
                      "Mono.Api.Tests.Migrations.002_customer_api_keys.sql",
+                     "Mono.Api.Tests.Migrations.003_delivery_request_intake.sql",
+                     "Mono.Api.Tests.Migrations.018_promise_commit.sql",
                      "Mono.Api.Tests.Migrations.054_webhook_endpoint_registry.sql",
-                     "Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql"
+                     "Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql",
+                     "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)

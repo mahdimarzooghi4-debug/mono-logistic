@@ -26,7 +26,7 @@ public static class WebhookEndpointValidator
         var errors = new List<string>();
         if (!Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var uri) ||
             !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
-            string.IsNullOrWhiteSpace(uri.Host) || uri.UserInfo.Length > 0 ||
+            uri.Port != 443 || string.IsNullOrWhiteSpace(uri.Host) || uri.UserInfo.Length > 0 ||
             uri.Fragment.Length > 0 || uri.Query.Length > 0 || uri.AbsoluteUri.Length > 2048)
         {
             errors.Add("WEBHOOK_URL_INVALID");
@@ -109,6 +109,19 @@ public sealed class WebhookSecretProtector
 
     public string Unprotect(string protectedValue)
     {
+        var plaintext = UnprotectBytes(protectedValue);
+        try
+        {
+            return new UTF8Encoding(false, true).GetString(plaintext);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plaintext);
+        }
+    }
+
+    public byte[] UnprotectBytes(string protectedValue)
+    {
         if (!IsConfigured)
             throw new InvalidOperationException("Webhook secret protection is not configured.");
 
@@ -122,14 +135,15 @@ public sealed class WebhookSecretProtector
             throw new CryptographicException("The protected webhook secret dimensions are invalid.");
         var plaintext = new byte[ciphertext.Length];
         using var aes = new AesGcm(_key, tag.Length);
-        aes.Decrypt(nonce, ciphertext, tag, plaintext);
         try
         {
-            return new UTF8Encoding(false, true).GetString(plaintext);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            return plaintext;
         }
-        finally
+        catch
         {
             CryptographicOperations.ZeroMemory(plaintext);
+            throw;
         }
     }
 }
