@@ -552,6 +552,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 169 adds paginated, audited operations audit-history inspection.
 - Sprint 170 adds race-safe, idempotent, audited cancellation for queued webhook deliveries.
 - Sprint 171 adds a double-entry, append-only courier earning ledger, atomic delivery-completion posting under the approved 89% rule, and a courier-scoped available-balance API.
+- Sprint 172 exposes the authenticated courier's immutable mission earning history with bounded keyset pagination over ledger entries; withdrawal and payout remain separate policy-backed work.
 
 ### E17.1 Event Envelope
 - event ID
