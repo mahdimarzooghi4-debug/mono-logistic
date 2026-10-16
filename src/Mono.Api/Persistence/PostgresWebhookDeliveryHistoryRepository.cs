@@ -1,6 +1,8 @@
 using Mono.Api.Domain;
 using Npgsql;
 using NpgsqlTypes;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 
 namespace Mono.Api.Persistence;
@@ -12,6 +14,7 @@ public sealed record WebhookDeliveryHistoryItem(
     [property: JsonPropertyName("event_type")] string EventType,
     [property: JsonPropertyName("status")] string Status,
     [property: JsonPropertyName("attempt_count")] int AttemptCount,
+    [property: JsonPropertyName("replay_generation")] int ReplayGeneration,
     [property: JsonPropertyName("last_http_status")] int? LastHttpStatus,
     [property: JsonPropertyName("last_error_code")] string? LastErrorCode,
     [property: JsonPropertyName("created_at")] DateTimeOffset CreatedAt,
@@ -34,8 +37,167 @@ public sealed record WebhookDeliveryHistoryPage(
     IReadOnlyList<WebhookDeliveryHistoryItem> Items,
     string? NextCursor);
 
+public sealed record WebhookDeliveryReplayResult(
+    WebhookDeliveryHistoryItem? Delivery,
+    string? ErrorCode,
+    bool AlreadyRequested);
+
 public sealed class PostgresWebhookDeliveryHistoryRepository(NpgsqlDataSource dataSource)
 {
+    public async Task<WebhookDeliveryReplayResult> ReplayAsync(
+        string customerId,
+        string originalDeliveryId,
+        string idempotencyKey,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        const string endpointLookupSql = """
+            SELECT endpoint_id FROM webhook_deliveries
+            WHERE customer_id = @customer_id AND delivery_id = @delivery_id;
+            """;
+        string? endpointId;
+        await using (var command = new NpgsqlCommand(endpointLookupSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            command.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, originalDeliveryId);
+            endpointId = (string?)await command.ExecuteScalarAsync(cancellationToken);
+        }
+        if (endpointId is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new WebhookDeliveryReplayResult(null, "NOT_FOUND", false);
+        }
+
+        const string endpointSql = """
+            SELECT status FROM webhook_endpoints
+            WHERE customer_id = @customer_id AND endpoint_id = @endpoint_id
+            FOR UPDATE;
+            """;
+        string? endpointStatus;
+        await using (var command = new NpgsqlCommand(endpointSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            command.Parameters.AddWithValue("endpoint_id", NpgsqlDbType.Text, endpointId);
+            endpointStatus = (string?)await command.ExecuteScalarAsync(cancellationToken);
+        }
+
+        const string originalSql = """
+            SELECT event_id, event_type, status, payload
+            FROM webhook_deliveries
+            WHERE customer_id = @customer_id AND delivery_id = @delivery_id
+            FOR UPDATE;
+            """;
+        string eventId;
+        string eventType;
+        string status;
+        string payload;
+        await using (var command = new NpgsqlCommand(originalSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            command.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, originalDeliveryId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new WebhookDeliveryReplayResult(null, "NOT_FOUND", false);
+            }
+            eventId = reader.GetString(0);
+            eventType = reader.GetString(1);
+            status = reader.GetString(2);
+            payload = reader.GetString(3);
+        }
+
+        const string priorRequestSql = """
+            SELECT replay_delivery_id
+            FROM webhook_delivery_replay_requests
+            WHERE original_delivery_id = @original_delivery_id AND idempotency_key = @idempotency_key;
+            """;
+        string? priorReplayId;
+        await using (var command = new NpgsqlCommand(priorRequestSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("original_delivery_id", NpgsqlDbType.Text, originalDeliveryId);
+            command.Parameters.AddWithValue("idempotency_key", NpgsqlDbType.Text, idempotencyKey);
+            priorReplayId = (string?)await command.ExecuteScalarAsync(cancellationToken);
+        }
+        if (priorReplayId is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new WebhookDeliveryReplayResult(
+                await FindAsync(customerId, priorReplayId, cancellationToken), null, true);
+        }
+
+        if (status != "DEAD_LETTERED")
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new WebhookDeliveryReplayResult(null, "NOT_REPLAYABLE", false);
+        }
+
+        if (endpointStatus != "ACTIVE")
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new WebhookDeliveryReplayResult(null, "ENDPOINT_DISABLED", false);
+        }
+
+        const string generationSql = """
+            SELECT COALESCE(MAX(replay_generation), 0)
+            FROM webhook_deliveries
+            WHERE customer_id = @customer_id AND endpoint_id = @endpoint_id AND event_id = @event_id;
+            """;
+        int generation;
+        await using (var command = new NpgsqlCommand(generationSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            command.Parameters.AddWithValue("endpoint_id", NpgsqlDbType.Text, endpointId);
+            command.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, eventId);
+            generation = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) + 1;
+        }
+        if (generation > 3)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new WebhookDeliveryReplayResult(null, "REPLAY_LIMIT_REACHED", false);
+        }
+
+        var replayDeliveryId = CreateReplayDeliveryId(eventId, endpointId, generation);
+        const string insertDeliverySql = """
+            INSERT INTO webhook_deliveries (
+                delivery_id, endpoint_id, customer_id, event_id, event_type, payload, status,
+                attempt_count, next_attempt_at, created_at, replay_generation)
+            VALUES (@delivery_id, @endpoint_id, @customer_id, @event_id, @event_type, @payload,
+                'PENDING', 0, @now, @now, @generation);
+            """;
+        await using (var command = new NpgsqlCommand(insertDeliverySql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, replayDeliveryId);
+            command.Parameters.AddWithValue("endpoint_id", NpgsqlDbType.Text, endpointId);
+            command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+            command.Parameters.AddWithValue("event_id", NpgsqlDbType.Text, eventId);
+            command.Parameters.AddWithValue("event_type", NpgsqlDbType.Text, eventType);
+            command.Parameters.AddWithValue("payload", NpgsqlDbType.Jsonb, payload);
+            command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
+            command.Parameters.AddWithValue("generation", NpgsqlDbType.Integer, generation);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        const string insertRequestSql = """
+            INSERT INTO webhook_delivery_replay_requests (
+                original_delivery_id, idempotency_key, replay_delivery_id, created_at)
+            VALUES (@original_delivery_id, @idempotency_key, @replay_delivery_id, @created_at);
+            """;
+        await using (var command = new NpgsqlCommand(insertRequestSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("original_delivery_id", NpgsqlDbType.Text, originalDeliveryId);
+            command.Parameters.AddWithValue("idempotency_key", NpgsqlDbType.Text, idempotencyKey);
+            command.Parameters.AddWithValue("replay_delivery_id", NpgsqlDbType.Text, replayDeliveryId);
+            command.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, now);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+        return new WebhookDeliveryReplayResult(
+            await FindAsync(customerId, replayDeliveryId, cancellationToken), null, false);
+    }
+
     public async Task<WebhookDeliveryHistoryPage> ListAsync(
         string customerId,
         int limit,
@@ -47,7 +209,7 @@ public sealed class PostgresWebhookDeliveryHistoryRepository(NpgsqlDataSource da
         CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT delivery_id, endpoint_id, event_id, event_type, status, attempt_count,
+            SELECT delivery_id, endpoint_id, event_id, event_type, status, attempt_count, replay_generation,
                    last_http_status, last_error_code, created_at, last_attempt_at,
                    next_attempt_at, completed_at
             FROM webhook_deliveries
@@ -93,7 +255,7 @@ public sealed class PostgresWebhookDeliveryHistoryRepository(NpgsqlDataSource da
         CancellationToken cancellationToken)
     {
         const string deliverySql = """
-            SELECT delivery_id, endpoint_id, event_id, event_type, status, attempt_count,
+            SELECT delivery_id, endpoint_id, event_id, event_type, status, attempt_count, replay_generation,
                    last_http_status, last_error_code, created_at, last_attempt_at,
                    next_attempt_at, completed_at
             FROM webhook_deliveries
@@ -136,9 +298,15 @@ public sealed class PostgresWebhookDeliveryHistoryRepository(NpgsqlDataSource da
 
     private static WebhookDeliveryHistoryItem ReadItem(NpgsqlDataReader reader) => new(
         reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
-        reader.GetString(4), reader.GetInt32(5), reader.IsDBNull(6) ? null : reader.GetInt32(6),
-        reader.IsDBNull(7) ? null : reader.GetString(7), reader.GetFieldValue<DateTimeOffset>(8),
-        reader.IsDBNull(9) ? null : reader.GetFieldValue<DateTimeOffset>(9),
+        reader.GetString(4), reader.GetInt32(5), reader.GetInt32(6), reader.IsDBNull(7) ? null : reader.GetInt32(7),
+        reader.IsDBNull(8) ? null : reader.GetString(8), reader.GetFieldValue<DateTimeOffset>(9),
         reader.IsDBNull(10) ? null : reader.GetFieldValue<DateTimeOffset>(10),
-        reader.IsDBNull(11) ? null : reader.GetFieldValue<DateTimeOffset>(11));
+        reader.IsDBNull(11) ? null : reader.GetFieldValue<DateTimeOffset>(11),
+        reader.IsDBNull(12) ? null : reader.GetFieldValue<DateTimeOffset>(12));
+
+    private static string CreateReplayDeliveryId(string eventId, string endpointId, int generation)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{eventId}:{endpointId}:replay:{generation}"));
+        return "whd_" + Convert.ToHexString(bytes.AsSpan(0, 16)).ToLowerInvariant();
+    }
 }
