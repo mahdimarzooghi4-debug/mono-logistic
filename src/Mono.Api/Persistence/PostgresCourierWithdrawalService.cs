@@ -9,6 +9,7 @@ using NpgsqlTypes;
 namespace Mono.Api.Persistence;
 
 public sealed record CourierPayoutDestination(string DestinationId, string MaskedIban);
+public sealed record CourierPayoutDestinationSecretResult(string OutcomeCode, string? Iban, string? MaskedIban);
 public sealed record CourierWithdrawalItem(
     string WithdrawalId,
     string CourierId,
@@ -129,6 +130,77 @@ public sealed class PostgresCourierWithdrawalService(
             "VERIFIED", actorId, idempotencyKey, requestHash, evidenceReference, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new CourierWithdrawalWriteResult("VERIFIED", null, false);
+    }
+
+    public async Task<CourierPayoutDestinationSecretResult> ReadDestinationForOperationsAsync(
+        string courierId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var actorId = operationsContext.ActorId;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        if (!await LockCourierAsync(connection, transaction, courierId, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new CourierPayoutDestinationSecretResult("NOT_FOUND", null, null);
+        }
+
+        if (!ibanProtector.IsConfigured)
+        {
+            await InsertDestinationAccessAuditAsync(connection, transaction, courierId, null,
+                actorId, "KEY_UNAVAILABLE", now, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new CourierPayoutDestinationSecretResult("KEY_UNAVAILABLE", null, null);
+        }
+
+        const string sql = """
+            SELECT destination.destination_id, destination.encrypted_iban, destination.masked_iban
+            FROM courier_payout_destinations destination
+            JOIN LATERAL (
+                SELECT action FROM courier_payout_destination_events
+                WHERE destination_id = destination.destination_id
+                ORDER BY destination_event_sequence DESC LIMIT 1
+            ) latest ON latest.action = 'VERIFIED'
+            WHERE destination.courier_id = @courier_id
+            ORDER BY destination.created_at DESC LIMIT 1;
+            """;
+        string? destinationId = null;
+        string? encryptedIban = null;
+        string? maskedIban = null;
+        await using (var command = new NpgsqlCommand(sql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                destinationId = reader.GetString(0);
+                encryptedIban = reader.GetString(1);
+                maskedIban = reader.GetString(2);
+            }
+        }
+        if (destinationId is null || encryptedIban is null || maskedIban is null)
+        {
+            await InsertDestinationAccessAuditAsync(connection, transaction, courierId, null,
+                actorId, "NOT_FOUND", now, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new CourierPayoutDestinationSecretResult("NOT_FOUND", null, null);
+        }
+
+        string iban;
+        try
+        {
+            iban = ibanProtector.Unprotect(courierId, encryptedIban);
+        }
+        catch (CryptographicException)
+        {
+            await InsertDestinationAccessAuditAsync(connection, transaction, courierId, destinationId,
+                actorId, "DECRYPTION_FAILED", now, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new CourierPayoutDestinationSecretResult("DECRYPTION_FAILED", null, maskedIban);
+        }
+        await InsertDestinationAccessAuditAsync(connection, transaction, courierId, destinationId,
+            actorId, "ACCESS_GRANTED", now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new CourierPayoutDestinationSecretResult("ACCESS_GRANTED", iban, maskedIban);
     }
 
     public async Task<CourierWithdrawalWriteResult> CreateWithdrawalAsync(
@@ -578,6 +650,26 @@ public sealed class PostgresCourierWithdrawalService(
         return await reader.ReadAsync(cancellationToken)
             ? (reader.GetString(0), reader.GetString(1))
             : null;
+    }
+
+    private static async Task InsertDestinationAccessAuditAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, string courierId,
+        string? destinationId, string actorId, string outcome, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            INSERT INTO courier_payout_destination_access_audit
+                (access_audit_id, courier_id, destination_id, actor_id, outcome_code, occurred_at)
+            VALUES (@audit_id, @courier_id, @destination_id, @actor_id, @outcome, @occurred_at);
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, "cpa_" + Guid.NewGuid().ToString("N"));
+        command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+        command.Parameters.AddWithValue("destination_id", NpgsqlDbType.Text, destinationId ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+        command.Parameters.AddWithValue("outcome", NpgsqlDbType.Text, outcome);
+        command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, now);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task InsertDestinationEventAsync(
