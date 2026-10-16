@@ -8,7 +8,7 @@ public static class WebhookOperationsEndpoints
 {
     private static readonly HashSet<string> AuditActions = new(StringComparer.Ordinal)
     {
-        "QUEUE_SUMMARY", "QUEUE_SEARCH", "DELIVERY_DETAIL", "DELIVERY_REPLAY", "AUDIT_HISTORY_READ"
+        "QUEUE_SUMMARY", "QUEUE_SEARCH", "DELIVERY_DETAIL", "DELIVERY_REPLAY", "DELIVERY_CANCEL", "AUDIT_HISTORY_READ"
     };
 
     private static readonly HashSet<string> Statuses = new(StringComparer.Ordinal)
@@ -153,6 +153,36 @@ public static class WebhookOperationsEndpoints
                 };
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost("/operations/v1/webhook-deliveries/{deliveryId}/cancel", async Task<IResult> (
+                string deliveryId,
+                HttpRequest request,
+                PostgresWebhookOperationsReadService service,
+                TimeProvider timeProvider,
+                CancellationToken cancellationToken) =>
+            {
+                if (!IsDeliveryId(deliveryId))
+                    return Results.NotFound();
+                var idempotencyValues = request.Headers["Idempotency-Key"];
+                var idempotencyKey = idempotencyValues.Count == 1 ? idempotencyValues[0] : null;
+                if (idempotencyKey is null || !IsValidIdempotencyKey(idempotencyKey))
+                    return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                        "INVALID_IDEMPOTENCY_KEY", "A valid Idempotency-Key header is required.")));
+
+                var result = await service.CancelDeliveryAsync(deliveryId, idempotencyKey,
+                    timeProvider.GetUtcNow(), cancellationToken);
+                return result.OutcomeCode switch
+                {
+                    "CANCELLED" or "ALREADY_CANCELLED" => Results.Ok(new WebhookDeliveryCancellationResponse(
+                        deliveryId, result.OutcomeCode, result.AlreadyRequested)),
+                    "NOT_FOUND" => Results.NotFound(),
+                    "NOT_CANCELLABLE" => Results.Conflict(new ApiErrorResponse(new ApiError(
+                        "WEBHOOK_DELIVERY_NOT_CANCELLABLE",
+                        "Only pending or retrying deliveries without an active worker lease can be cancelled."))),
+                    _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError)
+                };
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
         return endpoints;
     }
 
@@ -171,3 +201,8 @@ public static class WebhookOperationsEndpoints
     private static bool IsValidIdempotencyKey(string value) => value.Length is > 0 and <= 128 &&
         value.All(character => character is >= '!' and <= '~');
 }
+
+public sealed record WebhookDeliveryCancellationResponse(
+    [property: System.Text.Json.Serialization.JsonPropertyName("delivery_id")] string DeliveryId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("outcome_code")] string OutcomeCode,
+    [property: System.Text.Json.Serialization.JsonPropertyName("already_requested")] bool AlreadyRequested);
