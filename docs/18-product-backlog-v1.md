@@ -547,6 +547,11 @@ Courier Net = 89% of Mission Fare
 - Sprint 164 exposes tenant-scoped delivery history and detail APIs, filter-bound keyset pagination, and immutable attempt timelines without returning endpoint URLs, payload bodies, or secrets.
 - Sprint 165 adds idempotent manual replay for dead-lettered deliveries, with separate delivery generations, append-only replay request records, an active-endpoint gate, and a three-replay limit.
 - Sprint 166 exposes a privileged aggregate queue-health API for internal operations dashboards and audits reads with the authenticated administrator identity.
+- Sprint 167 adds filterable operations delivery search and detail.
+- Sprint 168 adds idempotent administrator replay for dead-lettered deliveries.
+- Sprint 169 adds paginated, audited operations audit-history inspection.
+- Sprint 170 adds race-safe, idempotent, audited cancellation for queued webhook deliveries.
+- Sprint 171 adds a double-entry, append-only courier earning ledger, atomic delivery-completion posting under the approved 89% rule, and a courier-scoped available-balance API.
 
 ### E17.1 Event Envelope
 - event ID
