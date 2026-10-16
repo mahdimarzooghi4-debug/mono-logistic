@@ -351,19 +351,15 @@ public sealed class PostgresCourierWithdrawalService(
             FROM courier_withdrawal_requests request
             JOIN latest ON latest.withdrawal_id = request.withdrawal_id
             JOIN courier_payout_destinations destination ON destination.destination_id = request.destination_id
-            WHERE (@courier_id IS NULL OR request.courier_id = @courier_id)
-              AND (@operations = TRUE OR latest.withdrawal_event_sequence < COALESCE(@before_sequence, 9223372036854775807))
-              AND (@operations = FALSE OR @before_sequence IS NULL OR latest.withdrawal_event_sequence < @before_sequence)
+            WHERE ((@operations = TRUE AND latest.action IN ('REQUESTED', 'PROCESSING')) OR
+                   (@operations = FALSE AND request.courier_id = @courier_id))
+              AND (@before_sequence IS NULL OR latest.withdrawal_event_sequence < @before_sequence)
             ORDER BY latest.withdrawal_event_sequence DESC
             LIMIT @take;
             """;
-        // Operations queue includes only requests still awaiting an operator decision.
-        var query = operations ? sql.Replace(
-            "WHERE (@courier_id IS NULL OR request.courier_id = @courier_id)",
-            "WHERE latest.action IN ('REQUESTED', 'PROCESSING')", StringComparison.Ordinal) : sql;
         var items = new List<CourierWithdrawalItem>();
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(query, connection);
+        await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId is null ? DBNull.Value : courierId);
         command.Parameters.AddWithValue("operations", NpgsqlDbType.Boolean, operations);
         command.Parameters.AddWithValue("before_sequence", NpgsqlDbType.Bigint,
