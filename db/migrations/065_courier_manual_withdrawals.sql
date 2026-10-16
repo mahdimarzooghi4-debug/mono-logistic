@@ -99,6 +99,105 @@ CREATE INDEX IF NOT EXISTS courier_withdrawal_events_history_idx
 CREATE INDEX IF NOT EXISTS courier_withdrawal_events_queue_idx
     ON courier_withdrawal_events (action, withdrawal_event_sequence DESC);
 
+CREATE OR REPLACE FUNCTION validate_courier_withdrawal_event_transition()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+DECLARE
+    previous_action text;
+    previous_actor_type text;
+BEGIN
+    SELECT action, actor_type INTO previous_action, previous_actor_type
+    FROM courier_withdrawal_events
+    WHERE withdrawal_id = NEW.withdrawal_id
+      AND withdrawal_event_sequence < NEW.withdrawal_event_sequence
+    ORDER BY withdrawal_event_sequence DESC
+    LIMIT 1;
+
+    IF previous_action IS NULL THEN
+        IF NEW.action <> 'REQUESTED' OR NEW.actor_type <> 'COURIER' THEN
+            RAISE EXCEPTION 'courier withdrawal must begin with a courier request';
+        END IF;
+    ELSIF NOT (
+        (previous_action = 'REQUESTED' AND
+            ((NEW.action = 'PROCESSING' AND NEW.actor_type = 'OPERATIONS') OR
+             (NEW.action = 'REJECTED' AND NEW.actor_type = 'OPERATIONS'))) OR
+        (previous_action = 'PROCESSING' AND
+            ((NEW.action = 'PAID' AND NEW.actor_type = 'OPERATIONS') OR
+             (NEW.action = 'REJECTED' AND NEW.actor_type = 'OPERATIONS')))
+    ) THEN
+        RAISE EXCEPTION 'courier withdrawal status transition is invalid';
+    END IF;
+
+    IF NEW.action = 'PAID' AND NOT EXISTS (
+        SELECT 1 FROM ledger_transactions
+        WHERE reference_type = 'WITHDRAWAL_PAYOUT' AND reference_id = NEW.withdrawal_id
+    ) THEN
+        RAISE EXCEPTION 'paid courier withdrawal requires a payout ledger transaction';
+    END IF;
+    RETURN NULL;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION require_initial_courier_withdrawal_event()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM courier_withdrawal_events
+        WHERE withdrawal_id = NEW.withdrawal_id
+          AND action = 'REQUESTED' AND actor_type = 'COURIER'
+    ) THEN
+        RAISE EXCEPTION 'courier withdrawal requires an initial request event';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM courier_payout_destination_events
+        WHERE destination_id = NEW.destination_id AND action = 'VERIFIED'
+          AND destination_event_sequence = (
+              SELECT MAX(destination_event_sequence)
+              FROM courier_payout_destination_events
+              WHERE destination_id = NEW.destination_id)
+    ) THEN
+        RAISE EXCEPTION 'courier withdrawal requires a currently verified payout destination';
+    END IF;
+    RETURN NULL;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION require_paid_withdrawal_event_for_payout()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+    IF NEW.reference_type = 'WITHDRAWAL_PAYOUT' AND NOT EXISTS (
+        SELECT 1 FROM courier_withdrawal_events
+        WHERE withdrawal_id = NEW.reference_id AND action = 'PAID' AND actor_type = 'OPERATIONS'
+    ) THEN
+        RAISE EXCEPTION 'payout ledger transaction requires an operator payment event';
+    END IF;
+    RETURN NULL;
+END;
+$;
+
+DROP TRIGGER IF EXISTS courier_withdrawal_transition_check ON courier_withdrawal_events;
+CREATE CONSTRAINT TRIGGER courier_withdrawal_transition_check
+    AFTER INSERT ON courier_withdrawal_events
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION validate_courier_withdrawal_event_transition();
+
+DROP TRIGGER IF EXISTS courier_withdrawal_initial_event_check ON courier_withdrawal_requests;
+CREATE CONSTRAINT TRIGGER courier_withdrawal_initial_event_check
+    AFTER INSERT ON courier_withdrawal_requests
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION require_initial_courier_withdrawal_event();
+
+DROP TRIGGER IF EXISTS courier_payout_operator_event_check ON ledger_transactions;
+CREATE CONSTRAINT TRIGGER courier_payout_operator_event_check
+    AFTER INSERT ON ledger_transactions
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION require_paid_withdrawal_event_for_payout();
+
 CREATE OR REPLACE FUNCTION reject_courier_finance_history_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
