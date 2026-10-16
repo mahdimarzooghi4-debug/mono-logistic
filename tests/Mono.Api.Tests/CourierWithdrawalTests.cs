@@ -195,6 +195,54 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal(operations.ActorId, reader.GetString(2));
                 Assert.False(await reader.ReadAsync());
             }
+
+            var destinationAuditReader = new PostgresCourierPayoutDestinationAuditReadService(dataSource, operations);
+            var firstAuditPage = await destinationAuditReader.ReadAsync(
+                courierId, 1, null, now.AddMinutes(10), CancellationToken.None);
+            Assert.Equal("FOUND", firstAuditPage.OutcomeCode);
+            Assert.Single(firstAuditPage.Items);
+            Assert.Equal("SECRET_ACCESS", firstAuditPage.Items[0].EventType);
+            Assert.Equal("ACCESS_GRANTED", firstAuditPage.Items[0].OutcomeCode);
+            Assert.Equal("IR********************9012", firstAuditPage.Items[0].MaskedIban);
+            Assert.NotNull(firstAuditPage.NextCursor);
+
+            var secondAuditPage = await destinationAuditReader.ReadAsync(
+                courierId, 1, firstAuditPage.NextCursor, now.AddMinutes(11), CancellationToken.None);
+            Assert.Equal("FOUND", secondAuditPage.OutcomeCode);
+            Assert.Single(secondAuditPage.Items);
+            Assert.Equal("DESTINATION", secondAuditPage.Items[0].EventType);
+            Assert.Equal("VERIFIED", secondAuditPage.Items[0].Action);
+            Assert.Equal("case:bank-proof-001", secondAuditPage.Items[0].EvidenceReference);
+            Assert.Equal("IR********************9012", secondAuditPage.Items[0].MaskedIban);
+            Assert.Null(secondAuditPage.NextCursor);
+
+            var emptyCourierAudit = await destinationAuditReader.ReadAsync(
+                "crr_22222222222222222222222222222222", 50, null, now.AddMinutes(12), CancellationToken.None);
+            Assert.Equal("NOT_FOUND", emptyCourierAudit.OutcomeCode);
+            Assert.Empty(emptyCourierAudit.Items);
+
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT outcome_code, result_count, actor_id
+                FROM courier_payout_destination_history_read_audit
+                ORDER BY occurred_at, read_audit_id;
+                """, connection))
+            await using (var reader = await audit.ExecuteReaderAsync())
+            {
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("FOUND", reader.GetString(0));
+                Assert.Equal(1, reader.GetInt32(1));
+                Assert.Equal(operations.ActorId, reader.GetString(2));
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("FOUND", reader.GetString(0));
+                Assert.Equal(1, reader.GetInt32(1));
+                Assert.Equal(operations.ActorId, reader.GetString(2));
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("NOT_FOUND", reader.GetString(0));
+                Assert.Equal(0, reader.GetInt32(1));
+                Assert.Equal(operations.ActorId, reader.GetString(2));
+                Assert.False(await reader.ReadAsync());
+            }
         }
         finally
         {
@@ -211,7 +259,8 @@ public sealed class CourierWithdrawalTests
         {
             "Mono.Api.Tests.Migrations.064_courier_earning_ledger.sql",
             "Mono.Api.Tests.Migrations.065_courier_manual_withdrawals.sql",
-            "Mono.Api.Tests.Migrations.066_courier_withdrawal_history_read_audit.sql"
+            "Mono.Api.Tests.Migrations.066_courier_withdrawal_history_read_audit.sql",
+            "Mono.Api.Tests.Migrations.067_courier_payout_destination_history_read_audit.sql"
         })
         {
             await using var stream = typeof(CourierWithdrawalTests).Assembly.GetManifestResourceStream(resourceName)
