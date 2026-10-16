@@ -6,6 +6,11 @@ namespace Mono.Api.Api;
 
 public static class WebhookOperationsEndpoints
 {
+    private static readonly HashSet<string> AuditActions = new(StringComparer.Ordinal)
+    {
+        "QUEUE_SUMMARY", "QUEUE_SEARCH", "DELIVERY_DETAIL", "DELIVERY_REPLAY", "AUDIT_HISTORY_READ"
+    };
+
     private static readonly HashSet<string> Statuses = new(StringComparer.Ordinal)
     {
         "PENDING", "IN_PROGRESS", "RETRYING", "SUCCEEDED", "DEAD_LETTERED", "CANCELLED"
@@ -61,6 +66,43 @@ public static class WebhookOperationsEndpoints
                     normalizedEventType, normalizedStatus, beforeCreatedAt, beforeDeliveryId,
                     timeProvider.GetUtcNow(), cancellationToken);
                 return Results.Ok(new WebhookDeliveryHistoryResponse(page.Items, page.NextCursor));
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet("/operations/v1/webhook-deliveries/audit", async Task<IResult> (
+                PostgresWebhookOperationsReadService service,
+                TimeProvider timeProvider,
+                int? limit,
+                string? actor_id,
+                string? action,
+                string? cursor,
+                CancellationToken cancellationToken) =>
+            {
+                var pageSize = limit ?? 50;
+                var normalizedActorId = string.IsNullOrWhiteSpace(actor_id) ? null : actor_id.Trim();
+                var normalizedAction = string.IsNullOrWhiteSpace(action) ? null : action.Trim().ToUpperInvariant();
+                if (pageSize is < 1 or > 100 ||
+                    (normalizedActorId is not null && (normalizedActorId.Length > 128 ||
+                        normalizedActorId.Any(char.IsControl))) ||
+                    (normalizedAction is not null && !AuditActions.Contains(normalizedAction)))
+                    return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                        "INVALID_WEBHOOK_AUDIT_FILTER", "Webhook operations audit filters are invalid.")));
+
+                DateTimeOffset? beforeOccurredAt = null;
+                string? beforeAuditId = null;
+                if (cursor is not null)
+                {
+                    if (!WebhookOperationsAuditCursor.TryDecode(cursor, normalizedActorId, normalizedAction,
+                            out var decodedAt, out var decodedId))
+                        return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                            "INVALID_CURSOR", "The webhook operations audit cursor is invalid for these filters.")));
+                    beforeOccurredAt = decodedAt;
+                    beforeAuditId = decodedId;
+                }
+
+                var page = await service.ListAuditAsync(pageSize, normalizedActorId, normalizedAction,
+                    beforeOccurredAt, beforeAuditId, timeProvider.GetUtcNow(), cancellationToken);
+                return Results.Ok(page);
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
