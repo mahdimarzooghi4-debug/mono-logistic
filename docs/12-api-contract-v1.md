@@ -432,6 +432,15 @@ Webhook URLs must be validated and secrets generated securely.
 
 Endpoint registration requires the `webhooks.manage` customer API-key scope. Mono returns the generated signing secret only in the creation response; persistence stores an AES-256-GCM encrypted value under a separately configured `Mono:WebhookEncryptionKey` (base64-encoded 32-byte key). Registration fails with `503` if that key is not configured. Only HTTPS DNS hostnames are accepted; IP literals, local-only hostnames, URL credentials, query strings, fragments, unsupported events, and duplicate event names are rejected. The eventual sender must validate resolved addresses and disable redirects at connection time.
 
+The endpoint registry also supports:
+
+- `GET /v1/webhook-endpoints?limit=50&cursor=...` — tenant-scoped keyset pagination; `limit` is 1–100 and the opaque cursor comes from the previous page's `next_cursor`.
+- `GET /v1/webhook-endpoints/{endpoint_id}` — tenant-scoped endpoint metadata. Responses never include the signing secret or ciphertext.
+- `POST /v1/webhook-endpoints/{endpoint_id}/disable` — disable an endpoint; repeating the request is safe and returns the disabled metadata.
+- `POST /v1/webhook-endpoints/{endpoint_id}/rotate-secret` — replace an active endpoint's signing secret. The new value is returned once; disabled endpoints return `409`, and missing encryption configuration returns `503`.
+
+Create, disable, and secret-rotation actions are written with append-only lifecycle history. These management APIs do not activate outbound event delivery.
+
 ## 17. Webhook Security
 
 Recommended:

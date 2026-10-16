@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Mono.Api.Domain;
+using Mono.Api.Persistence;
 using Mono.Api.Security;
 using Xunit;
 
@@ -71,5 +72,19 @@ public sealed class WebhookEndpointContractTests
     {
         Assert.Contains("webhooks.manage", Mono.Api.Security.MonoApiKeyScopeCatalog.All);
         Assert.True(Mono.Api.Security.MonoApiKeyScopeCatalog.IsSupported("webhooks.manage"));
+    }
+
+    [Fact]
+    public void Endpoint_list_cursor_round_trips_precise_tenant_ordering_key_and_rejects_invalid_values()
+    {
+        var createdAt = new DateTimeOffset(2026, 10, 16, 9, 25, 46, TimeSpan.Zero).AddTicks(1234560);
+        const string endpointId = "whk_0123456789abcdef0123456789abcdef";
+        var cursor = WebhookEndpointCursor.Encode(createdAt, endpointId);
+
+        Assert.True(WebhookEndpointCursor.TryDecode(cursor, out var decodedAt, out var decodedId));
+        Assert.Equal(createdAt, decodedAt);
+        Assert.Equal(endpointId, decodedId);
+        Assert.False(WebhookEndpointCursor.TryDecode("not-a-cursor", out _, out _));
+        Assert.False(WebhookEndpointCursor.TryDecode(Convert.ToBase64String("1|invalid"u8.ToArray()), out _, out _));
     }
 }
