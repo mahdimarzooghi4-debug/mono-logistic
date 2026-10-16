@@ -7,14 +7,14 @@ namespace Mono.Api.Tests;
 public sealed class WebhookEndpointContractTests
 {
     [Theory]
-    [InlineData("https://hooks.customer.example/mono", true)]
-    [InlineData("http://hooks.customer.example/mono", false)]
+    [InlineData("https://hooks.customer.com/mono", true)]
+    [InlineData("http://hooks.customer.com/mono", false)]
     [InlineData("https://localhost/mono", false)]
     [InlineData("https://127.0.0.1/hook", false)]
     [InlineData("https://service.internal/hook", false)]
-    [InlineData("https://user@hooks.customer.example/hook", false)]
-    [InlineData("https://hooks.customer.example/hook#fragment", false)]
-    [InlineData("https://hooks.customer.example/hook?token=secret", false)]
+    [InlineData("https://user@hooks.customer.com/hook", false)]
+    [InlineData("https://hooks.customer.com/hook#fragment", false)]
+    [InlineData("https://hooks.customer.com/hook?token=secret", false)]
     public void Endpoint_url_validation_is_https_and_rejects_local_or_ambiguous_targets(string url, bool valid)
     {
         var result = WebhookEndpointValidator.Validate(url, ["mission.delivered"]);
@@ -25,9 +25,9 @@ public sealed class WebhookEndpointContractTests
     [Fact]
     public void Event_validation_rejects_unknown_duplicate_and_empty_subscriptions()
     {
-        Assert.NotEmpty(WebhookEndpointValidator.Validate("https://hooks.customer.example", ["mission.unknown"]));
-        Assert.NotEmpty(WebhookEndpointValidator.Validate("https://hooks.customer.example", ["mission.delivered", "mission.delivered"]));
-        Assert.NotEmpty(WebhookEndpointValidator.Validate("https://hooks.customer.example", []));
+        Assert.NotEmpty(WebhookEndpointValidator.Validate("https://hooks.customer.com", ["mission.unknown"]));
+        Assert.NotEmpty(WebhookEndpointValidator.Validate("https://hooks.customer.com", ["mission.delivered", "mission.delivered"]));
+        Assert.NotEmpty(WebhookEndpointValidator.Validate("https://hooks.customer.com", []));
     }
 
     [Fact]
