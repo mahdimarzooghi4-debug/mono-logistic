@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Mono.Api.Domain;
 using Mono.Api.Security;
 using Npgsql;
 using NpgsqlTypes;
@@ -18,6 +19,19 @@ public sealed record WebhookOperationsQueueSummary(
     [property: JsonPropertyName("dead_lettered_last_24_hours")] long DeadLetteredLast24Hours,
     [property: JsonPropertyName("oldest_open_delivery_at")] DateTimeOffset? OldestOpenDeliveryAt,
     [property: JsonPropertyName("observed_at")] DateTimeOffset ObservedAt);
+
+public sealed record WebhookOperationsAuditItem(
+    [property: JsonPropertyName("audit_id")] string AuditId,
+    [property: JsonPropertyName("actor_id")] string ActorId,
+    [property: JsonPropertyName("action")] string Action,
+    [property: JsonPropertyName("result_count")] long ResultCount,
+    [property: JsonPropertyName("resource_id")] string? ResourceId,
+    [property: JsonPropertyName("outcome_code")] string? OutcomeCode,
+    [property: JsonPropertyName("occurred_at")] DateTimeOffset OccurredAt);
+
+public sealed record WebhookOperationsAuditPage(
+    [property: JsonPropertyName("items")] IReadOnlyList<WebhookOperationsAuditItem> Items,
+    [property: JsonPropertyName("next_cursor")] string? NextCursor);
 
 public sealed class PostgresWebhookOperationsReadService(
     NpgsqlDataSource dataSource,
@@ -89,6 +103,52 @@ public sealed class PostgresWebhookOperationsReadService(
         var actorId = RequireAdministrator();
         return await deliveryHistory.ReplayForOperationsAsync(deliveryId, idempotencyKey, actorId, now,
             cancellationToken);
+    }
+
+    public async Task<WebhookOperationsAuditPage> ListAuditAsync(
+        int limit, string? actorId, string? action, DateTimeOffset? beforeOccurredAt,
+        string? beforeAuditId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var operationsActorId = RequireAdministrator();
+        const string sql = """
+            SELECT audit_id, actor_id, action, result_count, resource_id, outcome_code, occurred_at
+            FROM webhook_operations_read_audit
+            WHERE (@actor_id_filter IS NULL OR actor_id = @actor_id_filter)
+              AND (@action_filter IS NULL OR action = @action_filter)
+              AND (@before_occurred_at IS NULL OR
+                   (occurred_at, audit_id) < (@before_occurred_at, @before_audit_id))
+            ORDER BY occurred_at DESC, audit_id DESC
+            LIMIT @limit;
+            """;
+        var items = new List<WebhookOperationsAuditItem>();
+        await using (var connection = await dataSource.OpenConnectionAsync(cancellationToken))
+        await using (var command = new NpgsqlCommand(sql, connection))
+        {
+            command.Parameters.AddWithValue("actor_id_filter", NpgsqlDbType.Text, (object?)actorId ?? DBNull.Value);
+            command.Parameters.AddWithValue("action_filter", NpgsqlDbType.Text, (object?)action ?? DBNull.Value);
+            command.Parameters.AddWithValue("before_occurred_at", NpgsqlDbType.TimestampTz,
+                (object?)beforeOccurredAt ?? DBNull.Value);
+            command.Parameters.AddWithValue("before_audit_id", NpgsqlDbType.Text,
+                (object?)beforeAuditId ?? DBNull.Value);
+            command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit + 1);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                items.Add(new WebhookOperationsAuditItem(reader.GetString(0), reader.GetString(1),
+                    reader.GetString(2), reader.GetInt64(3), reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetFieldValue<DateTimeOffset>(6)));
+        }
+
+        string? nextCursor = null;
+        if (items.Count > limit)
+        {
+            items.RemoveAt(items.Count - 1);
+            var last = items[^1];
+            nextCursor = WebhookOperationsAuditCursor.Encode(last.OccurredAt, last.AuditId, actorId, action);
+        }
+
+        await WriteAuditAsync(operationsActorId, "AUDIT_HISTORY_READ", items.Count, null, now,
+            cancellationToken);
+        return new WebhookOperationsAuditPage(items, nextCursor);
     }
 
     private async Task WriteAuditAsync(string actorId, string action, long resultCount, string? resourceId,
