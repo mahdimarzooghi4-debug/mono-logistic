@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
+using Mono.Api.Security;
 using Npgsql;
 using NpgsqlTypes;
 using Xunit;
@@ -13,6 +14,50 @@ namespace Mono.Api.Tests;
 [Collection("Mono PostgreSQL")]
 public sealed class WebhookDeliveryRepositoryTests
 {
+    [Fact]
+    public async Task Operations_queue_summary_is_role_checked_and_audited_immutably()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return;
+
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ApplyMigrationsAsync(dataSource);
+        var actorId = "ops_" + Guid.NewGuid().ToString("N");
+        var service = new PostgresWebhookOperationsReadService(dataSource,
+            new TestOperationsContext(actorId, [MonoOperationsRoles.Administrator]));
+        var summary = await service.GetQueueSummaryAsync(DateTimeOffset.UtcNow, CancellationToken.None);
+        Assert.Equal(summary.TotalCount,
+            summary.PendingCount + summary.InProgressCount + summary.RetryingCount + summary.SucceededCount +
+            summary.DeadLetteredCount + summary.CancelledCount);
+        Assert.True(summary.DueCount <= summary.PendingCount + summary.RetryingCount);
+        Assert.True(summary.StaleLeaseCount <= summary.InProgressCount);
+
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var audit = new NpgsqlCommand("""
+            SELECT action, result_count FROM webhook_operations_read_audit WHERE actor_id = @actor_id;
+            """, connection);
+        audit.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+        await using (var reader = await audit.ExecuteReaderAsync())
+        {
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("QUEUE_SUMMARY", reader.GetString(0));
+            Assert.Equal(summary.TotalCount, reader.GetInt64(1));
+            Assert.False(await reader.ReadAsync());
+        }
+
+        await using var mutate = new NpgsqlCommand("""
+            UPDATE webhook_operations_read_audit SET action = 'QUEUE_SUMMARY' WHERE actor_id = @actor_id;
+            """, connection);
+        mutate.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+        await Assert.ThrowsAsync<PostgresException>(() => mutate.ExecuteNonQueryAsync());
+
+        var denied = new PostgresWebhookOperationsReadService(dataSource,
+            new TestOperationsContext(actorId, []));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            denied.GetQueueSummaryAsync(DateTimeOffset.UtcNow, CancellationToken.None));
+    }
+
     [Fact]
     public async Task Outbox_fanout_is_idempotent_payloads_are_redacted_and_retry_history_is_append_only()
     {
@@ -191,7 +236,8 @@ public sealed class WebhookDeliveryRepositoryTests
                      "Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql",
                      "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql",
                      "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql",
-                     "Mono.Api.Tests.Migrations.058_webhook_delivery_replay.sql"
+                     "Mono.Api.Tests.Migrations.058_webhook_delivery_replay.sql",
+                     "Mono.Api.Tests.Migrations.059_webhook_operations_read_audit.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
@@ -202,5 +248,12 @@ public sealed class WebhookDeliveryRepositoryTests
             await using var command = new NpgsqlCommand(sql, connection);
             await command.ExecuteNonQueryAsync();
         }
+    }
+
+    private sealed class TestOperationsContext(string actorId, IReadOnlyCollection<string> roles)
+        : IMonoOperationsContext
+    {
+        public string ActorId => actorId;
+        public IReadOnlyCollection<string> Roles => roles;
     }
 }
