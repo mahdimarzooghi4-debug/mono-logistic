@@ -91,6 +91,23 @@ public sealed class CourierWithdrawalTests
                 Assert.DoesNotContain(iban, reader.GetString(1), StringComparison.Ordinal);
             }
 
+            var destinationRead = await withdrawals.ReadDestinationForOperationsAsync(
+                courierId, now.AddMinutes(1), CancellationToken.None);
+            Assert.Equal("ACCESS_GRANTED", destinationRead.OutcomeCode);
+            Assert.Equal(iban, destinationRead.Iban);
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT outcome_code, actor_id, destination_id
+                FROM courier_payout_destination_access_audit;
+                """, connection))
+            await using (var reader = await audit.ExecuteReaderAsync())
+            {
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("ACCESS_GRANTED", reader.GetString(0));
+                Assert.Equal(operations.ActorId, reader.GetString(1));
+                Assert.False(reader.IsDBNull(2));
+            }
+
             var request = await withdrawals.CreateWithdrawalAsync(courierId, 30_000,
                 "withdraw-001", now, CancellationToken.None);
             Assert.Equal("REQUESTED", request.OutcomeCode);
