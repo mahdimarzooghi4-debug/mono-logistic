@@ -125,6 +125,17 @@ public static class MonoCourierWithdrawalEndpoints
                 })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
+        endpoints.MapGet("/courier/v1/finance/withdrawals/{withdrawalId}", async Task<IResult> (
+                string withdrawalId,
+                IMonoCourierContext courier,
+                PostgresCourierWithdrawalService service,
+                CancellationToken cancellationToken) =>
+            {
+                var item = await service.FindForCourierAsync(courier.CourierId, withdrawalId, cancellationToken);
+                return item is null ? Results.NotFound() : Results.Ok(ToCourierResponse(item));
+            })
+            .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
+
         endpoints.MapGet("/courier/v1/finance/withdrawals", async Task<IResult> (
                 IMonoCourierContext courier,
                 PostgresCourierWithdrawalService service,
