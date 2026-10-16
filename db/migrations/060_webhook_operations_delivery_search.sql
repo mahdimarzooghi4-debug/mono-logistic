@@ -1,4 +1,7 @@
 -- Expand privileged webhook reads with auditable queue searches and delivery detail access.
+CREATE INDEX IF NOT EXISTS webhook_deliveries_operations_history_idx
+    ON webhook_deliveries (created_at DESC, delivery_id DESC);
+
 ALTER TABLE webhook_operations_read_audit
     ADD COLUMN IF NOT EXISTS resource_id text;
 
