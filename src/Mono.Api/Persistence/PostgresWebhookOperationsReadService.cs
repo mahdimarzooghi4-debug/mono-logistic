@@ -105,6 +105,14 @@ public sealed class PostgresWebhookOperationsReadService(
             cancellationToken);
     }
 
+    public async Task<WebhookDeliveryCancellationResult> CancelDeliveryAsync(
+        string deliveryId, string idempotencyKey, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var actorId = RequireAdministrator();
+        return await deliveryHistory.CancelForOperationsAsync(deliveryId, idempotencyKey, actorId, now,
+            cancellationToken);
+    }
+
     public async Task<WebhookOperationsAuditPage> ListAuditAsync(
         int limit, string? actorId, string? action, DateTimeOffset? beforeOccurredAt,
         string? beforeAuditId, DateTimeOffset now, CancellationToken cancellationToken)
