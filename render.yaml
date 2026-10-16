@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: mono-api-staging
+    runtime: docker
+    plan: free
+    branch: sprint-160-staging-readiness
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: false
+    healthCheckPath: /health/ready
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Staging
+      - key: MONO_AUTO_MIGRATE
+        value: "true"
+      - key: ConnectionStrings__Mono
+        fromDatabase:
+          name: mono-stage-db
+          property: connectionString
+
+databases:
+  - name: mono-stage-db
+    databaseName: mono_stage
+    user: mono_stage
+    plan: free
+    ipAllowList: []

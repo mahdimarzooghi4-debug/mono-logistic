@@ -1,13 +1,16 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Npgsql;
 using Mono.Api.Api;
 using Mono.Api.Domain;
+using Mono.Api.Health;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
 using Mono.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks()
+    .AddCheck<MonoPostgresHealthCheck>("postgres", tags: ["ready"]);
 builder.Services.AddMonoCustomerTenantAuthorization();
 builder.Services.AddMonoApiKeyAuthentication(builder.Configuration);
 builder.Services.AddMonoOperationsAuthentication(builder.Configuration);
@@ -98,10 +101,9 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// These endpoints report process readiness only. Dependency checks will be added
-// alongside the corresponding infrastructure integration.
-app.MapHealthChecks("/health/live");
-app.MapHealthChecks("/health/ready");
+// Liveness is process-only; readiness includes registered infrastructure dependencies.
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapMissionConfirmationEndpoints();
