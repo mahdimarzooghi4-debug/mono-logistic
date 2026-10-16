@@ -436,55 +436,53 @@ public sealed class CourierWithdrawalTests
                     (destination_id, courier_id, encrypted_iban, iban_fingerprint, masked_iban, created_at)
                 VALUES ('cpd_22222222222222222222222222222222',
                         'crr_22222222222222222222222222222222',
-                        'v1:YWJj:ZGVm:Z2hp', repeat('a', 64), 'IR********************2222', @now);
+                        'v1:YWJj:ZGVm:Z2hp', repeat('a', 64), 'IR********************2222', TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 INSERT INTO courier_payout_destination_events
                     (destination_id, courier_id, action, actor_id, idempotency_key, request_hash,
                      evidence_reference, occurred_at)
                 VALUES ('cpd_22222222222222222222222222222222',
                         'crr_22222222222222222222222222222222', 'VERIFIED', 'ops_legacy',
-                        'legacy-verify', repeat('b', 64), 'case:legacy-proof', @now);
+                        'legacy-verify', repeat('b', 64), 'case:legacy-proof', TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 INSERT INTO courier_withdrawal_requests
                     (withdrawal_id, courier_id, destination_id, amount_toman,
                      idempotency_key, request_hash, created_at)
                 VALUES ('wdr_22222222222222222222222222222222',
                         'crr_22222222222222222222222222222222',
                         'cpd_22222222222222222222222222222222', 1000,
-                        'legacy-request', repeat('c', 64), @now);
+                        'legacy-request', repeat('c', 64), TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 INSERT INTO courier_withdrawal_events
                     (withdrawal_id, action, actor_type, actor_id, idempotency_key, request_hash, occurred_at)
                 VALUES ('wdr_22222222222222222222222222222222', 'REQUESTED', 'COURIER',
-                        'crr_22222222222222222222222222222222', 'legacy-request-event', repeat('d', 64), @now);
+                        'crr_22222222222222222222222222222222', 'legacy-request-event', repeat('d', 64), TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 INSERT INTO courier_withdrawal_events
                     (withdrawal_id, action, actor_type, actor_id, idempotency_key, request_hash, occurred_at)
                 VALUES ('wdr_22222222222222222222222222222222', 'PROCESSING', 'OPERATIONS',
-                        'ops_legacy', 'legacy-processing', repeat('e', 64), @now);
+                        'ops_legacy', 'legacy-processing', repeat('e', 64), TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 INSERT INTO courier_withdrawal_events
                     (withdrawal_id, action, actor_type, actor_id, idempotency_key, request_hash,
                      bank_reference, occurred_at)
                 VALUES ('wdr_22222222222222222222222222222222', 'PAID', 'OPERATIONS',
-                        'ops_legacy', 'legacy-paid', repeat('f', 64), 'bank:legacy-222', @now);
+                        'ops_legacy', 'legacy-paid', repeat('f', 64), 'bank:legacy-222', TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 INSERT INTO ledger_accounts
                     (ledger_account_id, owner_type, owner_id, account_code, currency, created_at)
                 VALUES ('lac_22222222222222222222222222222222', 'COURIER',
-                        'crr_22222222222222222222222222222222', 'COURIER_AVAILABLE', 'TOMAN', @now),
+                        'crr_22222222222222222222222222222222', 'COURIER_AVAILABLE', 'TOMAN', TIMESTAMPTZ '2026-10-16 10:00:00+00'),
                        ('lac_33333333333333333333333333333333', 'MONO',
-                        'mono', 'MONO_PAYOUT_CLEARING', 'TOMAN', @now);
+                        'mono', 'MONO_PAYOUT_CLEARING', 'TOMAN', TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 INSERT INTO ledger_transactions
                     (ledger_transaction_id, reference_type, reference_id, idempotency_key,
                      currency, occurred_at, created_at)
                 VALUES ('ltx_22222222222222222222222222222222', 'WITHDRAWAL_PAYOUT',
                         'wdr_22222222222222222222222222222222', 'legacy-payout:222',
-                        'TOMAN', @now, @now);
+                        'TOMAN', TIMESTAMPTZ '2026-10-16 10:00:00+00', TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 INSERT INTO ledger_entries
                     (ledger_transaction_id, ledger_account_id, debit_amount, credit_amount, created_at)
                 VALUES ('ltx_22222222222222222222222222222222',
-                        'lac_22222222222222222222222222222222', 999, 0, @now),
+                        'lac_22222222222222222222222222222222', 999, 0, TIMESTAMPTZ '2026-10-16 10:00:00+00'),
                        ('ltx_22222222222222222222222222222222',
-                        'lac_33333333333333333333333333333333', 0, 999, @now);
+                        'lac_33333333333333333333333333333333', 0, 999, TIMESTAMPTZ '2026-10-16 10:00:00+00');
                 """, connection, transaction))
             {
-                seed.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz,
-                    new DateTimeOffset(2026, 10, 16, 10, 0, 0, TimeSpan.Zero));
                 await seed.ExecuteNonQueryAsync();
                 await transaction.CommitAsync();
             }
