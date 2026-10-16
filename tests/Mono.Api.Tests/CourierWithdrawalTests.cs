@@ -258,6 +258,49 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal(operations.ActorId, reader.GetString(2));
                 Assert.False(await reader.ReadAsync());
             }
+
+            var operationsSearch = new PostgresCourierWithdrawalOperationsSearchService(dataSource, operations);
+            var operationsPage1 = await operationsSearch.SearchAsync(
+                null, null, 1, null, now.AddMinutes(13), CancellationToken.None);
+            Assert.Single(operationsPage1.Items);
+            Assert.Equal(third.Withdrawal!.WithdrawalId, operationsPage1.Items[0].WithdrawalId);
+            Assert.Equal("REQUESTED", operationsPage1.Items[0].Status);
+            Assert.NotNull(operationsPage1.NextBeforeSequence);
+
+            var operationsPage2 = await operationsSearch.SearchAsync(
+                null, null, 1, operationsPage1.NextBeforeSequence, now.AddMinutes(14), CancellationToken.None);
+            Assert.Single(operationsPage2.Items);
+            Assert.Equal(second.Withdrawal!.WithdrawalId, operationsPage2.Items[0].WithdrawalId);
+            Assert.Equal("REJECTED", operationsPage2.Items[0].Status);
+            Assert.NotNull(operationsPage2.NextBeforeSequence);
+
+            var operationsPage3 = await operationsSearch.SearchAsync(
+                null, null, 1, operationsPage2.NextBeforeSequence, now.AddMinutes(15), CancellationToken.None);
+            Assert.Single(operationsPage3.Items);
+            Assert.Equal(request.Withdrawal.WithdrawalId, operationsPage3.Items[0].WithdrawalId);
+            Assert.Equal("PAID", operationsPage3.Items[0].Status);
+            Assert.Null(operationsPage3.NextBeforeSequence);
+
+            var paidOnly = await operationsSearch.SearchAsync(
+                "PAID", courierId, 50, null, now.AddMinutes(16), CancellationToken.None);
+            Assert.Single(paidOnly.Items);
+            Assert.Equal(request.Withdrawal.WithdrawalId, paidOnly.Items[0].WithdrawalId);
+
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT count(*), count(*) FILTER (
+                    WHERE status_filter = 'PAID' AND courier_id_filter = @courier_id AND result_count = 1),
+                    count(*) FILTER (WHERE cursor_sequence IS NOT NULL)
+                FROM courier_withdrawal_operations_search_audit;
+                """, connection))
+            {
+                audit.Parameters.AddWithValue("courier_id", courierId);
+                await using var reader = await audit.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(4L, reader.GetInt64(0));
+                Assert.Equal(1L, reader.GetInt64(1));
+                Assert.Equal(2L, reader.GetInt64(2));
+            }
         }
         finally
         {
@@ -275,7 +318,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.064_courier_earning_ledger.sql",
             "Mono.Api.Tests.Migrations.065_courier_manual_withdrawals.sql",
             "Mono.Api.Tests.Migrations.066_courier_withdrawal_history_read_audit.sql",
-            "Mono.Api.Tests.Migrations.067_courier_payout_destination_history_read_audit.sql"
+            "Mono.Api.Tests.Migrations.067_courier_payout_destination_history_read_audit.sql",
+            "Mono.Api.Tests.Migrations.068_courier_withdrawal_operations_search_audit.sql"
         })
         {
             await using var stream = typeof(CourierWithdrawalTests).Assembly.GetManifestResourceStream(resourceName)
