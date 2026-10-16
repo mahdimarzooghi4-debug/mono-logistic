@@ -108,9 +108,16 @@ public sealed class CourierWithdrawalTests
                 Assert.False(reader.IsDBNull(2));
             }
 
-            var request = await withdrawals.CreateWithdrawalAsync(courierId, 30_000,
-                "withdraw-001", now, CancellationToken.None);
-            Assert.Equal("REQUESTED", request.OutcomeCode);
+            var concurrentKeys = new[] { "withdraw-001-a", "withdraw-001-b" };
+            var concurrentRequests = await Task.WhenAll(concurrentKeys.Select(key =>
+                withdrawals.CreateWithdrawalAsync(courierId, 30_000, key, now, CancellationToken.None)));
+            var acceptedIndex = Array.FindIndex(concurrentRequests,
+                result => result.OutcomeCode == "REQUESTED");
+            Assert.InRange(acceptedIndex, 0, 1);
+            var rejectedIndex = 1 - acceptedIndex;
+            Assert.Equal("INSUFFICIENT_AVAILABLE_BALANCE", concurrentRequests[rejectedIndex].OutcomeCode);
+            var successfulKey = concurrentKeys[acceptedIndex];
+            var request = concurrentRequests[acceptedIndex];
             Assert.NotNull(request.Withdrawal);
             Assert.Equal("IR********************9012", request.Withdrawal.MaskedIban);
 
@@ -121,11 +128,11 @@ public sealed class CourierWithdrawalTests
             Assert.Equal(14_500L, reservedBalance.AvailableAmountToman);
 
             var replay = await withdrawals.CreateWithdrawalAsync(courierId, 30_000,
-                "withdraw-001", now.AddMinutes(1), CancellationToken.None);
+                successfulKey, now.AddMinutes(1), CancellationToken.None);
             Assert.True(replay.AlreadyRequested);
             Assert.Equal(request.Withdrawal!.WithdrawalId, replay.Withdrawal!.WithdrawalId);
             var conflict = await withdrawals.CreateWithdrawalAsync(courierId, 29_000,
-                "withdraw-001", now.AddMinutes(1), CancellationToken.None);
+                successfulKey, now.AddMinutes(1), CancellationToken.None);
             Assert.Equal("IDEMPOTENCY_CONFLICT", conflict.OutcomeCode);
 
             var processing = await withdrawals.TransitionAsync(request.Withdrawal.WithdrawalId,
