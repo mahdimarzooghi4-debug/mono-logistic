@@ -62,6 +62,9 @@ public sealed class WebhookEndpointManagementEndpointTests
         Assert.Contains(endpointId, listJson, StringComparison.Ordinal);
         Assert.DoesNotContain(originalSecret, listJson, StringComparison.Ordinal);
         Assert.DoesNotContain("secret_ciphertext", listJson, StringComparison.OrdinalIgnoreCase);
+        using var otherListResponse = await otherClient.GetAsync("/v1/webhook-endpoints?limit=1");
+        Assert.Equal(HttpStatusCode.OK, otherListResponse.StatusCode);
+        Assert.DoesNotContain(endpointId, await otherListResponse.Content.ReadAsStringAsync(), StringComparison.Ordinal);
 
         using var detailResponse = await ownerClient.GetAsync(path);
         Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
