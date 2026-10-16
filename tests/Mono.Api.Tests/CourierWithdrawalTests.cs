@@ -406,6 +406,22 @@ public sealed class CourierWithdrawalTests
                 Assert.False(await reader.ReadAsync());
             }
 
+            var fromAt = now.AddMinutes(2);
+            var toAt = now.AddMinutes(7);
+            var courierWithdrawalPage1 = await withdrawals.ListForCourierAsync(
+                courierId, 1, null, CancellationToken.None, fromAt, toAt);
+            Assert.Single(courierWithdrawalPage1.Items);
+            Assert.Equal(second.Withdrawal.WithdrawalId, courierWithdrawalPage1.Items[0].WithdrawalId);
+            Assert.NotNull(courierWithdrawalPage1.NextBeforeSequence);
+            var courierWithdrawalPage2 = await withdrawals.ListForCourierAsync(
+                courierId, 1, courierWithdrawalPage1.NextBeforeSequence, CancellationToken.None, fromAt, toAt);
+            Assert.Single(courierWithdrawalPage2.Items);
+            Assert.Equal(third.Withdrawal!.WithdrawalId, courierWithdrawalPage2.Items[0].WithdrawalId);
+            Assert.Null(courierWithdrawalPage2.NextBeforeSequence);
+            var emptyCourierWithdrawalWindow = await withdrawals.ListForCourierAsync(
+                courierId, 50, null, CancellationToken.None, now.AddMinutes(7), now.AddMinutes(9));
+            Assert.Empty(emptyCourierWithdrawalWindow.Items);
+
             var operationsSearch = new PostgresCourierWithdrawalOperationsSearchService(dataSource, operations);
             var operationsPage1 = await operationsSearch.SearchAsync(
                 null, null, 1, null, now.AddMinutes(13), CancellationToken.None);
