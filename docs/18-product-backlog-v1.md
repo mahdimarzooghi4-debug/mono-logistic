@@ -416,6 +416,7 @@ max_missions_per_route = 5
 - Sprint 156 binds accepted DeliveryRequest coordinate pairs to deterministic opaque pickup/drop-off route location IDs and seeds them into the catalog. Address-only inputs report pending coordinates without invoking an unconfigured geocoder.
 - Sprint 157 adds evidence-gated initialization of a Route's first immutable plan version. It simulates the explicit start-to-pickup and pickup-to-drop-off legs against pickup readiness, dwell, service times, and the committed Promise before persistence.
 - Sprint 158 exposes protected Route plan initialization and current/historical immutable version reads through the MFA-gated operations API; writes remain behind the existing trusted-evidence and simulation orchestration.
+- Sprint 159 composes active-route inventory, effective Zone capacity, and route-insertion evidence with the other supplied E7.1 results through the existing feasibility gate. Zone mismatches remain unresolved; no capacity threshold or freshness policy is inferred.
 - A registered maps provider and trusted signer, an address geocoding workflow, route lifecycle APIs, capacity and Zone checks, broader feasibility-gate integration, Mission/Promise orchestration, and dispatch authorization remain open. This insertion path is not overall feasibility or dispatch authorization.
 
 ## 14. Epic E12 — Pickup & Handoff
