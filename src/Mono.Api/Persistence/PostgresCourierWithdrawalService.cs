@@ -190,7 +190,7 @@ public sealed class PostgresCourierWithdrawalService(
         {
             iban = ibanProtector.Unprotect(courierId, encryptedIban);
         }
-        catch (Exception exception) when (exception is CryptographicException or FormatException)
+        catch (Exception exception) when (exception is CryptographicException or FormatException or DecoderFallbackException)
         {
             await InsertDestinationAccessAuditAsync(connection, transaction, courierId, destinationId,
                 actorId, "DECRYPTION_FAILED", now, cancellationToken);
