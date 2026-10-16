@@ -35,15 +35,15 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
         string courierId, int limit, long? beforeEntryId, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT transaction.reference_id, entry.credit_amount, transaction.occurred_at,
+            SELECT ledger_tx.reference_id, entry.credit_amount, ledger_tx.occurred_at,
                    entry.ledger_entry_id
             FROM ledger_accounts account
             JOIN ledger_entries entry ON entry.ledger_account_id = account.ledger_account_id
-            JOIN ledger_transactions transaction
-              ON transaction.ledger_transaction_id = entry.ledger_transaction_id
+            JOIN ledger_transactions ledger_tx
+              ON ledger_tx.ledger_transaction_id = entry.ledger_transaction_id
             WHERE account.owner_type = 'COURIER' AND account.owner_id = @courier_id
               AND account.account_code = 'COURIER_AVAILABLE' AND account.currency = 'TOMAN'
-              AND transaction.reference_type = 'MISSION_EARNING'
+              AND ledger_tx.reference_type = 'MISSION_EARNING'
               AND entry.credit_amount > 0
               AND (@before_entry_id IS NULL OR entry.ledger_entry_id < @before_entry_id)
             ORDER BY entry.ledger_entry_id DESC
