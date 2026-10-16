@@ -40,6 +40,7 @@ builder.Services.AddSingleton(services => WebhookDeliveryHttpClientFactory.Creat
 builder.Services.AddSingleton<IWebhookDeliveryTransport, WebhookHttpDeliveryTransport>();
 builder.Services.AddScoped<PostgresWebhookDeliveryRepository>();
 builder.Services.AddScoped<PostgresWebhookDeliveryHistoryRepository>();
+builder.Services.AddScoped<PostgresWebhookOperationsReadService>();
 builder.Services.AddScoped<WebhookDeliveryDispatcher>();
 builder.Services.AddHostedService<WebhookDeliveryBackgroundService>();
 builder.Services.AddScoped<PostgresCourierOperationsReadAuditService>();
@@ -118,6 +119,7 @@ app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapWebhookEndpointEndpoints();
 app.MapWebhookDeliveryHistoryEndpoints();
+app.MapWebhookOperationsEndpoints();
 app.MapMissionConfirmationEndpoints();
 app.MapMonoMissionLifecycleEndpoints();
 app.MapMissionCancellationEndpoints();
