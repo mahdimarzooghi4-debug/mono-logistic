@@ -321,7 +321,7 @@ public sealed class WebhookDeliveryRepositoryTests
         Assert.Equal("REPLAY_LIMIT_REACHED", beyondLimit.ErrorCode);
         Assert.Null(await historyRepository.FindAsync("cus_ffffffffffffffffffffffffffffffff", first.DeliveryId,
             CancellationToken.None));
-        await ApplyMigrationsAsync(dataSource);
+        await ApplyCancellationMigrationAsync(dataSource);
     }
 
     [Fact]
@@ -375,6 +375,19 @@ public sealed class WebhookDeliveryRepositoryTests
             await using var command = new NpgsqlCommand(sql, connection);
             await command.ExecuteNonQueryAsync();
         }
+    }
+
+    private static async Task ApplyCancellationMigrationAsync(NpgsqlDataSource dataSource)
+    {
+        var assembly = typeof(WebhookDeliveryRepositoryTests).Assembly;
+        const string resourceName = "Mono.Api.Tests.Migrations.063_webhook_delivery_operations_cancel.sql";
+        await using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
+        using var reader = new StreamReader(stream);
+        var sql = await reader.ReadToEndAsync();
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync();
     }
 
     private sealed class TestOperationsContext(string actorId, IReadOnlyCollection<string> roles)
