@@ -8,8 +8,8 @@ Prevent the payout integrity rollout from silently accepting historical ledger r
 
 - Scan every existing `WITHDRAWAL_PAYOUT` before rollout completes.
 - Require an existing withdrawal, latest operator-recorded `PAID` event with bank reference, and exactly two matching TOMAN entries.
-- Abort the migration with the offending transaction ID when any legacy payout is inconsistent.
-- Keep the preflight reusable so operators can rerun it during remediation.
+- Install the reusable preflight function in one migration and execute it in the following migration.
+- Abort the integrity check with the offending transaction ID when any legacy payout is inconsistent, while retaining the function for remediation and retry.
 
 ## Validation
 

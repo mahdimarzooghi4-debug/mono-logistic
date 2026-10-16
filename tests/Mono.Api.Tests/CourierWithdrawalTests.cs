@@ -491,6 +491,15 @@ public sealed class CourierWithdrawalTests
                 () => ApplyMigrationAsync(dataSource));
             Assert.Contains("pre-existing payout ledger transaction violates courier payout integrity",
                 exception.MessageText, StringComparison.Ordinal);
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var functionCheck = new NpgsqlCommand("""
+                SELECT to_regprocedure(
+                    'assert_existing_courier_payout_ledger_integrity()') IS NOT NULL;
+                """, connection))
+            {
+                Assert.True((bool)(await functionCheck.ExecuteScalarAsync()
+                    ?? throw new InvalidOperationException("Preflight function check returned no result.")));
+            }
         }
         finally
         {
@@ -512,7 +521,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.067_courier_payout_destination_history_read_audit.sql",
             "Mono.Api.Tests.Migrations.068_courier_withdrawal_operations_search_audit.sql",
             "Mono.Api.Tests.Migrations.069_courier_payout_ledger_integrity.sql",
-            "Mono.Api.Tests.Migrations.070_courier_payout_legacy_integrity_preflight.sql"
+            "Mono.Api.Tests.Migrations.070_courier_payout_legacy_integrity_preflight.sql",
+            "Mono.Api.Tests.Migrations.071_courier_payout_legacy_integrity_check.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {

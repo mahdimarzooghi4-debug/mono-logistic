@@ -70,4 +70,3 @@ BEGIN
 END;
 $$;
 
-SELECT assert_existing_courier_payout_ledger_integrity();

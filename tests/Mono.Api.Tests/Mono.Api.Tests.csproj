@@ -89,5 +89,6 @@
     <EmbeddedResource Include="../../db/migrations/068_courier_withdrawal_operations_search_audit.sql" LogicalName="Mono.Api.Tests.Migrations.068_courier_withdrawal_operations_search_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/069_courier_payout_ledger_integrity.sql" LogicalName="Mono.Api.Tests.Migrations.069_courier_payout_ledger_integrity.sql" />
     <EmbeddedResource Include="../../db/migrations/070_courier_payout_legacy_integrity_preflight.sql" LogicalName="Mono.Api.Tests.Migrations.070_courier_payout_legacy_integrity_preflight.sql" />
+    <EmbeddedResource Include="../../db/migrations/071_courier_payout_legacy_integrity_check.sql" LogicalName="Mono.Api.Tests.Migrations.071_courier_payout_legacy_integrity_check.sql" />
   </ItemGroup>
 </Project>
