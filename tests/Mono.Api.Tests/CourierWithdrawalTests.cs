@@ -141,7 +141,31 @@ public sealed class CourierWithdrawalTests
             Assert.Equal(request.Withdrawal.WithdrawalId, ledgerPage.Items[0].ReferenceId);
             Assert.Equal(30_000L, ledgerPage.Items[0].DebitAmountToman);
             Assert.Equal(0L, ledgerPage.Items[0].CreditAmountToman);
+            Assert.Equal(30_000L, ledgerPage.TotalDebitAmountToman);
+            Assert.Equal(44_500L, ledgerPage.TotalCreditAmountToman);
             Assert.NotNull(ledgerPage.NextBeforeEntryId);
+
+            var rangedLedgerPage1 = await ledger.GetLedgerHistoryAsync(
+                courierId, 1, null, CancellationToken.None, now, now.AddMinutes(4));
+            Assert.Single(rangedLedgerPage1.Items);
+            Assert.Equal("WITHDRAWAL_PAYOUT", rangedLedgerPage1.Items[0].ReferenceType);
+            Assert.Equal(30_000L, rangedLedgerPage1.TotalDebitAmountToman);
+            Assert.Equal(44_500L, rangedLedgerPage1.TotalCreditAmountToman);
+            Assert.NotNull(rangedLedgerPage1.NextBeforeEntryId);
+            var rangedLedgerPage2 = await ledger.GetLedgerHistoryAsync(
+                courierId, 1, rangedLedgerPage1.NextBeforeEntryId, CancellationToken.None,
+                now, now.AddMinutes(4));
+            Assert.Single(rangedLedgerPage2.Items);
+            Assert.Equal("MISSION_EARNING", rangedLedgerPage2.Items[0].ReferenceType);
+            Assert.Equal(rangedLedgerPage1.TotalDebitAmountToman, rangedLedgerPage2.TotalDebitAmountToman);
+            Assert.Equal(rangedLedgerPage1.TotalCreditAmountToman, rangedLedgerPage2.TotalCreditAmountToman);
+            Assert.Null(rangedLedgerPage2.NextBeforeEntryId);
+
+            var payoutWindow = await ledger.GetLedgerHistoryAsync(
+                courierId, 50, null, CancellationToken.None, now.AddMinutes(1), now.AddMinutes(4));
+            Assert.Single(payoutWindow.Items);
+            Assert.Equal(30_000L, payoutWindow.TotalDebitAmountToman);
+            Assert.Equal(0L, payoutWindow.TotalCreditAmountToman);
             var earlierLedgerPage = await ledger.GetLedgerHistoryAsync(
                 courierId, 1, ledgerPage.NextBeforeEntryId, CancellationToken.None);
             Assert.Single(earlierLedgerPage.Items);
@@ -522,7 +546,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.068_courier_withdrawal_operations_search_audit.sql",
             "Mono.Api.Tests.Migrations.069_courier_payout_ledger_integrity.sql",
             "Mono.Api.Tests.Migrations.070_courier_payout_legacy_integrity_preflight.sql",
-            "Mono.Api.Tests.Migrations.071_courier_payout_legacy_integrity_check.sql"
+            "Mono.Api.Tests.Migrations.071_courier_payout_legacy_integrity_check.sql",
+            "Mono.Api.Tests.Migrations.072_courier_ledger_statement_index.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {

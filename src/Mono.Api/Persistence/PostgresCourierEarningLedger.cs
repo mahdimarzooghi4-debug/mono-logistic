@@ -1,3 +1,5 @@
+using System.Data;
+using System.Globalization;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -16,7 +18,8 @@ public sealed record CourierLedgerHistoryItem(
     DateTimeOffset OccurredAt, long LedgerEntryId);
 
 public sealed record CourierLedgerHistoryPage(
-    IReadOnlyList<CourierLedgerHistoryItem> Items, long? NextBeforeEntryId);
+    IReadOnlyList<CourierLedgerHistoryItem> Items, long? NextBeforeEntryId,
+    long TotalDebitAmountToman, long TotalCreditAmountToman);
 
 public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
 {
@@ -93,8 +96,14 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
     }
 
     public async Task<CourierLedgerHistoryPage> GetLedgerHistoryAsync(
-        string courierId, int limit, long? beforeEntryId, CancellationToken cancellationToken)
+        string courierId, int limit, long? beforeEntryId, CancellationToken cancellationToken,
+        DateTimeOffset? fromAt = null, DateTimeOffset? toAt = null)
     {
+        if (limit is < 1 or > 100 || beforeEntryId is <= 0 ||
+            fromAt.HasValue != toAt.HasValue ||
+            (fromAt.HasValue && fromAt.Value >= toAt!.Value))
+            throw new ArgumentOutOfRangeException(nameof(limit));
+
         const string sql = """
             SELECT ledger_tx.reference_type, ledger_tx.reference_id,
                    entry.debit_amount, entry.credit_amount, ledger_tx.occurred_at,
@@ -105,28 +114,67 @@ public sealed class PostgresCourierEarningLedger(NpgsqlDataSource dataSource)
               ON ledger_tx.ledger_transaction_id = entry.ledger_transaction_id
             WHERE account.owner_type = 'COURIER' AND account.owner_id = @courier_id
               AND account.account_code = 'COURIER_AVAILABLE' AND account.currency = 'TOMAN'
+              AND (@from_at IS NULL OR ledger_tx.occurred_at >= @from_at)
+              AND (@to_at IS NULL OR ledger_tx.occurred_at < @to_at)
               AND (@before_entry_id IS NULL OR entry.ledger_entry_id < @before_entry_id)
             ORDER BY entry.ledger_entry_id DESC
             LIMIT @take;
             """;
+        const string summarySql = """
+            SELECT COALESCE(SUM(entry.debit_amount), 0)::bigint,
+                   COALESCE(SUM(entry.credit_amount), 0)::bigint
+            FROM ledger_accounts account
+            JOIN ledger_entries entry ON entry.ledger_account_id = account.ledger_account_id
+            JOIN ledger_transactions ledger_tx
+              ON ledger_tx.ledger_transaction_id = entry.ledger_transaction_id
+            WHERE account.owner_type = 'COURIER' AND account.owner_id = @courier_id
+              AND account.account_code = 'COURIER_AVAILABLE' AND account.currency = 'TOMAN'
+              AND (@from_at IS NULL OR ledger_tx.occurred_at >= @from_at)
+              AND (@to_at IS NULL OR ledger_tx.occurred_at < @to_at);
+            """;
         var items = new List<CourierLedgerHistoryItem>();
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
-        command.Parameters.AddWithValue("before_entry_id", NpgsqlDbType.Bigint,
-            beforeEntryId.HasValue ? beforeEntryId.Value : DBNull.Value);
-        command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, checked(limit + 1));
-        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        await using var transaction = await connection.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead, cancellationToken);
+        await using (var command = new NpgsqlCommand(sql, connection, transaction))
         {
+            command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+            command.Parameters.AddWithValue("from_at", NpgsqlDbType.TimestampTz,
+                fromAt.HasValue ? fromAt.Value.ToUniversalTime() : DBNull.Value);
+            command.Parameters.AddWithValue("to_at", NpgsqlDbType.TimestampTz,
+                toAt.HasValue ? toAt.Value.ToUniversalTime() : DBNull.Value);
+            command.Parameters.AddWithValue("before_entry_id", NpgsqlDbType.Bigint,
+                beforeEntryId.HasValue ? beforeEntryId.Value : DBNull.Value);
+            command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, checked(limit + 1));
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
                 items.Add(new CourierLedgerHistoryItem(
                     reader.GetString(0), reader.GetString(1), reader.GetInt64(2), reader.GetInt64(3),
                     reader.GetFieldValue<DateTimeOffset>(4), reader.GetInt64(5)));
         }
+
+        long totalDebit;
+        long totalCredit;
+        await using (var command = new NpgsqlCommand(summarySql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+            command.Parameters.AddWithValue("from_at", NpgsqlDbType.TimestampTz,
+                fromAt.HasValue ? fromAt.Value.ToUniversalTime() : DBNull.Value);
+            command.Parameters.AddWithValue("to_at", NpgsqlDbType.TimestampTz,
+                toAt.HasValue ? toAt.Value.ToUniversalTime() : DBNull.Value);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+                throw new InvalidOperationException("Courier ledger summary query returned no result.");
+            totalDebit = reader.GetInt64(0);
+            totalCredit = reader.GetInt64(1);
+        }
+
         var hasMore = items.Count > limit;
         if (hasMore)
             items.RemoveAt(limit);
-        return new CourierLedgerHistoryPage(items, hasMore ? items[^1].LedgerEntryId : null);
+        await transaction.CommitAsync(cancellationToken);
+        return new CourierLedgerHistoryPage(
+            items, hasMore ? items[^1].LedgerEntryId : null, totalDebit, totalCredit);
     }
 
     public static async Task<bool> PostMissionEarningAsync(
