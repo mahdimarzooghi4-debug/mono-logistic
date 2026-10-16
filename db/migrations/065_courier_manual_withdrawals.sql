@@ -114,7 +114,7 @@ CREATE INDEX IF NOT EXISTS courier_withdrawal_events_queue_idx
 CREATE OR REPLACE FUNCTION validate_courier_withdrawal_event_transition()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $$
 DECLARE
     previous_action text;
     previous_actor_type text;
@@ -149,12 +149,12 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION require_initial_courier_withdrawal_event()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM courier_withdrawal_events
@@ -175,12 +175,12 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION require_paid_withdrawal_event_for_payout()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $$
 BEGIN
     IF NEW.reference_type = 'WITHDRAWAL_PAYOUT' AND NOT EXISTS (
         SELECT 1 FROM courier_withdrawal_events
@@ -190,7 +190,7 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS courier_withdrawal_transition_check ON courier_withdrawal_events;
 CREATE CONSTRAINT TRIGGER courier_withdrawal_transition_check
