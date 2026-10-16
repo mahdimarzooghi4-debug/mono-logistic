@@ -142,6 +142,7 @@ public sealed class PostgresWebhookEndpointRepository(NpgsqlDataSource dataSourc
             command.Parameters.AddWithValue("endpoint_id", NpgsqlDbType.Text, endpointId);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
+        await CancelQueuedDeliveriesAsync(connection, transaction, endpointId, occurredAt, cancellationToken);
         await AppendEventAsync(connection, transaction, endpointId, customerId, "DISABLED", occurredAt, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new WebhookEndpointMutationResult(current with { Status = "DISABLED" }, true);
@@ -202,6 +203,24 @@ public sealed class PostgresWebhookEndpointRepository(NpgsqlDataSource dataSourc
     private static StoredWebhookEndpoint ReadEndpoint(NpgsqlDataReader reader) => new(
         reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<string[]>(3),
         reader.GetString(4), reader.GetFieldValue<DateTimeOffset>(5));
+
+    private static async Task CancelQueuedDeliveriesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string endpointId,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            UPDATE webhook_deliveries
+            SET status = 'CANCELLED', completed_at = @occurred_at, lease_expires_at = NULL
+            WHERE endpoint_id = @endpoint_id AND status IN ('PENDING', 'RETRYING');
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, occurredAt);
+        command.Parameters.AddWithValue("endpoint_id", NpgsqlDbType.Text, endpointId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
 
     private static async Task AppendEventAsync(
         NpgsqlConnection connection,
