@@ -561,6 +561,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 178 makes PostgreSQL verify that a payout references a paid withdrawal and contains exactly the requested courier debit and matching Mono clearing credit.
 - Sprint 179 blocks the payout-integrity migration when historical payout rows do not satisfy the same settlement invariant.
 - Sprint 180 adds time-bounded courier ledger statements with stable, filter-bound pagination and period debit/credit totals.
+- Sprint 181 adds opening and closing posted balances to courier ledger statements so period movement can be reconciled without mixing pending reservations.
 
 ### E17.1 Event Envelope
 - event ID
