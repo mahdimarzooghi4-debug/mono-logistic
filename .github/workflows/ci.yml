@@ -41,6 +41,29 @@ jobs:
         run: dotnet restore Mono.sln
       - name: Build
         run: dotnet build Mono.sln --no-restore --configuration Release
+      - name: Validate database migrations
+        env:
+          ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_migration_test
+        run: |
+          PGPASSWORD=mono createdb --host=localhost --port=5432 --username=mono mono_migration_test
+          dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
+          dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
+      - name: Smoke test API health endpoints
+        env:
+          ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_migration_test
+        run: |
+          dotnet run --project src/Mono.Api/Mono.Api.csproj --configuration Release --no-build -- --urls http://127.0.0.1:5180 > /tmp/mono-api-health.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5180/health/live >/dev/null &&
+               curl --fail --silent http://127.0.0.1:5180/health/ready >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/mono-api-health.log
+          exit 1
       - name: Test
         run: dotnet test Mono.sln --no-build --configuration Release --logger "trx;LogFileName=mono-tests.trx"
       - name: Build container image
