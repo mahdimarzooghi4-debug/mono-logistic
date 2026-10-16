@@ -34,6 +34,13 @@ builder.Services.AddScoped<PostgresMissionLifecycleRepository>();
 builder.Services.AddScoped<PostgresCourierOnboardingService>();
 builder.Services.AddScoped<PostgresWebhookEndpointRepository>();
 builder.Services.AddSingleton(_ => new WebhookSecretProtector(builder.Configuration["Mono:WebhookEncryptionKey"]));
+builder.Services.AddSingleton<IWebhookDnsResolver, SystemWebhookDnsResolver>();
+builder.Services.AddSingleton(services => WebhookDeliveryHttpClientFactory.Create(
+    services.GetRequiredService<IWebhookDnsResolver>()));
+builder.Services.AddSingleton<IWebhookDeliveryTransport, WebhookHttpDeliveryTransport>();
+builder.Services.AddScoped<PostgresWebhookDeliveryRepository>();
+builder.Services.AddScoped<WebhookDeliveryDispatcher>();
+builder.Services.AddHostedService<WebhookDeliveryBackgroundService>();
 builder.Services.AddScoped<PostgresCourierOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresCourierAvailabilityService>();
 builder.Services.AddScoped<PostgresCourierCapacityProjectionService>();
