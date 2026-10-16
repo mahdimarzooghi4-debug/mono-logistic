@@ -487,6 +487,8 @@ Delivery history is now available to customer API keys with `webhooks.manage`:
 
 Each manual replay has a distinct delivery ID and preserves the previous generation's status and attempts. Repeating a request with the same idempotency key returns the same generation.
 
+Internal operations dashboards can read `GET /operations/v1/webhook-deliveries/summary`. It requires the Mono administrator role with verified MFA and reports aggregate queue state, due deliveries, expired leases, recent dead letters, and the oldest open delivery. Every successful read is recorded in an append-only operations audit table; the response contains no customer payloads, callback URLs, or secrets.
+
 ## 19. Branches
 
 ```
