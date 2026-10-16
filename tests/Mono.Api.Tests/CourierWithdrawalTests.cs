@@ -419,6 +419,29 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal(1L, reader.GetInt64(1));
                 Assert.Equal(2L, reader.GetInt64(2));
             }
+
+            var tehran = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
+            var nextLocalMidnight = DateTime.SpecifyKind(
+                new DateTime(2026, 10, 17, 0, 0, 0), DateTimeKind.Unspecified);
+            var nextTehranDayStart = new DateTimeOffset(
+                TimeZoneInfo.ConvertTimeToUtc(nextLocalMidnight, tehran));
+            var boundaryOne = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
+                "boundary-001", nextTehranDayStart, CancellationToken.None);
+            var boundaryTwo = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
+                "boundary-002", nextTehranDayStart.AddMinutes(1), CancellationToken.None);
+            var boundaryThree = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
+                "boundary-003", nextTehranDayStart.AddMinutes(2), CancellationToken.None);
+            Assert.Equal("REQUESTED", boundaryOne.OutcomeCode);
+            Assert.Equal("REQUESTED", boundaryTwo.OutcomeCode);
+            Assert.Equal("REQUESTED", boundaryThree.OutcomeCode);
+
+            var boundaryReplay = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
+                "boundary-001", nextTehranDayStart.AddMinutes(3), CancellationToken.None);
+            Assert.True(boundaryReplay.AlreadyRequested);
+            Assert.Equal(boundaryOne.Withdrawal!.WithdrawalId, boundaryReplay.Withdrawal!.WithdrawalId);
+            var overBoundaryLimit = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
+                "boundary-004", nextTehranDayStart.AddMinutes(4), CancellationToken.None);
+            Assert.Equal("DAILY_LIMIT_REACHED", overBoundaryLimit.OutcomeCode);
         }
         finally
         {
