@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS courier_payout_destinations (
     courier_id text NOT NULL REFERENCES couriers(courier_id),
     encrypted_iban text NOT NULL CHECK (encrypted_iban ~ '^v1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$'),
     iban_fingerprint text NOT NULL CHECK (iban_fingerprint ~ '^[0-9a-f]{64}$'),
-    masked_iban text NOT NULL CHECK (left(masked_iban, 2) = 'IR' AND substring(masked_iban from 3 for 20) = repeat('*', 20) AND right(masked_iban, 4) ~ '^[0-9]{4}$'),
+    masked_iban text NOT NULL CHECK (length(masked_iban) = 26 AND left(masked_iban, 2) = 'IR' AND substring(masked_iban from 3 for 20) = repeat('*', 20) AND right(masked_iban, 4) ~ '^[0-9]{4}$'),
     created_at timestamp with time zone NOT NULL,
     UNIQUE (courier_id, iban_fingerprint)
 );
