@@ -74,5 +74,6 @@
     <EmbeddedResource Include="../../db/migrations/053_route_location_coordinate_catalog.sql" LogicalName="Mono.Api.Tests.Migrations.053_route_location_coordinate_catalog.sql" />
     <EmbeddedResource Include="../../db/migrations/054_webhook_endpoint_registry.sql" LogicalName="Mono.Api.Tests.Migrations.054_webhook_endpoint_registry.sql" />
     <EmbeddedResource Include="../../db/migrations/055_webhook_endpoint_lifecycle_audit.sql" LogicalName="Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/056_webhook_delivery_queue.sql" LogicalName="Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql" />
   </ItemGroup>
 </Project>
