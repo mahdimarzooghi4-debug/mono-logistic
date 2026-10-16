@@ -56,7 +56,11 @@ public sealed class WebhookEndpointContractTests
         var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var protector = new WebhookSecretProtector(key);
         var encrypted = protector.Protect("secret");
-        var tampered = encrypted[..^2] + (encrypted[^1] == 'A' ? "B" : "A");
+        var parts = encrypted.Split(':');
+        var ciphertext = Convert.FromBase64String(parts[3]);
+        ciphertext[0] ^= 0x01;
+        parts[3] = Convert.ToBase64String(ciphertext);
+        var tampered = string.Join(':', parts);
         Assert.ThrowsAny<CryptographicException>(() => protector.Unprotect(tampered));
         var otherKey = new WebhookSecretProtector(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
         Assert.ThrowsAny<CryptographicException>(() => otherKey.Unprotect(encrypted));
