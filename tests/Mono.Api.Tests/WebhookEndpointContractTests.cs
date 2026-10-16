@@ -90,6 +90,24 @@ public sealed class WebhookEndpointContractTests
         Assert.False(WebhookEndpointCursor.TryDecode(Convert.ToBase64String("1|invalid"u8.ToArray()), out _, out _));
     }
 
+    [Fact]
+    public void Delivery_history_cursor_round_trips_and_is_bound_to_filters()
+    {
+        var createdAt = new DateTimeOffset(2026, 10, 16, 9, 25, 46, TimeSpan.Zero).AddTicks(1234560);
+        const string deliveryId = "whd_0123456789abcdef0123456789abcdef";
+        var cursor = WebhookDeliveryHistoryCursor.Encode(createdAt, deliveryId,
+            "whk_0123456789abcdef0123456789abcdef", "promise.committed", "SUCCEEDED");
+
+        Assert.True(WebhookDeliveryHistoryCursor.TryDecode(cursor,
+            "whk_0123456789abcdef0123456789abcdef", "promise.committed", "SUCCEEDED",
+            out var decodedAt, out var decodedId));
+        Assert.Equal(createdAt, decodedAt);
+        Assert.Equal(deliveryId, decodedId);
+        Assert.False(WebhookDeliveryHistoryCursor.TryDecode(cursor,
+            "whk_0123456789abcdef0123456789abcdef", "promise.committed", "RETRYING", out _, out _));
+        Assert.False(WebhookDeliveryHistoryCursor.TryDecode("not-a-cursor", null, null, null, out _, out _));
+    }
+
     [Theory]
     [InlineData("1.1.1.1", true)]
     [InlineData("10.1.2.3", false)]
