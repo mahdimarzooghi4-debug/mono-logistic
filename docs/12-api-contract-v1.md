@@ -441,6 +441,10 @@ The endpoint registry also supports:
 
 Create, disable, and secret-rotation actions are written with append-only lifecycle history. These management APIs do not activate outbound event delivery.
 
+When the delivery worker is explicitly enabled, it fans out supported Outbox events to active subscriptions created before the event. The JSON envelope contains `event_id`, `event_type`, `event_version`, `occurred_at`, `correlation_id`, `aggregate`, and an event-specific allowlist of customer-safe `data` fields. Internal actor IDs, decision IDs, policy evidence, reason codes, and raw Outbox JSON are excluded. Requests use HTTPS on port 443, `X-Mono-Event-Id`, `X-Mono-Delivery-Id`, and `X-Mono-Signature: sha256=<hex HMAC-SHA256 of the exact UTF-8 body>`.
+
+Delivery is disabled by default (`Mono:WebhookDelivery:Enabled=false`) and also requires the configured 32-byte `Mono:WebhookEncryptionKey`. The worker disables proxies and redirects, resolves the host for each new connection, rejects a DNS answer set containing any non-public address, and connects directly to the validated address while TLS continues to validate the URL hostname. Only 2xx responses succeed. Network errors, timeouts, 408, 429, and 5xx responses retry up to five attempts with 30-second, 2-minute, 10-minute, and 30-minute delays; other HTTP responses are dead-lettered. Disablement cancels queued retries. See `docs/operations/webhook-delivery.md` for staging configuration and operations.
+
 ## 17. Webhook Security
 
 Recommended:
