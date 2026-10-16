@@ -77,5 +77,6 @@
     <EmbeddedResource Include="../../db/migrations/056_webhook_delivery_queue.sql" LogicalName="Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql" />
     <EmbeddedResource Include="../../db/migrations/057_webhook_delivery_history_index.sql" LogicalName="Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql" />
     <EmbeddedResource Include="../../db/migrations/058_webhook_delivery_replay.sql" LogicalName="Mono.Api.Tests.Migrations.058_webhook_delivery_replay.sql" />
+    <EmbeddedResource Include="../../db/migrations/059_webhook_operations_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.059_webhook_operations_read_audit.sql" />
   </ItemGroup>
 </Project>
