@@ -67,6 +67,7 @@ These are design artifacts; displayed sample values are not operational data. Pr
 - [Versioned Route Plan Storage (Sprint 151)](docs/sprints/sprint-151-route-versioned-storage.md)
 - [Route Insertion Orchestration (Sprint 152)](docs/sprints/sprint-152-route-insertion-orchestration.md)
 - [Route Matrix Evidence Verification (Sprint 153)](docs/sprints/sprint-153-route-matrix-evidence-verification.md)
+- [Route Plan Operations API (Sprint 158)](docs/sprints/sprint-158-route-lifecycle-api.md)
 - [SLA Feasibility Criterion v1](docs/41-sla-feasibility-criterion-v1.md)
 - [Feasibility Outcome Evaluation v1](docs/42-feasibility-outcome-evaluation-v1.md)
 - [Promise Commit Contract v1](docs/43-promise-commit-contract-v1.md)

@@ -110,6 +110,7 @@ app.MapMissionCancellationEndpoints();
 app.MapMissionHistoryEndpoints();
 app.MapMonoMissionOperationsEndpoints();
 app.MapMonoMissionDispatchAttemptHistoryEndpoints();
+app.MapMonoRoutePlanOperationsEndpoints();
 app.MapMonoCourierOperationsEndpoints();
 app.MapMonoCourierSuspensionEndpoints();
 app.MapMonoCourierSessionEndpoints();
