@@ -124,7 +124,36 @@ public sealed class WebhookDeliveryRepositoryTests
                 """, connection);
             mutate.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, first.DeliveryId);
             await Assert.ThrowsAsync<PostgresException>(() => mutate.ExecuteNonQueryAsync());
+
+            await using var markDeadLetter = new NpgsqlCommand("""
+                UPDATE webhook_deliveries SET status = 'DEAD_LETTERED'
+                WHERE delivery_id = @delivery_id;
+                """, connection);
+            markDeadLetter.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, first.DeliveryId);
+            await markDeadLetter.ExecuteNonQueryAsync();
         }
+
+        var firstReplay = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
+            "retry-request-1", now.AddMinutes(1), CancellationToken.None);
+        Assert.Null(firstReplay.ErrorCode);
+        Assert.False(firstReplay.AlreadyRequested);
+        Assert.Equal(1, firstReplay.Delivery!.ReplayGeneration);
+        Assert.Equal("PENDING", firstReplay.Delivery.Status);
+        var idempotentReplay = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
+            "retry-request-1", now.AddMinutes(2), CancellationToken.None);
+        Assert.True(idempotentReplay.AlreadyRequested);
+        Assert.Equal(firstReplay.Delivery.DeliveryId, idempotentReplay.Delivery!.DeliveryId);
+        var secondReplay = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
+            "retry-request-2", now.AddMinutes(3), CancellationToken.None);
+        var thirdReplay = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
+            "retry-request-3", now.AddMinutes(4), CancellationToken.None);
+        Assert.Equal(2, secondReplay.Delivery!.ReplayGeneration);
+        Assert.Equal(3, thirdReplay.Delivery!.ReplayGeneration);
+        var beyondLimit = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
+            "retry-request-4", now.AddMinutes(5), CancellationToken.None);
+        Assert.Equal("REPLAY_LIMIT_REACHED", beyondLimit.ErrorCode);
+        Assert.Null(await historyRepository.FindAsync("cus_ffffffffffffffffffffffffffffffff", first.DeliveryId,
+            CancellationToken.None));
     }
 
     [Fact]
@@ -161,7 +190,8 @@ public sealed class WebhookDeliveryRepositoryTests
                      "Mono.Api.Tests.Migrations.054_webhook_endpoint_registry.sql",
                      "Mono.Api.Tests.Migrations.055_webhook_endpoint_lifecycle_audit.sql",
                      "Mono.Api.Tests.Migrations.056_webhook_delivery_queue.sql",
-                     "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql"
+                     "Mono.Api.Tests.Migrations.057_webhook_delivery_history_index.sql",
+                     "Mono.Api.Tests.Migrations.058_webhook_delivery_replay.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
