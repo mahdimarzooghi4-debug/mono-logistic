@@ -30,6 +30,7 @@ jobs:
           --health-retries 5
     env:
       MONO_TEST_DATABASE: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_test
+      ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_test
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
