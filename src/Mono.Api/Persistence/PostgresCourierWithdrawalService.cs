@@ -398,6 +398,36 @@ public sealed class PostgresCourierWithdrawalService(
         return new CourierWithdrawalWriteResult(action, updated, false);
     }
 
+    public async Task<CourierWithdrawalItem?> FindForCourierAsync(
+        string courierId, string withdrawalId, CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        const string sql = """
+            SELECT request.withdrawal_id, request.courier_id, request.amount_toman,
+                   destination.masked_iban, latest.action, request.created_at,
+                   latest.reason_code, latest.bank_reference, latest.withdrawal_event_sequence
+            FROM courier_withdrawal_requests request
+            JOIN courier_payout_destinations destination ON destination.destination_id = request.destination_id
+            JOIN LATERAL (
+                SELECT action, reason_code, bank_reference, withdrawal_event_sequence
+                FROM courier_withdrawal_events
+                WHERE withdrawal_id = request.withdrawal_id
+                ORDER BY withdrawal_event_sequence DESC LIMIT 1
+            ) latest ON TRUE
+            WHERE request.courier_id = @courier_id AND request.withdrawal_id = @withdrawal_id;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+        command.Parameters.AddWithValue("withdrawal_id", NpgsqlDbType.Text, withdrawalId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+            return null;
+        return new CourierWithdrawalItem(reader.GetString(0), reader.GetString(1), reader.GetInt64(2),
+            reader.GetString(3), reader.GetString(4), reader.GetFieldValue<DateTimeOffset>(5),
+            reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7),
+            reader.GetInt64(8));
+    }
+
     public async Task<CourierWithdrawalPage> ListForCourierAsync(
         string courierId, int limit, long? beforeSequence, CancellationToken cancellationToken) =>
         await ListAsync(courierId, false, limit, beforeSequence, cancellationToken);
