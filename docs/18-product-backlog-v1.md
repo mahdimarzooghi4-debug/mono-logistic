@@ -546,7 +546,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 163 adds a disabled-by-default Outbox fan-out worker, tenant-safe event payload allowlists, HMAC-SHA256 signatures, HTTPS-only direct connections with DNS/SSRF and redirect controls, bounded retries, lease recovery, dead-letter state, and immutable attempt history.
 - Sprint 164 exposes tenant-scoped delivery history and detail APIs, filter-bound keyset pagination, and immutable attempt timelines without returning endpoint URLs, payload bodies, or secrets.
 - Sprint 165 adds idempotent manual replay for dead-lettered deliveries, with separate delivery generations, append-only replay request records, an active-endpoint gate, and a three-replay limit.
-- Operational dashboard integration remains follow-on work.
+- Sprint 166 exposes a privileged aggregate queue-health API for internal operations dashboards and audits reads with the authenticated administrator identity.
 
 ### E17.1 Event Envelope
 - event ID
