@@ -544,7 +544,8 @@ Courier Net = 89% of Mission Fare
 - Sprint 161 adds tenant-scoped webhook endpoint registration through `POST /v1/webhook-endpoints`, HTTPS/event validation, a dedicated `webhooks.manage` API-key scope, and AES-256-GCM protected signing secrets.
 - Sprint 162 adds tenant-scoped endpoint listing/detail, idempotent disablement, one-time secret rotation, and append-only lifecycle history.
 - Sprint 163 adds a disabled-by-default Outbox fan-out worker, tenant-safe event payload allowlists, HMAC-SHA256 signatures, HTTPS-only direct connections with DNS/SSRF and redirect controls, bounded retries, lease recovery, dead-letter state, and immutable attempt history.
-- Delivery-history API/replay controls and operational dashboard integration remain follow-on work.
+- Sprint 164 exposes tenant-scoped delivery history and detail APIs, filter-bound keyset pagination, and immutable attempt timelines without returning endpoint URLs, payload bodies, or secrets.
+- Manual replay controls and operational dashboard integration remain follow-on work.
 
 ### E17.1 Event Envelope
 - event ID
