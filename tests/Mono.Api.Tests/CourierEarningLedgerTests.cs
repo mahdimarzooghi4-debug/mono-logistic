@@ -28,6 +28,7 @@ public sealed class CourierEarningLedgerTests
             await using var dataSource = NpgsqlDataSource.Create(scoped.ConnectionString);
             await using (var connection = await dataSource.OpenConnectionAsync())
             await using (var setup = new NpgsqlCommand("""
+                CREATE TABLE couriers (courier_id text PRIMARY KEY);
                 CREATE TABLE missions (
                     mission_id text PRIMARY KEY, customer_id text NOT NULL,
                     delivery_request_id text NOT NULL, quote_id text NOT NULL,
@@ -172,13 +173,19 @@ public sealed class CourierEarningLedgerTests
 
     private static async Task ApplyMigrationAsync(NpgsqlDataSource dataSource)
     {
-        const string resourceName = "Mono.Api.Tests.Migrations.064_courier_earning_ledger.sql";
-        await using var stream = typeof(CourierEarningLedgerTests).Assembly.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
-        using var reader = new StreamReader(stream);
-        var sql = await reader.ReadToEndAsync();
-        await using var connection = await dataSource.OpenConnectionAsync();
-        await using var command = new NpgsqlCommand(sql, connection);
-        await command.ExecuteNonQueryAsync();
+        foreach (var resourceName in new[]
+        {
+            "Mono.Api.Tests.Migrations.064_courier_earning_ledger.sql",
+            "Mono.Api.Tests.Migrations.065_courier_manual_withdrawals.sql"
+        })
+        {
+            await using var stream = typeof(CourierEarningLedgerTests).Assembly.GetManifestResourceStream(resourceName)
+                ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
+            using var reader = new StreamReader(stream);
+            var sql = await reader.ReadToEndAsync();
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            await command.ExecuteNonQueryAsync();
+        }
     }
 }
