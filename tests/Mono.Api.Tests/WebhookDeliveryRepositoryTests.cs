@@ -70,6 +70,26 @@ public sealed class WebhookDeliveryRepositoryTests
             Assert.False(await reader.ReadAsync());
         }
 
+        var auditPage = await service.ListAuditAsync(2, actorId, null, null, null,
+            DateTimeOffset.UtcNow, CancellationToken.None);
+        Assert.Equal(2, auditPage.Items.Count);
+        Assert.NotNull(auditPage.NextCursor);
+        Assert.True(WebhookOperationsAuditCursor.TryDecode(auditPage.NextCursor, actorId, null,
+            out var beforeOccurredAt, out var beforeAuditId));
+        var auditPage2 = await service.ListAuditAsync(2, actorId, null, beforeOccurredAt,
+            beforeAuditId, DateTimeOffset.UtcNow, CancellationToken.None);
+        Assert.Single(auditPage2.Items);
+        Assert.Null(auditPage2.NextCursor);
+        Assert.Equal("QUEUE_SUMMARY", auditPage2.Items[0].Action);
+        await using (var readAudits = new NpgsqlCommand("""
+            SELECT COUNT(*) FROM webhook_operations_read_audit
+            WHERE actor_id = @actor_id AND action = 'AUDIT_HISTORY_READ';
+            """, connection))
+        {
+            readAudits.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            Assert.Equal(2L, await readAudits.ExecuteScalarAsync());
+        }
+
         await using var mutate = new NpgsqlCommand("""
             UPDATE webhook_operations_read_audit SET action = 'QUEUE_SUMMARY' WHERE actor_id = @actor_id;
             """, connection);
@@ -82,6 +102,9 @@ public sealed class WebhookDeliveryRepositoryTests
             denied.GetQueueSummaryAsync(DateTimeOffset.UtcNow, CancellationToken.None));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => denied.SearchDeliveriesAsync(10,
             null, null, null, null, null, null, DateTimeOffset.UtcNow, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => denied.ListAuditAsync(10,
+            null, null, null, null, DateTimeOffset.UtcNow, CancellationToken.None));
+        await ApplyMigrationsAsync(dataSource);
     }
 
     [Fact]
@@ -305,7 +328,8 @@ public sealed class WebhookDeliveryRepositoryTests
                      "Mono.Api.Tests.Migrations.058_webhook_delivery_replay.sql",
                      "Mono.Api.Tests.Migrations.059_webhook_operations_read_audit.sql",
                      "Mono.Api.Tests.Migrations.060_webhook_operations_delivery_search.sql",
-                     "Mono.Api.Tests.Migrations.061_webhook_operations_delivery_replay.sql"
+                     "Mono.Api.Tests.Migrations.061_webhook_operations_delivery_replay.sql",
+                     "Mono.Api.Tests.Migrations.062_webhook_operations_audit_history.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)

@@ -80,5 +80,6 @@
     <EmbeddedResource Include="../../db/migrations/059_webhook_operations_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.059_webhook_operations_read_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/060_webhook_operations_delivery_search.sql" LogicalName="Mono.Api.Tests.Migrations.060_webhook_operations_delivery_search.sql" />
     <EmbeddedResource Include="../../db/migrations/061_webhook_operations_delivery_replay.sql" LogicalName="Mono.Api.Tests.Migrations.061_webhook_operations_delivery_replay.sql" />
+    <EmbeddedResource Include="../../db/migrations/062_webhook_operations_audit_history.sql" LogicalName="Mono.Api.Tests.Migrations.062_webhook_operations_audit_history.sql" />
   </ItemGroup>
 </Project>

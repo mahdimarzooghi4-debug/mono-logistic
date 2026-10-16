@@ -13,7 +13,8 @@ ALTER TABLE webhook_operations_read_audit
 
 ALTER TABLE webhook_operations_read_audit
     ADD CONSTRAINT webhook_operations_read_audit_action_check
-        CHECK (action IN ('QUEUE_SUMMARY', 'QUEUE_SEARCH', 'DELIVERY_DETAIL', 'DELIVERY_REPLAY'));
+        CHECK (action IN (
+            'QUEUE_SUMMARY', 'QUEUE_SEARCH', 'DELIVERY_DETAIL', 'DELIVERY_REPLAY', 'AUDIT_HISTORY_READ'));
 
 ALTER TABLE webhook_operations_read_audit
     ADD CONSTRAINT webhook_operations_read_audit_resource_id_check
