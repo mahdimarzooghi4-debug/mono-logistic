@@ -556,6 +556,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 173 adds MFA-gated manual payout destination verification, encrypted courier IBAN storage, daily-limited idempotent withdrawal requests with reserved-balance accounting, and audited operator processing, rejection, and balanced payout posting.
 - Sprint 174 exposes the operator-only append-only withdrawal lifecycle timeline and records every history read, including not-found probes, without exposing payout IBANs.
 - Sprint 175 provides an audited, cursor-paginated operations view of payout destination verification/revocation and secret-access events, returning only masked IBANs.
+- Sprint 176 adds a courier-scoped, keyset-paginated read of posted available-ledger entries, covering both mission earning credits and completed payout debits.
 
 ### E17.1 Event Envelope
 - event ID

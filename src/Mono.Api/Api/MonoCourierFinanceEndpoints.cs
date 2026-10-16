@@ -20,6 +20,18 @@ public sealed record MonoCourierEarningHistoryResponse(
     [property: JsonPropertyName("items")] IReadOnlyList<MonoCourierEarningHistoryItemResponse> Items,
     [property: JsonPropertyName("next_cursor")] string? NextCursor);
 
+public sealed record MonoCourierLedgerHistoryItemResponse(
+    [property: JsonPropertyName("ledger_entry_id")] long LedgerEntryId,
+    [property: JsonPropertyName("reference_type")] string ReferenceType,
+    [property: JsonPropertyName("reference_id")] string ReferenceId,
+    [property: JsonPropertyName("direction")] string Direction,
+    [property: JsonPropertyName("amount_toman")] long AmountToman,
+    [property: JsonPropertyName("occurred_at")] DateTimeOffset OccurredAt);
+
+public sealed record MonoCourierLedgerHistoryResponse(
+    [property: JsonPropertyName("items")] IReadOnlyList<MonoCourierLedgerHistoryItemResponse> Items,
+    [property: JsonPropertyName("next_cursor")] string? NextCursor);
+
 public static class MonoCourierFinanceEndpoints
 {
     public static IEndpointRouteBuilder MapMonoCourierFinanceEndpoints(
@@ -59,6 +71,31 @@ public static class MonoCourierFinanceEndpoints
                     page.NextBeforeEntryId is long next ? EncodeCursor(next) : null));
             })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
+        endpoints.MapGet("/courier/v1/finance/ledger", async Task<IResult> (
+                IMonoCourierContext courier,
+                PostgresCourierEarningLedger ledger,
+                int? limit,
+                string? cursor,
+                CancellationToken cancellationToken) =>
+            {
+                var pageSize = limit ?? 50;
+                if (pageSize is < 1 or > 100)
+                    return Results.BadRequest(new { error_code = "INVALID_LIMIT" });
+                if (!TryDecodeCursor(cursor, out var beforeEntryId))
+                    return Results.BadRequest(new { error_code = "INVALID_CURSOR" });
+
+                var page = await ledger.GetLedgerHistoryAsync(courier.CourierId,
+                    pageSize, beforeEntryId, cancellationToken);
+                var items = page.Items.Select(item => new MonoCourierLedgerHistoryItemResponse(
+                    item.LedgerEntryId, item.ReferenceType, item.ReferenceId,
+                    item.DebitAmountToman > 0 ? "DEBIT" : "CREDIT",
+                    item.DebitAmountToman > 0 ? item.DebitAmountToman : item.CreditAmountToman,
+                    item.OccurredAt)).ToArray();
+                return Results.Ok(new MonoCourierLedgerHistoryResponse(items,
+                    page.NextBeforeEntryId is long next ? EncodeCursor(next) : null));
+            })
+            .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
+
         return endpoints;
     }
 
