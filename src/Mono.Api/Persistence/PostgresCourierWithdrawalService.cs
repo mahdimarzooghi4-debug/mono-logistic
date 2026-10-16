@@ -479,16 +479,16 @@ public sealed class PostgresCourierWithdrawalService(
 
     public async Task<CourierWithdrawalPage> ListForCourierAsync(
         string courierId, int limit, long? beforeSequence, CancellationToken cancellationToken,
-        DateTimeOffset? fromAt = null, DateTimeOffset? toAt = null) =>
-        await ListAsync(courierId, false, limit, beforeSequence, cancellationToken, fromAt, toAt);
+        DateTimeOffset? fromAt = null, DateTimeOffset? toAt = null, string? status = null) =>
+        await ListAsync(courierId, false, limit, beforeSequence, cancellationToken, fromAt, toAt, status);
 
     public async Task<CourierWithdrawalPage> ListForOperationsAsync(
         int limit, long? beforeSequence, CancellationToken cancellationToken) =>
-        await ListAsync(null, true, limit, beforeSequence, cancellationToken, null, null);
+        await ListAsync(null, true, limit, beforeSequence, cancellationToken, null, null, null);
 
     private async Task<CourierWithdrawalPage> ListAsync(
         string? courierId, bool operations, int limit, long? beforeSequence,
-        CancellationToken cancellationToken, DateTimeOffset? fromAt, DateTimeOffset? toAt)
+        CancellationToken cancellationToken, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status)
     {
         const string sql = """
             WITH latest AS (
@@ -508,6 +508,7 @@ public sealed class PostgresCourierWithdrawalService(
                    (@operations = FALSE AND request.courier_id = @courier_id))
               AND (@from_at IS NULL OR request.created_at >= @from_at)
               AND (@to_at IS NULL OR request.created_at < @to_at)
+              AND (@status IS NULL OR latest.action = @status)
               AND (@before_sequence IS NULL OR latest.withdrawal_event_sequence < @before_sequence)
             ORDER BY latest.withdrawal_event_sequence DESC
             LIMIT @take;
@@ -523,6 +524,8 @@ public sealed class PostgresCourierWithdrawalService(
             fromAt.HasValue ? fromAt.Value.ToUniversalTime() : DBNull.Value);
         command.Parameters.AddWithValue("to_at", NpgsqlDbType.TimestampTz,
             toAt.HasValue ? toAt.Value.ToUniversalTime() : DBNull.Value);
+        command.Parameters.AddWithValue("status", NpgsqlDbType.Text,
+            status is null ? DBNull.Value : status);
         command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, checked(limit + 1));
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
