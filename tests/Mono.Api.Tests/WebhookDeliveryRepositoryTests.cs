@@ -266,6 +266,40 @@ public sealed class WebhookDeliveryRepositoryTests
             Assert.False(await reader.ReadAsync());
         }
 
+        var cancellation = await operationsReplayService.CancelDeliveryAsync(
+            operationsReplay.Delivery.DeliveryId, "operations-cancel-1", now.AddMinutes(3),
+            CancellationToken.None);
+        Assert.Equal("CANCELLED", cancellation.OutcomeCode);
+        Assert.False(cancellation.AlreadyRequested);
+        var cancellationReplay = await operationsReplayService.CancelDeliveryAsync(
+            operationsReplay.Delivery.DeliveryId, "operations-cancel-1", now.AddMinutes(4),
+            CancellationToken.None);
+        Assert.Equal("CANCELLED", cancellationReplay.OutcomeCode);
+        Assert.True(cancellationReplay.AlreadyRequested);
+        await using (var cancellationConnection = await dataSource.OpenConnectionAsync())
+        await using (var cancellationCheck = new NpgsqlCommand("""
+            SELECT delivery.status, audit.outcome_code
+            FROM webhook_deliveries delivery
+            JOIN webhook_operations_read_audit audit ON audit.resource_id = delivery.delivery_id
+            WHERE delivery.delivery_id = @delivery_id AND audit.action = 'DELIVERY_CANCEL'
+            ORDER BY audit.occurred_at, audit.audit_id;
+            """, cancellationConnection))
+        {
+            cancellationCheck.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text,
+                operationsReplay.Delivery.DeliveryId);
+            await using var reader = await cancellationCheck.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("CANCELLED", reader.GetString(0));
+            Assert.Equal("CANCELLED", reader.GetString(1));
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("CANCELLED", reader.GetString(0));
+            Assert.Equal("ALREADY_REQUESTED", reader.GetString(1));
+            Assert.False(await reader.ReadAsync());
+        }
+        var completedCancellation = await operationsReplayService.CancelDeliveryAsync(first.DeliveryId,
+            "operations-cancel-completed", now.AddMinutes(5), CancellationToken.None);
+        Assert.Equal("NOT_CANCELLABLE", completedCancellation.OutcomeCode);
+
         var firstReplay = await historyRepository.ReplayAsync(customer.CustomerId, first.DeliveryId,
             "retry-request-1", now.AddMinutes(1), CancellationToken.None);
         Assert.Null(firstReplay.ErrorCode);
@@ -287,7 +321,7 @@ public sealed class WebhookDeliveryRepositoryTests
         Assert.Equal("REPLAY_LIMIT_REACHED", beyondLimit.ErrorCode);
         Assert.Null(await historyRepository.FindAsync("cus_ffffffffffffffffffffffffffffffff", first.DeliveryId,
             CancellationToken.None));
-        await ApplyMigrationsAsync(dataSource);
+        await ApplyCancellationMigrationAsync(dataSource);
     }
 
     [Fact]
@@ -329,7 +363,8 @@ public sealed class WebhookDeliveryRepositoryTests
                      "Mono.Api.Tests.Migrations.059_webhook_operations_read_audit.sql",
                      "Mono.Api.Tests.Migrations.060_webhook_operations_delivery_search.sql",
                      "Mono.Api.Tests.Migrations.061_webhook_operations_delivery_replay.sql",
-                     "Mono.Api.Tests.Migrations.062_webhook_operations_audit_history.sql"
+                     "Mono.Api.Tests.Migrations.062_webhook_operations_audit_history.sql",
+                     "Mono.Api.Tests.Migrations.063_webhook_delivery_operations_cancel.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)
@@ -340,6 +375,19 @@ public sealed class WebhookDeliveryRepositoryTests
             await using var command = new NpgsqlCommand(sql, connection);
             await command.ExecuteNonQueryAsync();
         }
+    }
+
+    private static async Task ApplyCancellationMigrationAsync(NpgsqlDataSource dataSource)
+    {
+        var assembly = typeof(WebhookDeliveryRepositoryTests).Assembly;
+        const string resourceName = "Mono.Api.Tests.Migrations.063_webhook_delivery_operations_cancel.sql";
+        await using var stream = assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidOperationException("Missing embedded migration resource: " + resourceName);
+        using var reader = new StreamReader(stream);
+        var sql = await reader.ReadToEndAsync();
+        await using var connection = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(sql, connection);
+        await command.ExecuteNonQueryAsync();
     }
 
     private sealed class TestOperationsContext(string actorId, IReadOnlyCollection<string> roles)

@@ -43,8 +43,116 @@ public sealed record WebhookDeliveryReplayResult(
     string? ErrorCode,
     bool AlreadyRequested);
 
+public sealed record WebhookDeliveryCancellationResult(string OutcomeCode, bool AlreadyRequested);
+
 public sealed class PostgresWebhookDeliveryHistoryRepository(NpgsqlDataSource dataSource)
 {
+    public async Task<WebhookDeliveryCancellationResult> CancelForOperationsAsync(
+        string deliveryId,
+        string idempotencyKey,
+        string operationsActorId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string lockSql = """
+            SELECT status FROM webhook_deliveries WHERE delivery_id = @delivery_id FOR UPDATE;
+            """;
+        string? status;
+        await using (var command = new NpgsqlCommand(lockSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, deliveryId);
+            status = (string?)await command.ExecuteScalarAsync(cancellationToken);
+        }
+
+        const string priorSql = """
+            SELECT outcome_code FROM webhook_delivery_cancellation_requests
+            WHERE delivery_id = @delivery_id AND idempotency_key = @idempotency_key;
+            """;
+        string? priorOutcome;
+        await using (var command = new NpgsqlCommand(priorSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, deliveryId);
+            command.Parameters.AddWithValue("idempotency_key", NpgsqlDbType.Text, idempotencyKey);
+            priorOutcome = (string?)await command.ExecuteScalarAsync(cancellationToken);
+        }
+        if (priorOutcome is not null)
+        {
+            await InsertOperationsCancellationAuditAsync(connection, transaction, operationsActorId,
+                deliveryId, "ALREADY_REQUESTED", 1, now, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new WebhookDeliveryCancellationResult(priorOutcome, true);
+        }
+
+        var outcome = status switch
+        {
+            null => "NOT_FOUND",
+            "PENDING" or "RETRYING" => "CANCELLED",
+            "CANCELLED" => "ALREADY_CANCELLED",
+            _ => "NOT_CANCELLABLE"
+        };
+        if (outcome == "CANCELLED")
+        {
+            const string cancelSql = """
+                UPDATE webhook_deliveries
+                SET status = 'CANCELLED', completed_at = @now, lease_expires_at = NULL
+                WHERE delivery_id = @delivery_id AND status IN ('PENDING', 'RETRYING')
+                  AND lease_expires_at IS NULL;
+                """;
+            await using var command = new NpgsqlCommand(cancelSql, connection, transaction);
+            command.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, deliveryId);
+            command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
+            if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+                outcome = "NOT_CANCELLABLE";
+        }
+
+        const string requestSql = """
+            INSERT INTO webhook_delivery_cancellation_requests
+                (delivery_id, idempotency_key, outcome_code, created_at)
+            VALUES (@delivery_id, @idempotency_key, @outcome_code, @created_at);
+            """;
+        await using (var command = new NpgsqlCommand(requestSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("delivery_id", NpgsqlDbType.Text, deliveryId);
+            command.Parameters.AddWithValue("idempotency_key", NpgsqlDbType.Text, idempotencyKey);
+            command.Parameters.AddWithValue("outcome_code", NpgsqlDbType.Text, outcome);
+            command.Parameters.AddWithValue("created_at", NpgsqlDbType.TimestampTz, now);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await InsertOperationsCancellationAuditAsync(connection, transaction, operationsActorId,
+            deliveryId, outcome, outcome is "CANCELLED" or "ALREADY_CANCELLED" ? 1 : 0, now,
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new WebhookDeliveryCancellationResult(outcome, false);
+    }
+
+    private static async Task InsertOperationsCancellationAuditAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string actorId,
+        string deliveryId,
+        string outcomeCode,
+        long resultCount,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            INSERT INTO webhook_operations_read_audit
+                (audit_id, actor_id, action, result_count, resource_id, outcome_code, occurred_at)
+            VALUES (@audit_id, @actor_id, 'DELIVERY_CANCEL', @result_count, @resource_id, @outcome_code, @occurred_at);
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("audit_id", NpgsqlDbType.Text, "woa_" + Guid.NewGuid().ToString("N"));
+        command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+        command.Parameters.AddWithValue("result_count", NpgsqlDbType.Bigint, resultCount);
+        command.Parameters.AddWithValue("resource_id", NpgsqlDbType.Text, deliveryId);
+        command.Parameters.AddWithValue("outcome_code", NpgsqlDbType.Text, outcomeCode);
+        command.Parameters.AddWithValue("occurred_at", NpgsqlDbType.TimestampTz, occurredAt);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<WebhookDeliveryReplayResult> ReplayAsync(
         string customerId,
         string originalDeliveryId,
