@@ -67,10 +67,22 @@ public sealed class CourierPayoutIbanProtector
         return $"v1:{Convert.ToBase64String(nonce)}:{Convert.ToBase64String(tag)}:{Convert.ToBase64String(ciphertext)}";
     }
 
-    public static string Fingerprint(string courierId, string iban)
+    public string Fingerprint(string courierId, string iban)
     {
-        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(courierId + "\0" + iban));
-        return Convert.ToHexString(digest).ToLowerInvariant();
+        if (!IsConfigured)
+            throw new InvalidOperationException("Courier payout IBAN encryption is not configured.");
+        var message = Encoding.UTF8.GetBytes(courierId + "\0" + iban);
+        var derivedKey = HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes("mono-courier-payout-iban-fingerprint-v1"));
+        try
+        {
+            var digest = HMACSHA256.HashData(derivedKey, message);
+            return Convert.ToHexString(digest).ToLowerInvariant();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(derivedKey);
+            CryptographicOperations.ZeroMemory(message);
+        }
     }
 
     public static string Mask(string iban) => "IR" + new string('*', 20) + iban[^4..];
