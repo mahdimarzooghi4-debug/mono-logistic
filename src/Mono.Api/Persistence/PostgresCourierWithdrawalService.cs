@@ -160,6 +160,67 @@ public sealed class PostgresCourierWithdrawalService(
         return new CourierWithdrawalWriteResult("VERIFIED", null, false);
     }
 
+    public async Task<CourierWithdrawalWriteResult> RevokeDestinationAsync(
+        string courierId, string evidenceReference, string idempotencyKey,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        evidenceReference = evidenceReference.Trim();
+        idempotencyKey = idempotencyKey.Trim();
+        if (!IsSafeReference(evidenceReference, 256) || !IsSafeReference(idempotencyKey, 128))
+            return new CourierWithdrawalWriteResult("INVALID_INPUT", null, false);
+
+        var actorId = operationsContext.ActorId;
+        var requestHash = Hash("REVOKE\\n" + courierId + "\\n" + evidenceReference);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        if (!await LockCourierAsync(connection, transaction, courierId, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new CourierWithdrawalWriteResult("COURIER_NOT_FOUND", null, false);
+        }
+
+        const string priorSql = """
+            SELECT action, request_hash
+            FROM courier_payout_destination_events
+            WHERE actor_id = @actor_id AND idempotency_key = @idempotency_key;
+            """;
+        string? priorAction = null;
+        string? priorHash = null;
+        await using (var command = new NpgsqlCommand(priorSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            command.Parameters.AddWithValue("idempotency_key", NpgsqlDbType.Text, idempotencyKey);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                priorAction = reader.GetString(0);
+                priorHash = reader.GetString(1);
+            }
+        }
+        if (priorAction is not null)
+        {
+            if (priorAction != "REVOKED" || !string.Equals(priorHash, requestHash, StringComparison.Ordinal))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new CourierWithdrawalWriteResult("IDEMPOTENCY_CONFLICT", null, false);
+            }
+            await transaction.CommitAsync(cancellationToken);
+            return new CourierWithdrawalWriteResult("REVOKED", null, true);
+        }
+
+        var destination = await FindCurrentDestinationAsync(connection, transaction, courierId, cancellationToken);
+        if (destination is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new CourierWithdrawalWriteResult("DESTINATION_NOT_VERIFIED", null, false);
+        }
+
+        await InsertDestinationEventAsync(connection, transaction, destination.Value.DestinationId, courierId,
+            "REVOKED", actorId, idempotencyKey, requestHash, evidenceReference, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new CourierWithdrawalWriteResult("REVOKED", null, false);
+    }
+
     public async Task<CourierPayoutDestinationSecretResult> ReadDestinationForOperationsAsync(
         string courierId, DateTimeOffset now, CancellationToken cancellationToken)
     {
