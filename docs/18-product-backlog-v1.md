@@ -650,6 +650,7 @@ Dashboard must use the same application/core rules as API customers.
 - assignment
 - zone capacity
 - Sprint 208 adds a time-consistent, administrator-only delivery SLA alert feed for all active Missions, with an operator-selected lookahead window, assigned-courier context, stable filter-bound keyset pagination, and append-only read auditing.
+- Sprint 209 adds an opt-in background worker that expires only overdue OFFERED rows on Missions still searching for a courier, reusing the existing idempotent expiry rules and immutable event history; it never auto-selects a replacement courier.
 - SLA alerts
 - re-dispatch
 - controlled exception handling

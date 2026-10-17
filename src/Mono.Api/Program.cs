@@ -58,6 +58,8 @@ builder.Services.AddScoped<PostgresWebhookDeliveryHistoryRepository>();
 builder.Services.AddScoped<PostgresWebhookOperationsReadService>();
 builder.Services.AddScoped<WebhookDeliveryDispatcher>();
 builder.Services.AddHostedService<WebhookDeliveryBackgroundService>();
+builder.Services.AddScoped<PostgresMissionCourierOfferExpiryDispatcher>();
+builder.Services.AddHostedService<MissionCourierOfferExpiryBackgroundService>();
 builder.Services.AddScoped<PostgresCourierOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresCourierAvailabilityService>();
 builder.Services.AddScoped<PostgresCourierCapacityProjectionService>();

@@ -98,3 +98,18 @@ The full list is validated before execution. Duplicate Mission IDs are rejected,
 
 
 `GET /operations/v1/missions/{missionId}/dispatch-attempts` returns up to 100 offers newest first, with each offer's current status and latest event action, actor, reason, and timestamp. Successful reads are recorded as `MISSION_DISPATCH_ATTEMPT_HISTORY` audit events. The per-offer `/events` route returns the full event sequence.
+
+
+## Optional automatic expiry worker
+
+The API can expire overdue courier offers in the background. The worker is disabled unless `Mono:MissionOfferExpiry:Enabled` is set to `true`. When enabled, it polls OFFERED rows whose stored expires_at has passed and whose Mission is still SEARCHING_COURIER, then calls the same idempotent expiry service used by the operations endpoint. The worker records the explicit system actor `mono-dispatch-expiry-worker` in the existing immutable offer event history. It does not create a replacement offer or change courier-selection rules.
+
+Configuration:
+
+```text
+Mono:MissionOfferExpiry:Enabled=true
+Mono:MissionOfferExpiry:PollIntervalSeconds=10   # optional, 1–300
+Mono:MissionOfferExpiry:BatchSize=20             # optional, 1–100
+```
+
+The stored offer expiry remains authoritative (currently five minutes after offer creation). Leave the worker disabled when operations intends to manage expiry manually.
