@@ -16,6 +16,7 @@ public sealed class MissionCourierOfferExpiryBackgroundServiceTests
         var worker = new MissionCourierOfferExpiryBackgroundService(
             services.GetRequiredService<IServiceScopeFactory>(),
             new ConfigurationBuilder().Build(),
+            new MissionCourierOfferExpiryWorkerStatus(TimeProvider.System),
             NullLogger<MissionCourierOfferExpiryBackgroundService>.Instance);
 
         await worker.StartAsync(CancellationToken.None);

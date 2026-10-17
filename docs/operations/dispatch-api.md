@@ -113,3 +113,8 @@ Mono:MissionOfferExpiry:BatchSize=20             # optional, 1–100
 ```
 
 The stored offer expiry remains authoritative (currently five minutes after offer creation). Leave the worker disabled when operations intends to manage expiry manually.
+
+
+## Offer expiry worker status
+
+Administrators can inspect the in-process worker state with `GET /operations/v1/dispatch/offer-expiry-worker/status`. The no-store response reports whether the worker is enabled, its state (`disabled`, `starting`, `healthy`, or `degraded`), the latest attempt and success timestamps, and the number of candidates in the last successful batch. A failed batch marks the worker degraded until a later successful batch. This diagnostic does not affect API readiness; the disabled-by-default worker reports `disabled` and does not make the API unhealthy. The status is process-local, so query each instance when the deployment has multiple API instances.
