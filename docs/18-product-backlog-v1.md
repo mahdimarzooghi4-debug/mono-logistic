@@ -577,6 +577,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 194 adds administrator-wide withdrawal lifecycle event search with actor, action, courier, and occurrence-time filters, filter-bound cursors, and append-only read auditing.
 - Sprint 195 adds administrator-wide payout-destination audit search across verification, revocation, and secret-access events, with filter-bound cursors and a dedicated append-only search-read ledger.
 - Sprint 196 adds a read-only, time-bounded payout reconciliation report that compares withdrawal lifecycle state with posted double-entry ledger transactions and audits each report page.
+- Sprint 197 adds an administrator-only, audited ledger drilldown for an individual withdrawal, showing safe transaction and double-entry details without payout secrets or idempotency keys.
 
 ### E17.1 Event Envelope
 - event ID

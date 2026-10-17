@@ -96,5 +96,6 @@
     <EmbeddedResource Include="../../db/migrations/075_courier_withdrawal_operations_event_search_audit.sql" LogicalName="Mono.Api.Tests.Migrations.075_courier_withdrawal_operations_event_search_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/076_courier_payout_destination_operations_search_audit.sql" LogicalName="Mono.Api.Tests.Migrations.076_courier_payout_destination_operations_search_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/077_courier_payout_reconciliation_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.077_courier_payout_reconciliation_read_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/078_courier_payout_ledger_detail_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.078_courier_payout_ledger_detail_read_audit.sql" />
   </ItemGroup>
 </Project>
