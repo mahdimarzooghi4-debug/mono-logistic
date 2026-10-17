@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json.Serialization;
 using Mono.Api.Security;
 using Npgsql;
 using NpgsqlTypes;
@@ -7,8 +8,12 @@ namespace Mono.Api.Persistence;
 
 public sealed record MissionSlaAlertCursor(DateTimeOffset DueAt, string MissionId);
 public sealed record MissionSlaAlert(
-    string MissionId, string CustomerId, string Status, DateTimeOffset CommittedDeliveryAt,
-    string? CourierId, bool IsOverdue);
+    [property: JsonPropertyName("mission_id")] string MissionId,
+    [property: JsonPropertyName("customer_id")] string CustomerId,
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("committed_delivery_at")] DateTimeOffset CommittedDeliveryAt,
+    [property: JsonPropertyName("courier_id")] string? CourierId,
+    [property: JsonPropertyName("is_overdue")] bool IsOverdue);
 public sealed record MissionSlaAlertPage(
     IReadOnlyList<MissionSlaAlert> Items, MissionSlaAlertCursor? NextCursor, DateTimeOffset EvaluatedAt);
 

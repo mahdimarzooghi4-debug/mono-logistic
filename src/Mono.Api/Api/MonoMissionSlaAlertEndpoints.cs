@@ -9,7 +9,8 @@ using Mono.Api.Security;
 namespace Mono.Api.Api;
 
 public sealed record MissionSlaAlertPageResponse(
-    IReadOnlyList<MissionSlaAlert> Items, string? NextCursor,
+    [property: System.Text.Json.Serialization.JsonPropertyName("items")] IReadOnlyList<MissionSlaAlert> Items,
+    [property: System.Text.Json.Serialization.JsonPropertyName("next_cursor")] string? NextCursor,
     [property: System.Text.Json.Serialization.JsonPropertyName("evaluated_at")] DateTimeOffset EvaluatedAt);
 
 public static class MonoMissionSlaAlertEndpoints
