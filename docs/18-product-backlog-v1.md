@@ -579,6 +579,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 196 adds a read-only, time-bounded payout reconciliation report that compares withdrawal lifecycle state with posted double-entry ledger transactions and audits each report page.
 - Sprint 197 adds an administrator-only, audited ledger drilldown for an individual withdrawal, showing safe transaction and double-entry details without payout secrets or idempotency keys.
 - Sprint 198 adds filterable administrator search over payout ledger drilldown audit history, with filter-bound keyset pagination and an immutable audit trail for every search page.
+- Sprint 199 adds an administrator reconciliation summary that aggregates withdrawal and discrepancy counts and toman amounts by reconciliation code, with an append-only audit for each bounded-time summary read.
 
 ### E17.1 Event Envelope
 - event ID
