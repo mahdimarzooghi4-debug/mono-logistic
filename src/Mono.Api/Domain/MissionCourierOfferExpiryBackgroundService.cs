@@ -63,19 +63,98 @@ public sealed class PostgresMissionCourierOfferExpiryDispatcher(
     }
 }
 
+public sealed record MissionCourierOfferExpiryWorkerSnapshot(
+    [property: System.Text.Json.Serialization.JsonPropertyName("enabled")] bool Enabled,
+    [property: System.Text.Json.Serialization.JsonPropertyName("state")] string State,
+    [property: System.Text.Json.Serialization.JsonPropertyName("last_attempt_at")] DateTimeOffset? LastAttemptAt,
+    [property: System.Text.Json.Serialization.JsonPropertyName("last_success_at")] DateTimeOffset? LastSuccessAt,
+    [property: System.Text.Json.Serialization.JsonPropertyName("last_batch_candidates")] int? LastBatchCandidates);
+
+/// <summary>In-process, non-sensitive status of the optional offer expiry worker.</summary>
+public sealed class MissionCourierOfferExpiryWorkerStatus(TimeProvider timeProvider)
+{
+    private readonly object _gate = new();
+    private bool _enabled;
+    private bool _initialized;
+    private bool? _lastAttemptSucceeded;
+    private DateTimeOffset? _lastAttemptAt;
+    private DateTimeOffset? _lastSuccessAt;
+    private int? _lastBatchCandidates;
+
+    public void MarkDisabled()
+    {
+        lock (_gate)
+        {
+            _enabled = false;
+            _initialized = true;
+        }
+    }
+
+    public void MarkEnabled()
+    {
+        lock (_gate)
+        {
+            _enabled = true;
+            _initialized = true;
+        }
+    }
+
+    public void RecordSuccess(int candidateCount)
+    {
+        lock (_gate)
+        {
+            _enabled = true;
+            _initialized = true;
+            _lastAttemptSucceeded = true;
+            _lastAttemptAt = timeProvider.GetUtcNow();
+            _lastSuccessAt = _lastAttemptAt;
+            _lastBatchCandidates = candidateCount;
+        }
+    }
+
+    public void RecordFailure()
+    {
+        lock (_gate)
+        {
+            _enabled = true;
+            _initialized = true;
+            _lastAttemptSucceeded = false;
+            _lastAttemptAt = timeProvider.GetUtcNow();
+            _lastBatchCandidates = null;
+        }
+    }
+
+    public MissionCourierOfferExpiryWorkerSnapshot GetSnapshot()
+    {
+        lock (_gate)
+        {
+            var state = !_initialized ? "starting"
+                : !_enabled ? "disabled"
+                : _lastAttemptSucceeded is false ? "degraded"
+                : _lastAttemptSucceeded is true ? "healthy"
+                : "starting";
+            return new MissionCourierOfferExpiryWorkerSnapshot(
+                _enabled, state, _lastAttemptAt, _lastSuccessAt, _lastBatchCandidates);
+        }
+    }
+}
+
 public sealed class MissionCourierOfferExpiryBackgroundService(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
+    MissionCourierOfferExpiryWorkerStatus workerStatus,
     ILogger<MissionCourierOfferExpiryBackgroundService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (!configuration.GetValue<bool>("Mono:MissionOfferExpiry:Enabled"))
         {
+            workerStatus.MarkDisabled();
             logger.LogInformation("Mission courier offer expiry worker is disabled by configuration.");
             return;
         }
 
+        workerStatus.MarkEnabled();
         var pollSeconds = configuration.GetValue("Mono:MissionOfferExpiry:PollIntervalSeconds", 10);
         var batchSize = configuration.GetValue("Mono:MissionOfferExpiry:BatchSize", 20);
         if (pollSeconds is < 1 or > 300 || batchSize is < 1 or > PostgresMissionCourierOfferExpiryDispatcher.MaximumBatchSize)
@@ -89,6 +168,7 @@ public sealed class MissionCourierOfferExpiryBackgroundService(
                 await using var scope = scopeFactory.CreateAsyncScope();
                 var dispatcher = scope.ServiceProvider.GetRequiredService<PostgresMissionCourierOfferExpiryDispatcher>();
                 processed = await dispatcher.ExpireOverdueBatchAsync(batchSize, stoppingToken);
+                workerStatus.RecordSuccess(processed);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -96,6 +176,7 @@ public sealed class MissionCourierOfferExpiryBackgroundService(
             }
             catch (Exception exception)
             {
+                workerStatus.RecordFailure();
                 logger.LogError(exception, "Mission courier offer expiry batch failed.");
             }
 
