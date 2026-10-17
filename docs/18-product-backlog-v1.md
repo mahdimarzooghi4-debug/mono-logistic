@@ -584,6 +584,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 201 centralizes the payout reconciliation SQL projection so detailed reports, aggregate summaries, and daily trends apply identical lifecycle and double-entry rules.
 - Sprint 202 scopes reconciliation to withdrawals in the requested time/courier/status window before ledger aggregation and adds a partial reference index for payout transactions.
 - Sprint 203 adds a reconciliation-code filter to the administrator report, binds it into keyset cursors, and records the selected code in append-only page-read audit.
+- Sprint 204 adds administrator search and keyset pagination for payout reconciliation report-read history, with filter-bound cursors and a separate immutable search-read ledger.
 
 ### E17.1 Event Envelope
 - event ID

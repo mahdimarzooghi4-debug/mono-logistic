@@ -537,6 +537,66 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal((long)(reconciliationPages + matchedFilterPages - 2), reader.GetInt64(4));
             }
 
+            var reconciliationAuditSearch =
+                new PostgresCourierPayoutReconciliationAuditSearchService(dataSource, operations);
+            var reconciliationAuditFrom = now.AddMinutes(39);
+            var reconciliationAuditTo = now.AddMinutes(49);
+            var reconciliationAuditItems = new List<CourierPayoutReconciliationAuditItem>();
+            CourierPayoutReconciliationAuditCursor? reconciliationAuditCursor = null;
+            var reconciliationAuditPages = 0;
+            do
+            {
+                var auditPage = await reconciliationAuditSearch.ReadAsync(
+                    1, operations.ActorId, courierId, null, "MATCHED", "FOUND", false,
+                    reconciliationAuditFrom, reconciliationAuditTo, reconciliationAuditCursor,
+                    now.AddMinutes(60 + reconciliationAuditPages), CancellationToken.None);
+                reconciliationAuditPages++;
+                reconciliationAuditItems.AddRange(auditPage.Items);
+                reconciliationAuditCursor = auditPage.NextCursor;
+            } while (reconciliationAuditCursor is not null);
+            Assert.Equal(matchedFilterPages, reconciliationAuditPages);
+            Assert.All(reconciliationAuditItems, item =>
+            {
+                Assert.Equal(operations.ActorId, item.ActorId);
+                Assert.Equal(courierId, item.CourierIdFilter);
+                Assert.Equal("MATCHED", item.ReconciliationCodeFilter);
+                Assert.Equal("FOUND", item.OutcomeCode);
+                Assert.Equal(1, item.ResultCount);
+            });
+
+            var emptyReconciliationAudit = await reconciliationAuditSearch.ReadAsync(
+                10, operations.ActorId, courierId, null, "MISSING_PAYOUT", "EMPTY", false,
+                reconciliationAuditFrom, reconciliationAuditTo, null,
+                now.AddMinutes(70), CancellationToken.None);
+            Assert.Empty(emptyReconciliationAudit.Items);
+            Assert.Null(emptyReconciliationAudit.NextCursor);
+
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT count(*),
+                    count(*) FILTER (WHERE actor_id = @actor AND actor_filter = @actor
+                      AND courier_id_filter = @courier_id AND reconciliation_code_filter = 'MATCHED'
+                      AND outcome_filter = 'FOUND' AND occurred_from_filter = @from_at
+                      AND occurred_to_filter = @to_at AND result_count = 1 AND outcome_code = 'FOUND'),
+                    count(*) FILTER (WHERE actor_id = @actor AND actor_filter = @actor
+                      AND courier_id_filter = @courier_id AND reconciliation_code_filter = 'MISSING_PAYOUT'
+                      AND outcome_filter = 'EMPTY' AND result_count = 0 AND outcome_code = 'EMPTY'),
+                    count(*) FILTER (WHERE cursor_read_audit_id IS NOT NULL)
+                FROM courier_payout_reconciliation_search_read_audit;
+                """, connection))
+            {
+                audit.Parameters.AddWithValue("actor", operations.ActorId);
+                audit.Parameters.AddWithValue("courier_id", courierId);
+                audit.Parameters.AddWithValue("from_at", reconciliationAuditFrom);
+                audit.Parameters.AddWithValue("to_at", reconciliationAuditTo);
+                await using var reader = await audit.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal((long)(reconciliationAuditPages + 1), reader.GetInt64(0));
+                Assert.Equal((long)reconciliationAuditPages, reader.GetInt64(1));
+                Assert.Equal(1L, reader.GetInt64(2));
+                Assert.Equal((long)(reconciliationAuditPages - 1), reader.GetInt64(3));
+            }
+
             var ledgerDetailReader = new PostgresCourierPayoutLedgerDetailReadService(dataSource, operations);
             var payoutLedgerDetail = await ledgerDetailReader.ReadAsync(
                 request.Withdrawal!.WithdrawalId, now.AddMinutes(31), CancellationToken.None);
@@ -1090,7 +1150,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.080_courier_payout_reconciliation_summary_audit.sql",
             "Mono.Api.Tests.Migrations.081_courier_payout_reconciliation_trend_audit.sql",
             "Mono.Api.Tests.Migrations.082_courier_payout_reconciliation_indexes.sql",
-            "Mono.Api.Tests.Migrations.083_courier_payout_reconciliation_code_filter.sql"
+            "Mono.Api.Tests.Migrations.083_courier_payout_reconciliation_code_filter.sql",
+            "Mono.Api.Tests.Migrations.084_courier_payout_reconciliation_search_audit.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {
