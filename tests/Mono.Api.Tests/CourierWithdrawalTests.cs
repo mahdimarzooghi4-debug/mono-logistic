@@ -601,6 +601,47 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal(1L, reader.GetInt64(1));
             }
 
+            var reconciliationTrendService = new PostgresCourierPayoutReconciliationTrendService(dataSource, operations);
+            var reconciliationTrend = await reconciliationTrendService.ReadAsync(
+                courierId, null, reconciliationFrom, reconciliationTo, now.AddMinutes(36), CancellationToken.None);
+            Assert.Equal((long)reconciled.Count, reconciliationTrend.TotalWithdrawalCount);
+            Assert.Equal(reconciled.Sum(item => item.AmountToman), reconciliationTrend.TotalAmountToman);
+            Assert.Equal((long)reconciled.Count(item => item.ReconciliationCode != "MATCHED"),
+                reconciliationTrend.DiscrepancyCount);
+            var expectedTrend = reconciled.GroupBy(item => new
+            {
+                Day = DateOnly.FromDateTime(item.CreatedAt.UtcDateTime),
+                item.ReconciliationCode
+            }).ToDictionary(group => (group.Key.Day, group.Key.ReconciliationCode), group => group.ToArray());
+            Assert.Equal(expectedTrend.Count, reconciliationTrend.Buckets.Count);
+            foreach (var bucket in reconciliationTrend.Buckets)
+            {
+                var expected = expectedTrend[(bucket.UtcDate, bucket.ReconciliationCode)];
+                Assert.Equal((long)expected.Length, bucket.WithdrawalCount);
+                Assert.Equal(expected.Sum(item => item.AmountToman), bucket.AmountToman);
+            }
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT count(*), count(*) FILTER (
+                    WHERE actor_id = @actor AND courier_id_filter = @courier_id
+                      AND status_filter IS NULL AND created_from_filter = @from_at
+                      AND created_to_filter = @to_at AND total_withdrawal_count = @total
+                      AND bucket_count = @buckets AND outcome_code = 'FOUND')
+                FROM courier_payout_reconciliation_trend_read_audit;
+                """, connection))
+            {
+                audit.Parameters.AddWithValue("actor", operations.ActorId);
+                audit.Parameters.AddWithValue("courier_id", courierId);
+                audit.Parameters.AddWithValue("from_at", reconciliationFrom);
+                audit.Parameters.AddWithValue("to_at", reconciliationTo);
+                audit.Parameters.AddWithValue("total", (long)reconciled.Count);
+                audit.Parameters.AddWithValue("buckets", reconciliationTrend.Buckets.Count);
+                await using var reader = await audit.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(1L, reader.GetInt64(0));
+                Assert.Equal(1L, reader.GetInt64(1));
+            }
+
             var fromAt = now.AddMinutes(2);
             var toAt = now.AddMinutes(7);
             var courierWithdrawalPage1 = await withdrawals.ListForCourierAsync(
@@ -1000,7 +1041,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.077_courier_payout_reconciliation_read_audit.sql",
             "Mono.Api.Tests.Migrations.078_courier_payout_ledger_detail_read_audit.sql",
             "Mono.Api.Tests.Migrations.079_courier_payout_ledger_detail_search_audit.sql",
-            "Mono.Api.Tests.Migrations.080_courier_payout_reconciliation_summary_audit.sql"
+            "Mono.Api.Tests.Migrations.080_courier_payout_reconciliation_summary_audit.sql",
+            "Mono.Api.Tests.Migrations.081_courier_payout_reconciliation_trend_audit.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {
