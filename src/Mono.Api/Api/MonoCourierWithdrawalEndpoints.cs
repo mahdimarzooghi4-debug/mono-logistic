@@ -190,6 +190,8 @@ public static class MonoCourierWithdrawalEndpoints
                 DateTimeOffset? from_at,
                 DateTimeOffset? to_at,
                 string? status,
+                long? min_amount_toman,
+                long? max_amount_toman,
                 CancellationToken cancellationToken) =>
             {
                 var pageSize = limit ?? 50;
@@ -198,18 +200,23 @@ public static class MonoCourierWithdrawalEndpoints
                 if (from_at.HasValue != to_at.HasValue ||
                     (from_at.HasValue && from_at.Value >= to_at!.Value))
                     return Results.BadRequest(new { error_code = "INVALID_DATE_RANGE" });
+                if (min_amount_toman < 0 || max_amount_toman < 0 ||
+                    (min_amount_toman.HasValue && max_amount_toman.HasValue && min_amount_toman > max_amount_toman))
+                    return Results.BadRequest(new { error_code = "INVALID_AMOUNT_RANGE" });
                 var normalizedStatus = string.IsNullOrWhiteSpace(status) ? null : status.Trim().ToUpperInvariant();
                 if (normalizedStatus is not null && !CourierWithdrawalStatuses.Contains(normalizedStatus))
                     return Results.BadRequest(new { error_code = "INVALID_STATUS" });
                 var fromAt = from_at?.ToUniversalTime();
                 var toAt = to_at?.ToUniversalTime();
-                if (!TryDecodeCourierCursor(cursor, fromAt, toAt, normalizedStatus, out var before))
+                if (!TryDecodeCourierCursor(cursor, fromAt, toAt, normalizedStatus,
+                        min_amount_toman, max_amount_toman, out var before))
                     return Results.BadRequest(new { error_code = "INVALID_CURSOR" });
                 var page = await service.ListForCourierAsync(
-                    courier.CourierId, pageSize, before, cancellationToken, fromAt, toAt, normalizedStatus);
+                    courier.CourierId, pageSize, before, cancellationToken, fromAt, toAt,
+                    normalizedStatus, min_amount_toman, max_amount_toman);
                 return Results.Ok(new CourierWithdrawalPageResponse<CourierWithdrawalItemResponse>(
                     page.Items.Select(ToCourierResponse).ToArray(),
-                    page.NextBeforeSequence is long next ? EncodeCourierCursor(next, fromAt, toAt, normalizedStatus) : null));
+                    page.NextBeforeSequence is long next ? EncodeCourierCursor(next, fromAt, toAt, normalizedStatus, min_amount_toman, max_amount_toman) : null));
             })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
@@ -278,19 +285,23 @@ public static class MonoCourierWithdrawalEndpoints
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     private static string EncodeCourierCursor(
-        long sequence, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status)
+        long sequence, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status,
+        long? minAmountToman, long? maxAmountToman)
     {
-        var value = string.Join("|", "withdrawals-v2",
+        var value = string.Join("|", "withdrawals-v3",
             fromAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*",
             toAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*",
             status ?? "*",
+            minAmountToman?.ToString(CultureInfo.InvariantCulture) ?? "*",
+            maxAmountToman?.ToString(CultureInfo.InvariantCulture) ?? "*",
             sequence.ToString(CultureInfo.InvariantCulture));
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(value))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 
     private static bool TryDecodeCourierCursor(
-        string? cursor, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status, out long? sequence)
+        string? cursor, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status,
+        long? minAmountToman, long? maxAmountToman, out long? sequence)
     {
         sequence = null;
         if (cursor is null)
@@ -302,11 +313,13 @@ public static class MonoCourierWithdrawalEndpoints
             var value = cursor.Replace('-', '+').Replace('_', '/');
             value += new string('=', (4 - value.Length % 4) % 4);
             var parts = Encoding.UTF8.GetString(Convert.FromBase64String(value)).Split('|');
-            if (parts.Length != 5 || parts[0] != "withdrawals-v2" ||
+            if (parts.Length != 7 || parts[0] != "withdrawals-v3" ||
                 parts[1] != (fromAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*") ||
                 parts[2] != (toAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ?? "*") ||
                 parts[3] != (status ?? "*") ||
-                !long.TryParse(parts[4], NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
+                parts[4] != (minAmountToman?.ToString(CultureInfo.InvariantCulture) ?? "*") ||
+                parts[5] != (maxAmountToman?.ToString(CultureInfo.InvariantCulture) ?? "*") ||
+                !long.TryParse(parts[6], NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) ||
                 parsed <= 0)
                 return false;
             sequence = parsed;
