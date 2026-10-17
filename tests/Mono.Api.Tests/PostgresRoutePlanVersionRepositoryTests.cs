@@ -67,7 +67,7 @@ public sealed class PostgresRoutePlanVersionRepositoryTests(ITestOutputHelper ou
                 "UPDATE route_plan_operations_read_audit SET outcome = 'TAMPERED' WHERE route_id = @route_id;",
                 connection);
             update.Parameters.AddWithValue("route_id", routeId);
-            await Assert.ThrowsAsync<PostgresException>(() => update.ExecuteNonQuery());
+            await Assert.ThrowsAsync<PostgresException>(async () => { await update.ExecuteNonQueryAsync(); });
         }
     }
 
