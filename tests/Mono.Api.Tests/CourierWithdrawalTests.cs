@@ -514,6 +514,33 @@ public sealed class CourierWithdrawalTests
             var overBoundaryLimit = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
                 "boundary-004", nextTehranDayStart.AddMinutes(4), CancellationToken.None);
             Assert.Equal("DAILY_LIMIT_REACHED", overBoundaryLimit.OutcomeCode);
+
+            var revoke = await withdrawals.RevokeDestinationAsync(courierId,
+                "case:bank-account-compromised", "destination-revoke-001",
+                nextTehranDayStart.AddMinutes(5), CancellationToken.None);
+            Assert.Equal("REVOKED", revoke.OutcomeCode);
+            Assert.False(revoke.AlreadyRequested);
+            var revokeReplay = await withdrawals.RevokeDestinationAsync(courierId,
+                "case:bank-account-compromised", "destination-revoke-001",
+                nextTehranDayStart.AddMinutes(6), CancellationToken.None);
+            Assert.Equal("REVOKED", revokeReplay.OutcomeCode);
+            Assert.True(revokeReplay.AlreadyRequested);
+            var revokeConflict = await withdrawals.RevokeDestinationAsync(courierId,
+                "case:other-evidence", "destination-revoke-001",
+                nextTehranDayStart.AddMinutes(6), CancellationToken.None);
+            Assert.Equal("IDEMPOTENCY_CONFLICT", revokeConflict.OutcomeCode);
+            var revokedStatus = await withdrawals.GetDestinationStatusAsync(courierId, CancellationToken.None);
+            Assert.Equal("NOT_VERIFIED", revokedStatus.OutcomeCode);
+            Assert.Null(revokedStatus.MaskedIban);
+            var withdrawalAfterRevocation = await withdrawals.CreateWithdrawalAsync(courierId, 1_000,
+                "after-destination-revoke", nextTehranDayStart.AddMinutes(7), CancellationToken.None);
+            Assert.Equal("PAYOUT_DESTINATION_UNVERIFIED", withdrawalAfterRevocation.OutcomeCode);
+            var reverified = await withdrawals.VerifyDestinationAsync(courierId, iban,
+                "case:bank-account-restored", "destination-reverify-001",
+                nextTehranDayStart.AddMinutes(8), CancellationToken.None);
+            Assert.Equal("VERIFIED", reverified.OutcomeCode);
+            Assert.Equal("VERIFIED",
+                (await withdrawals.GetDestinationStatusAsync(courierId, CancellationToken.None)).OutcomeCode);
         }
         finally
         {

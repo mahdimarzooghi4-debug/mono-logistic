@@ -10,6 +10,8 @@ namespace Mono.Api.Api;
 public sealed record CourierPayoutDestinationVerificationInput(
     [property: JsonPropertyName("iban")] string? Iban,
     [property: JsonPropertyName("evidence_reference")] string? EvidenceReference);
+public sealed record CourierPayoutDestinationRevokeInput(
+    [property: JsonPropertyName("evidence_reference")] string? EvidenceReference);
 public sealed record CourierPayoutDestinationStatusResponse(
     [property: JsonPropertyName("destination_status")] string DestinationStatus,
     [property: JsonPropertyName("masked_iban")] string? MaskedIban);
@@ -77,6 +79,34 @@ public static class MonoCourierWithdrawalEndpoints
                         "INVALID_INPUT" => Results.BadRequest(new { error_code = result.OutcomeCode }),
                         "COURIER_NOT_FOUND" => Results.NotFound(new { error_code = result.OutcomeCode }),
                         "ENCRYPTION_UNAVAILABLE" => Results.Problem(statusCode: 503, title: "Payout destination verification is unavailable."),
+                        _ => Results.Conflict(new { error_code = result.OutcomeCode })
+                    };
+                })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapPost("/operations/v1/couriers/{courierId}/payout-destination/revoke",
+                async Task<IResult> (
+                    string courierId,
+                    CourierPayoutDestinationRevokeInput input,
+                    HttpContext httpContext,
+                    PostgresCourierWithdrawalService service,
+                    TimeProvider timeProvider,
+                    CancellationToken cancellationToken) =>
+                {
+                    var key = httpContext.Request.Headers["Idempotency-Key"].ToString();
+                    if (string.IsNullOrWhiteSpace(key))
+                        return Results.BadRequest(new { error_code = "IDEMPOTENCY_KEY_REQUIRED" });
+                    var result = await service.RevokeDestinationAsync(courierId,
+                        input.EvidenceReference ?? "", key, timeProvider.GetUtcNow(), cancellationToken);
+                    return result.OutcomeCode switch
+                    {
+                        "REVOKED" => Results.Ok(new
+                        {
+                            destination_status = "NOT_VERIFIED",
+                            already_revoked = result.AlreadyRequested
+                        }),
+                        "INVALID_INPUT" => Results.BadRequest(new { error_code = result.OutcomeCode }),
+                        "COURIER_NOT_FOUND" => Results.NotFound(new { error_code = result.OutcomeCode }),
                         _ => Results.Conflict(new { error_code = result.OutcomeCode })
                     };
                 })
