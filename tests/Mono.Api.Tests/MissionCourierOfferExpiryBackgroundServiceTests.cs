@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Mono.Api.Domain;
 using Npgsql;
+using Xunit;
 
 namespace Mono.Api.Tests;
 
