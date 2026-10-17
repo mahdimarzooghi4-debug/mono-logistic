@@ -446,6 +446,20 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal(1L, reader.GetInt64(2));
             }
 
+            await using (var indexConnection = await dataSource.OpenConnectionAsync())
+            await using (var indexCheck = new NpgsqlCommand("""
+                SELECT indexdef
+                FROM pg_indexes
+                WHERE schemaname = current_schema()
+                  AND indexname = 'ledger_transactions_withdrawal_payout_reference_idx';
+                """, indexConnection))
+            {
+                var indexDefinition = (string?)await indexCheck.ExecuteScalarAsync();
+                Assert.NotNull(indexDefinition);
+                Assert.Contains("reference_id", indexDefinition);
+                Assert.Contains("WITHDRAWAL_PAYOUT", indexDefinition);
+            }
+
             var reconciliation = new PostgresCourierPayoutReconciliationService(dataSource, operations);
             var reconciliationFrom = now.AddMinutes(-30);
             var reconciliationTo = now.AddMinutes(90);
@@ -1042,7 +1056,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.078_courier_payout_ledger_detail_read_audit.sql",
             "Mono.Api.Tests.Migrations.079_courier_payout_ledger_detail_search_audit.sql",
             "Mono.Api.Tests.Migrations.080_courier_payout_reconciliation_summary_audit.sql",
-            "Mono.Api.Tests.Migrations.081_courier_payout_reconciliation_trend_audit.sql"
+            "Mono.Api.Tests.Migrations.081_courier_payout_reconciliation_trend_audit.sql",
+            "Mono.Api.Tests.Migrations.082_courier_payout_reconciliation_indexes.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {

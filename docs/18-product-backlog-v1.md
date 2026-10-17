@@ -582,6 +582,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 199 adds an administrator reconciliation summary that aggregates withdrawal and discrepancy counts and toman amounts by reconciliation code, with an append-only audit for each bounded-time summary read.
 - Sprint 200 adds an administrator UTC-day reconciliation trend grouped by reconciliation code and toman value, with optional courier/status filters and an append-only summary-read audit.
 - Sprint 201 centralizes the payout reconciliation SQL projection so detailed reports, aggregate summaries, and daily trends apply identical lifecycle and double-entry rules.
+- Sprint 202 scopes reconciliation to withdrawals in the requested time/courier/status window before ledger aggregation and adds a partial reference index for payout transactions.
 
 ### E17.1 Event Envelope
 - event ID
