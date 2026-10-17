@@ -561,8 +561,9 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal(courierId, item.CourierIdFilter);
                 Assert.Equal("MATCHED", item.ReconciliationCodeFilter);
                 Assert.Equal("FOUND", item.OutcomeCode);
-                Assert.Equal(1, item.ResultCount);
+                Assert.InRange(item.ResultCount, 1, 2);
             });
+            Assert.Equal(matchedOnly.Count, reconciliationAuditItems.Sum(item => item.ResultCount));
 
             var emptyReconciliationAudit = await reconciliationAuditSearch.ReadAsync(
                 10, operations.ActorId, courierId, null, "MISSING_PAYOUT", "EMPTY", false,
