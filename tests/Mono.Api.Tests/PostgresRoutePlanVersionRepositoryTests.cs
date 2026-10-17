@@ -1,5 +1,6 @@
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
+using Mono.Api.Security;
 using Npgsql;
 using Xunit;
 using Xunit.Abstractions;
@@ -56,6 +57,10 @@ public sealed class PostgresRoutePlanVersionRepositoryTests(ITestOutputHelper ou
             var missingOnly = await audit.ListAsync(routeId, null, "NOT_FOUND",
                 now.AddMinutes(-2), now.AddMinutes(2), 10, null);
             Assert.Single(missingOnly!.Items);
+            var inspections = await audit.ListAsync(null,
+                PostgresRoutePlanOperationsReadAuditService.AuditInspection, "FOUND",
+                now.AddMinutes(-2), now.AddMinutes(2), 10, null);
+            Assert.Equal(3, inspections!.Items.Count);
 
             await using var connection = await dataSource.OpenConnectionAsync();
             await using var update = new NpgsqlCommand(

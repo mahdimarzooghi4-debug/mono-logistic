@@ -94,7 +94,7 @@ public static class MonoRoutePlanReadAuditEndpoints
             var payload = JsonSerializer.Deserialize<CursorPayload>(Convert.FromBase64String(base64));
             if (payload is null || payload.RouteId != routeId || payload.Action != action ||
                 payload.Outcome != outcome || payload.From != Format(from) || payload.To != Format(to) ||
-                !DateTimeOffset.TryParse(payload.At, CultureInfo.InvariantCulture,
+                payload.AuditId is null || !DateTimeOffset.TryParse(payload.At, CultureInfo.InvariantCulture,
                     DateTimeStyles.RoundtripKind, out var occurredAt) ||
                 !PostgresRoutePlanOperationsReadAuditService.IsValidAuditCursor(payload.AuditId))
                 return false;

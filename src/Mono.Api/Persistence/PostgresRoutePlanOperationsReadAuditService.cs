@@ -36,10 +36,12 @@ public sealed class PostgresRoutePlanOperationsReadAuditService(
             resultCount is < 0 or > 100 ||
             (action == CurrentPlanRead &&
              (!IsRouteIdValid(routeId) || (version is not null and < 1) ||
+              (outcome is not ("FOUND" or "NOT_FOUND")) ||
               (outcome == "FOUND" && (version is null || resultCount != 1)) ||
               (outcome == "NOT_FOUND" && (version is not null || resultCount != 0)))) ||
             (action == PlanVersionRead &&
              (!IsRouteIdValid(routeId) || version is null or < 1 ||
+              (outcome is not ("FOUND" or "NOT_FOUND")) ||
               (outcome == "FOUND" && resultCount != 1) ||
               (outcome == "NOT_FOUND" && resultCount != 0))) ||
             (action == AuditInspection &&

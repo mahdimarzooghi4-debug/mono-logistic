@@ -58,10 +58,12 @@ public static class MonoRoutePlanOperationsEndpoints
 
         endpoints.MapGet(route, async (
                 string routeId,
+                HttpContext context,
                 IRoutePlanVersionStore routePlans,
                 PostgresRoutePlanOperationsReadAuditService readAudit,
                 CancellationToken cancellationToken) =>
             {
+                context.Response.Headers.CacheControl = "no-store";
                 if (!IsRouteIdValid(routeId))
                     return (IResult)Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_REQUEST", "Route ID is invalid.")));
@@ -80,11 +82,13 @@ public static class MonoRoutePlanOperationsEndpoints
 
         endpoints.MapGet(route + "/versions/{version:int}", async (
                 string routeId,
+                HttpContext context,
                 int version,
                 IRoutePlanVersionStore routePlans,
                 PostgresRoutePlanOperationsReadAuditService readAudit,
                 CancellationToken cancellationToken) =>
             {
+                context.Response.Headers.CacheControl = "no-store";
                 if (!IsRouteIdValid(routeId) || version <= 0)
                     return (IResult)Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_REQUEST", "Route ID or version is invalid.")));
