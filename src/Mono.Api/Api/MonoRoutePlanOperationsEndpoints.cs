@@ -58,14 +58,21 @@ public static class MonoRoutePlanOperationsEndpoints
 
         endpoints.MapGet(route, async (
                 string routeId,
+                HttpContext context,
                 IRoutePlanVersionStore routePlans,
+                PostgresRoutePlanOperationsReadAuditService readAudit,
                 CancellationToken cancellationToken) =>
             {
+                context.Response.Headers.CacheControl = "no-store";
                 if (!IsRouteIdValid(routeId))
                     return (IResult)Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_REQUEST", "Route ID is invalid.")));
 
                 var current = await routePlans.FindCurrentAsync(routeId, cancellationToken);
+                await readAudit.RecordAsync(
+                    PostgresRoutePlanOperationsReadAuditService.CurrentPlanRead, routeId,
+                    current?.Version, current is null ? "NOT_FOUND" : "FOUND",
+                    current is null ? 0 : 1, cancellationToken);
                 IResult response = current is null
                     ? Results.NotFound(new ApiErrorResponse(new ApiError("ROUTE_NOT_FOUND", "The Route plan was not found.")))
                     : Results.Ok(current);
@@ -75,15 +82,22 @@ public static class MonoRoutePlanOperationsEndpoints
 
         endpoints.MapGet(route + "/versions/{version:int}", async (
                 string routeId,
+                HttpContext context,
                 int version,
                 IRoutePlanVersionStore routePlans,
+                PostgresRoutePlanOperationsReadAuditService readAudit,
                 CancellationToken cancellationToken) =>
             {
+                context.Response.Headers.CacheControl = "no-store";
                 if (!IsRouteIdValid(routeId) || version <= 0)
                     return (IResult)Results.BadRequest(new ApiErrorResponse(
                         new ApiError("INVALID_REQUEST", "Route ID or version is invalid.")));
 
                 var plan = await routePlans.FindVersionAsync(routeId, version, cancellationToken);
+                await readAudit.RecordAsync(
+                    PostgresRoutePlanOperationsReadAuditService.PlanVersionRead, routeId,
+                    version, plan is null ? "NOT_FOUND" : "FOUND", plan is null ? 0 : 1,
+                    cancellationToken);
                 IResult response = plan is null
                     ? Results.NotFound(new ApiErrorResponse(new ApiError("ROUTE_PLAN_VERSION_NOT_FOUND", "The Route plan version was not found.")))
                     : Results.Ok(plan);

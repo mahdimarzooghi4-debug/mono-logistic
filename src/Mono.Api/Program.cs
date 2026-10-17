@@ -64,6 +64,7 @@ builder.Services.AddScoped<PostgresCourierCapacityProjectionService>();
 builder.Services.AddScoped<PostgresCourierSuspensionService>();
 builder.Services.AddScoped<PostgresCourierLivePresenceService>();
 builder.Services.AddScoped<PostgresCourierLivePresenceOperationsSearchService>();
+builder.Services.AddScoped<PostgresRoutePlanOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresMissionCourierOfferService>();
 builder.Services.AddScoped<PostgresMissionCourierIssueService>();
 builder.Services.AddScoped(services => new PostgresCourierIdentityBindingService(
@@ -143,6 +144,7 @@ app.MapMissionHistoryEndpoints();
 app.MapMonoMissionOperationsEndpoints();
 app.MapMonoMissionDispatchAttemptHistoryEndpoints();
 app.MapMonoRoutePlanOperationsEndpoints();
+app.MapMonoRoutePlanReadAuditEndpoints();
 app.MapMonoCourierOperationsEndpoints();
 app.MapMonoCourierSuspensionEndpoints();
 app.MapMonoCourierSessionEndpoints();

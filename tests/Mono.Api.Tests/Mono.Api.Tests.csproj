@@ -104,5 +104,6 @@
     <EmbeddedResource Include="../../db/migrations/083_courier_payout_reconciliation_code_filter.sql" LogicalName="Mono.Api.Tests.Migrations.083_courier_payout_reconciliation_code_filter.sql" />
     <EmbeddedResource Include="../../db/migrations/084_courier_payout_reconciliation_search_audit.sql" LogicalName="Mono.Api.Tests.Migrations.084_courier_payout_reconciliation_search_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/085_courier_live_presence_operations_search.sql" LogicalName="Mono.Api.Tests.Migrations.085_courier_live_presence_operations_search.sql" />
+    <EmbeddedResource Include="../../db/migrations/086_route_plan_operations_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.086_route_plan_operations_read_audit.sql" />
   </ItemGroup>
 </Project>
