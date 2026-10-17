@@ -649,6 +649,7 @@ Dashboard must use the same application/core rules as API customers.
 - courier state
 - assignment
 - zone capacity
+- Sprint 208 adds a time-consistent, administrator-only delivery SLA alert feed for all active Missions, with an operator-selected lookahead window, assigned-courier context, stable filter-bound keyset pagination, and append-only read auditing.
 - SLA alerts
 - re-dispatch
 - controlled exception handling
