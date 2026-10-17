@@ -204,6 +204,95 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
 
 
     [Fact]
+    public async Task Operations_presence_search_filters_pages_and_audits_without_exposing_coordinates()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central", "zone-east");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(database.DataSource, context);
+        var presence = new PostgresCourierLivePresenceService(database.DataSource);
+        var readAudit = new PostgresCourierOperationsReadAuditService(database.DataSource, context);
+
+        async Task<string> CreateOnlineCourier(string key, string zone)
+        {
+            var registration = await onboarding.RegisterAsync("BIKE", [zone], key + "-register");
+            var courierId = registration.Snapshot!.CourierId;
+            var statuses = new[]
+            {
+                "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED",
+                "TRUST_REQUIREMENTS_VERIFIED", "MONO_APPROVED", "ACTIVE"
+            };
+            for (var index = 0; index < statuses.Length; index++)
+            {
+                var status = statuses[index];
+                var transition = await onboarding.AdvanceTrustAsync(
+                    courierId, status, status == "ACTIVE" ? [zone] : null,
+                    status == "ACTIVE" ? zone : null, "REVIEW_COMPLETED",
+                    key + ":" + status, key + "-transition-" + index);
+                Assert.Equal(CourierOperationsWriteOutcome.Applied, transition.Outcome);
+            }
+            var online = await presence.GoOnlineAsync(courierId, zone, key + "-online");
+            Assert.Equal(CourierLivePresenceOutcome.Applied, online.Outcome);
+            return courierId;
+        }
+
+        var centralOne = await CreateOnlineCourier("presence-central-one", "zone-central");
+        var centralTwo = await CreateOnlineCourier("presence-central-two", "zone-central");
+        var east = await CreateOnlineCourier("presence-east", "zone-east");
+        var offlineRegistration = await onboarding.RegisterAsync(
+            "WALK", ["zone-central"], "presence-offline-register");
+        var offlineId = offlineRegistration.Snapshot!.CourierId;
+
+        var first = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            1, "online", "zone-central", null, null, null);
+        Assert.Single(first.Items);
+        Assert.Equal("ONLINE", first.Items[0].Status);
+        Assert.Equal("zone-central", first.Items[0].ZoneId);
+        Assert.NotNull(first.NextCursor);
+        Assert.Contains(first.Items[0].CourierId, new[] { centralOne, centralTwo });
+        Assert.DoesNotContain(first.Items[0].CourierId, new[] { east, offlineId });
+
+        var second = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            1, "ONLINE", "zone-central", null, null, first.NextCursor);
+        Assert.Single(second.Items);
+        Assert.Null(second.NextCursor);
+        Assert.NotEqual(first.Items[0].CourierId, second.Items[0].CourierId);
+        Assert.Contains(second.Items[0].CourierId, new[] { centralOne, centralTwo });
+
+        var timeFiltered = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            10, "ONLINE", "zone-central", now, now.AddHours(1), null);
+        Assert.Equal(2, timeFiltered.Items.Count);
+        Assert.All(timeFiltered.Items, item => Assert.True(item.UpdatedAt >= now));
+        Assert.All(timeFiltered.Items, item => Assert.True(item.UpdatedAt < now.AddHours(1)));
+
+        var offline = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            10, "OFFLINE", null, null, null, null);
+        Assert.Contains(offline.Items, item => item.CourierId == offlineId && item.UpdatedAt is null);
+        Assert.DoesNotContain(offline.Items, item => item.CourierId == east);
+
+        var auditPage = await readAudit.ListAsync(20, null);
+        Assert.NotNull(auditPage);
+        Assert.Equal(4, auditPage.Items.Count(item =>
+            item.Action == PostgresCourierOperationsReadAuditService.CourierPresenceSearch &&
+            item.CourierId is null));
+        Assert.DoesNotContain("Latitude", typeof(CourierLivePresenceOperationsSearchItem).GetProperties()
+            .Select(property => property.Name), StringComparer.OrdinalIgnoreCase);
+    }
+
+
+    [Fact]
     public async Task Live_presence_is_idempotent_zone_approved_and_event_maintained()
     {
         var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
@@ -953,6 +1042,16 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var livePresenceConnection = await DataSource.OpenConnectionAsync();
             await using var livePresenceCommand = new NpgsqlCommand(livePresenceSql, livePresenceConnection);
             await livePresenceCommand.ExecuteNonQueryAsync();
+
+            const string operationsPresenceSearchResourceName = "Mono.Api.Tests.Migrations.085_courier_live_presence_operations_search.sql";
+            await using var operationsPresenceSearchStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(operationsPresenceSearchResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {operationsPresenceSearchResourceName}.");
+            using var operationsPresenceSearchReader = new StreamReader(operationsPresenceSearchStream);
+            var operationsPresenceSearchSql = await operationsPresenceSearchReader.ReadToEndAsync();
+            await using var operationsPresenceSearchConnection = await DataSource.OpenConnectionAsync();
+            await using var operationsPresenceSearchCommand = new NpgsqlCommand(operationsPresenceSearchSql, operationsPresenceSearchConnection);
+            await operationsPresenceSearchCommand.ExecuteNonQueryAsync();
         }
 
         public async ValueTask DisposeAsync()
