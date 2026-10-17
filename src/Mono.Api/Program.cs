@@ -35,6 +35,7 @@ builder.Services.AddScoped<PostgresCourierEarningLedger>();
 builder.Services.AddScoped<PostgresCourierWithdrawalService>();
 builder.Services.AddScoped<PostgresCourierWithdrawalHistoryReadService>();
 builder.Services.AddScoped<PostgresCourierWithdrawalOperationsSearchService>();
+builder.Services.AddScoped<PostgresCourierWithdrawalOperationsAuditReadService>();
 builder.Services.AddScoped<PostgresCourierPayoutDestinationAuditReadService>();
 builder.Services.AddSingleton(_ => new CourierPayoutIbanProtector(builder.Configuration["MonoCourier:PayoutIbanEncryptionKey"]));
 builder.Services.AddScoped<PostgresCourierOnboardingService>();
