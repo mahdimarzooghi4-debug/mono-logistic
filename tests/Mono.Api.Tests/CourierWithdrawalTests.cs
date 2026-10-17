@@ -406,6 +406,46 @@ public sealed class CourierWithdrawalTests
                 Assert.False(await reader.ReadAsync());
             }
 
+
+            var destinationSearch = new PostgresCourierPayoutDestinationAuditSearchService(dataSource, operations);
+            var destinationSearchFrom = now.AddMinutes(-30);
+            var destinationSearchTo = now.AddMinutes(30);
+            var destinationSearchPage1 = await destinationSearch.SearchAsync(
+                1, courierId, null, null, null, destinationSearchFrom, destinationSearchTo,
+                null, now.AddMinutes(13), CancellationToken.None);
+            Assert.Single(destinationSearchPage1.Items);
+            Assert.NotNull(destinationSearchPage1.NextCursor);
+            var destinationSearchPage2 = await destinationSearch.SearchAsync(
+                1, courierId, null, null, null, destinationSearchFrom, destinationSearchTo,
+                destinationSearchPage1.NextCursor, now.AddMinutes(14), CancellationToken.None);
+            Assert.Single(destinationSearchPage2.Items);
+            Assert.All(destinationSearchPage1.Items.Concat(destinationSearchPage2.Items), item =>
+            {
+                Assert.Contains(item.EventType, new[] { "DESTINATION", "SECRET_ACCESS" });
+                Assert.True(item.MaskedIban is null ||
+                    item.MaskedIban.StartsWith("IR********************", StringComparison.Ordinal));
+            });
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT count(*), count(*) FILTER (
+                    WHERE actor_id = @actor AND courier_id_filter = @courier_id
+                      AND occurred_from_filter = @from_at AND occurred_to_filter = @to_at
+                      AND result_count = 1 AND outcome_code = 'FOUND'),
+                    count(*) FILTER (WHERE cursor_event_key IS NOT NULL)
+                FROM courier_payout_destination_operations_search_audit;
+                """, connection))
+            {
+                audit.Parameters.AddWithValue("actor", operations.ActorId);
+                audit.Parameters.AddWithValue("courier_id", courierId);
+                audit.Parameters.AddWithValue("from_at", destinationSearchFrom);
+                audit.Parameters.AddWithValue("to_at", destinationSearchTo);
+                await using var reader = await audit.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(2L, reader.GetInt64(0));
+                Assert.Equal(2L, reader.GetInt64(1));
+                Assert.Equal(1L, reader.GetInt64(2));
+            }
+
             var fromAt = now.AddMinutes(2);
             var toAt = now.AddMinutes(7);
             var courierWithdrawalPage1 = await withdrawals.ListForCourierAsync(
@@ -800,7 +840,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.072_courier_ledger_statement_index.sql",
             "Mono.Api.Tests.Migrations.073_courier_withdrawal_operations_search_filters.sql",
             "Mono.Api.Tests.Migrations.074_courier_withdrawal_operations_audit_read.sql",
-            "Mono.Api.Tests.Migrations.075_courier_withdrawal_operations_event_search_audit.sql"
+            "Mono.Api.Tests.Migrations.075_courier_withdrawal_operations_event_search_audit.sql",
+            "Mono.Api.Tests.Migrations.076_courier_payout_destination_operations_search_audit.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {
