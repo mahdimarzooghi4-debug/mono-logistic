@@ -426,6 +426,15 @@ public sealed class CourierWithdrawalTests
                 courierId, 50, null, CancellationToken.None, fromAt, toAt, "REJECTED");
             Assert.Single(rejectedCourierWithdrawals.Items);
             Assert.Equal(second.Withdrawal.WithdrawalId, rejectedCourierWithdrawals.Items[0].WithdrawalId);
+            Assert.Equal(10_000L, rejectedCourierWithdrawals.Items[0].AmountToman);
+            var exactAmountCourierWithdrawals = await withdrawals.ListForCourierAsync(
+                courierId, 50, null, CancellationToken.None, fromAt, toAt, null, 1_000, 1_000);
+            Assert.Single(exactAmountCourierWithdrawals.Items);
+            Assert.Equal(third.Withdrawal!.WithdrawalId, exactAmountCourierWithdrawals.Items[0].WithdrawalId);
+            var minimumAmountCourierWithdrawals = await withdrawals.ListForCourierAsync(
+                courierId, 50, null, CancellationToken.None, fromAt, toAt, null, 10_000, null);
+            Assert.Single(minimumAmountCourierWithdrawals.Items);
+            Assert.Equal(second.Withdrawal.WithdrawalId, minimumAmountCourierWithdrawals.Items[0].WithdrawalId);
             var emptyCourierWithdrawalWindow = await withdrawals.ListForCourierAsync(
                 courierId, 50, null, CancellationToken.None, now.AddMinutes(7), now.AddMinutes(9));
             Assert.Empty(emptyCourierWithdrawalWindow.Items);

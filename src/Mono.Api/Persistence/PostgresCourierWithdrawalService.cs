@@ -479,16 +479,19 @@ public sealed class PostgresCourierWithdrawalService(
 
     public async Task<CourierWithdrawalPage> ListForCourierAsync(
         string courierId, int limit, long? beforeSequence, CancellationToken cancellationToken,
-        DateTimeOffset? fromAt = null, DateTimeOffset? toAt = null, string? status = null) =>
-        await ListAsync(courierId, false, limit, beforeSequence, cancellationToken, fromAt, toAt, status);
+        DateTimeOffset? fromAt = null, DateTimeOffset? toAt = null, string? status = null,
+        long? minAmountToman = null, long? maxAmountToman = null) =>
+        await ListAsync(courierId, false, limit, beforeSequence, cancellationToken,
+            fromAt, toAt, status, minAmountToman, maxAmountToman);
 
     public async Task<CourierWithdrawalPage> ListForOperationsAsync(
         int limit, long? beforeSequence, CancellationToken cancellationToken) =>
-        await ListAsync(null, true, limit, beforeSequence, cancellationToken, null, null, null);
+        await ListAsync(null, true, limit, beforeSequence, cancellationToken, null, null, null, null, null);
 
     private async Task<CourierWithdrawalPage> ListAsync(
         string? courierId, bool operations, int limit, long? beforeSequence,
-        CancellationToken cancellationToken, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status)
+        CancellationToken cancellationToken, DateTimeOffset? fromAt, DateTimeOffset? toAt, string? status,
+        long? minAmountToman, long? maxAmountToman)
     {
         const string sql = """
             WITH latest AS (
@@ -509,6 +512,8 @@ public sealed class PostgresCourierWithdrawalService(
               AND (@from_at IS NULL OR request.created_at >= @from_at)
               AND (@to_at IS NULL OR request.created_at < @to_at)
               AND (@status IS NULL OR latest.action = @status)
+              AND (@min_amount_toman IS NULL OR request.amount_toman >= @min_amount_toman)
+              AND (@max_amount_toman IS NULL OR request.amount_toman <= @max_amount_toman)
               AND (@before_sequence IS NULL OR latest.withdrawal_event_sequence < @before_sequence)
             ORDER BY latest.withdrawal_event_sequence DESC
             LIMIT @take;
@@ -526,6 +531,10 @@ public sealed class PostgresCourierWithdrawalService(
             toAt.HasValue ? toAt.Value.ToUniversalTime() : DBNull.Value);
         command.Parameters.AddWithValue("status", NpgsqlDbType.Text,
             status is null ? DBNull.Value : status);
+        command.Parameters.AddWithValue("min_amount_toman", NpgsqlDbType.Bigint,
+            minAmountToman.HasValue ? minAmountToman.Value : DBNull.Value);
+        command.Parameters.AddWithValue("max_amount_toman", NpgsqlDbType.Bigint,
+            maxAmountToman.HasValue ? maxAmountToman.Value : DBNull.Value);
         command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, checked(limit + 1));
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
