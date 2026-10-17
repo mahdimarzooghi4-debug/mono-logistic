@@ -491,6 +491,43 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal((long)(reconciliationPages - 1), reader.GetInt64(2));
             }
 
+            var ledgerDetailReader = new PostgresCourierPayoutLedgerDetailReadService(dataSource, operations);
+            var payoutLedgerDetail = await ledgerDetailReader.ReadAsync(
+                request.Withdrawal!.WithdrawalId, now.AddMinutes(31), CancellationToken.None);
+            Assert.Equal("FOUND", payoutLedgerDetail.OutcomeCode);
+            Assert.Equal("PAID", payoutLedgerDetail.LatestAction);
+            Assert.Single(payoutLedgerDetail.Transactions);
+            Assert.Equal(2, payoutLedgerDetail.Transactions[0].Entries.Count);
+            Assert.Contains(payoutLedgerDetail.Transactions[0].Entries, entry =>
+                entry.AccountCode == "COURIER_AVAILABLE" && entry.AccountOwnerType == "COURIER" &&
+                entry.DebitAmountToman == request.Withdrawal.AmountToman && entry.CreditAmountToman == 0);
+            Assert.Contains(payoutLedgerDetail.Transactions[0].Entries, entry =>
+                entry.AccountCode == "MONO_PAYOUT_CLEARING" && entry.AccountOwnerType == "MONO" &&
+                entry.DebitAmountToman == 0 && entry.CreditAmountToman == request.Withdrawal.AmountToman);
+            const string missingLedgerWithdrawalId = "wdr_88888888888888888888888888888888";
+            var missingLedgerDetail = await ledgerDetailReader.ReadAsync(missingLedgerWithdrawalId,
+                now.AddMinutes(32), CancellationToken.None);
+            Assert.Equal("WITHDRAWAL_NOT_FOUND", missingLedgerDetail.OutcomeCode);
+            Assert.Empty(missingLedgerDetail.Transactions);
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT count(*), count(*) FILTER (WHERE actor_id = @actor AND withdrawal_id = @withdrawal_id
+                    AND outcome_code = 'FOUND' AND transaction_count = 1 AND entry_count = 2),
+                    count(*) FILTER (WHERE actor_id = @actor AND withdrawal_id = @missing_id
+                    AND outcome_code = 'WITHDRAWAL_NOT_FOUND' AND transaction_count = 0 AND entry_count = 0)
+                FROM courier_payout_ledger_detail_read_audit;
+                """, connection))
+            {
+                audit.Parameters.AddWithValue("actor", operations.ActorId);
+                audit.Parameters.AddWithValue("withdrawal_id", request.Withdrawal.WithdrawalId);
+                audit.Parameters.AddWithValue("missing_id", missingLedgerWithdrawalId);
+                await using var reader = await audit.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(2L, reader.GetInt64(0));
+                Assert.Equal(1L, reader.GetInt64(1));
+                Assert.Equal(1L, reader.GetInt64(2));
+            }
+
             var fromAt = now.AddMinutes(2);
             var toAt = now.AddMinutes(7);
             var courierWithdrawalPage1 = await withdrawals.ListForCourierAsync(
@@ -887,7 +924,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.074_courier_withdrawal_operations_audit_read.sql",
             "Mono.Api.Tests.Migrations.075_courier_withdrawal_operations_event_search_audit.sql",
             "Mono.Api.Tests.Migrations.076_courier_payout_destination_operations_search_audit.sql",
-            "Mono.Api.Tests.Migrations.077_courier_payout_reconciliation_read_audit.sql"
+            "Mono.Api.Tests.Migrations.077_courier_payout_reconciliation_read_audit.sql",
+            "Mono.Api.Tests.Migrations.078_courier_payout_ledger_detail_read_audit.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {
