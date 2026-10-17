@@ -572,6 +572,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 189 adds courier-scoped withdrawal status filtering across REQUESTED, PROCESSING, PAID, and REJECTED states, with validation and cursors bound to both status and date filters.
 - Sprint 190 adds inclusive minimum and maximum toman filters to courier withdrawal history, validates invalid ranges, and binds cursors to all active filters.
 - Sprint 191 adds an MFA-gated, idempotent operations API to revoke the current verified courier payout destination, with append-only evidence and safe blocking of new withdrawal requests until re-verification.
+- Sprint 192 adds creation-time and inclusive amount-range filters to the operations withdrawal search, binds cursors to all active filters, and stores those filters in the append-only search audit.
 
 ### E17.1 Event Envelope
 - event ID

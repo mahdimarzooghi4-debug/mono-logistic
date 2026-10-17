@@ -10,9 +10,15 @@ public sealed class PostgresCourierWithdrawalOperationsSearchService(
 {
     public async Task<CourierWithdrawalPage> SearchAsync(
         string? status, string? courierId, int pageSize, long? beforeSequence,
-        DateTimeOffset now, CancellationToken cancellationToken)
+        DateTimeOffset now, CancellationToken cancellationToken,
+        DateTimeOffset? fromAt = null, DateTimeOffset? toAt = null,
+        long? minAmountToman = null, long? maxAmountToman = null)
     {
-        if (pageSize is < 1 or > 100 || beforeSequence is <= 0)
+        if (pageSize is < 1 or > 100 || beforeSequence is <= 0 ||
+            fromAt.HasValue != toAt.HasValue ||
+            (fromAt.HasValue && fromAt.Value >= toAt!.Value) ||
+            minAmountToman < 0 || maxAmountToman < 0 ||
+            (minAmountToman.HasValue && maxAmountToman.HasValue && minAmountToman > maxAmountToman))
             throw new ArgumentOutOfRangeException(nameof(pageSize));
 
         const string sql = """
@@ -31,6 +37,10 @@ public sealed class PostgresCourierWithdrawalOperationsSearchService(
             JOIN courier_payout_destinations destination ON destination.destination_id = request.destination_id
             WHERE (@status IS NULL OR latest.action = @status)
               AND (@courier_id IS NULL OR request.courier_id = @courier_id)
+              AND (@from_at IS NULL OR request.created_at >= @from_at)
+              AND (@to_at IS NULL OR request.created_at < @to_at)
+              AND (@min_amount_toman IS NULL OR request.amount_toman >= @min_amount_toman)
+              AND (@max_amount_toman IS NULL OR request.amount_toman <= @max_amount_toman)
               AND (@before_sequence IS NULL OR latest.withdrawal_event_sequence < @before_sequence)
             ORDER BY latest.withdrawal_event_sequence DESC
             LIMIT @take;
@@ -43,6 +53,14 @@ public sealed class PostgresCourierWithdrawalOperationsSearchService(
             command.Parameters.Add("status", NpgsqlDbType.Text).Value = status is null ? DBNull.Value : status;
             command.Parameters.Add("courier_id", NpgsqlDbType.Text).Value =
                 courierId is null ? DBNull.Value : courierId;
+            command.Parameters.Add("from_at", NpgsqlDbType.TimestampTz).Value =
+                fromAt.HasValue ? fromAt.Value.ToUniversalTime() : DBNull.Value;
+            command.Parameters.Add("to_at", NpgsqlDbType.TimestampTz).Value =
+                toAt.HasValue ? toAt.Value.ToUniversalTime() : DBNull.Value;
+            command.Parameters.Add("min_amount_toman", NpgsqlDbType.Bigint).Value =
+                minAmountToman.HasValue ? minAmountToman.Value : DBNull.Value;
+            command.Parameters.Add("max_amount_toman", NpgsqlDbType.Bigint).Value =
+                maxAmountToman.HasValue ? maxAmountToman.Value : DBNull.Value;
             command.Parameters.Add("before_sequence", NpgsqlDbType.Bigint).Value =
                 beforeSequence.HasValue ? beforeSequence.Value : DBNull.Value;
             command.Parameters.AddWithValue("take", NpgsqlDbType.Integer, checked(pageSize + 1));
@@ -58,22 +76,26 @@ public sealed class PostgresCourierWithdrawalOperationsSearchService(
         if (hasMore)
             items.RemoveAt(pageSize);
         var nextSequence = hasMore ? items[^1].EventSequence : (long?)null;
-        await RecordReadAsync(connection, transaction, status, courierId, beforeSequence,
-            pageSize, items.Count, now, cancellationToken);
+        await RecordReadAsync(connection, transaction, status, courierId, fromAt, toAt,
+            minAmountToman, maxAmountToman, beforeSequence, pageSize, items.Count, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new CourierWithdrawalPage(items, nextSequence);
     }
 
     private async Task RecordReadAsync(
         NpgsqlConnection connection, NpgsqlTransaction transaction,
-        string? status, string? courierId, long? beforeSequence, int pageSize,
+        string? status, string? courierId, DateTimeOffset? fromAt, DateTimeOffset? toAt,
+        long? minAmountToman, long? maxAmountToman, long? beforeSequence, int pageSize,
         int resultCount, DateTimeOffset now, CancellationToken cancellationToken)
     {
         const string sql = """
             INSERT INTO courier_withdrawal_operations_search_audit
                 (search_audit_id, actor_id, status_filter, courier_id_filter,
+                 created_from_filter, created_to_filter, min_amount_toman_filter, max_amount_toman_filter,
                  cursor_sequence, page_size, result_count, occurred_at)
-            VALUES (@id, @actor_id, @status, @courier_id, @cursor, @page_size, @result_count, @occurred_at);
+            VALUES (@id, @actor_id, @status, @courier_id,
+                    @from_at, @to_at, @min_amount_toman, @max_amount_toman,
+                    @cursor, @page_size, @result_count, @occurred_at);
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("id", NpgsqlDbType.Text, "cws_" + Guid.NewGuid().ToString("N"));
@@ -81,6 +103,14 @@ public sealed class PostgresCourierWithdrawalOperationsSearchService(
         command.Parameters.Add("status", NpgsqlDbType.Text).Value = status is null ? DBNull.Value : status;
         command.Parameters.Add("courier_id", NpgsqlDbType.Text).Value =
             courierId is null ? DBNull.Value : courierId;
+        command.Parameters.Add("from_at", NpgsqlDbType.TimestampTz).Value =
+            fromAt.HasValue ? fromAt.Value.ToUniversalTime() : DBNull.Value;
+        command.Parameters.Add("to_at", NpgsqlDbType.TimestampTz).Value =
+            toAt.HasValue ? toAt.Value.ToUniversalTime() : DBNull.Value;
+        command.Parameters.Add("min_amount_toman", NpgsqlDbType.Bigint).Value =
+            minAmountToman.HasValue ? minAmountToman.Value : DBNull.Value;
+        command.Parameters.Add("max_amount_toman", NpgsqlDbType.Bigint).Value =
+            maxAmountToman.HasValue ? maxAmountToman.Value : DBNull.Value;
         command.Parameters.Add("cursor", NpgsqlDbType.Bigint).Value =
             beforeSequence.HasValue ? beforeSequence.Value : DBNull.Value;
         command.Parameters.AddWithValue("page_size", NpgsqlDbType.Integer, pageSize);
