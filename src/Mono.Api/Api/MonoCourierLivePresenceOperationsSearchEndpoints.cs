@@ -64,7 +64,7 @@ public static class MonoCourierLivePresenceOperationsSearchEndpoints
     }
 
     private sealed record CursorPayload(
-        string? Status, string? ZoneId, string? UpdatedAfter, string? UpdatedBefore, string CourierId);
+        string? Status, string? ZoneId, string? UpdatedAfter, string? UpdatedBefore, string? CourierId);
 
     private static string EncodeCursor(string? status, string? zoneId,
         DateTimeOffset? updatedAfter, DateTimeOffset? updatedBefore, string courierId)
@@ -87,7 +87,7 @@ public static class MonoCourierLivePresenceOperationsSearchEndpoints
             var payload = JsonSerializer.Deserialize<CursorPayload>(Convert.FromBase64String(base64));
             if (payload is null || payload.Status != status || payload.ZoneId != zoneId ||
                 payload.UpdatedAfter != Format(updatedAfter) || payload.UpdatedBefore != Format(updatedBefore) ||
-                payload.CourierId.Length != 36 || !payload.CourierId.StartsWith("crr_", StringComparison.Ordinal) ||
+                payload.CourierId is null || payload.CourierId.Length != 36 || !payload.CourierId.StartsWith("crr_", StringComparison.Ordinal) ||
                 !Guid.TryParseExact(payload.CourierId.AsSpan(4), "N", out _))
                 return false;
             courierId = payload.CourierId;

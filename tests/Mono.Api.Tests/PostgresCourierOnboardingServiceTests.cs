@@ -269,6 +269,13 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         Assert.NotEqual(first.Items[0].CourierId, second.Items[0].CourierId);
         Assert.Contains(second.Items[0].CourierId, new[] { centralOne, centralTwo });
 
+        var timeFiltered = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            10, "ONLINE", "zone-central", now, now.AddHours(1), null);
+        Assert.Equal(2, timeFiltered.Items.Count);
+        Assert.All(timeFiltered.Items, item => Assert.True(item.UpdatedAt >= now));
+        Assert.All(timeFiltered.Items, item => Assert.True(item.UpdatedAt < now.AddHours(1)));
+
         var offline = await new PostgresCourierLivePresenceOperationsSearchService(
             database.DataSource, context, readAudit).SearchAsync(
             10, "OFFLINE", null, null, null, null);
@@ -277,7 +284,7 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
 
         var auditPage = await readAudit.ListAsync(20, null);
         Assert.NotNull(auditPage);
-        Assert.Equal(3, auditPage.Items.Count(item =>
+        Assert.Equal(4, auditPage.Items.Count(item =>
             item.Action == PostgresCourierOperationsReadAuditService.CourierPresenceSearch &&
             item.CourierId is null));
         Assert.DoesNotContain("Latitude", typeof(CourierLivePresenceOperationsSearchItem).GetProperties()
