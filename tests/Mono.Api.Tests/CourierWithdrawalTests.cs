@@ -446,6 +446,51 @@ public sealed class CourierWithdrawalTests
                 Assert.Equal(1L, reader.GetInt64(2));
             }
 
+            var reconciliation = new PostgresCourierPayoutReconciliationService(dataSource, operations);
+            var reconciliationFrom = now.AddMinutes(-30);
+            var reconciliationTo = now.AddMinutes(90);
+            var reconciled = new List<CourierPayoutReconciliationItem>();
+            CourierPayoutReconciliationCursor? reconciliationCursor = null;
+            var reconciliationPages = 0;
+            do
+            {
+                var reconciliationPage = await reconciliation.ReadAsync(
+                    2, courierId, null, reconciliationFrom, reconciliationTo, false,
+                    reconciliationCursor, now.AddMinutes(30 + reconciliationPages), CancellationToken.None);
+                reconciliationPages++;
+                reconciled.AddRange(reconciliationPage.Items);
+                reconciliationCursor = reconciliationPage.NextCursor;
+            } while (reconciliationCursor is not null);
+            Assert.Contains(reconciled, item =>
+                item.WithdrawalId == request.Withdrawal!.WithdrawalId &&
+                item.LatestAction == "PAID" &&
+                item.ReconciliationCode == "MATCHED" &&
+                item.PayoutTransactionCount == 1 &&
+                item.LedgerEntryCount == 2 &&
+                item.MatchingCourierDebitCount == 1 &&
+                item.MatchingClearingCreditCount == 1);
+            Assert.All(reconciled, item => Assert.NotEqual("LEDGER_MISMATCH", item.ReconciliationCode));
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var audit = new NpgsqlCommand("""
+                SELECT count(*), count(*) FILTER (
+                    WHERE actor_id = @actor AND courier_id_filter = @courier_id
+                      AND created_from_filter = @from_at AND created_to_filter = @to_at
+                      AND only_discrepancies = false AND outcome_code = 'FOUND'),
+                    count(*) FILTER (WHERE cursor_withdrawal_id IS NOT NULL)
+                FROM courier_payout_reconciliation_read_audit;
+                """, connection))
+            {
+                audit.Parameters.AddWithValue("actor", operations.ActorId);
+                audit.Parameters.AddWithValue("courier_id", courierId);
+                audit.Parameters.AddWithValue("from_at", reconciliationFrom);
+                audit.Parameters.AddWithValue("to_at", reconciliationTo);
+                await using var reader = await audit.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal((long)reconciliationPages, reader.GetInt64(0));
+                Assert.Equal((long)reconciliationPages, reader.GetInt64(1));
+                Assert.Equal((long)(reconciliationPages - 1), reader.GetInt64(2));
+            }
+
             var fromAt = now.AddMinutes(2);
             var toAt = now.AddMinutes(7);
             var courierWithdrawalPage1 = await withdrawals.ListForCourierAsync(
@@ -841,7 +886,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.073_courier_withdrawal_operations_search_filters.sql",
             "Mono.Api.Tests.Migrations.074_courier_withdrawal_operations_audit_read.sql",
             "Mono.Api.Tests.Migrations.075_courier_withdrawal_operations_event_search_audit.sql",
-            "Mono.Api.Tests.Migrations.076_courier_payout_destination_operations_search_audit.sql"
+            "Mono.Api.Tests.Migrations.076_courier_payout_destination_operations_search_audit.sql",
+            "Mono.Api.Tests.Migrations.077_courier_payout_reconciliation_read_audit.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {
