@@ -118,6 +118,44 @@ public static class MonoCourierWithdrawalOperationsSearchEndpoints
                             item.ResultCount, item.OccurredAt)).ToArray(), nextCursor));
                 })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+        endpoints.MapGet("/operations/v1/courier-withdrawals/events",
+                async Task<IResult> (HttpContext httpContext,
+                    PostgresCourierWithdrawalOperationsEventSearchService service, TimeProvider timeProvider,
+                    int? limit, string? action, string? actor_type, string? actor_id, string? courier_id,
+                    DateTimeOffset? from_at, DateTimeOffset? to_at, string? cursor,
+                    CancellationToken cancellationToken) =>
+                {
+                    httpContext.Response.Headers.CacheControl = "no-store";
+                    var pageSize = limit ?? 50;
+                    if (pageSize is < 1 or > 100) return Results.BadRequest(new { error_code = "INVALID_LIMIT" });
+                    var normalizedAction = string.IsNullOrWhiteSpace(action) ? null : action.Trim().ToUpperInvariant();
+                    if (normalizedAction is not null && !Statuses.Contains(normalizedAction))
+                        return Results.BadRequest(new { error_code = "INVALID_ACTION" });
+                    var actorType = string.IsNullOrWhiteSpace(actor_type) ? null : actor_type.Trim().ToUpperInvariant();
+                    if (actorType is not null && actorType is not ("COURIER" or "OPERATIONS"))
+                        return Results.BadRequest(new { error_code = "INVALID_ACTOR_TYPE" });
+                    var actorId = string.IsNullOrWhiteSpace(actor_id) ? null : actor_id.Trim();
+                    if (actorId is { Length: > 128 } || (actorId is not null && actorId.Any(char.IsControl)))
+                        return Results.BadRequest(new { error_code = "INVALID_ACTOR_ID" });
+                    var courierId = string.IsNullOrWhiteSpace(courier_id) ? null : courier_id.Trim();
+                    if (courierId is not null && !IsCourierId(courierId))
+                        return Results.BadRequest(new { error_code = "INVALID_COURIER_ID" });
+                    if (from_at.HasValue != to_at.HasValue || (from_at.HasValue && from_at.Value >= to_at!.Value))
+                        return Results.BadRequest(new { error_code = "INVALID_DATE_RANGE" });
+                    var fromAt = from_at?.ToUniversalTime();
+                    var toAt = to_at?.ToUniversalTime();
+                    if (!TryDecodeEventCursor(cursor, normalizedAction, actorType, actorId, courierId, fromAt, toAt, out var beforeSequence))
+                        return Results.BadRequest(new { error_code = "INVALID_CURSOR" });
+                    var page = await service.SearchAsync(pageSize, normalizedAction, actorType, actorId,
+                        courierId, fromAt, toAt, beforeSequence, timeProvider.GetUtcNow(), cancellationToken);
+                    var nextCursor = page.NextSequence is long sequence
+                        ? EncodeEventCursor(normalizedAction, actorType, actorId, courierId, fromAt, toAt, sequence) : null;
+                    return Results.Ok(new CourierWithdrawalOperationsEventPageResponse(
+                        page.Items.Select(item => new CourierWithdrawalOperationsEventItemResponse(
+                            item.EventSequence, item.WithdrawalId, item.CourierId, item.Action, item.ActorType,
+                            item.ActorId, item.OccurredAt, item.ReasonCode, item.BankReference)).ToArray(), nextCursor));
+                })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
         return endpoints;
     }
 
@@ -171,6 +209,40 @@ public static class MonoCourierWithdrawalOperationsSearchEndpoints
         {
             return false;
         }
+    }
+
+
+    private sealed record EventCursorPayload(string? Action, string? ActorType, string? ActorId,
+        string? CourierId, string? FromAt, string? ToAt, long Sequence);
+    private static string EncodeEventCursor(string? action, string? actorType, string? actorId,
+        string? courierId, DateTimeOffset? fromAt, DateTimeOffset? toAt, long sequence)
+    {
+        var payload = new EventCursorPayload(action, actorType, actorId, courierId,
+            fromAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            toAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), sequence);
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload)))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+    private static bool TryDecodeEventCursor(string? encoded, string? action, string? actorType,
+        string? actorId, string? courierId, DateTimeOffset? fromAt, DateTimeOffset? toAt, out long? sequence)
+    {
+        sequence = null;
+        if (encoded is null) return true;
+        if (encoded.Length is < 8 or > 1024) return false;
+        try
+        {
+            var base64 = encoded.Replace('-', '+').Replace('_', '/');
+            base64 += new string('=', (4 - base64.Length % 4) % 4);
+            var payload = JsonSerializer.Deserialize<EventCursorPayload>(Convert.FromBase64String(base64));
+            if (payload is null || payload.Action != action || payload.ActorType != actorType ||
+                payload.ActorId != actorId || payload.CourierId != courierId ||
+                payload.FromAt != fromAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ||
+                payload.ToAt != toAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ||
+                payload.Sequence <= 0) return false;
+            sequence = payload.Sequence;
+            return true;
+        }
+        catch (Exception exception) when (exception is FormatException or JsonException) { return false; }
     }
 
     private static bool IsCourierId(string value) => value.Length == 36 &&
@@ -234,3 +306,9 @@ public sealed record CourierWithdrawalOperationsAuditItemResponse(
 public sealed record CourierWithdrawalOperationsAuditPageResponse(
     IReadOnlyList<CourierWithdrawalOperationsAuditItemResponse> Items, string? NextCursor);
 
+
+public sealed record CourierWithdrawalOperationsEventItemResponse(
+    long EventSequence, string WithdrawalId, string CourierId, string Action, string ActorType,
+    string ActorId, DateTimeOffset OccurredAt, string? ReasonCode, string? BankReference);
+public sealed record CourierWithdrawalOperationsEventPageResponse(
+    IReadOnlyList<CourierWithdrawalOperationsEventItemResponse> Items, string? NextCursor);
