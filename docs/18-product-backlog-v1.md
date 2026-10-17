@@ -580,6 +580,7 @@ Courier Net = 89% of Mission Fare
 - Sprint 197 adds an administrator-only, audited ledger drilldown for an individual withdrawal, showing safe transaction and double-entry details without payout secrets or idempotency keys.
 - Sprint 198 adds filterable administrator search over payout ledger drilldown audit history, with filter-bound keyset pagination and an immutable audit trail for every search page.
 - Sprint 199 adds an administrator reconciliation summary that aggregates withdrawal and discrepancy counts and toman amounts by reconciliation code, with an append-only audit for each bounded-time summary read.
+- Sprint 200 adds an administrator UTC-day reconciliation trend grouped by reconciliation code and toman value, with optional courier/status filters and an append-only summary-read audit.
 
 ### E17.1 Event Envelope
 - event ID
