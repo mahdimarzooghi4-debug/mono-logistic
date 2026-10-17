@@ -19,6 +19,7 @@ public sealed class MissionOperationsReadAuditTests
         await ExecuteMigrationAsync(dataSource, "024_mission_operations_read_audit.sql");
         await ExecuteMigrationAsync(dataSource, "025_mission_operations_read_audit_inspection.sql");
         await ExecuteMigrationAsync(dataSource, "051_mission_fare_review_audit.sql");
+        await ExecuteMigrationAsync(dataSource, "087_mission_courier_issue_inbox_search.sql");
 
         var actorId = "mission-read-audit-test-" + Guid.NewGuid().ToString("N");
         var missionId = "mis_0123456789abcdef0123456789abcdef";
@@ -49,6 +50,7 @@ public sealed class MissionOperationsReadAuditTests
             service.ListAsync(10, null, actorId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(-1), null));
 
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionFareReview, null, 3);
+        await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionCourierIssueInboxSearch, null, 0);
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using (var select = new NpgsqlCommand("""
@@ -64,10 +66,11 @@ public sealed class MissionOperationsReadAuditTests
             while (await reader.ReadAsync())
                 rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetInt32(2)));
 
-            Assert.Equal(7, rows.Count);
+            Assert.Equal(8, rows.Count);
             Assert.Equal(3, rows.Count(row => row.Action == "MISSION_AUDIT_INSPECTION"));
             Assert.Contains(rows, row => row == ("MISSION_SEARCH", null, 2));
             Assert.Contains(rows, row => row == ("MISSION_FARE_REVIEW", null, 3));
+            Assert.Contains(rows, row => row == ("MISSION_COURIER_ISSUE_INBOX_SEARCH", null, 0));
             Assert.Contains(rows, row => row == ("MISSION_DETAIL", missionId, 1));
             Assert.Contains(rows, row => row == ("MISSION_TIMELINE", missionId, 0));
         }

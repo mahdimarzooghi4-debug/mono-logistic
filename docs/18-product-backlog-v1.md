@@ -652,6 +652,7 @@ Dashboard must use the same application/core rules as API customers.
 - SLA alerts
 - re-dispatch
 - controlled exception handling
+- Sprint 207 adds an administrator-wide courier-issue inbox with status/code/Mission/courier/time filters, stable filter-bound keyset pagination, no-store responses, and append-only read auditing.
 - audit trail
 
 ## 22. Epic E20 — Security

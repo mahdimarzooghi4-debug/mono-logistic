@@ -67,6 +67,7 @@ builder.Services.AddScoped<PostgresCourierLivePresenceOperationsSearchService>()
 builder.Services.AddScoped<PostgresRoutePlanOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresMissionCourierOfferService>();
 builder.Services.AddScoped<PostgresMissionCourierIssueService>();
+builder.Services.AddScoped<PostgresMissionCourierIssueInboxService>();
 builder.Services.AddScoped(services => new PostgresCourierIdentityBindingService(
     services.GetRequiredService<NpgsqlDataSource>(),
     services.GetRequiredService<IMonoOperationsContext>(),
@@ -164,6 +165,7 @@ app.MapMonoCourierLivePresenceEndpoints();
 app.MapMonoCourierLivePresenceOperationsSearchEndpoints();
 app.MapMonoMissionCourierOfferEndpoints();
 app.MapMonoMissionCourierIssueEndpoints();
+app.MapMonoMissionCourierIssueInboxEndpoints();
 app.MapCustomerServiceConfigurationInspectionEndpoints();
 app.MapCustomerServiceConfigurationAuthoringEndpoints();
 app.MapMonoCustomerOperationsEndpoints();
