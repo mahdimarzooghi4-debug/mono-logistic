@@ -18,6 +18,8 @@ public static class MonoCourierPayoutReconciliationEndpoints
 {
     private static readonly HashSet<string> Statuses = new(StringComparer.Ordinal)
         { "REQUESTED", "PROCESSING", "PAID", "REJECTED" };
+    private static readonly HashSet<string> ReconciliationCodes = new(StringComparer.Ordinal)
+        { "MATCHED", "MISSING_PAYOUT", "UNEXPECTED_PAYOUT", "MULTIPLE_PAYOUTS", "LEDGER_MISMATCH" };
 
     public static IEndpointRouteBuilder MapMonoCourierPayoutReconciliationEndpoints(
         this IEndpointRouteBuilder endpoints)
@@ -27,7 +29,7 @@ public static class MonoCourierPayoutReconciliationEndpoints
                     PostgresCourierPayoutReconciliationService service,
                     TimeProvider timeProvider, int? limit, string? courier_id, string? status,
                     DateTimeOffset? from_at, DateTimeOffset? to_at, bool? only_discrepancies,
-                    string? cursor, CancellationToken cancellationToken) =>
+                    string? reconciliation_code, string? cursor, CancellationToken cancellationToken) =>
                 {
                     httpContext.Response.Headers.CacheControl = "no-store";
                     var pageSize = limit ?? 50;
@@ -44,13 +46,18 @@ public static class MonoCourierPayoutReconciliationEndpoints
                     var fromAt = from_at.Value.ToUniversalTime();
                     var toAt = to_at.Value.ToUniversalTime();
                     var onlyDiscrepancies = only_discrepancies ?? false;
-                    if (!TryDecodeCursor(cursor, courierId, normalizedStatus, fromAt, toAt,
+                    var reconciliationCode = string.IsNullOrWhiteSpace(reconciliation_code)
+                        ? null : reconciliation_code.Trim().ToUpperInvariant();
+                    if (reconciliationCode is not null && !ReconciliationCodes.Contains(reconciliationCode))
+                        return Results.BadRequest(new { error_code = "INVALID_RECONCILIATION_CODE" });
+                    if (!TryDecodeCursor(cursor, courierId, normalizedStatus, reconciliationCode, fromAt, toAt,
                             onlyDiscrepancies, out var before))
                         return Results.BadRequest(new { error_code = "INVALID_CURSOR" });
-                    var page = await service.ReadAsync(pageSize, courierId, normalizedStatus,
+                    var page = await service.ReadAsync(pageSize, courierId, normalizedStatus, reconciliationCode,
                         fromAt, toAt, onlyDiscrepancies, before, timeProvider.GetUtcNow(), cancellationToken);
                     var nextCursor = page.NextCursor is null ? null : EncodeCursor(
-                        courierId, normalizedStatus, fromAt, toAt, onlyDiscrepancies, page.NextCursor);
+                        courierId, normalizedStatus, reconciliationCode, fromAt, toAt,
+                        onlyDiscrepancies, page.NextCursor);
                     return Results.Ok(new CourierPayoutReconciliationPageResponse(
                         page.Items.Select(item => new CourierPayoutReconciliationItemResponse(
                             item.WithdrawalId, item.CourierId, item.AmountToman, item.LatestAction,
@@ -63,13 +70,14 @@ public static class MonoCourierPayoutReconciliationEndpoints
     }
 
     private sealed record CursorPayload(
-        string? CourierId, string? Status, string FromAt, string ToAt,
+        string? CourierId, string? Status, string? ReconciliationCode, string FromAt, string ToAt,
         bool OnlyDiscrepancies, string CreatedAt, string WithdrawalId);
 
-    private static string EncodeCursor(string? courierId, string? status, DateTimeOffset fromAt,
-        DateTimeOffset toAt, bool onlyDiscrepancies, CourierPayoutReconciliationCursor cursor)
+    private static string EncodeCursor(string? courierId, string? status, string? reconciliationCode,
+        DateTimeOffset fromAt, DateTimeOffset toAt, bool onlyDiscrepancies,
+        CourierPayoutReconciliationCursor cursor)
     {
-        var payload = new CursorPayload(courierId, status,
+        var payload = new CursorPayload(courierId, status, reconciliationCode,
             fromAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
             toAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), onlyDiscrepancies,
             cursor.CreatedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), cursor.WithdrawalId);
@@ -78,8 +86,8 @@ public static class MonoCourierPayoutReconciliationEndpoints
     }
 
     private static bool TryDecodeCursor(string? encoded, string? courierId, string? status,
-        DateTimeOffset fromAt, DateTimeOffset toAt, bool onlyDiscrepancies,
-        out CourierPayoutReconciliationCursor? cursor)
+        string? reconciliationCode, DateTimeOffset fromAt, DateTimeOffset toAt,
+        bool onlyDiscrepancies, out CourierPayoutReconciliationCursor? cursor)
     {
         cursor = null;
         if (encoded is null) return true;
@@ -90,6 +98,7 @@ public static class MonoCourierPayoutReconciliationEndpoints
             base64 += new string('=', (4 - base64.Length % 4) % 4);
             var payload = JsonSerializer.Deserialize<CursorPayload>(Convert.FromBase64String(base64));
             if (payload is null || payload.CourierId != courierId || payload.Status != status ||
+                payload.ReconciliationCode != reconciliationCode ||
                 payload.FromAt != fromAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ||
                 payload.ToAt != toAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture) ||
                 payload.OnlyDiscrepancies != onlyDiscrepancies ||

@@ -15,21 +15,29 @@ public sealed record CourierPayoutReconciliationPage(
 public sealed class PostgresCourierPayoutReconciliationService(
     NpgsqlDataSource dataSource, IMonoOperationsContext operationsContext)
 {
+    private static readonly string[] ReconciliationCodes =
+        ["MATCHED", "MISSING_PAYOUT", "UNEXPECTED_PAYOUT", "MULTIPLE_PAYOUTS", "LEDGER_MISMATCH"];
+
     public async Task<CourierPayoutReconciliationPage> ReadAsync(
-        int pageSize, string? courierId, string? status, DateTimeOffset fromAt, DateTimeOffset toAt,
-        bool onlyDiscrepancies, CourierPayoutReconciliationCursor? before,
+        int pageSize, string? courierId, string? status, string? reconciliationCode,
+        DateTimeOffset fromAt, DateTimeOffset toAt, bool onlyDiscrepancies,
+        CourierPayoutReconciliationCursor? before,
         DateTimeOffset now, CancellationToken cancellationToken)
     {
         if (!operationsContext.Roles.Contains(MonoOperationsRoles.Administrator, StringComparer.Ordinal))
             throw new UnauthorizedAccessException("Administrator role is required.");
         if (pageSize is < 1 or > 100 || fromAt >= toAt)
             throw new ArgumentOutOfRangeException(nameof(pageSize));
+        if (reconciliationCode is not null &&
+            !ReconciliationCodes.Contains(reconciliationCode, StringComparer.Ordinal))
+            throw new ArgumentException("Unknown reconciliation code.", nameof(reconciliationCode));
         var sql = CourierPayoutReconciliationSql.CommonCtes + """
             SELECT withdrawal_id, courier_id, amount_toman, latest_action, created_at,
                    transaction_count, entry_count, courier_debit_count, clearing_credit_count,
                    reconciliation_code
             FROM reconciled
             WHERE (NOT @only_discrepancies OR reconciliation_code <> 'MATCHED')
+              AND (@reconciliation_code IS NULL OR reconciliation_code = @reconciliation_code)
               AND (@before_created IS NULL OR (created_at, withdrawal_id) < (@before_created, @before_id))
             ORDER BY created_at DESC, withdrawal_id DESC
             LIMIT @take;
@@ -43,6 +51,8 @@ public sealed class PostgresCourierPayoutReconciliationService(
             command.Parameters.Add("to_at", NpgsqlDbType.TimestampTz).Value = toAt.ToUniversalTime();
             command.Parameters.Add("courier_id", NpgsqlDbType.Text).Value = courierId is null ? DBNull.Value : courierId;
             command.Parameters.Add("status", NpgsqlDbType.Text).Value = status is null ? DBNull.Value : status;
+            command.Parameters.Add("reconciliation_code", NpgsqlDbType.Text).Value =
+                reconciliationCode is null ? DBNull.Value : reconciliationCode;
             command.Parameters.AddWithValue("only_discrepancies", NpgsqlDbType.Boolean, onlyDiscrepancies);
             command.Parameters.Add("before_created", NpgsqlDbType.TimestampTz).Value = before is null ? DBNull.Value : before.CreatedAt.ToUniversalTime();
             command.Parameters.Add("before_id", NpgsqlDbType.Text).Value = before is null ? DBNull.Value : before.WithdrawalId;
@@ -58,23 +68,24 @@ public sealed class PostgresCourierPayoutReconciliationService(
         if (more) items.RemoveAt(pageSize);
         var next = more ? new CourierPayoutReconciliationCursor(items[^1].CreatedAt, items[^1].WithdrawalId) : null;
         var outcome = items.Count == 0 ? "EMPTY" : "FOUND";
-        await RecordReadAsync(connection, transaction, courierId, status, fromAt, toAt,
+        await RecordReadAsync(connection, transaction, courierId, status, reconciliationCode, fromAt, toAt,
             onlyDiscrepancies, before, pageSize, items.Count, outcome, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new CourierPayoutReconciliationPage(items, next);
     }
 
     private async Task RecordReadAsync(NpgsqlConnection connection, NpgsqlTransaction transaction,
-        string? courierId, string? status, DateTimeOffset fromAt, DateTimeOffset toAt,
-        bool onlyDiscrepancies, CourierPayoutReconciliationCursor? cursor,
+        string? courierId, string? status, string? reconciliationCode,
+        DateTimeOffset fromAt, DateTimeOffset toAt, bool onlyDiscrepancies,
+        CourierPayoutReconciliationCursor? cursor,
         int pageSize, int resultCount, string outcome, DateTimeOffset now, CancellationToken cancellationToken)
     {
         const string sql = """
             INSERT INTO courier_payout_reconciliation_read_audit
-                (read_audit_id, actor_id, courier_id_filter, status_filter, created_from_filter, created_to_filter,
-                 only_discrepancies, cursor_created_at, cursor_withdrawal_id, page_size, result_count,
-                 outcome_code, occurred_at)
-            VALUES (@id, @actor_id, @courier_id, @status, @from_at, @to_at,
+                (read_audit_id, actor_id, courier_id_filter, status_filter, reconciliation_code_filter,
+                 created_from_filter, created_to_filter, only_discrepancies, cursor_created_at,
+                 cursor_withdrawal_id, page_size, result_count, outcome_code, occurred_at)
+            VALUES (@id, @actor_id, @courier_id, @status, @reconciliation_code, @from_at, @to_at,
                     @only, @cursor_at, @cursor_id, @page_size, @count, @outcome, @occurred_at);
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -82,6 +93,8 @@ public sealed class PostgresCourierPayoutReconciliationService(
         command.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, operationsContext.ActorId);
         command.Parameters.Add("courier_id", NpgsqlDbType.Text).Value = courierId is null ? DBNull.Value : courierId;
         command.Parameters.Add("status", NpgsqlDbType.Text).Value = status is null ? DBNull.Value : status;
+        command.Parameters.Add("reconciliation_code", NpgsqlDbType.Text).Value =
+            reconciliationCode is null ? DBNull.Value : reconciliationCode;
         command.Parameters.AddWithValue("from_at", NpgsqlDbType.TimestampTz, fromAt.ToUniversalTime());
         command.Parameters.AddWithValue("to_at", NpgsqlDbType.TimestampTz, toAt.ToUniversalTime());
         command.Parameters.AddWithValue("only", NpgsqlDbType.Boolean, onlyDiscrepancies);
