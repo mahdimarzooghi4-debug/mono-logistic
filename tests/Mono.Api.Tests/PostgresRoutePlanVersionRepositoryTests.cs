@@ -12,6 +12,67 @@ public sealed class PostgresRoutePlanVersionRepositoryTests(ITestOutputHelper ou
     private static readonly DateTimeOffset StartedAt = new(2026, 10, 14, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task Route_plan_reads_and_audit_inspection_are_scoped_paginated_and_append_only()
+    {
+        var dataSource = await CreateDataSourceOrSkipAsync();
+        if (dataSource is null)
+            return;
+        await using (dataSource)
+        {
+            await ApplyMigrationAsync(dataSource);
+            var routeId = Identifier("route-audit");
+            var repository = new PostgresRoutePlanVersionRepository(dataSource);
+            var snapshot = Snapshot(routeId, "mission-audit", "pickup", "dropoff", StartedAt.AddMinutes(30));
+            Assert.Equal(RoutePlanVersionWriteOutcome.Persisted,
+                (await repository.PersistAsync(new RoutePlanVersionWriteCommand(
+                    Identifier("cmd"), 0, snapshot))).Outcome);
+
+            var now = DateTimeOffset.UtcNow;
+            var context = new TestOperationsContext();
+            var audit = new PostgresRoutePlanOperationsReadAuditService(dataSource, context);
+            await audit.RecordAsync(PostgresRoutePlanOperationsReadAuditService.CurrentPlanRead,
+                routeId, 1, "FOUND", 1);
+            await audit.RecordAsync(PostgresRoutePlanOperationsReadAuditService.PlanVersionRead,
+                routeId, 1, "FOUND", 1);
+            await audit.RecordAsync(PostgresRoutePlanOperationsReadAuditService.PlanVersionRead,
+                routeId, 9, "NOT_FOUND", 0);
+
+            var first = await audit.ListAsync(routeId, null, null,
+                now.AddMinutes(-2), now.AddMinutes(2), 2, null);
+            Assert.Equal(2, first!.Items.Count);
+            Assert.NotNull(first.NextCursor);
+            var second = await audit.ListAsync(routeId, null, null,
+                now.AddMinutes(-2), now.AddMinutes(2), 2, first.NextCursor);
+            Assert.Single(second!.Items);
+            Assert.Null(second.NextCursor);
+            Assert.Equal(3, first.Items.Concat(second.Items).Count(item => item.RouteId == routeId));
+            Assert.Contains(first.Items.Concat(second.Items), item =>
+                item.Action == PostgresRoutePlanOperationsReadAuditService.CurrentPlanRead &&
+                item.Version == 1 && item.Outcome == "FOUND");
+            Assert.Contains(first.Items.Concat(second.Items), item =>
+                item.Action == PostgresRoutePlanOperationsReadAuditService.PlanVersionRead &&
+                item.Version == 9 && item.Outcome == "NOT_FOUND");
+
+            var missingOnly = await audit.ListAsync(routeId, null, "NOT_FOUND",
+                now.AddMinutes(-2), now.AddMinutes(2), 10, null);
+            Assert.Single(missingOnly!.Items);
+
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var update = new NpgsqlCommand(
+                "UPDATE route_plan_operations_read_audit SET outcome = 'TAMPERED' WHERE route_id = @route_id;",
+                connection);
+            update.Parameters.AddWithValue("route_id", routeId);
+            await Assert.ThrowsAsync<PostgresException>(() => update.ExecuteNonQuery());
+        }
+    }
+
+    private sealed class TestOperationsContext : IMonoOperationsContext
+    {
+        public string ActorId => "route-audit-operator";
+        public IReadOnlyCollection<string> Roles => [MonoOperationsRoles.Administrator];
+    }
+
+    [Fact]
     public async Task Persists_immutable_route_versions_and_replays_idempotently()
     {
         var dataSource = await CreateDataSourceOrSkipAsync();
@@ -229,5 +290,12 @@ public sealed class PostgresRoutePlanVersionRepositoryTests(ITestOutputHelper ou
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var command = new NpgsqlCommand(sql, connection);
         await command.ExecuteNonQueryAsync();
+        await using var auditStream = assembly.GetManifestResourceStream(
+            "Mono.Api.Tests.Migrations.086_route_plan_operations_read_audit.sql")
+            ?? throw new InvalidOperationException("Missing route plan read audit migration resource.");
+        using var auditReader = new StreamReader(auditStream);
+        var auditSql = await auditReader.ReadToEndAsync();
+        await using var auditCommand = new NpgsqlCommand(auditSql, connection);
+        await auditCommand.ExecuteNonQueryAsync();
     }
 }
