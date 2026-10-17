@@ -466,20 +466,46 @@ public sealed class CourierWithdrawalTests
             Assert.Single(paidOnly.Items);
             Assert.Equal(request.Withdrawal.WithdrawalId, paidOnly.Items[0].WithdrawalId);
 
+            var operationsFromAt = now.AddMinutes(2);
+            var operationsToAt = now.AddMinutes(7);
+            var filteredOperationsPage1 = await operationsSearch.SearchAsync(
+                null, courierId, 1, null, now.AddMinutes(17), CancellationToken.None,
+                operationsFromAt, operationsToAt, 1_000, 10_000);
+            Assert.Single(filteredOperationsPage1.Items);
+            Assert.Equal(third.Withdrawal!.WithdrawalId, filteredOperationsPage1.Items[0].WithdrawalId);
+            Assert.NotNull(filteredOperationsPage1.NextBeforeSequence);
+            var filteredOperationsPage2 = await operationsSearch.SearchAsync(
+                null, courierId, 1, filteredOperationsPage1.NextBeforeSequence,
+                now.AddMinutes(18), CancellationToken.None,
+                operationsFromAt, operationsToAt, 1_000, 10_000);
+            Assert.Single(filteredOperationsPage2.Items);
+            Assert.Equal(second.Withdrawal!.WithdrawalId, filteredOperationsPage2.Items[0].WithdrawalId);
+            Assert.Null(filteredOperationsPage2.NextBeforeSequence);
+
             await using (var connection = await dataSource.OpenConnectionAsync())
             await using (var audit = new NpgsqlCommand("""
                 SELECT count(*), count(*) FILTER (
                     WHERE status_filter = 'PAID' AND courier_id_filter = @courier_id AND result_count = 1),
-                    count(*) FILTER (WHERE cursor_sequence IS NOT NULL)
+                    count(*) FILTER (WHERE cursor_sequence IS NOT NULL),
+                    count(*) FILTER (
+                        WHERE courier_id_filter = @courier_id
+                          AND created_from_filter = @created_from
+                          AND created_to_filter = @created_to
+                          AND min_amount_toman_filter = 1000
+                          AND max_amount_toman_filter = 10000
+                          AND result_count = 1)
                 FROM courier_withdrawal_operations_search_audit;
                 """, connection))
             {
                 audit.Parameters.AddWithValue("courier_id", courierId);
+                audit.Parameters.AddWithValue("created_from", operationsFromAt);
+                audit.Parameters.AddWithValue("created_to", operationsToAt);
                 await using var reader = await audit.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
-                Assert.Equal(4L, reader.GetInt64(0));
+                Assert.Equal(6L, reader.GetInt64(0));
                 Assert.Equal(1L, reader.GetInt64(1));
-                Assert.Equal(2L, reader.GetInt64(2));
+                Assert.Equal(3L, reader.GetInt64(2));
+                Assert.Equal(2L, reader.GetInt64(3));
             }
 
             var tehran = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tehran");
@@ -692,7 +718,8 @@ public sealed class CourierWithdrawalTests
             "Mono.Api.Tests.Migrations.069_courier_payout_ledger_integrity.sql",
             "Mono.Api.Tests.Migrations.070_courier_payout_legacy_integrity_preflight.sql",
             "Mono.Api.Tests.Migrations.071_courier_payout_legacy_integrity_check.sql",
-            "Mono.Api.Tests.Migrations.072_courier_ledger_statement_index.sql"
+            "Mono.Api.Tests.Migrations.072_courier_ledger_statement_index.sql",
+            "Mono.Api.Tests.Migrations.073_courier_withdrawal_operations_search_filters.sql"
         };
         foreach (var resourceName in resources.Take(includePayoutIntegrity ? resources.Length : 5))
         {
