@@ -68,7 +68,10 @@ public sealed record MissionCourierOfferExpiryWorkerSnapshot(
     [property: System.Text.Json.Serialization.JsonPropertyName("state")] string State,
     [property: System.Text.Json.Serialization.JsonPropertyName("last_attempt_at")] DateTimeOffset? LastAttemptAt,
     [property: System.Text.Json.Serialization.JsonPropertyName("last_success_at")] DateTimeOffset? LastSuccessAt,
-    [property: System.Text.Json.Serialization.JsonPropertyName("last_batch_candidates")] int? LastBatchCandidates);
+    [property: System.Text.Json.Serialization.JsonPropertyName("last_batch_candidates")] int? LastBatchCandidates,
+    [property: System.Text.Json.Serialization.JsonPropertyName("total_batches")] long TotalBatches,
+    [property: System.Text.Json.Serialization.JsonPropertyName("successful_batches")] long SuccessfulBatches,
+    [property: System.Text.Json.Serialization.JsonPropertyName("failed_batches")] long FailedBatches);
 
 /// <summary>In-process, non-sensitive status of the optional offer expiry worker.</summary>
 public sealed class MissionCourierOfferExpiryWorkerStatus(TimeProvider timeProvider)
@@ -80,6 +83,9 @@ public sealed class MissionCourierOfferExpiryWorkerStatus(TimeProvider timeProvi
     private DateTimeOffset? _lastAttemptAt;
     private DateTimeOffset? _lastSuccessAt;
     private int? _lastBatchCandidates;
+    private long _totalBatches;
+    private long _successfulBatches;
+    private long _failedBatches;
 
     public void MarkDisabled()
     {
@@ -106,6 +112,8 @@ public sealed class MissionCourierOfferExpiryWorkerStatus(TimeProvider timeProvi
             _enabled = true;
             _initialized = true;
             _lastAttemptSucceeded = true;
+            _totalBatches++;
+            _successfulBatches++;
             _lastAttemptAt = timeProvider.GetUtcNow();
             _lastSuccessAt = _lastAttemptAt;
             _lastBatchCandidates = candidateCount;
@@ -119,6 +127,8 @@ public sealed class MissionCourierOfferExpiryWorkerStatus(TimeProvider timeProvi
             _enabled = true;
             _initialized = true;
             _lastAttemptSucceeded = false;
+            _totalBatches++;
+            _failedBatches++;
             _lastAttemptAt = timeProvider.GetUtcNow();
             _lastBatchCandidates = null;
         }
@@ -134,7 +144,8 @@ public sealed class MissionCourierOfferExpiryWorkerStatus(TimeProvider timeProvi
                 : _lastAttemptSucceeded is true ? "healthy"
                 : "starting";
             return new MissionCourierOfferExpiryWorkerSnapshot(
-                _enabled, state, _lastAttemptAt, _lastSuccessAt, _lastBatchCandidates);
+                _enabled, state, _lastAttemptAt, _lastSuccessAt, _lastBatchCandidates,
+                _totalBatches, _successfulBatches, _failedBatches);
         }
     }
 }

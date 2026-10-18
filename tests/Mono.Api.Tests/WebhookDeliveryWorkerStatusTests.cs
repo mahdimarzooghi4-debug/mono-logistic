@@ -16,6 +16,9 @@ public sealed class WebhookDeliveryWorkerStatusTests
         Assert.False(snapshot.Enabled);
         Assert.Equal("disabled", snapshot.State);
         Assert.Null(snapshot.LastAttemptAt);
+        Assert.Equal(0L, snapshot.TotalBatches);
+        Assert.Equal(0L, snapshot.SuccessfulBatches);
+        Assert.Equal(0L, snapshot.FailedBatches);
     }
 
     [Fact]
@@ -29,6 +32,8 @@ public sealed class WebhookDeliveryWorkerStatusTests
         Assert.True(snapshot.Enabled);
         Assert.Equal("blocked", snapshot.State);
         Assert.Null(snapshot.LastBatchClaimed);
+        Assert.Equal(0L, snapshot.TotalBatches);
+        Assert.Equal(0L, snapshot.FailedBatches);
         Assert.Null(snapshot.LastSuccessAt);
     }
 
@@ -39,13 +44,19 @@ public sealed class WebhookDeliveryWorkerStatusTests
         status.MarkEnabled();
         status.RecordFailure();
 
-        Assert.Equal("degraded", status.GetSnapshot().State);
+        var degraded = status.GetSnapshot();
+        Assert.Equal("degraded", degraded.State);
+        Assert.Equal(1L, degraded.TotalBatches);
+        Assert.Equal(1L, degraded.FailedBatches);
 
         status.RecordSuccess(2);
 
         var snapshot = status.GetSnapshot();
         Assert.Equal("healthy", snapshot.State);
         Assert.Equal(2, snapshot.LastBatchClaimed);
+        Assert.Equal(2L, snapshot.TotalBatches);
+        Assert.Equal(1L, snapshot.SuccessfulBatches);
+        Assert.Equal(1L, snapshot.FailedBatches);
         Assert.Equal(snapshot.LastSuccessAt, snapshot.LastAttemptAt);
     }
 }
