@@ -38,6 +38,12 @@ public sealed class PostgresWebhookOperationsReadService(
     IMonoOperationsContext operationsContext,
     PostgresWebhookDeliveryHistoryRepository deliveryHistory)
 {
+    public Task RecordWorkerStatusReadAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var actorId = RequireAdministrator();
+        return WriteAuditAsync(actorId, "WORKER_STATUS_READ", 1, null, now, cancellationToken);
+    }
+
     public async Task<WebhookOperationsQueueSummary> GetQueueSummaryAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken)

@@ -8,7 +8,7 @@ public static class WebhookOperationsEndpoints
 {
     private static readonly HashSet<string> AuditActions = new(StringComparer.Ordinal)
     {
-        "QUEUE_SUMMARY", "QUEUE_SEARCH", "DELIVERY_DETAIL", "DELIVERY_REPLAY", "DELIVERY_CANCEL", "AUDIT_HISTORY_READ"
+        "QUEUE_SUMMARY", "QUEUE_SEARCH", "DELIVERY_DETAIL", "DELIVERY_REPLAY", "DELIVERY_CANCEL", "AUDIT_HISTORY_READ", "WORKER_STATUS_READ"
     };
 
     private static readonly HashSet<string> Statuses = new(StringComparer.Ordinal)
@@ -19,10 +19,14 @@ public static class WebhookOperationsEndpoints
     public static IEndpointRouteBuilder MapWebhookOperationsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/operations/v1/webhook-deliveries/worker-status",
-                (HttpContext context, WebhookDeliveryWorkerStatus status) =>
+                async Task<IResult> (HttpContext context, WebhookDeliveryWorkerStatus status,
+                    PostgresWebhookOperationsReadService service, TimeProvider timeProvider,
+                    CancellationToken cancellationToken) =>
                 {
                     context.Response.Headers.CacheControl = "no-store";
-                    return Results.Ok(status.GetSnapshot());
+                    var snapshot = status.GetSnapshot();
+                    await service.RecordWorkerStatusReadAsync(timeProvider.GetUtcNow(), cancellationToken);
+                    return Results.Ok(snapshot);
                 })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
