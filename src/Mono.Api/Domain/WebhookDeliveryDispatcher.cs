@@ -90,8 +90,6 @@ public sealed class WebhookDeliveryWorkerStatus(TimeProvider timeProvider)
             _blocked = true;
             _initialized = true;
             _lastAttemptSucceeded = false;
-            _totalBatches++;
-            _failedBatches++;
             _lastAttemptAt = timeProvider.GetUtcNow();
             _lastBatchClaimed = null;
         }
@@ -131,6 +129,8 @@ public sealed class WebhookDeliveryWorkerStatus(TimeProvider timeProvider)
             _blocked = false;
             _initialized = true;
             _lastAttemptSucceeded = false;
+            _totalBatches++;
+            _failedBatches++;
             _lastAttemptAt = timeProvider.GetUtcNow();
             _lastBatchClaimed = null;
         }
