@@ -39,7 +39,7 @@ Required only for specific integration tests:
 1. Create the Blueprint in the confirmed Render workspace and review the web-service and PostgreSQL resources before applying it.
 2. Confirm the service branch matches the `branch` value in `render.yaml` (`sprint-215-stage-candidate`) and that no Production database or secrets are referenced.
 3. Apply the Blueprint, then wait for the service deploy to become live.
-4. Confirm /health/live and /health/ready both return HTTP 200.
+4. Run `MONO_STAGE_BASE_URL=https://<stage-host> tools/stage-smoke.sh` and confirm both `/health/live` and `/health/ready` return HTTP 200.
 5. Review deploy logs for the ordered migration list and Database migrations complete.
 6. Run only the authenticated or integration smoke tests whose Stage prerequisites are configured, using Stage-only identities and synthetic data.
 7. Preserve required test evidence before tearing down the staging database.
