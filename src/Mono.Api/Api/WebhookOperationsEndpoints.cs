@@ -18,6 +18,14 @@ public static class WebhookOperationsEndpoints
 
     public static IEndpointRouteBuilder MapWebhookOperationsEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/operations/v1/webhook-deliveries/worker-status",
+                (HttpContext context, WebhookDeliveryWorkerStatus status) =>
+                {
+                    context.Response.Headers.CacheControl = "no-store";
+                    return Results.Ok(status.GetSnapshot());
+                })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
         endpoints.MapGet("/operations/v1/webhook-deliveries/summary", async Task<IResult> (
                 PostgresWebhookOperationsReadService service,
                 TimeProvider timeProvider,
