@@ -3,7 +3,7 @@ services:
     name: mono-api-staging
     runtime: docker
     plan: free
-    branch: sprint-160-staging-readiness
+    branch: sprint-215-stage-candidate
     dockerfilePath: ./Dockerfile
     dockerContext: .
     autoDeploy: false

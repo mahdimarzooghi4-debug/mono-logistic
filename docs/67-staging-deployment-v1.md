@@ -18,7 +18,7 @@ The container runs the migrator only when MONO_AUTO_MIGRATE=true. The staging Bl
 ## Stage test checklist
 
 1. Create the Blueprint in the intended Render workspace and review the web-service and PostgreSQL resources before applying it.
-2. Confirm the service branch is the staging-readiness branch and that no Production database or secrets are referenced.
+2. Confirm the service branch matches the `branch` value in `render.yaml` (`sprint-215-stage-candidate`) and that no Production database or secrets are referenced.
 3. Apply the Blueprint, then wait for the service deploy to become live.
 4. Confirm /health/live and /health/ready both return HTTP 200.
 5. Review deploy logs for the ordered migration list and Database migrations complete.
