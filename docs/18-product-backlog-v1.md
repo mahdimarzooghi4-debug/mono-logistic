@@ -652,6 +652,7 @@ Dashboard must use the same application/core rules as API customers.
 - Sprint 208 adds a time-consistent, administrator-only delivery SLA alert feed for all active Missions, with an operator-selected lookahead window, assigned-courier context, stable filter-bound keyset pagination, and append-only read auditing.
 - Sprint 209 adds an opt-in background worker that expires only overdue OFFERED rows on Missions still searching for a courier, reusing the existing idempotent expiry rules and immutable event history; it never auto-selects a replacement courier.
 - Sprint 210 adds a no-store, administrator-only status endpoint for the optional offer-expiry worker, exposing safe in-process state and last successful batch details without changing API readiness.
+- Sprint 211 adds PostgreSQL integration coverage proving the expiry worker ignores not-yet-due offers, expires due offers through the audited transaction, records its system actor, and stops selecting the offer after expiry.
 - SLA alerts
 - re-dispatch
 - controlled exception handling
