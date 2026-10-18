@@ -29,7 +29,6 @@ public sealed class WebhookDeliveryRepositoryTests
             new TestOperationsContext(actorId, [MonoOperationsRoles.Administrator]), historyRepository);
         var auditObservedAt = DateTimeOffset.UtcNow;
         var summary = await service.GetQueueSummaryAsync(auditObservedAt, CancellationToken.None);
-        await service.RecordWorkerStatusReadAsync(auditObservedAt.AddTicks(1), CancellationToken.None);
         Assert.Equal(summary.TotalCount,
             summary.PendingCount + summary.InProgressCount + summary.RetryingCount + summary.SucceededCount +
             summary.DeadLetteredCount + summary.CancelledCount);
@@ -38,7 +37,7 @@ public sealed class WebhookDeliveryRepositoryTests
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var audit = new NpgsqlCommand("""
-            SELECT action, result_count FROM webhook_operations_read_audit WHERE actor_id = @actor_id ORDER BY occurred_at, audit_id;
+            SELECT action, result_count FROM webhook_operations_read_audit WHERE actor_id = @actor_id;
             """, connection);
         audit.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
         await using (var reader = await audit.ExecuteReaderAsync())
@@ -46,9 +45,6 @@ public sealed class WebhookDeliveryRepositoryTests
             Assert.True(await reader.ReadAsync());
             Assert.Equal("QUEUE_SUMMARY", reader.GetString(0));
             Assert.Equal(summary.TotalCount, reader.GetInt64(1));
-            Assert.True(await reader.ReadAsync());
-            Assert.Equal("WORKER_STATUS_READ", reader.GetString(0));
-            Assert.Equal(1L, reader.GetInt64(1));
             Assert.False(await reader.ReadAsync());
         }
 
@@ -66,9 +62,6 @@ public sealed class WebhookDeliveryRepositoryTests
             await using var reader = await auditedReads.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.Equal("QUEUE_SUMMARY", reader.GetString(0));
-            Assert.True(await reader.ReadAsync());
-            Assert.Equal("WORKER_STATUS_READ", reader.GetString(0));
-            Assert.True(reader.IsDBNull(2));
             Assert.True(await reader.ReadAsync());
             Assert.Equal("QUEUE_SEARCH", reader.GetString(0));
             Assert.True(reader.IsDBNull(2));
@@ -113,6 +106,64 @@ public sealed class WebhookDeliveryRepositoryTests
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => denied.ListAuditAsync(10,
             null, null, null, null, DateTimeOffset.UtcNow, CancellationToken.None));
         await ApplyMigrationsAsync(dataSource);
+    }
+
+    [Fact]
+    public async Task Webhook_worker_status_read_is_recorded_in_an_isolated_audit_ledger()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return;
+
+        await using var rootDataSource = NpgsqlDataSource.Create(connectionString);
+        var schema = "webhook_worker_audit_" + Guid.NewGuid().ToString("N");
+        await using (var connection = await rootDataSource.OpenConnectionAsync())
+        await using (var createSchema = new NpgsqlCommand($"CREATE SCHEMA \"{schema}\";", connection))
+            await createSchema.ExecuteNonQueryAsync();
+
+        try
+        {
+            var isolatedConnectionString = new NpgsqlConnectionStringBuilder(connectionString)
+            {
+                SearchPath = schema
+            }.ConnectionString;
+            await using var dataSource = NpgsqlDataSource.Create(isolatedConnectionString);
+            await ApplyMigrationsAsync(dataSource);
+
+            var actorId = "ops-worker-audit-" + Guid.NewGuid().ToString("N");
+            var historyRepository = new PostgresWebhookDeliveryHistoryRepository(dataSource);
+            var service = new PostgresWebhookOperationsReadService(dataSource,
+                new TestOperationsContext(actorId, [MonoOperationsRoles.Administrator]), historyRepository);
+            var observedAt = DateTimeOffset.UtcNow;
+            await service.RecordWorkerStatusReadAsync(observedAt, CancellationToken.None);
+
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var select = new NpgsqlCommand("""
+                SELECT action, result_count, resource_id, outcome_code
+                FROM webhook_operations_read_audit WHERE actor_id = @actor_id;
+                """, connection);
+            select.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
+            await using (var reader = await select.ExecuteReaderAsync())
+            {
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("WORKER_STATUS_READ", reader.GetString(0));
+                Assert.Equal(1L, reader.GetInt64(1));
+                Assert.True(reader.IsDBNull(2));
+                Assert.True(reader.IsDBNull(3));
+                Assert.False(await reader.ReadAsync());
+            }
+
+            var denied = new PostgresWebhookOperationsReadService(dataSource,
+                new TestOperationsContext(actorId, []), historyRepository);
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                denied.RecordWorkerStatusReadAsync(observedAt, CancellationToken.None));
+        }
+        finally
+        {
+            await using var connection = await rootDataSource.OpenConnectionAsync();
+            await using var dropSchema = new NpgsqlCommand($"DROP SCHEMA IF EXISTS \"{schema}\" CASCADE;", connection);
+            await dropSchema.ExecuteNonQueryAsync();
+        }
     }
 
     [Fact]
