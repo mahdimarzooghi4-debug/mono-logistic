@@ -16,6 +16,9 @@ public sealed class MissionCourierOfferExpiryWorkerStatusTests
         Assert.False(snapshot.Enabled);
         Assert.Equal("disabled", snapshot.State);
         Assert.Null(snapshot.LastAttemptAt);
+        Assert.Equal(0L, snapshot.TotalBatches);
+        Assert.Equal(0L, snapshot.SuccessfulBatches);
+        Assert.Equal(0L, snapshot.FailedBatches);
     }
 
     [Fact]
@@ -25,7 +28,10 @@ public sealed class MissionCourierOfferExpiryWorkerStatusTests
         status.MarkEnabled();
         status.RecordFailure();
 
-        Assert.Equal("degraded", status.GetSnapshot().State);
+        var degraded = status.GetSnapshot();
+        Assert.Equal("degraded", degraded.State);
+        Assert.Equal(1L, degraded.TotalBatches);
+        Assert.Equal(1L, degraded.FailedBatches);
 
         status.RecordSuccess(3);
 
@@ -33,6 +39,9 @@ public sealed class MissionCourierOfferExpiryWorkerStatusTests
         Assert.True(snapshot.Enabled);
         Assert.Equal("healthy", snapshot.State);
         Assert.Equal(3, snapshot.LastBatchCandidates);
+        Assert.Equal(2L, snapshot.TotalBatches);
+        Assert.Equal(1L, snapshot.SuccessfulBatches);
+        Assert.Equal(1L, snapshot.FailedBatches);
         Assert.NotNull(snapshot.LastSuccessAt);
         Assert.Equal(snapshot.LastSuccessAt, snapshot.LastAttemptAt);
     }

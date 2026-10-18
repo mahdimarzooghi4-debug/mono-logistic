@@ -52,7 +52,10 @@ public sealed record WebhookDeliveryWorkerSnapshot(
     [property: System.Text.Json.Serialization.JsonPropertyName("state")] string State,
     [property: System.Text.Json.Serialization.JsonPropertyName("last_attempt_at")] DateTimeOffset? LastAttemptAt,
     [property: System.Text.Json.Serialization.JsonPropertyName("last_success_at")] DateTimeOffset? LastSuccessAt,
-    [property: System.Text.Json.Serialization.JsonPropertyName("last_batch_claimed")] int? LastBatchClaimed);
+    [property: System.Text.Json.Serialization.JsonPropertyName("last_batch_claimed")] int? LastBatchClaimed,
+    [property: System.Text.Json.Serialization.JsonPropertyName("total_batches")] long TotalBatches,
+    [property: System.Text.Json.Serialization.JsonPropertyName("successful_batches")] long SuccessfulBatches,
+    [property: System.Text.Json.Serialization.JsonPropertyName("failed_batches")] long FailedBatches);
 
 /// <summary>In-process, non-sensitive status of the optional webhook delivery worker.</summary>
 public sealed class WebhookDeliveryWorkerStatus(TimeProvider timeProvider)
@@ -65,6 +68,9 @@ public sealed class WebhookDeliveryWorkerStatus(TimeProvider timeProvider)
     private DateTimeOffset? _lastAttemptAt;
     private DateTimeOffset? _lastSuccessAt;
     private int? _lastBatchClaimed;
+    private long _totalBatches;
+    private long _successfulBatches;
+    private long _failedBatches;
 
     public void MarkDisabled()
     {
@@ -84,6 +90,8 @@ public sealed class WebhookDeliveryWorkerStatus(TimeProvider timeProvider)
             _blocked = true;
             _initialized = true;
             _lastAttemptSucceeded = false;
+            _totalBatches++;
+            _failedBatches++;
             _lastAttemptAt = timeProvider.GetUtcNow();
             _lastBatchClaimed = null;
         }
@@ -107,6 +115,8 @@ public sealed class WebhookDeliveryWorkerStatus(TimeProvider timeProvider)
             _blocked = false;
             _initialized = true;
             _lastAttemptSucceeded = true;
+            _totalBatches++;
+            _successfulBatches++;
             _lastAttemptAt = timeProvider.GetUtcNow();
             _lastSuccessAt = _lastAttemptAt;
             _lastBatchClaimed = claimedCount;
@@ -137,7 +147,8 @@ public sealed class WebhookDeliveryWorkerStatus(TimeProvider timeProvider)
                 : _lastAttemptSucceeded is true ? "healthy"
                 : "starting";
             return new WebhookDeliveryWorkerSnapshot(
-                _enabled, state, _lastAttemptAt, _lastSuccessAt, _lastBatchClaimed);
+                _enabled, state, _lastAttemptAt, _lastSuccessAt, _lastBatchClaimed,
+                _totalBatches, _successfulBatches, _failedBatches);
         }
     }
 }
