@@ -57,6 +57,7 @@ builder.Services.AddScoped<PostgresWebhookDeliveryRepository>();
 builder.Services.AddScoped<PostgresWebhookDeliveryHistoryRepository>();
 builder.Services.AddScoped<PostgresWebhookOperationsReadService>();
 builder.Services.AddScoped<WebhookDeliveryDispatcher>();
+builder.Services.AddSingleton<WebhookDeliveryWorkerStatus>();
 builder.Services.AddHostedService<WebhookDeliveryBackgroundService>();
 builder.Services.AddScoped<PostgresMissionCourierOfferExpiryDispatcher>();
 builder.Services.AddSingleton<MissionCourierOfferExpiryWorkerStatus>();

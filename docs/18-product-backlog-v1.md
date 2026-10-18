@@ -673,6 +673,7 @@ Dashboard must use the same application/core rules as API customers.
 
 ## 23. Epic E21 — Observability
 
+- Sprint 212 adds an administrator-only webhook worker status endpoint, including disabled/blocked/running state and last batch timestamps, alongside the existing delivery queue summary.
 - structured logs
 - metrics
 - traces

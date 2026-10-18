@@ -29,4 +29,9 @@ Callback URLs are HTTPS on port 443. Automatic redirects and system proxies are 
 
 ## Monitoring and recovery
 
-Inspect `webhook_deliveries` for `PENDING`, `RETRYING`, `IN_PROGRESS`, `SUCCEEDED`, `DEAD_LETTERED`, or `CANCELLED` state, and `webhook_delivery_attempt_events` for append-only attempt history. Expired leases are rescheduled automatically while attempts remain; after the fifth attempt, the delivery is dead-lettered. There is no public replay endpoint yet; manual SQL changes to delivery state or attempt history are not an approved recovery path.
+Inspect `webhook_deliveries` for `PENDING`, `RETRYING`, `IN_PROGRESS`, `SUCCEEDED`, `DEAD_LETTERED`, or `CANCELLED` state, and `webhook_delivery_attempt_events` for append-only attempt history. Expired leases are rescheduled automatically while attempts remain; after the fifth attempt, the delivery is dead-lettered. Administrators can replay a delivery with `POST /operations/v1/webhook-deliveries/{deliveryId}/replay` and an `Idempotency-Key`; manual SQL changes to delivery state or attempt history are not an approved recovery path.
+
+
+### Worker status
+
+Administrators can inspect the in-process sender state with `GET /operations/v1/webhook-deliveries/worker-status`. The no-store response reports whether delivery is enabled, whether this worker is `disabled`, `blocked`, `starting`, `healthy`, or `degraded`, the latest attempt/success timestamps, and the most recent claimed batch size. A worker configured on but missing secret protection reports `blocked` without exposing key material. A failed batch reports `degraded` until a later successful batch. The status does not affect API readiness and is process-local; query each API instance in a multi-instance deployment.
