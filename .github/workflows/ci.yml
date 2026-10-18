@@ -49,6 +49,8 @@ jobs:
           PGPASSWORD=mono createdb --host=localhost --port=5432 --username=mono mono_migration_test
           dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
           dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
+      - name: Test staging smoke script URL/status handling
+        run: bash tools/tests/stage-smoke.test.sh
       - name: Smoke test API health endpoints
         env:
           ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_migration_test

@@ -12,6 +12,7 @@ Make the cumulative backend candidate deployable to a separate Stage environment
 - Official Render JSON Schema validation passes for `render.yaml`.
 - GitHub Actions build, migration validation, API health smoke test, test suite, and container build run on the PR head.
 - The reusable `tools/stage-smoke.sh` checks both health endpoints; CI uses it against the local API and the Stage checklist uses it against the deployed service.
+- Mocked contract tests cover remote HTTPS enforcement, localhost HTTP, non-200 status, and transport failure.
 - No Render resources have been created or changed.
 
 ## External boundary
