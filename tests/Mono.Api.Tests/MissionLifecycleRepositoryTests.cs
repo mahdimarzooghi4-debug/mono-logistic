@@ -677,6 +677,23 @@ public sealed class MissionLifecycleRepositoryTests(ITestOutputHelper output)
                 Assert.Equal(4, auditReader.GetInt32(2));
             }
 
+            var workerOffer = await offers.CreateOfferAsync(
+                MissionId, courierId, "zone-central", "mission-offer-create-worker-expiring");
+            Assert.Equal(MissionCourierOfferOutcome.Applied, workerOffer.Outcome);
+            var expiryDispatcher = new PostgresMissionCourierOfferExpiryDispatcher(dataSource, offerClock);
+            Assert.Equal(0, await expiryDispatcher.ExpireOverdueBatchAsync(20, CancellationToken.None));
+            Assert.Equal("OFFERED", await GetOfferStatusAsync(dataSource, workerOffer.Offer!.OfferId));
+
+            offerClock.Advance(TimeSpan.FromMinutes(6));
+            Assert.Equal(1, await expiryDispatcher.ExpireOverdueBatchAsync(20, CancellationToken.None));
+            Assert.Equal("EXPIRED", await GetOfferStatusAsync(dataSource, workerOffer.Offer.OfferId));
+            Assert.Equal(0, await expiryDispatcher.ExpireOverdueBatchAsync(20, CancellationToken.None));
+
+            var workerEvents = await offers.ListOfferEventsAsync(MissionId, workerOffer.Offer.OfferId);
+            var workerExpiryEvent = Assert.Single(workerEvents!, item => item.Action == "EXPIRED");
+            Assert.Equal("mono-dispatch-expiry-worker", workerExpiryEvent.ActorId);
+            Assert.Equal("OPERATIONS_EXPIRED_OFFER", workerExpiryEvent.Reason);
+
             offerClock.Set(DateTimeOffset.UtcNow);
 
             var reassignedOffer = await offers.CreateOfferAsync(
