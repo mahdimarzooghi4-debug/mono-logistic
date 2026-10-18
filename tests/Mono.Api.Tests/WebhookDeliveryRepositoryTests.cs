@@ -27,7 +27,9 @@ public sealed class WebhookDeliveryRepositoryTests
         var historyRepository = new PostgresWebhookDeliveryHistoryRepository(dataSource);
         var service = new PostgresWebhookOperationsReadService(dataSource,
             new TestOperationsContext(actorId, [MonoOperationsRoles.Administrator]), historyRepository);
-        var summary = await service.GetQueueSummaryAsync(DateTimeOffset.UtcNow, CancellationToken.None);
+        var auditObservedAt = DateTimeOffset.UtcNow;
+        var summary = await service.GetQueueSummaryAsync(auditObservedAt, CancellationToken.None);
+        await service.RecordWorkerStatusReadAsync(auditObservedAt.AddTicks(1), CancellationToken.None);
         Assert.Equal(summary.TotalCount,
             summary.PendingCount + summary.InProgressCount + summary.RetryingCount + summary.SucceededCount +
             summary.DeadLetteredCount + summary.CancelledCount);
@@ -36,7 +38,7 @@ public sealed class WebhookDeliveryRepositoryTests
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using var audit = new NpgsqlCommand("""
-            SELECT action, result_count FROM webhook_operations_read_audit WHERE actor_id = @actor_id;
+            SELECT action, result_count FROM webhook_operations_read_audit WHERE actor_id = @actor_id ORDER BY occurred_at, audit_id;
             """, connection);
         audit.Parameters.AddWithValue("actor_id", NpgsqlDbType.Text, actorId);
         await using (var reader = await audit.ExecuteReaderAsync())
@@ -44,6 +46,9 @@ public sealed class WebhookDeliveryRepositoryTests
             Assert.True(await reader.ReadAsync());
             Assert.Equal("QUEUE_SUMMARY", reader.GetString(0));
             Assert.Equal(summary.TotalCount, reader.GetInt64(1));
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("WORKER_STATUS_READ", reader.GetString(0));
+            Assert.Equal(1L, reader.GetInt64(1));
             Assert.False(await reader.ReadAsync());
         }
 
@@ -61,6 +66,9 @@ public sealed class WebhookDeliveryRepositoryTests
             await using var reader = await auditedReads.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.Equal("QUEUE_SUMMARY", reader.GetString(0));
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("WORKER_STATUS_READ", reader.GetString(0));
+            Assert.True(reader.IsDBNull(2));
             Assert.True(await reader.ReadAsync());
             Assert.Equal("QUEUE_SEARCH", reader.GetString(0));
             Assert.True(reader.IsDBNull(2));
@@ -364,7 +372,8 @@ public sealed class WebhookDeliveryRepositoryTests
                      "Mono.Api.Tests.Migrations.060_webhook_operations_delivery_search.sql",
                      "Mono.Api.Tests.Migrations.061_webhook_operations_delivery_replay.sql",
                      "Mono.Api.Tests.Migrations.062_webhook_operations_audit_history.sql",
-                     "Mono.Api.Tests.Migrations.063_webhook_delivery_operations_cancel.sql"
+                     "Mono.Api.Tests.Migrations.063_webhook_delivery_operations_cancel.sql",
+                     "Mono.Api.Tests.Migrations.090_webhook_worker_status_audit.sql"
                  })
         {
             await using var stream = assembly.GetManifestResourceStream(resourceName)

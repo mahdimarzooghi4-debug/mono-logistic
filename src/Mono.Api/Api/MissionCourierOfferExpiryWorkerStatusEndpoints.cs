@@ -10,10 +10,15 @@ public static class MissionCourierOfferExpiryWorkerStatusEndpoints
         this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/operations/v1/dispatch/offer-expiry-worker/status",
-            (HttpContext context, MissionCourierOfferExpiryWorkerStatus status) =>
+            async Task<IResult> (HttpContext context, MissionCourierOfferExpiryWorkerStatus status,
+                PostgresMissionOperationsReadAuditService audit, TimeProvider timeProvider,
+                CancellationToken cancellationToken) =>
             {
                 context.Response.Headers.CacheControl = "no-store";
-                return Results.Ok(status.GetSnapshot());
+                var snapshot = status.GetSnapshot();
+                await audit.RecordAsync(PostgresMissionOperationsReadAuditService.MissionWorkerStatus,
+                    null, 1, cancellationToken);
+                return Results.Ok(snapshot);
             }).RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
         return endpoints;
     }
