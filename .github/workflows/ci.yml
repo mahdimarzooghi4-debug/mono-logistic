@@ -49,6 +49,8 @@ jobs:
           PGPASSWORD=mono createdb --host=localhost --port=5432 --username=mono mono_migration_test
           dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
           dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
+      - name: Test staging smoke script URL/status handling
+        run: bash tools/tests/stage-smoke.test.sh
       - name: Smoke test API health endpoints
         env:
           ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_migration_test
@@ -57,8 +59,7 @@ jobs:
           api_pid=$!
           trap 'kill "$api_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:5180/health/live >/dev/null &&
-               curl --fail --silent http://127.0.0.1:5180/health/ready >/dev/null; then
+            if tools/stage-smoke.sh http://127.0.0.1:5180; then
               exit 0
             fi
             sleep 1

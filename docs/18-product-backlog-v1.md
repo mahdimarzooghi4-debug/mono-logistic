@@ -676,6 +676,7 @@ Dashboard must use the same application/core rules as API customers.
 - Sprint 212 adds an administrator-only webhook worker status endpoint, including disabled/blocked/running state and last batch timestamps, alongside the existing delivery queue summary.
 - Sprint 213 adds append-only read-audit records when administrators inspect webhook delivery and mission offer-expiry worker status.
 - Sprint 214 adds process-local cumulative success/failure batch counters to webhook and Mission offer-expiry worker status snapshots.
+- Sprint 215 aligns the staging Blueprint with the cumulative candidate branch and records required external Stage setup; Render JSON Schema and exact-head CI checks pass, with no Render resources created.
 - structured logs
 - metrics
 - traces

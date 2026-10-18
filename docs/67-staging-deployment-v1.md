@@ -2,7 +2,7 @@
 
 ## Scope
 
-The Render Blueprint provisions a staging-only web service and PostgreSQL database. It does not target Production and does not include Production secrets. Automatic deployment is disabled so a staging build is deployed deliberately.
+The Render Blueprint provisions a staging-only web service and PostgreSQL database. It does not target Production and does not include Production secrets. Automatic deployment is disabled so a staging build is deployed deliberately. The current runtime is suitable for health and database migration checks; optional authenticated and routing tests need the external prerequisites below.
 
 ## Database migration behavior
 
@@ -15,12 +15,31 @@ The container runs the migrator only when MONO_AUTO_MIGRATE=true. The staging Bl
 - /health/live reports process liveness without requiring PostgreSQL.
 - /health/ready checks PostgreSQL connectivity and reports unhealthy when the database cannot be reached.
 
+## Owner-supplied Stage prerequisites
+
+Required before deploying:
+
+- Confirm the Render workspace and ensure it can access this GitHub repository and create a web service plus PostgreSQL database. The Blueprint uses the free plan and Render's default region; if those are unavailable, agree on an alternative plan/region before changing the Blueprint.
+- Keep all test records synthetic and Stage-only. Do not copy Production credentials or personal data into Stage.
+
+Required only for authenticated API tests:
+
+- Provide HTTPS OIDC Authority and Audience values for the Operations and/or Courier identity issuer, configured in Render as `MonoOperations__Authority`, `MonoOperations__Audience`, `MonoCourier__Authority`, and `MonoCourier__Audience` as applicable.
+- Provide Stage-only test identities. An Operations administrator token needs one `sub`, `mono/role=MONO_ADMIN`, and issuer-verified `mono/mfa=true`. A Courier token needs `sub` and `mono/role=COURIER`, with that issuer/subject already bound to an active, unsuspended synthetic Courier in the Stage database.
+- Enter tokens and secret values only through the identity provider or Render's secret configuration; do not put them in GitHub or chat.
+
+Required only for specific integration tests:
+
+- Payout-account encryption tests need a Stage-only 32-byte Base64 key at `MonoCourier__PayoutIbanEncryptionKey`. Webhook-secret tests need a separate Stage-only 32-byte Base64 key at `Mono__WebhookEncryptionKey`.
+- Live route-matrix tests need a chosen Maps provider and its Stage API credential. The current runtime deliberately uses `UnconfiguredMapsProvider`, so real route estimates are not available until a provider is selected and its adapter is implemented.
+- Webhook delivery tests need a Stage-only public HTTPS receiver on port 443. The API rejects local and non-public webhook hosts.
+
 ## Stage test checklist
 
-1. Create the Blueprint in the intended Render workspace and review the web-service and PostgreSQL resources before applying it.
-2. Confirm the service branch is the staging-readiness branch and that no Production database or secrets are referenced.
+1. Create the Blueprint in the confirmed Render workspace and review the web-service and PostgreSQL resources before applying it.
+2. Confirm the service branch matches the `branch` value in `render.yaml` (`sprint-215-stage-candidate`) and that no Production database or secrets are referenced.
 3. Apply the Blueprint, then wait for the service deploy to become live.
-4. Confirm /health/live and /health/ready both return HTTP 200.
+4. Run `MONO_STAGE_BASE_URL=https://<stage-host> tools/stage-smoke.sh` and confirm both `/health/live` and `/health/ready` return HTTP 200.
 5. Review deploy logs for the ordered migration list and Database migrations complete.
-6. Run the selected authenticated API smoke tests using staging-only credentials and test data.
-7. Tear down the staging database only after preserving any test evidence that must be retained.
+6. Run only the authenticated or integration smoke tests whose Stage prerequisites are configured, using Stage-only identities and synthetic data.
+7. Preserve required test evidence before tearing down the staging database.
