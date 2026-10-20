@@ -45,6 +45,8 @@ The same Figma file also contains product screen designs:
 
 These are design artifacts; displayed sample values are not operational data. Product behavior and release scope remain governed by the approved product decisions and roadmap.
 
+The initial implementation of the [Mono Merchant Portal](src/Mono.MerchantPortal/README.md) covers the currently supported dashboard, delivery creation, delivery list/tracking, and active branch reads. It uses live customer-scoped API data and does not show fabricated KPI totals, issue quotes without verified distance evidence, or perform payment/settlement operations.
+
 ## Business Foundation
 
 - [Business Architecture](docs/01-business-architecture.md)
