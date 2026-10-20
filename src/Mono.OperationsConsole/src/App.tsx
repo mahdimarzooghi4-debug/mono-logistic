@@ -38,6 +38,15 @@ type MissionRecord = {
   createdAt: string
 }
 type MissionPage = { items: MissionRecord[]; nextCursor: string | null }
+type SlaAlert = {
+  mission_id: string
+  customer_id: string
+  status: string
+  committed_delivery_at: string
+  courier_id: string | null
+  is_overdue: boolean
+}
+type SlaAlertPage = { items: SlaAlert[]; next_cursor: string | null; evaluated_at: string }
 type MissionFare = { mission_id: string; customer_id: string; delivery_request_id: string; status: string; committed_delivery_at: string; created_at: string; quote_id: string; quote_version: number; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number; mono_commission_estimate_toman: number; commission_vat_estimate_toman: number; courier_net_estimate_toman: number }
 type MissionFarePage = { items: MissionFare[]; next_cursor: string | null }
 type MissionTimeline = { events?: Array<{ eventId: string; eventType: string; sequence: number; occurredAt: string }> }
@@ -78,11 +87,15 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance'>('dispatch')
+  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla'>('dispatch')
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
   const [missionItems, setMissionItems] = useState<MissionRecord[]>([])
+  const [slaItems, setSlaItems] = useState<SlaAlert[]>([])
+  const [slaNextCursor, setSlaNextCursor] = useState<string | null>(null)
+  const [slaMinutesAhead, setSlaMinutesAhead] = useState('0')
+  const [slaEvaluatedAt, setSlaEvaluatedAt] = useState<string | null>(null)
   const [courierItems, setCourierItems] = useState<CourierSummary[]>([])
   const [courierQuery, setCourierQuery] = useState('')
   const [courierStatus, setCourierStatus] = useState('')
@@ -212,6 +225,40 @@ export default function App() {
       setLoading(false)
     }
   }, [token, query, createdAfter, createdBefore])
+
+  const fetchSlaPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
+    if (!token) {
+      setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
+      return
+    }
+    setLoading(true)
+    setError('')
+    setSlaItems([])
+    const params = new URLSearchParams({ limit: '50', minutes_ahead: slaMinutesAhead })
+    if (cursor) params.set('cursor', cursor)
+    try {
+      const response = await fetch(`/operations/v1/sla/delivery-alerts?${params}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const page = (await response.json()) as SlaAlertPage
+      if (!Array.isArray(page.items) || typeof page.evaluated_at !== 'string')
+        throw new Error('ساختار پاسخ هشدارهای SLA با قرارداد API سازگار نیست.')
+      setSlaItems(page.items)
+      setSlaNextCursor(page.next_cursor || null)
+      setSlaEvaluatedAt(page.evaluated_at)
+      setCursorStack(nextStack || [null])
+      setPageIndex((nextStack || [null]).length - 1)
+      setConnected(true)
+      setUpdatedAt(new Date().toISOString())
+    } catch (cause) {
+      setConnected(false)
+      setError(cause instanceof Error ? cause.message : 'ارتباط با API برقرار نشد.')
+    } finally {
+      setLoading(false)
+    }
+  }, [token, slaMinutesAhead])
 
   const fetchCourierPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
     if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
@@ -443,17 +490,19 @@ export default function App() {
     else if (viewMode === 'missions') void fetchMissionPage(null, [null])
     else if (viewMode === 'couriers') void fetchCourierPage(null, [null])
     else if (viewMode === 'finance') void fetchFinancePage(null, [null])
+    else if (viewMode === 'sla') void fetchSlaPage(null, [null])
     else void fetchZoneCapacity(null, [null], true)
   }
 
   function goNext() {
-    const cursor = viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : availabilityNextCursor
+    const cursor = viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : availabilityNextCursor
     if (!cursor) return
     const nextStack = [...cursorStack, cursor]
     if (viewMode === 'dispatch') void fetchPage(cursor, nextStack)
     else if (viewMode === 'missions') void fetchMissionPage(cursor, nextStack)
     else if (viewMode === 'couriers') void fetchCourierPage(cursor, nextStack)
     else if (viewMode === 'finance') void fetchFinancePage(cursor, nextStack)
+    else if (viewMode === 'sla') void fetchSlaPage(cursor, nextStack)
     else void fetchZoneCapacity(cursor, nextStack, false)
   }
 
@@ -465,10 +514,11 @@ export default function App() {
     else if (viewMode === 'missions') void fetchMissionPage(cursor, previousStack)
     else if (viewMode === 'couriers') void fetchCourierPage(cursor, previousStack)
     else if (viewMode === 'finance') void fetchFinancePage(cursor, previousStack)
+    else if (viewMode === 'sla') void fetchSlaPage(cursor, previousStack)
     else void fetchZoneCapacity(cursor, previousStack, false)
   }
 
-  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance') {
+  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
@@ -477,6 +527,7 @@ export default function App() {
     else if (mode === 'missions') void fetchMissionPage(null, [null])
     else if (mode === 'couriers') void fetchCourierPage(null, [null])
     else if (mode === 'finance') void fetchFinancePage(null, [null])
+    else if (mode === 'sla') void fetchSlaPage(null, [null])
     else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
   }
 
@@ -584,6 +635,7 @@ export default function App() {
         <div className="side-caption">فضای عملیات</div>
         <nav className="navigation" aria-label="ناوبری اصلی">
           <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon">▦</span>صف dispatch</button>
+          <button className={`nav-item ${viewMode === 'sla' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon">!</span>هشدارهای SLA</button>
           <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon">↗</span>همهٔ مأموریت‌ها</button>
           <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon">⌁</span>پیک‌ها</button>
           <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>زون‌ها و ظرفیت</button>
@@ -595,11 +647,11 @@ export default function App() {
       <main className="workspace">
         <header className="topbar">
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
-          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
+          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت' : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
         </header>
 
         {!token && <section className="connect-card">
@@ -618,9 +670,15 @@ export default function App() {
           <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>موعد تحویل گذشته</small><strong>{fa.format(totals.overdue)}</strong></div></article>
           <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>پیشنهاد با مهلت گذشته</small><strong>{fa.format(totals.lateOffers)}</strong></div></article>
         </section>}
+        {viewMode === 'sla' && <section className="kpi-grid" aria-label="خلاصهٔ هشدارهای SLA این صفحه">
+          <article className="kpi-card"><span className="kpi-icon cyan">!</span><div><small>هشدارهای این صفحه</small><strong>{fa.format(slaItems.length)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon red">◷</span><div><small>عبورکرده از موعد</small><strong>{fa.format(slaItems.filter((item) => item.is_overdue).length)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon amber">⌁</span><div><small>بدون پیک پذیرفته‌شده</small><strong>{fa.format(slaItems.filter((item) => !item.courier_id).length)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon blue">✓</span><div><small>دارای پیک پذیرفته‌شده</small><strong>{fa.format(slaItems.filter((item) => Boolean(item.courier_id)).length)}</strong></div></article>
+        </section>}
 
         <section className="queue-panel">
-          <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
+          <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
           {viewMode === 'dispatch' ? <form className="filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجوی شناسهٔ مأموریت" /></label>
             <label><span className="sr-only">وضعیت موعد</span><select value={deliveryWindow} onChange={(event) => setDeliveryWindow(event.target.value)}><option value="">همهٔ موعدها</option><option value="upcoming">در پیش</option><option value="due_now">موعد همین حالا</option><option value="overdue">از موعد گذشته</option></select></label>
@@ -640,6 +698,9 @@ export default function App() {
             <label className="search-field"><span>⌕</span><input value={financeQuery} onChange={(event) => setFinanceQuery(event.target.value)} placeholder="شناسهٔ مأموریت، درخواست یا مرجع سفارش" /></label>
             <label><span className="sr-only">وضعیت مأموریت</span><select value={financeStatus} onChange={(event) => setFinanceStatus(event.target.value)}><option value="">همهٔ وضعیت‌ها</option><option value="DELIVERED">تحویل‌شده</option><option value="FAILED">ناموفق</option><option value="CANCELLED">لغوشده</option></select></label>
             <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال فیلتر</button>
+          </form> : viewMode === 'sla' ? <form className="filters" onSubmit={applyFilters}>
+            <label>هشدار در بازهٔ زمانی<select value={slaMinutesAhead} onChange={(event) => setSlaMinutesAhead(event.target.value)}><option value="0">موعد رسیده یا گذشته</option><option value="15">۱۵ دقیقهٔ آینده</option><option value="30">۳۰ دقیقهٔ آینده</option><option value="60">یک ساعت آینده</option><option value="240">چهار ساعت آینده</option></select></label>
+            <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال بازه</button>
           </form> : <form className="filters capacity-filters" onSubmit={applyFilters}>
             <label>شناسهٔ زون<input value={zoneId} onChange={(event) => setZoneId(event.target.value)} placeholder="شناسهٔ زون عملیاتی فعال" dir="ltr" /></label>
             <label>از زمان<input type="datetime-local" value={capacityFrom} onChange={(event) => setCapacityFrom(event.target.value)} /></label>
@@ -668,10 +729,10 @@ export default function App() {
 
           <div className="table-wrap">
             <table className={viewMode === 'finance' ? 'finance-table' : undefined}>
-              <thead>{viewMode === 'dispatch' ? <tr><th>شناسه مأموریت</th><th>مشتری / شعبه</th><th>زمان ایجاد</th><th>موعد تحویل</th><th>تلاش / آخرین اقدام</th><th>پیشنهاد فعال</th><th>سوابق</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : viewMode === 'couriers' ? <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr> : viewMode === 'finance' ? <tr><th>مأموریت</th><th>وضعیت</th><th>نرخ ثبت‌شده</th><th>مسافت</th><th>کرایه</th><th>سهم خریدار</th><th>سهم فروشنده</th><th>کمیسیون مونو (برآورد)</th><th>مالیات کمیسیون</th><th>خالص پیک (برآورد)</th></tr> : <tr><th>شناسه پنجره</th><th>شناسه پیک</th><th>زون</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>ثبت‌کننده</th><th>زمان ثبت</th><th>عملیات</th></tr>}</thead>
+              <thead>{viewMode === 'dispatch' ? <tr><th>شناسه مأموریت</th><th>مشتری / شعبه</th><th>زمان ایجاد</th><th>موعد تحویل</th><th>تلاش / آخرین اقدام</th><th>پیشنهاد فعال</th><th>سوابق</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : viewMode === 'couriers' ? <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr> : viewMode === 'finance' ? <tr><th>مأموریت</th><th>وضعیت</th><th>نرخ ثبت‌شده</th><th>مسافت</th><th>کرایه</th><th>سهم خریدار</th><th>سهم فروشنده</th><th>کمیسیون مونو (برآورد)</th><th>مالیات کمیسیون</th><th>خالص پیک (برآورد)</th></tr> : viewMode === 'sla' ? <tr><th>شناسهٔ مأموریت</th><th>مشتری</th><th>وضعیت مأموریت</th><th>موعد تحویل</th><th>پیک پذیرفته‌شده</th><th>وضعیت SLA</th><th>سوابق</th></tr> : <tr><th>شناسه پنجره</th><th>شناسه پیک</th><th>زون</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>ثبت‌کننده</th><th>زمان ثبت</th><th>عملیات</th></tr>}</thead>
               <tbody>
-                {loading && <tr><td colSpan={viewMode === 'finance' ? 10 : viewMode === 'zones' ? 9 : 8} className="state-cell"><span className="spinner" />در حال دریافت اطلاعات…</td></tr>}
-                {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : viewMode === 'finance' ? financeItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={viewMode === 'finance' ? 10 : 8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
+                {loading && <tr><td colSpan={viewMode === 'finance' ? 10 : viewMode === 'zones' ? 9 : viewMode === 'sla' ? 7 : 8} className="state-cell"><span className="spinner" />در حال دریافت اطلاعات…</td></tr>}
+                {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : viewMode === 'finance' ? financeItems.length === 0 : viewMode === 'sla' ? slaItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={viewMode === 'finance' ? 10 : viewMode === 'sla' ? 7 : 8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
                 {!loading && viewMode === 'dispatch' && items.map((mission) => <tr key={mission.missionId}>
                   <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong>{mission.deliveryOverdue && <span className="badge danger">موعد گذشته</span>}</td>
                   <td><span className="cell-primary" dir="ltr">{mission.customerId}</span><span className="cell-secondary" dir="ltr">{mission.branchId}</span></td>
@@ -689,6 +750,15 @@ export default function App() {
                   <td>{formatDate(mission.committedDeliveryAt)}</td>
                   <td>{formatDate(mission.createdAt)}</td>
                   <td><button className="history-button" onClick={() => void showMissionDetails(mission.missionId)}>جزئیات</button></td>
+                </tr>)}
+                {!loading && viewMode === 'sla' && slaItems.map((alert) => <tr key={alert.mission_id}>
+                  <td><strong className="mission-id" dir="ltr">{alert.mission_id}</strong></td>
+                  <td dir="ltr">{alert.customer_id}</td>
+                  <td><span className="badge neutral">{alert.status}</span></td>
+                  <td>{formatDate(alert.committed_delivery_at)}</td>
+                  <td dir="ltr">{alert.courier_id || <span className="cell-secondary">تخصیص پذیرفته‌شده ندارد</span>}</td>
+                  <td><span className={`badge ${alert.is_overdue ? 'danger' : 'warning'}`}>{alert.is_overdue ? 'از موعد گذشته' : new Date(alert.committed_delivery_at) <= new Date(slaEvaluatedAt || '') ? 'موعد رسیده' : 'نزدیک موعد'}</span></td>
+                  <td><button className="history-button" onClick={() => void showMissionDetails(alert.mission_id)}>جزئیات</button></td>
                 </tr>)}
                 {!loading && viewMode === 'couriers' && courierItems.map((courier) => <tr key={courier.courier_id}>
                   <td><strong className="mission-id" dir="ltr">{courier.courier_id}</strong></td>
@@ -718,9 +788,10 @@ export default function App() {
               </tbody>
             </table>
           </div>
-          <footer className="table-footer"><span>{fa.format(viewMode === 'dispatch' ? items.length : viewMode === 'missions' ? missionItems.length : viewMode === 'couriers' ? courierItems.length : viewMode === 'finance' ? financeItems.length : availabilityPage?.items.length || 0)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !(viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : availabilityNextCursor)}>بعدی</button></div></footer>
+          <footer className="table-footer"><span>{fa.format(viewMode === 'dispatch' ? items.length : viewMode === 'missions' ? missionItems.length : viewMode === 'couriers' ? courierItems.length : viewMode === 'finance' ? financeItems.length : viewMode === 'sla' ? slaItems.length : availabilityPage?.items.length || 0)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !(viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : availabilityNextCursor)}>بعدی</button></div></footer>
         </section>
         {viewMode === 'dispatch' && <p className="data-note">آمار بالا فقط از ردیف‌های صفحهٔ جاری محاسبه شده است؛ API فعلاً شمار کل صف را برنمی‌گرداند.</p>}
+        {viewMode === 'sla' && <p className="data-note">خلاصه فقط از ردیف‌های همین صفحه است. هشدارها در زمان «مبنای ارزیابی» محاسبه شده‌اند؛ برای تازه‌سازی، دکمهٔ ↻ را بزنید.</p>}
         {viewMode === 'zones' && <p className="data-note">این داده‌ها پنجره‌های کاری ثبت‌شده‌اند؛ حضور زنده، ظرفیت لحظه‌ای یا اختیار تخصیص از آن‌ها نتیجه نمی‌شود.</p>}{viewMode === 'finance' && <p className="data-note">این نما فقط از snapshot قطعی تعرفه و مفروضات تجاری Phase 1 برآورد می‌سازد؛ پرداخت، موجودی، برداشت، تسویهٔ واقعی یا وصول از حنا را گزارش نمی‌کند.</p>}
       </main>
 

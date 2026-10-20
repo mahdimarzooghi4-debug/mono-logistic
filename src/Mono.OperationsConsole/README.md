@@ -16,6 +16,7 @@ The Vite development server listens on `127.0.0.1:5173` and proxies `/operations
 ## Implemented in this slice
 
 - MFA-protected dispatch queue read via `GET /operations/v1/dispatch/queue`.
+- Administrator-only delivery SLA alert feed via `GET /operations/v1/sla/delivery-alerts`, with 0/15/30/60/240-minute due windows, evaluated-at display, and cursor pagination. Counts are limited to the currently loaded page. Alert rows link to Mission details and timeline.
 - Searchable, date-filtered Mission directory via `GET /operations/v1/missions`.
 - Prefix search, exact customer scope, active-offer filter, delivery-window filter, created-before filter, due/creation ordering, and cursor pagination.
 - Per-page summaries calculated only from the current response page.
