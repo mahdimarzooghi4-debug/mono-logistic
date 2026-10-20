@@ -53,6 +53,11 @@ type CourierIssue = { report_id: string; mission_id: string; courier_id: string;
 type CourierIssuePage = { reports: CourierIssue[]; nextCursor: string | null }
 type WorkerSnapshot = { enabled: boolean; state: 'disabled' | 'blocked' | 'starting' | 'healthy' | 'degraded' | string; last_attempt_at: string | null; last_success_at: string | null; last_batch_claimed?: number | null; last_batch_candidates?: number | null; total_batches: number; successful_batches: number; failed_batches: number }
 type WorkerStatusState = { mission: WorkerSnapshot | null; webhook: WorkerSnapshot | null }
+type WebhookSummary = { total_count: number; pending_count: number; in_progress_count: number; retrying_count: number; succeeded_count: number; dead_lettered_count: number; cancelled_count: number; due_count: number; stale_lease_count: number; dead_lettered_last_24_hours: number; oldest_open_delivery_at: string | null; observed_at: string }
+type WebhookDelivery = { delivery_id: string; endpoint_id: string; event_id: string; event_type: string; status: string; attempt_count: number; replay_generation: number; last_http_status: number | null; last_error_code: string | null; created_at: string; last_attempt_at: string | null; next_attempt_at: string | null; completed_at: string | null }
+type WebhookPage = { items: WebhookDelivery[]; nextCursor: string | null }
+type WebhookDetail = { delivery: WebhookDelivery; attempts: Array<{ attempt_number: number; action: string; http_status: number | null; error_code: string | null; occurred_at: string }> }
+type WebhookAuditPage = { items: Array<{ audit_id: string; actor_id: string; action: string; result_count: number; resource_id: string | null; outcome_code: string | null; occurred_at: string }>; next_cursor: string | null }
 type MissionFare = { mission_id: string; customer_id: string; delivery_request_id: string; status: string; committed_delivery_at: string; created_at: string; quote_id: string; quote_version: number; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number; mono_commission_estimate_toman: number; commission_vat_estimate_toman: number; courier_net_estimate_toman: number }
 type MissionFarePage = { items: MissionFare[]; next_cursor: string | null }
 type MissionTimeline = { events?: Array<{ eventId: string; eventType: string; sequence: number; occurredAt: string }> }
@@ -98,7 +103,7 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers'>('dispatch')
+  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks'>('dispatch')
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
@@ -121,6 +126,23 @@ export default function App() {
   const [issueToAt, setIssueToAt] = useState('')
   const [workerSnapshots, setWorkerSnapshots] = useState<WorkerStatusState>({ mission: null, webhook: null })
   const [workerErrors, setWorkerErrors] = useState<{ mission: string; webhook: string }>({ mission: '', webhook: '' })
+  const [webhookSummary, setWebhookSummary] = useState<WebhookSummary | null>(null)
+  const [webhookItems, setWebhookItems] = useState<WebhookDelivery[]>([])
+  const [webhookNextCursor, setWebhookNextCursor] = useState<string | null>(null)
+  const [webhookDetail, setWebhookDetail] = useState<WebhookDetail | null>(null)
+  const [webhookDetailError, setWebhookDetailError] = useState('')
+  const [webhookAudit, setWebhookAudit] = useState<WebhookAuditPage | null>(null)
+  const [webhookTab, setWebhookTab] = useState<'deliveries' | 'audit'>('deliveries')
+  const [webhookCustomerId, setWebhookCustomerId] = useState('')
+  const [webhookEndpointId, setWebhookEndpointId] = useState('')
+  const [webhookEventType, setWebhookEventType] = useState('')
+  const [webhookStatus, setWebhookStatus] = useState('')
+  const [webhookErrors, setWebhookErrors] = useState({ summary: '', list: '', audit: '' })
+  const [webhookAction, setWebhookAction] = useState<{ deliveryId: string; kind: 'replay' | 'cancel' } | null>(null)
+  const [webhookActionError, setWebhookActionError] = useState('')
+  const [webhookActionMessage, setWebhookActionMessage] = useState('')
+  const [webhookActionLoading, setWebhookActionLoading] = useState(false)
+  const webhookActionKeys = useRef(new Map<string, string>())
   const [courierItems, setCourierItems] = useState<CourierSummary[]>([])
   const [courierQuery, setCourierQuery] = useState('')
   const [courierStatus, setCourierStatus] = useState('')
@@ -362,6 +384,96 @@ export default function App() {
       setLoading(false)
     }
   }, [token, issueStatus, issueCode, issueMissionId, issueCourierId, issueFromAt, issueToAt])
+
+
+  const fetchWebhookOps = useCallback(async (cursor: string | null = null, nextStack?: Array<string | null>) => {
+    if (!token) {
+      setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
+      return
+    }
+    setLoading(true)
+    setWebhookErrors({ summary: '', list: '', audit: '' })
+    const listParams = new URLSearchParams({ limit: '50' })
+    if (webhookCustomerId.trim()) listParams.set('customer_id', webhookCustomerId.trim())
+    if (webhookEndpointId.trim()) listParams.set('endpoint_id', webhookEndpointId.trim())
+    if (webhookEventType) listParams.set('event_type', webhookEventType)
+    if (webhookStatus) listParams.set('status', webhookStatus)
+    if (cursor) listParams.set('cursor', cursor)
+    const requests = [
+      fetch('/operations/v1/webhook-deliveries/summary', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+      fetch(`/operations/v1/webhook-deliveries?${listParams}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+      fetch('/operations/v1/webhook-deliveries/audit?limit=50', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+    ]
+    const [summaryResult, listResult, auditResult] = await Promise.allSettled(requests)
+    const errors = { summary: '', list: '', audit: '' }
+    let succeeded = false
+    if (summaryResult.status === 'fulfilled' && summaryResult.value.ok) {
+      try {
+        const value = await summaryResult.value.json() as WebhookSummary
+        if (typeof value.total_count !== 'number' || typeof value.pending_count !== 'number' || typeof value.observed_at !== 'string')
+          throw new Error('ساختار خلاصهٔ صف webhook با قرارداد API سازگار نیست.')
+        setWebhookSummary(value); succeeded = true
+      } catch (cause) { errors.summary = cause instanceof Error ? cause.message : 'پاسخ خلاصه نامعتبر است.' }
+    } else errors.summary = summaryResult.status === 'fulfilled' ? await readError(summaryResult.value) : 'ارتباط با API برقرار نشد.'
+    if (listResult.status === 'fulfilled' && listResult.value.ok) {
+      try {
+        const value = await listResult.value.json() as WebhookPage
+        if (!Array.isArray(value.items) || value.items.some((item) => typeof item.delivery_id !== 'string' || typeof item.status !== 'string'))
+          throw new Error('ساختار فهرست webhook با قرارداد API سازگار نیست.')
+        setWebhookItems(value.items); setWebhookNextCursor(value.nextCursor || null); setCursorStack(nextStack || [null]); setPageIndex((nextStack || [null]).length - 1); succeeded = true
+      } catch (cause) { errors.list = cause instanceof Error ? cause.message : 'پاسخ فهرست نامعتبر است.' }
+    } else errors.list = listResult.status === 'fulfilled' ? await readError(listResult.value) : 'ارتباط با API برقرار نشد.'
+    if (auditResult.status === 'fulfilled' && auditResult.value.ok) {
+      try {
+        const value = await auditResult.value.json() as WebhookAuditPage
+        if (!Array.isArray(value.items)) throw new Error('ساختار audit webhook با قرارداد API سازگار نیست.')
+        setWebhookAudit(value); succeeded = true
+      } catch (cause) { errors.audit = cause instanceof Error ? cause.message : 'پاسخ audit نامعتبر است.' }
+    } else errors.audit = auditResult.status === 'fulfilled' ? await readError(auditResult.value) : 'ارتباط با API برقرار نشد.'
+    setWebhookErrors(errors)
+    setConnected(succeeded)
+    setUpdatedAt(new Date().toISOString())
+    setLoading(false)
+  }, [token, webhookCustomerId, webhookEndpointId, webhookEventType, webhookStatus])
+
+  const showWebhookDetail = useCallback(async (deliveryId: string) => {
+    if (!token) return
+    setWebhookDetail(null); setWebhookDetailError('')
+    try {
+      const response = await fetch(`/operations/v1/webhook-deliveries/${encodeURIComponent(deliveryId)}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+      if (!response.ok) throw new Error(await readError(response))
+      const detail = await response.json() as WebhookDetail
+      if (!detail.delivery || !Array.isArray(detail.attempts)) throw new Error('ساختار جزئیات webhook با قرارداد API سازگار نیست.')
+      setWebhookDetail(detail)
+    } catch (cause) { setWebhookDetailError(cause instanceof Error ? cause.message : 'دریافت جزئیات ناموفق بود.') }
+  }, [token])
+
+  async function performWebhookAction() {
+    if (!token || !webhookAction) return
+    const { deliveryId, kind } = webhookAction
+    const keyId = `${kind}:${deliveryId}`
+    let idempotencyKey = webhookActionKeys.current.get(keyId)
+    if (!idempotencyKey) {
+      idempotencyKey = `ops-${kind}-${crypto.randomUUID()}`
+      webhookActionKeys.current.set(keyId, idempotencyKey)
+    }
+    setWebhookActionLoading(true); setWebhookActionError(''); setWebhookActionMessage('')
+    try {
+      const response = await fetch(`/operations/v1/webhook-deliveries/${encodeURIComponent(deliveryId)}/${kind}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Idempotency-Key': idempotencyKey },
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      webhookActionKeys.current.delete(keyId)
+      setWebhookActionMessage(kind === 'replay' ? 'درخواست replay پذیرفته شد؛ نتیجهٔ ارسال در وضعیت بعدی و تاریخچه ثبت می‌شود.' : 'درخواست لغو ثبت شد.')
+      setWebhookAction(null)
+      await fetchWebhookOps(null)
+      await showWebhookDetail(deliveryId)
+    } catch (cause) {
+      setWebhookActionError(cause instanceof Error ? cause.message : 'عملیات ناموفق بود. در صورت ابهام، تلاش مجدد با همان کلید idempotency انجام می‌شود.')
+    } finally { setWebhookActionLoading(false) }
+  }
 
   const fetchWorkerStatus = useCallback(async () => {
     if (!token) {
@@ -639,11 +751,12 @@ export default function App() {
     else if (viewMode === 'presence') void fetchPresencePage(null, [null])
     else if (viewMode === 'issues') void fetchIssuePage(null, [null])
     else if (viewMode === 'workers') void fetchWorkerStatus()
+    else if (viewMode === 'webhooks') void fetchWebhookOps(null)
     else void fetchZoneCapacity(null, [null], true)
   }
 
   function goNext() {
-    const cursor = viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : viewMode === 'presence' ? presenceNextCursor : viewMode === 'issues' ? issueNextCursor : availabilityNextCursor
+    const cursor = viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : viewMode === 'presence' ? presenceNextCursor : viewMode === 'issues' ? issueNextCursor : viewMode === 'webhooks' ? webhookNextCursor : availabilityNextCursor
     if (!cursor) return
     const nextStack = [...cursorStack, cursor]
     if (viewMode === 'dispatch') void fetchPage(cursor, nextStack)
@@ -654,6 +767,7 @@ export default function App() {
     else if (viewMode === 'presence') void fetchPresencePage(cursor, nextStack)
     else if (viewMode === 'issues') void fetchIssuePage(cursor, nextStack)
     else if (viewMode === 'workers') return
+    else if (viewMode === 'webhooks') { const nextStack = [...cursorStack, webhookNextCursor!]; void fetchWebhookOps(webhookNextCursor, nextStack) }
     else void fetchZoneCapacity(cursor, nextStack, false)
   }
 
@@ -669,10 +783,11 @@ export default function App() {
     else if (viewMode === 'presence') void fetchPresencePage(cursor, previousStack)
     else if (viewMode === 'issues') void fetchIssuePage(cursor, previousStack)
     else if (viewMode === 'workers') return
+    else if (viewMode === 'webhooks') void fetchWebhookOps(cursor, previousStack)
     else void fetchZoneCapacity(cursor, previousStack, false)
   }
 
-  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers') {
+  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
@@ -685,6 +800,7 @@ export default function App() {
     else if (mode === 'presence') void fetchPresencePage(null, [null])
     else if (mode === 'issues') void fetchIssuePage(null, [null])
     else if (mode === 'workers') void fetchWorkerStatus()
+    else if (mode === 'webhooks') { setWebhookTab('deliveries'); void fetchWebhookOps(null) }
     else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
   }
 
@@ -800,6 +916,7 @@ export default function App() {
           <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon">●</span>وضعیت حضور پیک‌ها</button>
           <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon">!</span>صندوق مشکلات پیک‌ها</button>
           <button className={`nav-item ${viewMode === 'workers' ? 'active' : ''}`} onClick={() => switchView('workers')}><span className="nav-icon">⚙</span>سلامت پردازش‌ها</button>
+          <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon">↻</span>وب‌هوک‌های خروجی</button>
           <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>زون‌ها و ظرفیت</button>
           <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon">▤</span>بررسی کرایه</button>
         </nav>
@@ -809,11 +926,11 @@ export default function App() {
       <main className="workspace">
         <header className="topbar">
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null) : viewMode === 'workers' ? void fetchWorkerStatus() : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
-          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'presence' ? 'وضعیت آنلاین/آفلاین و آخرین زمان ثبت حضور' : viewMode === 'issues' ? 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت'  : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA' : viewMode === 'workers' ? 'وضعیت workerهای پردازش در همین نمونهٔ API' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
+          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'presence' ? 'وضعیت آنلاین/آفلاین و آخرین زمان ثبت حضور' : viewMode === 'issues' ? 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت'  : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA'  : viewMode === 'workers' ? 'وضعیت workerهای پردازش در همین نمونهٔ API' : viewMode === 'webhooks' ? 'پایش صف تحویل و بررسی تلاش‌های ارسال webhook' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
         </header>
 
         {!token && <section className="connect-card">
@@ -876,7 +993,68 @@ export default function App() {
             </article>
           })}
         </section>}
-        {viewMode !== 'workers' && <section className="queue-panel">
+        {viewMode === 'webhooks' && <div className="webhook-dashboard">
+          {webhookSummary && <section className="kpi-grid" aria-label="خلاصهٔ سراسری صف webhook">
+            <article className="kpi-card"><span className="kpi-icon cyan">↻</span><div><small>کل تحویل‌ها</small><strong>{fa.format(webhookSummary.total_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>موعد ارسال</small><strong>{fa.format(webhookSummary.due_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>قفل منقضی</small><strong>{fa.format(webhookSummary.stale_lease_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon blue">▤</span><div><small>Dead-letter در ۲۴ ساعت</small><strong>{fa.format(webhookSummary.dead_lettered_last_24_hours)}</strong></div></article>
+          </section>}
+          {webhookSummary && <p className="data-note">خلاصهٔ کل صف، مبنای مشاهده: {formatDate(webhookSummary.observed_at)} · باز: {fa.format(webhookSummary.pending_count + webhookSummary.in_progress_count + webhookSummary.retrying_count)} · موفق: {fa.format(webhookSummary.succeeded_count)} · لغوشده: {fa.format(webhookSummary.cancelled_count)} · قدیمی‌ترین کار باز: {formatDate(webhookSummary.oldest_open_delivery_at)}</p>}
+          {Object.entries(webhookErrors).filter(([, message]) => message).map(([key, message]) => <div className="webhook-inline-error" role="alert" key={key}>{key === 'summary' ? 'خلاصهٔ صف' : key === 'list' ? 'فهرست تحویل‌ها' : 'audit'}: {message}</div>)}
+          {webhookActionMessage && <div className="availability-write-success" role="status">{webhookActionMessage}</div>}
+          <section className="queue-panel webhook-panel">
+            <div className="panel-heading"><div><span className="eyebrow">پایش وب‌هوک خروجی</span><h2>تحویل‌ها و تاریخچهٔ عملیات</h2></div><span className="panel-meta">محتوای payload، URL مقصد و secret نمایش داده نمی‌شود</span></div>
+            <div className="webhook-tabs" role="tablist" aria-label="نمای وب‌هوک">
+              <button type="button" className={webhookTab === 'deliveries' ? 'active' : ''} onClick={() => setWebhookTab('deliveries')}>تحویل‌ها</button>
+              <button type="button" className={webhookTab === 'audit' ? 'active' : ''} onClick={() => setWebhookTab('audit')}>سوابق عملیات</button>
+            </div>
+            {webhookTab === 'deliveries' ? <>
+              <form className="filters webhook-filters" onSubmit={applyFilters}>
+                <label>شناسهٔ مشتری<input value={webhookCustomerId} onChange={(event) => setWebhookCustomerId(event.target.value)} placeholder="cus_…" dir="ltr" autoComplete="off" /></label>
+                <label>شناسهٔ endpoint<input value={webhookEndpointId} onChange={(event) => setWebhookEndpointId(event.target.value)} placeholder="whk_…" dir="ltr" autoComplete="off" /></label>
+                <label>نوع رویداد<input value={webhookEventType} onChange={(event) => setWebhookEventType(event.target.value)} placeholder="mission.delivered" dir="ltr" autoComplete="off" /></label>
+                <label><span className="sr-only">وضعیت تحویل</span><select value={webhookStatus} onChange={(event) => setWebhookStatus(event.target.value)}><option value="">همهٔ وضعیت‌ها</option><option value="PENDING">در صف</option><option value="IN_PROGRESS">در حال ارسال</option><option value="RETRYING">تلاش مجدد</option><option value="SUCCEEDED">موفق</option><option value="DEAD_LETTERED">ناموفق نهایی</option><option value="CANCELLED">لغوشده</option></select></label>
+                <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال فیلتر</button>
+              </form>
+              <div className="table-wrap"><table className="webhook-table"><thead><tr><th>شناسهٔ تحویل</th><th>رویداد</th><th>وضعیت</th><th>تلاش</th><th>آخرین HTTP</th><th>کد خطا</th><th>ایجاد</th><th>اقدام</th></tr></thead><tbody>
+                {loading && <tr><td className="state-cell" colSpan={8}><span className="spinner"/>در حال دریافت اطلاعات…</td></tr>}
+                {!loading && webhookItems.map((item) => <tr key={item.delivery_id}>
+                  <td><strong className="mission-id" dir="ltr">{item.delivery_id}</strong><span className="cell-secondary" dir="ltr">{item.endpoint_id}</span></td>
+                  <td><span className="cell-primary" dir="ltr">{item.event_type}</span><span className="cell-secondary" dir="ltr">event {item.event_id}</span></td>
+                  <td><span className={`badge ${item.status === 'SUCCEEDED' ? 'success' : item.status === 'DEAD_LETTERED' ? 'danger' : item.status === 'CANCELLED' ? 'neutral' : 'warning'}`}>{item.status}</span></td>
+                  <td>{fa.format(item.attempt_count)}<span className="cell-secondary">نسل replay: {fa.format(item.replay_generation)}</span></td>
+                  <td>{item.last_http_status ?? '—'}</td><td dir="ltr">{item.last_error_code || '—'}</td><td>{formatDate(item.created_at)}</td>
+                  <td><div className="webhook-row-actions"><button className="history-button" onClick={() => void showWebhookDetail(item.delivery_id)}>جزئیات</button>
+                    {item.status === 'DEAD_LETTERED' && <button className="history-button" onClick={() => { setWebhookAction({ deliveryId: item.delivery_id, kind: 'replay' }); setWebhookActionError('') }}>Replay</button>}
+                    {(item.status === 'PENDING' || item.status === 'RETRYING') && <button className="history-button danger-action" onClick={() => { setWebhookAction({ deliveryId: item.delivery_id, kind: 'cancel' }); setWebhookActionError('') }}>لغو</button>}
+                  </div></td>
+                </tr>)}
+                {!loading && !webhookErrors.list && webhookItems.length === 0 && <tr><td className="state-cell" colSpan={8}><span className="empty-icon">⌕</span><strong>تحویلی پیدا نشد</strong><small>فیلترها را بررسی کنید یا صف را تازه‌سازی کنید.</small></td></tr>}
+              </tbody></table></div>
+              <footer className="table-footer"><span>{fa.format(webhookItems.length)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !webhookNextCursor}>بعدی</button></div></footer>
+            </> : <div className="table-wrap"><table className="webhook-table"><thead><tr><th>زمان</th><th>کاربر عملیات</th><th>عمل</th><th>شناسهٔ منبع</th><th>نتیجه</th></tr></thead><tbody>
+              {webhookAudit?.items.map((item) => <tr key={item.audit_id}><td>{formatDate(item.occurred_at)}</td><td dir="ltr">{item.actor_id}</td><td dir="ltr">{item.action}</td><td dir="ltr">{item.resource_id || '—'}</td><td dir="ltr">{item.outcome_code || fa.format(item.result_count)}</td></tr>)}
+              {(!webhookAudit || webhookAudit.items.length === 0) && <tr><td className="state-cell" colSpan={5}><strong>رکورد audit برای این صفحه دریافت نشد</strong></td></tr>}
+            </tbody></table><p className="data-note webhook-audit-note">نمای audit شامل ۵۰ رکورد نخست است.</p></div>}
+          </section>
+          {webhookDetail && <section className="queue-panel webhook-detail">
+            <div className="panel-heading"><div><span className="eyebrow">جزئیات امن تحویل</span><h2 dir="ltr">{webhookDetail.delivery.delivery_id}</h2></div><button className="text-button" onClick={() => setWebhookDetail(null)}>بستن جزئیات</button></div>
+            <dl className="worker-details webhook-meta">
+              <div><dt>Endpoint</dt><dd dir="ltr">{webhookDetail.delivery.endpoint_id}</dd></div><div><dt>Event</dt><dd dir="ltr">{webhookDetail.delivery.event_id} · {webhookDetail.delivery.event_type}</dd></div>
+              <div><dt>وضعیت</dt><dd>{webhookDetail.delivery.status}</dd></div><div><dt>تلاش‌ها</dt><dd>{fa.format(webhookDetail.delivery.attempt_count)} · replay {fa.format(webhookDetail.delivery.replay_generation)}</dd></div>
+              <div><dt>آخرین تلاش</dt><dd>{formatDate(webhookDetail.delivery.last_attempt_at)}</dd></div><div><dt>تلاش بعدی</dt><dd>{formatDate(webhookDetail.delivery.next_attempt_at)}</dd></div>
+              <div><dt>پایان</dt><dd>{formatDate(webhookDetail.delivery.completed_at)}</dd></div><div><dt>HTTP / خطا</dt><dd>{webhookDetail.delivery.last_http_status ?? '—'} · {webhookDetail.delivery.last_error_code || '—'}</dd></div>
+            </dl>
+            {webhookDetailError && <p className="webhook-inline-error">{webhookDetailError}</p>}
+            <div className="table-wrap"><table className="webhook-table"><thead><tr><th>#</th><th>عمل</th><th>HTTP</th><th>کد خطا</th><th>زمان</th></tr></thead><tbody>
+              {webhookDetail.attempts.map((attempt, index) => <tr key={`${attempt.attempt_number}-${index}`}><td>{fa.format(attempt.attempt_number)}</td><td dir="ltr">{attempt.action}</td><td>{attempt.http_status ?? '—'}</td><td dir="ltr">{attempt.error_code || '—'}</td><td>{formatDate(attempt.occurred_at)}</td></tr>)}
+              {webhookDetail.attempts.length === 0 && <tr><td className="state-cell" colSpan={5}>تلاشی در تاریخچه ثبت نشده است.</td></tr>}
+            </tbody></table></div>
+          </section>}
+          {webhookDetailError && !webhookDetail && <div className="webhook-inline-error" role="alert">{webhookDetailError}</div>}
+        </div>}
+        {viewMode !== 'workers' && viewMode !== 'webhooks' && <section className="queue-panel">
           <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
           {viewMode === 'dispatch' ? <form className="filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجوی شناسهٔ مأموریت" /></label>
@@ -1023,6 +1201,13 @@ export default function App() {
         {viewMode === 'zones' && <p className="data-note">این داده‌ها پنجره‌های کاری ثبت‌شده‌اند؛ حضور زنده، ظرفیت لحظه‌ای یا اختیار تخصیص از آن‌ها نتیجه نمی‌شود.</p>}{viewMode === 'finance' && <p className="data-note">این نما فقط از snapshot قطعی تعرفه و مفروضات تجاری Phase 1 برآورد می‌سازد؛ پرداخت، موجودی، برداشت، تسویهٔ واقعی یا وصول از حنا را گزارش نمی‌کند.</p>}
       </main>
 
+      {webhookAction && <div className="modal-backdrop" role="presentation" onClick={() => !webhookActionLoading && setWebhookAction(null)}><section className="timeline-modal webhook-confirm" role="dialog" aria-modal="true" aria-labelledby="webhook-confirm-title" onClick={(event) => event.stopPropagation()}>
+        <header><div><span className="eyebrow">عملیات وب‌هوک</span><h2 id="webhook-confirm-title">{webhookAction.kind === 'replay' ? 'ارسال دوبارهٔ تحویل' : 'لغو تحویل در صف'}</h2></div><button className="icon-button" onClick={() => !webhookActionLoading && setWebhookAction(null)} aria-label="بستن">×</button></header>
+        <p className="modal-state" dir="ltr">{webhookAction.deliveryId}</p>
+        <p>{webhookAction.kind === 'replay' ? 'درخواست replay به API ارسال می‌شود و ممکن است endpoint مقصد را دوباره فراخوانی کند. فقط گزارش‌های dead-letter قابل replay هستند و API سقف و فعال‌بودن endpoint را بررسی می‌کند.' : 'API فقط تحویل‌های در صف یا retrying بدون lease فعال را لغو می‌کند. ممکن است درخواست به دلیل شروع ارسال هم‌زمان رد شود.'}</p>
+        {webhookActionError && <div className="webhook-inline-error" role="alert">{webhookActionError}<small>در صورت نامشخص‌بودن نتیجه، دکمهٔ تلاش مجدد همان کلید idempotency را حفظ می‌کند.</small></div>}
+        <div className="capacity-actions"><button className="primary-button" onClick={() => void performWebhookAction()} disabled={webhookActionLoading}>{webhookActionLoading ? 'در حال ارسال…' : webhookActionError ? 'تلاش مجدد' : 'تأیید عملیات'}</button><button className="secondary-button" onClick={() => setWebhookAction(null)} disabled={webhookActionLoading}>انصراف</button></div>
+      </section></div>}
       {timelineTitle && <div className="modal-backdrop" role="presentation" onClick={closeDetails}><section className="timeline-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}><header><div><span className="eyebrow">جزئیات و سوابق عملیاتی</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></header>{timelineLoading ? <p className="modal-state">در حال دریافت اطلاعات…</p> : viewMode === 'couriers' || viewMode === 'presence' ? <>
         {detailErrors.length > 0 && <div className="detail-errors">{detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
         <section className="detail-section"><h3>مشخصات پیک</h3>{courierDetail ? <dl className="detail-grid">
