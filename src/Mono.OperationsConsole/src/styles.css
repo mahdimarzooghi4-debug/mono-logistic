@@ -199,3 +199,6 @@ tbody tr:hover { background: #fbfdfd; }
 @media (max-width: 720px) { .capacity-filters { grid-template-columns: 1fr 1fr; } .capacity-filters label:first-child,.capacity-filters .capacity-actions { grid-column: 1/-1; }
 .cancel-window-form { align-items: stretch; flex-direction: column; }
 .cancel-window-form input { min-width: 0; } .capacity-result { margin-inline: 12px; } }
+
+.issue-filters { display: grid; grid-template-columns: repeat(auto-fit,minmax(145px,1fr)); align-items: end; }
+.issue-filters>label:not(.search-field) { width: auto; }
