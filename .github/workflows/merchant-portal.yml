@@ -35,3 +35,6 @@ jobs:
       - name: Build portal
         run: npm run build
         working-directory: src/Mono.MerchantPortal
+      - name: Test portal flow
+        run: npm test
+        working-directory: src/Mono.MerchantPortal
