@@ -51,6 +51,8 @@ type CourierPresence = { courier_id: string; status: 'ONLINE' | 'OFFLINE'; zone_
 type CourierPresencePage = { items: CourierPresence[]; nextCursor?: string | null; next_cursor?: string | null }
 type CourierIssue = { report_id: string; mission_id: string; courier_id: string; issue_code: string; status: 'OPEN' | 'RESOLVED'; reported_at: string; updated_at: string }
 type CourierIssuePage = { reports: CourierIssue[]; nextCursor: string | null }
+type WorkerSnapshot = { enabled: boolean; state: 'disabled' | 'blocked' | 'starting' | 'healthy' | 'degraded' | string; last_attempt_at: string | null; last_success_at: string | null; last_batch_claimed?: number | null; last_batch_candidates?: number | null; total_batches: number; successful_batches: number; failed_batches: number }
+type WorkerStatusState = { mission: WorkerSnapshot | null; webhook: WorkerSnapshot | null }
 type MissionFare = { mission_id: string; customer_id: string; delivery_request_id: string; status: string; committed_delivery_at: string; created_at: string; quote_id: string; quote_version: number; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number; mono_commission_estimate_toman: number; commission_vat_estimate_toman: number; courier_net_estimate_toman: number }
 type MissionFarePage = { items: MissionFare[]; next_cursor: string | null }
 type MissionTimeline = { events?: Array<{ eventId: string; eventType: string; sequence: number; occurredAt: string }> }
@@ -96,7 +98,7 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues'>('dispatch')
+  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers'>('dispatch')
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
@@ -117,6 +119,8 @@ export default function App() {
   const [issueCourierId, setIssueCourierId] = useState('')
   const [issueFromAt, setIssueFromAt] = useState('')
   const [issueToAt, setIssueToAt] = useState('')
+  const [workerSnapshots, setWorkerSnapshots] = useState<WorkerStatusState>({ mission: null, webhook: null })
+  const [workerErrors, setWorkerErrors] = useState<{ mission: string; webhook: string }>({ mission: '', webhook: '' })
   const [courierItems, setCourierItems] = useState<CourierSummary[]>([])
   const [courierQuery, setCourierQuery] = useState('')
   const [courierStatus, setCourierStatus] = useState('')
@@ -359,6 +363,44 @@ export default function App() {
     }
   }, [token, issueStatus, issueCode, issueMissionId, issueCourierId, issueFromAt, issueToAt])
 
+  const fetchWorkerStatus = useCallback(async () => {
+    if (!token) {
+      setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
+      return
+    }
+    setLoading(true)
+    setWorkerErrors({ mission: '', webhook: '' })
+    const endpoints = {
+      mission: '/operations/v1/dispatch/offer-expiry-worker/status',
+      webhook: '/operations/v1/webhook-deliveries/worker-status',
+    }
+    const entries = await Promise.all(Object.entries(endpoints).map(async ([key, path]) => {
+      try {
+        const response = await fetch(path, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          cache: 'no-store',
+        })
+        if (!response.ok) throw new Error(await readError(response))
+        const snapshot = await response.json() as WorkerSnapshot
+        if (typeof snapshot.enabled !== 'boolean' || typeof snapshot.state !== 'string' ||
+          typeof snapshot.total_batches !== 'number' || typeof snapshot.successful_batches !== 'number' ||
+          typeof snapshot.failed_batches !== 'number')
+          throw new Error('ساختار پاسخ وضعیت worker با قرارداد API سازگار نیست.')
+        return [key, { snapshot, error: '' }] as const
+      } catch (cause) {
+        return [key, { snapshot: null, error: cause instanceof Error ? cause.message : 'ارتباط با API برقرار نشد.' }] as const
+      }
+    }))
+    const result = Object.fromEntries(entries)
+    const mission = result.mission as { snapshot: WorkerSnapshot | null; error: string }
+    const webhook = result.webhook as { snapshot: WorkerSnapshot | null; error: string }
+    setWorkerSnapshots({ mission: mission.snapshot, webhook: webhook.snapshot })
+    setWorkerErrors({ mission: mission.error, webhook: webhook.error })
+    setConnected(Boolean(mission.snapshot || webhook.snapshot))
+    setUpdatedAt(new Date().toISOString())
+    setLoading(false)
+  }, [token])
+
   const fetchCourierPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
     if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
     setLoading(true); setError(''); setCourierItems([])
@@ -596,6 +638,7 @@ export default function App() {
     else if (viewMode === 'sla') void fetchSlaPage(null, [null])
     else if (viewMode === 'presence') void fetchPresencePage(null, [null])
     else if (viewMode === 'issues') void fetchIssuePage(null, [null])
+    else if (viewMode === 'workers') void fetchWorkerStatus()
     else void fetchZoneCapacity(null, [null], true)
   }
 
@@ -610,6 +653,7 @@ export default function App() {
     else if (viewMode === 'sla') void fetchSlaPage(cursor, nextStack)
     else if (viewMode === 'presence') void fetchPresencePage(cursor, nextStack)
     else if (viewMode === 'issues') void fetchIssuePage(cursor, nextStack)
+    else if (viewMode === 'workers') return
     else void fetchZoneCapacity(cursor, nextStack, false)
   }
 
@@ -624,10 +668,11 @@ export default function App() {
     else if (viewMode === 'sla') void fetchSlaPage(cursor, previousStack)
     else if (viewMode === 'presence') void fetchPresencePage(cursor, previousStack)
     else if (viewMode === 'issues') void fetchIssuePage(cursor, previousStack)
+    else if (viewMode === 'workers') return
     else void fetchZoneCapacity(cursor, previousStack, false)
   }
 
-  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues') {
+  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
@@ -639,6 +684,7 @@ export default function App() {
     else if (mode === 'sla') void fetchSlaPage(null, [null])
     else if (mode === 'presence') void fetchPresencePage(null, [null])
     else if (mode === 'issues') void fetchIssuePage(null, [null])
+    else if (mode === 'workers') void fetchWorkerStatus()
     else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
   }
 
@@ -753,6 +799,7 @@ export default function App() {
           <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon">⌁</span>پیک‌ها</button>
           <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon">●</span>وضعیت حضور پیک‌ها</button>
           <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon">!</span>صندوق مشکلات پیک‌ها</button>
+          <button className={`nav-item ${viewMode === 'workers' ? 'active' : ''}`} onClick={() => switchView('workers')}><span className="nav-icon">⚙</span>سلامت پردازش‌ها</button>
           <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>زون‌ها و ظرفیت</button>
           <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon">▤</span>بررسی کرایه</button>
         </nav>
@@ -762,11 +809,11 @@ export default function App() {
       <main className="workspace">
         <header className="topbar">
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null) : viewMode === 'workers' ? void fetchWorkerStatus() : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
-          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'presence' ? 'وضعیت آنلاین/آفلاین و آخرین زمان ثبت حضور' : viewMode === 'issues' ? 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت' : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
+          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'presence' ? 'وضعیت آنلاین/آفلاین و آخرین زمان ثبت حضور' : viewMode === 'issues' ? 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت'  : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA' : viewMode === 'workers' ? 'وضعیت workerهای پردازش در همین نمونهٔ API' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
         </header>
 
         {!token && <section className="connect-card">
@@ -804,7 +851,32 @@ export default function App() {
           <article className="kpi-card"><span className="kpi-icon blue">✓</span><div><small>دارای پیک پذیرفته‌شده</small><strong>{fa.format(slaItems.filter((item) => Boolean(item.courier_id)).length)}</strong></div></article>
         </section>}
 
-        <section className="queue-panel">
+        {viewMode === 'workers' && <section className="worker-grid" aria-label="وضعیت پردازش‌های پس‌زمینه">
+          {([
+            ['mission', 'انقضای پیشنهادهای پیک', '/operations/v1/dispatch/offer-expiry-worker/status'],
+            ['webhook', 'ارسال webhookها', '/operations/v1/webhook-deliveries/worker-status'],
+          ] as const).map(([key, title, endpoint]) => {
+            const worker = workerSnapshots[key]
+            const errorText = workerErrors[key]
+            const stateLabels: Record<string, string> = { disabled: 'غیرفعال', blocked: 'مسدود', starting: 'در حال شروع', healthy: 'سالم', degraded: 'دارای خطا' }
+            return <article className="worker-card" key={key}>
+              <header><div><span className="eyebrow">وضعیت سرویس پس‌زمینه</span><h2>{title}</h2></div>
+                {worker && <span className={`badge ${worker.state === 'healthy' ? 'success' : worker.state === 'degraded' || worker.state === 'blocked' ? 'danger' : 'neutral'}`}>{stateLabels[worker.state] || worker.state}</span>}
+              </header>
+              {errorText ? <p className="worker-error" role="alert">دریافت وضعیت ناموفق بود: {errorText}</p> : worker ? <>
+                <dl className="worker-details">
+                  <div><dt>تنظیم فعال</dt><dd>{worker.enabled ? 'بله' : 'خیر'}</dd></div>
+                  <div><dt>آخرین تلاش</dt><dd>{formatDate(worker.last_attempt_at)}</dd></div>
+                  <div><dt>آخرین موفقیت</dt><dd>{formatDate(worker.last_success_at)}</dd></div>
+                  <div><dt>آخرین batch</dt><dd>{fa.format(worker.last_batch_claimed ?? worker.last_batch_candidates ?? 0)}</dd></div>
+                </dl>
+                <div className="worker-counts"><span>کل batchها <strong>{fa.format(worker.total_batches)}</strong></span><span>موفق <strong>{fa.format(worker.successful_batches)}</strong></span><span>ناموفق <strong>{fa.format(worker.failed_batches)}</strong></span></div>
+              </> : <p className="modal-state">برای دریافت وضعیت، صفحه را تازه‌سازی کنید.</p>}
+              <code dir="ltr">{endpoint}</code>
+            </article>
+          })}
+        </section>}
+        {viewMode !== 'workers' && <section className="queue-panel">
           <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
           {viewMode === 'dispatch' ? <form className="filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجوی شناسهٔ مأموریت" /></label>
@@ -942,11 +1014,12 @@ export default function App() {
             </table>
           </div>
           <footer className="table-footer"><span>{fa.format(viewMode === 'dispatch' ? items.length : viewMode === 'missions' ? missionItems.length : viewMode === 'couriers' ? courierItems.length : viewMode === 'presence' ? presenceItems.length : viewMode === 'issues' ? issueItems.length : viewMode === 'finance' ? financeItems.length : viewMode === 'sla' ? slaItems.length : availabilityPage?.items.length || 0)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !(viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : viewMode === 'presence' ? presenceNextCursor : availabilityNextCursor)}>بعدی</button></div></footer>
-        </section>
+        </section>}
         {viewMode === 'dispatch' && <p className="data-note">آمار بالا فقط از ردیف‌های صفحهٔ جاری محاسبه شده است؛ API فعلاً شمار کل صف را برنمی‌گرداند.</p>}
         {viewMode === 'issues' && <p className="data-note">این صندوق فقط فرادادهٔ ساختاریافتهٔ گزارش را نشان می‌دهد؛ متن آزاد یا موقعیت مکانی پیک در این API ارائه نمی‌شود. این نما گزارش را resolve یا وضعیت مأموریت را تغییر نمی‌دهد.</p>}
         {viewMode === 'presence' && <p className="data-note">آمار فقط از ردیف‌های صفحهٔ جاری محاسبه شده و وضعیت براساس snapshot API است؛ این نما polling خودکار یا موقعیت GPS ارائه نمی‌کند.</p>}
         {viewMode === 'sla' && <p className="data-note">خلاصه فقط از ردیف‌های همین صفحه است. هشدارها در زمان «مبنای ارزیابی» محاسبه شده‌اند؛ برای تازه‌سازی، دکمهٔ ↻ را بزنید.</p>}
+        {viewMode === 'workers' && <p className="data-note">این وضعیت درون‌فرایندی و مخصوص همین نمونهٔ API است؛ در استقرار چندنمونه‌ای، وضعیت سایر نمونه‌ها را پوشش نمی‌دهد و health کلی API محسوب نمی‌شود. دریافت خودکار انجام نمی‌شود.</p>}
         {viewMode === 'zones' && <p className="data-note">این داده‌ها پنجره‌های کاری ثبت‌شده‌اند؛ حضور زنده، ظرفیت لحظه‌ای یا اختیار تخصیص از آن‌ها نتیجه نمی‌شود.</p>}{viewMode === 'finance' && <p className="data-note">این نما فقط از snapshot قطعی تعرفه و مفروضات تجاری Phase 1 برآورد می‌سازد؛ پرداخت، موجودی، برداشت، تسویهٔ واقعی یا وصول از حنا را گزارش نمی‌کند.</p>}
       </main>
 
