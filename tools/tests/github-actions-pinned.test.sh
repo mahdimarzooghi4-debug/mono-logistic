@@ -8,7 +8,7 @@ import sys
 
 workflow_dir = Path(".github/workflows")
 failures = []
-uses_pattern = re.compile(r"^\\s*-\\s*uses:\\s*([^\\s#]+)", re.IGNORECASE)
+uses_pattern = re.compile(r"^\s*-\s*uses:\s*([^\s#]+)", re.IGNORECASE)
 sha_pattern = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 
 for workflow in sorted(workflow_dir.glob("*.yml")):
@@ -22,7 +22,7 @@ for workflow in sorted(workflow_dir.glob("*.yml")):
             failures.append(f"{workflow}:{line_number}: action must use a full 40-character commit SHA: {reference}")
 
 if failures:
-    print("\\n".join(failures), file=sys.stderr)
+    print("\n".join(failures), file=sys.stderr)
     raise SystemExit(1)
 
 print(f"All GitHub Actions references are pinned by full commit SHA across {len(list(workflow_dir.glob('*.yml')))} workflow files.")
