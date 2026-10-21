@@ -132,7 +132,9 @@ export default function OnboardingWorkbench({ token, reloadKey, onConnected }: P
       const path = `/operations/v1/customers/${encodeURIComponent(selected.customerId)}/branches${branchForm.branchId ? `/${encodeURIComponent(branchForm.branchId)}` : ''}`
       const saved = await api<Branch>(path, { method: branchForm.branchId ? 'PUT' : 'POST', body: JSON.stringify(body) })
       setBranchOpen(false); setBranchForm({ branchId: '', name: '', address: '', latitude: '', longitude: '', zoneId: '', operatingHours: '{}', reason: '' }); setNotice(branchForm.branchId ? 'تغییرات شعبه با سابقهٔ ممیزی ذخیره شد.' : 'شعبهٔ فعال در API ثبت شد.')
-      await loadDetail(selected); setBranchDetail(saved); await loadBranchAudit(saved.branchId)
+      await loadDetail(selected)
+      const detail = await api<Branch>(`/operations/v1/customers/${encodeURIComponent(selected.customerId)}/branches/${encodeURIComponent(saved.branchId)}`)
+      setBranchDetail(detail); await loadBranchAudit(saved.branchId)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'ذخیرهٔ شعبه ناموفق بود.') } finally { setBusy(false) }
   }
   async function loadBranchAudit(branchId: string, after: string | null = null, append = false) {

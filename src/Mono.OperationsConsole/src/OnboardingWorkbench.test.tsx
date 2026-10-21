@@ -91,7 +91,7 @@ describe('OnboardingWorkbench', () => {
     vi.mocked(fetch).mockImplementation(async (input, init) => {
       const url = String(input)
       if (url.includes('/branches/') && url.includes('/audit')) return ok({ entries: [{ auditId: 'ba_1', action: 'CREATED', actorId: 'admin', reason: 'ثبت شعبه', occurredAt: '2026-10-21T10:00:00Z' }] })
-      if (url.endsWith('/branches') && init?.method === 'POST') return ok(branch, 201)
+      if (url.endsWith('/branches') && init?.method === 'POST') { const { operatingHours: _hours, ...summary } = branch; return ok(summary, 201) }
       if (url.includes('/branches/') && !url.endsWith('/audit')) return ok(branch)
       if (url.endsWith('/branches')) return ok({ branches: [] })
       if (url.includes('/audit')) return ok({ entries: [] })
@@ -104,6 +104,7 @@ describe('OnboardingWorkbench', () => {
     await user.type(screen.getByLabelText('دلیل الزامی'), 'ثبت شعبه')
     await user.click(screen.getByRole('button', { name: 'ذخیره از طریق API' }))
     expect(await screen.findByText('zone-1')).toBeInTheDocument()
+    expect(screen.getByText(/weekdays/)).toBeInTheDocument()
     expect(await screen.findByText(/admin · ثبت شعبه/)).toBeInTheDocument()
     const call = vi.mocked(fetch).mock.calls.find(([url, init]) => String(url).endsWith('/branches') && init?.method === 'POST')
     expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({ name: 'شعبه مرکزی', reason: 'ثبت شعبه', operatingHours: {} })
