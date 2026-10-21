@@ -28,7 +28,7 @@ An endpoint alone does not complete a panel. Figma sample data is not production
 
 Merchant Mobile prototype copies are duplicates, not additional unique screens. The former incoming-call reference frame has been converted into the Mono Operations Console caller-context flow; it is counted as a screen, with telephony integration explicitly marked as an external dependency. The caller flow now covers recognized, unmatched, and multiple-active-order states.
 
-## 1. Operations Console — 13 screens
+## 1. Operations Console — 18 screens
 
 | Figma node | Screen | Current implementation | Gap / follow-up |
 |---|---|---|---|
