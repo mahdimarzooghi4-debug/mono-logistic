@@ -700,6 +700,7 @@ Dashboard must use the same application/core rules as API customers.
 - monitoring
 - CI checks
 - Sprint 227 pins every GitHub Actions dependency in CI workflows to immutable full commit SHAs and adds a regression check that rejects tag-based action references.
+- Sprint 228 adds executable CI contract tests to keep the Render Blueprint Stage-only, non-auto-deploying, and isolated from Production database access.
 - release approval
 
 ## 25. Epic E23 — Merchant Mobile App
