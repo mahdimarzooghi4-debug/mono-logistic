@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import PolicyWorkbench from './PolicyWorkbench'
 
 type Offer = {
   offerId?: string
@@ -103,7 +104,8 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks'>('dispatch')
+  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies'>('dispatch')
+  const [policyReloadKey, setPolicyReloadKey] = useState(0)
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
@@ -787,7 +789,7 @@ export default function App() {
     else void fetchZoneCapacity(cursor, previousStack, false)
   }
 
-  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks') {
+  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
@@ -801,6 +803,7 @@ export default function App() {
     else if (mode === 'issues') void fetchIssuePage(null, [null])
     else if (mode === 'workers') void fetchWorkerStatus()
     else if (mode === 'webhooks') { setWebhookTab('deliveries'); void fetchWebhookOps(null) }
+    else if (mode === 'policies') setPolicyReloadKey((value) => value + 1)
     else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
   }
 
@@ -917,6 +920,7 @@ export default function App() {
           <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon">!</span>صندوق مشکلات پیک‌ها</button>
           <button className={`nav-item ${viewMode === 'workers' ? 'active' : ''}`} onClick={() => switchView('workers')}><span className="nav-icon">⚙</span>سلامت پردازش‌ها</button>
           <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon">↻</span>وب‌هوک‌های خروجی</button>
+          <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon">⚖</span>سیاست‌ها و پیکربندی</button>
           <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>زون‌ها و ظرفیت</button>
           <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon">▤</span>بررسی کرایه</button>
         </nav>
@@ -926,11 +930,11 @@ export default function App() {
       <main className="workspace">
         <header className="topbar">
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
-          <div className="page-heading"><h1>مرکز کنترل عملیات</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'presence' ? 'وضعیت آنلاین/آفلاین و آخرین زمان ثبت حضور' : viewMode === 'issues' ? 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت'  : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA'  : viewMode === 'workers' ? 'وضعیت workerهای پردازش در همین نمونهٔ API' : viewMode === 'webhooks' ? 'پایش صف تحویل و بررسی تلاش‌های ارسال webhook' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
+          <div className="page-heading"><h1>{viewMode === 'policies' ? 'سیاست‌ها و پیکربندی' : 'مرکز کنترل عملیات'}</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'presence' ? 'وضعیت آنلاین/آفلاین و آخرین زمان ثبت حضور' : viewMode === 'issues' ? 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت'  : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA'  : viewMode === 'workers' ? 'وضعیت workerهای پردازش در همین نمونهٔ API' : viewMode === 'webhooks' ? 'پایش صف تحویل و بررسی تلاش‌های ارسال webhook' : viewMode === 'policies' ? 'ثبت و بررسی نسخه‌های سیاست با دسترسی مدیر Mono' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
         </header>
 
         {!token && <section className="connect-card">
@@ -1054,7 +1058,8 @@ export default function App() {
           </section>}
           {webhookDetailError && !webhookDetail && <div className="webhook-inline-error" role="alert">{webhookDetailError}</div>}
         </div>}
-        {viewMode !== 'workers' && viewMode !== 'webhooks' && <section className="queue-panel">
+        {viewMode === 'policies' && <PolicyWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
+        {viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && <section className="queue-panel">
           <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
           {viewMode === 'dispatch' ? <form className="filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجوی شناسهٔ مأموریت" /></label>
