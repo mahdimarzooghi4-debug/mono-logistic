@@ -39,6 +39,7 @@ export default function OnboardingWorkbench({ token, reloadKey, onConnected }: P
   const [branchForm, setBranchForm] = useState({ branchId: '', name: '', address: '', latitude: '', longitude: '', zoneId: '', operatingHours: '{}', reason: '' })
   const requestId = useRef(0)
   const detailRequestId = useRef(0)
+  const tokenAtMount = useRef(token)
 
   const api = useCallback(async <T,>(path: string, init: RequestInit = {}): Promise<T> => {
     const headers = new Headers(init.headers)
@@ -88,7 +89,12 @@ export default function OnboardingWorkbench({ token, reloadKey, onConnected }: P
   }, [api])
 
   useEffect(() => { void loadCustomers() }, [loadCustomers, reloadKey])
-  useEffect(() => { setCustomers([]); setSelected(null); setCustomerAudit([]); setBranches([]); setBranchDetail(null); setBranchAudit([]); setBranchAuditNextCursor(null); setNextCursor(null); setError('') }, [token])
+  useEffect(() => {
+    if (tokenAtMount.current === token) return
+    tokenAtMount.current = token
+    requestId.current += 1; detailRequestId.current += 1
+    setCustomers([]); setSelected(null); setCustomerAudit([]); setBranches([]); setBranchDetail(null); setBranchAudit([]); setBranchAuditNextCursor(null); setNextCursor(null); setError('')
+  }, [token])
 
   function applySearch(event: FormEvent) { event.preventDefault(); setSearch(searchDraft.trim()); void loadCustomers(null, [null]) }
   async function createCustomer(event: FormEvent) {
@@ -131,21 +137,25 @@ export default function OnboardingWorkbench({ token, reloadKey, onConnected }: P
   }
   async function loadBranchAudit(branchId: string, after: string | null = null, append = false) {
     if (!selected) return
+    const id = detailRequestId.current
     try {
       const params = new URLSearchParams({ page_size: '50' })
       if (after) params.set('cursor', after)
       const page = await api<AuditPage>(`/operations/v1/customers/${encodeURIComponent(selected.customerId)}/branches/${encodeURIComponent(branchId)}/audit?${params}`)
+      if (id !== detailRequestId.current) return
       setBranchAudit((current) => append ? [...current, ...page.entries] : page.entries); setBranchAuditNextCursor(page.nextCursor)
     }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'دریافت سابقهٔ شعبه ناموفق بود.') }
+    catch (cause) { if (id === detailRequestId.current) setError(cause instanceof Error ? cause.message : 'دریافت سابقهٔ شعبه ناموفق بود.') }
   }
   async function inspectBranch(branchId: string): Promise<Branch | null> {
     if (!selected) return null
+    const id = ++detailRequestId.current
     setError('')
     try {
       const detail = await api<Branch>(`/operations/v1/customers/${encodeURIComponent(selected.customerId)}/branches/${encodeURIComponent(branchId)}`)
+      if (id !== detailRequestId.current) return null
       setBranchDetail(detail); setBranchAudit([]); setBranchAuditNextCursor(null); await loadBranchAudit(branchId); return detail
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'دریافت شعبه ناموفق بود.'); return null }
+    } catch (cause) { if (id === detailRequestId.current) setError(cause instanceof Error ? cause.message : 'دریافت شعبه ناموفق بود.'); return null }
   }
   function editBranch(branch: Branch) {
     setBranchForm({ branchId: branch.branchId, name: branch.name, address: branch.address || '', latitude: branch.latitude?.toString() || '', longitude: branch.longitude?.toString() || '', zoneId: branch.zoneId || '', operatingHours: JSON.stringify(branch.operatingHours ?? {}, null, 2), reason: '' })
