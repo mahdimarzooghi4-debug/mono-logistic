@@ -135,6 +135,10 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Serve the Operations Console from the API origin so browser requests stay same-origin.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // Liveness is process-only; readiness includes registered infrastructure dependencies.
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
