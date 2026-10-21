@@ -2,7 +2,7 @@
 
 ## Scope
 
-The Render Blueprint provisions a staging-only web service and PostgreSQL database. It does not target Production and does not include Production secrets. Automatic deployment is disabled so a staging build is deployed deliberately. The current runtime is suitable for health and database migration checks; optional authenticated and routing tests need the external prerequisites below.
+The Render Blueprint provisions a staging-only API web service, Operations Console static assets in the same container/origin, and a PostgreSQL database. It does not target Production and does not include Production secrets. Automatic deployment is disabled so a staging build is deployed deliberately. The runtime supports health, console-shell, and database migration checks; optional authenticated and routing tests need the external prerequisites below.
 
 ## Database migration behavior
 
@@ -13,7 +13,7 @@ The container runs the migrator only when MONO_AUTO_MIGRATE=true. The staging Bl
 ## Health checks
 
 - /health/live reports process liveness without requiring PostgreSQL.
-- /health/ready checks PostgreSQL connectivity and reports unhealthy when the database cannot be reached.
+- /health/ready checks PostgreSQL connectivity and reports unhealthy when the database cannot be reached.\n- `/` serves the compiled Operations Console from the same origin as `/operations/*`, avoiding browser CORS configuration. API authorization remains enforced by the API endpoints.
 
 ## Owner-supplied Stage prerequisites
 
@@ -37,9 +37,9 @@ Required only for specific integration tests:
 ## Stage test checklist
 
 1. Create the Blueprint in the confirmed Render workspace and review the web-service and PostgreSQL resources before applying it.
-2. Confirm the service branch matches the `branch` value in `render.yaml` (`sprint-215-stage-candidate`) and that no Production database or secrets are referenced.
+2. Confirm the service branch matches the `branch` value in `render.yaml` (`sprint-225-stage-console-serving`) and that no Production database or secrets are referenced.
 3. Apply the Blueprint, then wait for the service deploy to become live.
-4. Run `MONO_STAGE_BASE_URL=https://<stage-host> tools/stage-smoke.sh` and confirm both `/health/live` and `/health/ready` return HTTP 200.
+4. Run `MONO_STAGE_BASE_URL=https://<stage-host> tools/stage-smoke.sh` and confirm `/`, `/health/live`, and `/health/ready` return HTTP 200; the root response must contain the Operations Console mount and built JavaScript asset reference.
 5. Review deploy logs for the ordered migration list and Database migrations complete.
 6. Run only the authenticated or integration smoke tests whose Stage prerequisites are configured, using Stage-only identities and synthetic data.
 7. Preserve required test evidence before tearing down the staging database.
