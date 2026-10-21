@@ -82,3 +82,22 @@ jobs:
         run: dotnet test Mono.sln --no-build --configuration Release --logger "trx;LogFileName=mono-tests.trx"
       - name: Build container image
         run: docker build --tag mono-api:ci .
+      - name: Smoke test staging container image
+        env:
+          ConnectionStrings__Mono: Host=127.0.0.1;Port=5432;Username=mono;Password=mono;Database=mono_container_stage_test
+        run: |
+          PGPASSWORD=mono createdb --host=localhost --port=5432 --username=mono mono_container_stage_test
+          docker run --detach --name mono-container-stage-smoke --network host \
+            --env ASPNETCORE_ENVIRONMENT=Staging \
+            --env MONO_AUTO_MIGRATE=true \
+            --env "ConnectionStrings__Mono=$ConnectionStrings__Mono" \
+            mono-api:ci
+          trap 'docker rm -f mono-container-stage-smoke >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 60); do
+            if MONO_STAGE_BASE_URL=http://127.0.0.1:10000 tools/stage-smoke.sh; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs mono-container-stage-smoke
+          exit 1

@@ -22,6 +22,10 @@ if [[ "$url" == */ ]]; then
   printf '%s' "${MOCK_CURL_HOME_BODY:-<html><div id=\"root\"></div><script type=\"module\" src=\"/assets/index-test.js\"></script></html>}"
   exit 0
 fi
+if [[ "$url" == */assets/*.js ]]; then
+  printf '%s' "${MOCK_CURL_ASSET_STATUS:-200}"
+  exit 0
+fi
 printf '%s' "${MOCK_CURL_STATUS:-200}"
 MOCK_CURL
 chmod +x "$mock_bin/curl"
@@ -31,11 +35,13 @@ invoke_smoke() {
   local url="$2"
   local status="$3"
   local home_body="${4:-}"
+  local asset_status="${5:-200}"
   PATH="$mock_bin:$PATH" \
     MOCK_CURL_LOG="$mock_log" \
     MOCK_CURL_MODE="$mode" \
     MOCK_CURL_STATUS="$status" \
     MOCK_CURL_HOME_BODY="$home_body" \
+    MOCK_CURL_ASSET_STATUS="$asset_status" \
     "$smoke_script" "$url"
 }
 
@@ -46,13 +52,13 @@ fail() {
 
 : > "$mock_log"
 if output="$(invoke_smoke success "https://stage.example.test" 200 2>&1)"; then
-  [[ "$output" == *"Operations Console shell and built asset reference"* ]] || fail "console shell success was not reported"
+  [[ "$output" == *"Operations Console shell and JavaScript asset served"* ]] || fail "console shell success was not reported"
   [[ "$output" == *"health/live (HTTP 200)"* ]] || fail "live endpoint success was not reported"
   [[ "$output" == *"health/ready (HTTP 200)"* ]] || fail "ready endpoint success was not reported"
 else
   fail "HTTPS success case failed: $output"
 fi
-[[ "$(wc -l < "$mock_log")" -eq 3 ]] || fail "success case did not check the console and both endpoints"
+[[ "$(wc -l < "$mock_log")" -eq 4 ]] || fail "success case did not check the console, JavaScript asset, and both endpoints"
 
 : > "$mock_log"
 if output="$(invoke_smoke success "http://stage.example.test" 200 2>&1)"; then
@@ -67,7 +73,7 @@ if output="$(invoke_smoke success "http://127.0.0.1:5180" 200 2>&1)"; then
 else
   fail "localhost HTTP case failed: $output"
 fi
-[[ "$(wc -l < "$mock_log")" -eq 3 ]] || fail "localhost case did not check the console and both endpoints"
+[[ "$(wc -l < "$mock_log")" -eq 4 ]] || fail "localhost case did not check the console, JavaScript asset, and both endpoints"
 
 : > "$mock_log"
 if output="$(invoke_smoke success "https://stage.example.test" 200 "<html></html>" 2>&1)"; then
@@ -77,11 +83,18 @@ fi
 [[ "$(wc -l < "$mock_log")" -eq 1 ]] || fail "smoke test checked health endpoints after a missing console shell"
 
 : > "$mock_log"
+if output="$(invoke_smoke success "https://stage.example.test" 200 "" 404 2>&1)"; then
+  fail "missing JavaScript asset was accepted"
+fi
+[[ "$output" == *"HTTP 404"* ]] || fail "missing JavaScript asset status was not reported"
+[[ "$(wc -l < "$mock_log")" -eq 2 ]] || fail "smoke test checked health endpoints after a missing JavaScript asset"
+
+: > "$mock_log"
 if output="$(invoke_smoke success "https://stage.example.test" 503 2>&1)"; then
   fail "non-200 endpoint response was accepted"
 fi
 [[ "$output" == *"HTTP 503"* ]] || fail "non-200 response was not reported"
-[[ "$(wc -l < "$mock_log")" -eq 2 ]] || fail "smoke test did not stop after the first unhealthy endpoint"
+[[ "$(wc -l < "$mock_log")" -eq 3 ]] || fail "smoke test did not stop after the first unhealthy endpoint"
 
 : > "$mock_log"
 if output="$(invoke_smoke request-fail "https://stage.example.test" 200 2>&1)"; then
