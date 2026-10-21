@@ -13,7 +13,8 @@ The container runs the migrator only when MONO_AUTO_MIGRATE=true. The staging Bl
 ## Health checks
 
 - /health/live reports process liveness without requiring PostgreSQL.
-- /health/ready checks PostgreSQL connectivity and reports unhealthy when the database cannot be reached.\n- `/` serves the compiled Operations Console from the same origin as `/operations/*`, avoiding browser CORS configuration. API authorization remains enforced by the API endpoints.
+- /health/ready checks PostgreSQL connectivity and reports unhealthy when the database cannot be reached.
+- `/` serves the compiled Operations Console from the same origin as `/operations/*`, avoiding browser CORS configuration. API authorization remains enforced by the API endpoints.
 
 ## Owner-supplied Stage prerequisites
 
