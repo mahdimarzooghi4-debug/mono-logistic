@@ -27,11 +27,11 @@ jobs:
           cache: npm
           cache-dependency-path: src/Mono.OperationsConsole/package-lock.json
       - name: Install dependencies
-        run: npm ci
-        working-directory: src/Mono.OperationsConsole
+        run: npm ci --prefix src/Mono.OperationsConsole
+        working-directory: .
       - name: Type-check and build
-        run: npm run build
-        working-directory: src/Mono.OperationsConsole
+        run: npm --prefix src/Mono.OperationsConsole run build
+        working-directory: .
       - name: Test operations policy workbench
-        run: npm test
-        working-directory: src/Mono.OperationsConsole
+        run: npm --prefix src/Mono.OperationsConsole test
+        working-directory: .
