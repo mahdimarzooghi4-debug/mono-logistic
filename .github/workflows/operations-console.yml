@@ -32,3 +32,6 @@ jobs:
       - name: Type-check and build
         run: npm run build
         working-directory: src/Mono.OperationsConsole
+      - name: Test operations policy workbench
+        run: npm test
+        working-directory: src/Mono.OperationsConsole
