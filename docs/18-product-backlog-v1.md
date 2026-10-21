@@ -699,6 +699,7 @@ Dashboard must use the same application/core rules as API customers.
 - backup
 - monitoring
 - CI checks
+- Sprint 227 pins every GitHub Actions dependency in CI workflows to immutable full commit SHAs and adds a regression check that rejects tag-based action references.
 - release approval
 
 ## 25. Epic E23 — Merchant Mobile App
