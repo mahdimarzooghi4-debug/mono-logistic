@@ -51,6 +51,18 @@ jobs:
           dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
       - name: Test staging smoke script URL/status handling
         run: bash tools/tests/stage-smoke.test.sh
+      - name: Set up Node.js for Operations Console
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/Mono.OperationsConsole/package-lock.json
+      - name: Build Operations Console for same-origin smoke test
+        run: |
+          npm ci --prefix src/Mono.OperationsConsole
+          npm run build --prefix src/Mono.OperationsConsole
+          mkdir -p src/Mono.Api/wwwroot
+          cp -R src/Mono.OperationsConsole/dist/. src/Mono.Api/wwwroot/
       - name: Smoke test API health endpoints
         env:
           ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_migration_test

@@ -19,6 +19,17 @@ if [[ "$base_url" != https://* && "$host" != "localhost" && "$host" != "127.0.0.
   exit 2
 fi
 
+home_url="${base_url}/"
+home_body="$(curl --silent --show-error --fail --connect-timeout 5 --max-time 15 "$home_url")" || {
+  echo "FAIL $home_url (request failed)" >&2
+  exit 1
+}
+if [[ "$home_body" != *'id="root"'* || "$home_body" != *'/assets/'* ]]; then
+  echo "FAIL $home_url (Operations Console shell or built asset reference missing)" >&2
+  exit 1
+fi
+echo "PASS $home_url (Operations Console shell and built asset reference)"
+
 for endpoint in health/live health/ready; do
   url="${base_url}/${endpoint}"
   status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
