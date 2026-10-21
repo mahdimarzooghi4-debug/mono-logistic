@@ -19,14 +19,14 @@ An endpoint alone does not complete a panel. Figma sample data is not production
 
 | Panel | Unique designed screens | Current repository coverage |
 |---|---:|---|
-| Operations Console | 13 | Several partial operational workbenches; substantial workflows remain absent or narrower. |
+| Operations Console | 18 | Several partial operational workbenches; 5 additional product-aligned screens/states were added to Figma during this review. |
 | Onboarding Console | 6 | No onboarding panel UI found; some related API capabilities exist. |
 | Courier App | 16 | No courier mobile app UI; several mission, presence, issue, and finance APIs exist. |
 | Merchant Dashboard | 15 | Core delivery and branch-read flows exist; settings, access, billing and configuration are absent or partial. |
 | Merchant Mobile | 15 | No mobile app UI; 6 system-state variants are separately designed. |
-| **Total** | **65** | Plus 6 system-state variants, prototype duplicates and one excluded reference frame. |
+| **Total** | **70** | Plus 6 system-state variants and prototype duplicates. |
 
-Merchant Mobile prototype copies are duplicates, not additional unique screens. The Operations frame “Reference — Hana incoming call context” is explicitly not a Mono UI deliverable and is excluded.
+Merchant Mobile prototype copies are duplicates, not additional unique screens. The former incoming-call reference frame has been converted into the Mono Operations Console caller-context flow; it is counted as a screen, with telephony integration explicitly marked as an external dependency. The caller flow now covers recognized, unmatched, and multiple-active-order states.
 
 ## 1. Operations Console — 13 screens
 
@@ -34,11 +34,16 @@ Merchant Mobile prototype copies are duplicates, not additional unique screens. 
 |---|---|---|---|
 | `72:4` | Operations console | **UI partial:** dispatch queue and API-backed operations workbenches. | Reconcile dashboard KPIs, alerts and regional capacity with authoritative API aggregates. Counts must remain page-scoped unless the API provides system-wide values. |
 | `79:2` | Mission detail | **UI partial:** mission detail, timeline and read audit. | Compare every designed field, state, action and event. Mutations require backend authorization and audit. |
+| `82:2` | Incoming call — recognized caller | **Design added:** automatic caller-number context with linked customer/order/Mission, Route, SLA, cancellation eligibility and open exception. | Requires telephony/VoIP integration and authorized caller-number matching; all displayed values remain sample data. |
+| `604:2` | Incoming call — unmatched caller | **Design added:** unmatched state preserves the number and provides fallback search. | Requires telephony/VoIP integration; no customer or Mission may be inferred when there is no match. |
+| `608:2` | Incoming call — multiple active orders | **Design added:** lists active matches and highlights the most relevant Mission with its context. | Relevance ranking and match results must come from authoritative customer/Mission records; telephony provider remains external. |
 | `84:2` | Route control | **API only:** route-plan operations APIs exist. | UI needs confirmed route semantics, authorization and map-provider decision. |
 | `87:2` | Courier control | **UI partial:** presence roster and courier profiles. | Live GPS/map, shifts, vehicle, battery and control actions are not provided by presence snapshots. Confirm provider and allowed controls. |
 | `89:2` | Zones and capacity | **UI partial:** planned capacity projections and availability windows. | Micro-zone map, geometry editing, demand/effective supply and risk visualization are not complete equivalents. Define authoritative data and map provider. |
 | `95:2` | SLA exceptions | **UI partial:** SLA alert feed and structured courier issue inbox. | Match incident grouping, evidence, severity, recommendations and actions to explicit API contracts and policy. |
 | `98:2` | Customers | **API only / partial adjacent UI:** customer configuration APIs exist; Merchant Portal covers the customer’s own delivery flow. | Customer/branch/service/API-status administration and customer creation are not represented as this operations panel. Define provisioning permissions. |
+| `607:2` | Policies and configurations | **Design added:** policy catalog/version lifecycle, effective-policy preview and bounded HARD evaluation. | Policy authoring/effective/evaluate APIs exist, but previews do not apply policy to delivery requests or Missions. Activation/retirement need Mono-admin MFA, reason and audit; connect real API states before production use. |
+| `607:353` | Audit operations | **Design added:** append-only cross-domain audit search concept for manual actions and domain events. | Existing audit capabilities are scoped across Mission reads, webhook operations and policy history; a unified filter/search contract across all entities must be verified before treating the panel as complete. |
 | `100:2` | Finance | **UI partial:** read-only mission fare review from recorded quote snapshots. | Actual ledger, collection, VAT remittance, invoices, payouts, wallet, adjustments and withdrawals are absent. Requires approved financial contracts and authorized provider/custodian. |
 | `102:2` | Integrations | **UI partial:** webhook delivery operations including replay/cancel. | API-client credentials and endpoint configuration are separate from delivery operations. Review secret lifecycle and customer configuration. |
 | `104:2` | Tracking | **UI partial:** mission directory, exact detail and timeline. | Map/live tracking needs verified location events and provider; presence is not live GPS. |
@@ -119,6 +124,15 @@ The Figma board also includes 6 system-state variants (empty, loading, error, in
 | `362:2` | Settings | **No mobile UI.** | Workspace settings and persistence are absent. |
 | `362:2` | Notification settings | **No mobile UI.** | Notification preference API is absent. |
 | `362:2` | Security | **No mobile UI.** | Depends on identity provider, session lifecycle and security policy. |
+
+## Product-document baseline checked in this review
+
+- `docs/19-mvp-scope-v1.md` — MVP scope and urban delivery operating limits.
+- `docs/21-product-architecture-v1.md` — five product surfaces and Operations information architecture.
+- `docs/22-ux-flows-v1.md` and `docs/23-merchant-mobile-backlog-v1.md` — required flows, mobile priorities and web-first boundaries.
+- `docs/06-b2b-policy-capability-model.md`, `docs/08-policy-catalog-v1.md`, and `docs/operations/policy-authoring-api.md` — unified policy model, MVP policy families, API lifecycle, preview limits, MFA and audit requirements.
+
+Figma was updated to add the distinct Merchant Mobile surface to the product map; mark sample data consistently on supporting boards; convert the incoming-call reference into recognized, unmatched and multiple-order Operations states; map Operations navigation to Policies/Configurations, SLA/Exceptions and Audit; add policy-authoring and audit concepts; and remove the false claim that the displayed Hana customer record is live. The current policy-authoring API explicitly does not apply activated policies to delivery requests or Missions, so the design labels its previews as non-executing.
 
 ## Out-of-design additions to reconcile
 
