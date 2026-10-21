@@ -20,7 +20,7 @@ An endpoint alone does not complete a panel. Figma sample data is not production
 | Panel | Unique designed screens | Current repository coverage |
 |---|---:|---|
 | Operations Console | 18 | Several partial operational workbenches; 5 additional product-aligned screens/states were added to Figma during this review. |
-| Onboarding Console | 6 | No onboarding panel UI found; some related API capabilities exist. |
+| Onboarding Console | 6 | **UI partial:** API-backed customer and branch onboarding workbench now covers customer queue, registration, activation, branch registration/editing and audit. Courier review and document verification remain absent. |
 | Courier App | 16 | No courier mobile app UI; several mission, presence, issue, and finance APIs exist. |
 | Merchant Dashboard | 15 | Core delivery and branch-read flows exist; settings, access, billing and configuration are absent or partial. |
 | Merchant Mobile | 15 | No mobile app UI; 6 system-state variants are separately designed. |
@@ -55,11 +55,11 @@ Merchant Mobile prototype copies are duplicates, not additional unique screens. 
 
 | Figma node | Screen | Current implementation | Gap / follow-up |
 |---|---|---|---|
-| `130:3` | Overview | **No UI found.** | Build queue/status rollups from canonical records. |
+| `130:3` | Overview | **UI partial:** customer onboarding queue with status/search and pagination. | Cross-entity rollups for customer, courier and document queues are not available; do not imply totals beyond the current API page. |
 | `153:2` | Couriers | **API only.** | Courier identity, application and status APIs exist in parts; onboarding queue/review UI is absent. |
-| `157:2` | Businesses | **API only.** | Customer/branch onboarding capabilities exist in parts; business review and activation UI are absent. |
+| `157:2` | Businesses | **UI partial:** create Pending customer, inspect current status/audit, and activate with a required reason. Branches can be registered/edited for active customers. | API credentials and service configuration remain separate workflows; no business document review or full activation checklist is implied. |
 | `161:2` | Verification documents | **No UI found.** | Requires secure storage, reviewer permissions, retention and access audit. Upload is not verification. |
-| `162:2` | Activation | **API only / no onboarding UI.** | Connect only to explicit eligibility and approval rules; never infer approval from a document or status. |
+| `162:2` | Activation | **UI partial:** reasoned activation for a Pending customer through the authoritative administrator/MFA API. | Courier activation and any eligibility/document decisions remain outside this panel; never infer approval from a document or status. |
 | `163:2` | Tracking | **No matching onboarding UI found.** | Clarify whether this means onboarding cases, deliveries or courier activity; the label overlaps other tracking concepts. |
 
 ## 3. Courier App — 16 screens
@@ -153,3 +153,7 @@ A screen is complete only when designed states/actions are accounted for; its AP
 ## Review boundary
 
 This is a Figma/repository inventory, not pixel-level visual QA or release approval. It does not certify every Figma interaction/variant, and it does not approve external provider, financial, identity or document-verification choices. No Stage or Production claim is made.
+
+## Implementation update — 2026-10-21
+
+The Operations Console now includes an API-backed customer/branch onboarding workbench. It covers the customer queue, Pending customer registration, reasoned customer activation, active-customer branch registration/editing, and customer/branch audit inspection. Customer creation does not issue API credentials. Document verification, courier onboarding review, and cross-entity onboarding analytics remain gaps.

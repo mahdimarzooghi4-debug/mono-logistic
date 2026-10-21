@@ -4,7 +4,7 @@ Persian RTL operations workbench for the Mono operations API. Read screens use l
 
 ## Local development
 
-Requirements: Node.js 20.19+ or 22.12+.
+Requirements: Node.js 22.22+ or 24.15+.
 
 ```sh
 npm ci
@@ -32,6 +32,7 @@ The Vite development server listens on `127.0.0.1:5173` and proxies `/operations
 - Schedule a courier work window for an entered courier ID, zone, and time range through the existing administrator-only API. The API enforces active courier status, approved active zone, no overlap, a 30-day horizon, 16-hour maximum duration, and idempotency. Cancel a scheduled window with a required reason and an idempotency key.
 - Administrator-only policy registry workbench via `/operations/v1/policies`: list and inspect immutable versions, create policies and Draft versions, inspect policy audit history, activate Draft versions, and retire Active/Inactive versions. Lifecycle actions require a non-empty reason; the API requires a Mono administrator token with verified MFA and records lifecycle audit events. Uncertain create responses must be verified from the registry before retrying because policy creation does not currently accept an idempotency key.
 - Effective-policy resolution preview via `GET /operations/v1/policies/effective` and bounded HARD evaluation via `POST /operations/v1/policies/evaluate`. These are previews only: activation changes registry status and does not apply policy to delivery requests or Missions. Non-HARD behavior is not evaluated.
+- Administrator-only customer and branch onboarding via the existing APIs: paginated customer queue and prefix search, Pending customer creation, reasoned activation confirmation, branch registration/editing for active customers, and customer/branch audit inspection. Customer registration does not issue credentials; every mutation remains API-authorized and audit-backed.
 - Loading, empty, invalid-response, authentication, and API error states.
 
 The bearer token remains in React memory and is cleared on reload or when the operator disconnects. No token is written to local storage, cookies, analytics, or logs. Use only a trusted local machine and HTTPS for any non-local API. Production login/session issuance is intentionally not included because the operations identity provider has not been selected or configured.
@@ -51,4 +52,4 @@ npm run build
 npm test
 ```
 
-The policy workbench tests cover bearer-token forwarding, registry/detail/audit reads, the administrator MFA-denial state, and non-executing HARD evaluation previews.
+The policy workbench tests cover bearer-token forwarding, registry/detail/audit reads, the administrator MFA-denial state, and non-executing HARD evaluation previews. The onboarding workbench tests cover customer reads and audit, Pending registration, reasoned activation, branch validation and creation, and administrator/MFA denial.
