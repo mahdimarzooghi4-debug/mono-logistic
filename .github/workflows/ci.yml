@@ -90,6 +90,12 @@ jobs:
         env:
           ConnectionStrings__Mono: Host=127.0.0.1;Port=5432;Username=mono;Password=mono;Database=mono_container_stage_test
         run: |
+          runtime_user="$(docker image inspect --format '{{.Config.User}}' mono-api:ci)"
+          runtime_uid="${runtime_user%%:*}"
+          if [[ ! "$runtime_uid" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Expected a non-root numeric container user; got '${runtime_user:-<empty>}'" >&2
+            exit 1
+          fi
           PGPASSWORD=mono createdb --host=localhost --port=5432 --username=mono mono_container_stage_test
           docker run --detach --name mono-container-stage-smoke --network host \
             --env ASPNETCORE_ENVIRONMENT=Staging \
