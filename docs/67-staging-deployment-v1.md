@@ -10,6 +10,8 @@ Mono.DbMigrator applies the ordered SQL files in db/migrations. Each file and it
 
 The container runs the migrator only when MONO_AUTO_MIGRATE=true. The staging Blueprint enables this setting. Other environments keep migration execution disabled unless their deployment owner explicitly opts in.
 
+The final Docker image runs as a non-root numeric user. Mono CI checks the image's configured UID before starting it with the disposable Stage database.
+
 ## Health checks
 
 - /health/live reports process liveness without requiring PostgreSQL.
