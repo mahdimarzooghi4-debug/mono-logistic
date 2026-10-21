@@ -35,7 +35,9 @@ The Vite development server listens on `127.0.0.1:5173` and proxies `/operations
 - Administrator-only customer and branch onboarding via the existing APIs: paginated customer queue and prefix search, Pending customer creation, reasoned activation confirmation, branch registration/editing for active customers, and customer/branch audit inspection. Customer registration does not issue credentials; every mutation remains API-authorized and audit-backed.
 - Loading, empty, invalid-response, authentication, and API error states.
 
-For Stage, the production Vite assets are built into the API container and served from the same HTTPS origin at `/`; browser API requests stay same-origin. Local development continues to use the Vite proxy.\n\nThe bearer token remains in React memory and is cleared on reload or when the operator disconnects. No token is written to local storage, cookies, analytics, or logs. Use only a trusted local machine and HTTPS for any non-local API. Production login/session issuance is intentionally not included because the operations identity provider has not been selected or configured.
+For Stage, the production Vite assets are built into the API container and served from the same HTTPS origin at `/`; browser API requests stay same-origin. Local development continues to use the Vite proxy.
+
+The bearer token remains in React memory and is cleared on reload or when the operator disconnects. No token is written to local storage, cookies, analytics, or logs. Use only a trusted local machine and HTTPS for any non-local API. Production login/session issuance is intentionally not included because the operations identity provider has not been selected or configured.
 
 ## Not included
 
