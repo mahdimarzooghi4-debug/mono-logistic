@@ -24,11 +24,22 @@ home_body="$(curl --silent --show-error --fail --connect-timeout 5 --max-time 15
   echo "FAIL $home_url (request failed)" >&2
   exit 1
 }
-if [[ "$home_body" != *'id="root"'* || "$home_body" != *'/assets/'* ]]; then
+asset_path="$(sed -nE 's/.*src="([^"]+\\.js)".*/\\1/p' <<<"$home_body" | head -n1)"
+if [[ "$home_body" != *'id="root"'* || "$asset_path" != /assets/*.js ]]; then
   echo "FAIL $home_url (Operations Console shell or built asset reference missing)" >&2
   exit 1
 fi
-echo "PASS $home_url (Operations Console shell and built asset reference)"
+asset_url="${base_url}${asset_path}"
+asset_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+  --connect-timeout 5 --max-time 15 "$asset_url")" || {
+    echo "FAIL $asset_url (request failed)" >&2
+    exit 1
+  }
+if [[ "$asset_status" != "200" ]]; then
+  echo "FAIL $asset_url (HTTP $asset_status)" >&2
+  exit 1
+fi
+echo "PASS $home_url (Operations Console shell and JavaScript asset served)"
 
 for endpoint in health/live health/ready; do
   url="${base_url}/${endpoint}"
