@@ -24,7 +24,7 @@ home_body="$(curl --silent --show-error --fail --connect-timeout 5 --max-time 15
   echo "FAIL $home_url (request failed)" >&2
   exit 1
 }
-asset_path="$(sed -nE 's/.*src="([^"]+\\.js)".*/\\1/p' <<<"$home_body" | head -n1)"
+asset_path="$(sed -nE 's/.*src="([^"]+\.js)".*/\1/p' <<<"$home_body" | head -n1)"
 if [[ "$home_body" != *'id="root"'* || "$asset_path" != /assets/*.js ]]; then
   echo "FAIL $home_url (Operations Console shell or built asset reference missing)" >&2
   exit 1
