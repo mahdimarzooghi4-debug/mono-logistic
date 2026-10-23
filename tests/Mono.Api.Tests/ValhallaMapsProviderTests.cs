@@ -59,6 +59,19 @@ public sealed class ValhallaMapsProviderTests
     }
 
     [Fact]
+    public async Task RouteRejectsMalformedProviderResponse()
+    {
+        var handler = new StubHttpMessageHandler("""{"trip":{}}""");
+        var provider = CreateProvider(handler);
+
+        await Assert.ThrowsAsync<MapsProviderContractException>(() =>
+            provider.GetRouteAsync(new RouteQuery(
+                new GeoCoordinate(35.7, 51.4),
+                new GeoCoordinate(35.8, 51.5),
+                RouteTravelMode.Car)));
+    }
+
+    [Fact]
     public async Task MatrixRejectsMismatchedDistanceAndDurationDimensions()
     {
         var handler = new StubHttpMessageHandler(
