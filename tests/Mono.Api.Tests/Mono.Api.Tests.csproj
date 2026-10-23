@@ -109,5 +109,6 @@
     <EmbeddedResource Include="../../db/migrations/088_mission_sla_alert_search.sql" LogicalName="Mono.Api.Tests.Migrations.088_mission_sla_alert_search.sql" />
     <EmbeddedResource Include="../../db/migrations/089_mission_worker_status_read_audit.sql" LogicalName="Mono.Api.Tests.Migrations.089_mission_worker_status_read_audit.sql" />
     <EmbeddedResource Include="../../db/migrations/090_webhook_worker_status_audit.sql" LogicalName="Mono.Api.Tests.Migrations.090_webhook_worker_status_audit.sql" />
+    <EmbeddedResource Include="../../db/migrations/091_courier_current_location.sql" LogicalName="Mono.Api.Tests.Migrations.091_courier_current_location.sql" />
   </ItemGroup>
 </Project>
