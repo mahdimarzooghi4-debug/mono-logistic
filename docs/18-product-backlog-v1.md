@@ -670,6 +670,7 @@ Dashboard must use the same application/core rules as API customers.
 - location privacy
 - finance authorization
 - security tests
+- Sprint 230 adds and tests browser security headers on API, health, and Operations Console responses.
 
 ## 23. Epic E21 — Observability
 

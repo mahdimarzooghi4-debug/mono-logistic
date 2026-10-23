@@ -130,6 +130,20 @@ builder.Services.AddScoped<PromiseCommitApplicationService>();
 
 var app = builder.Build();
 
+// Apply browser-facing response protections to API, health, and static console responses.
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
+        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
+
 // Customer authentication is invoked by its explicit authorization policy.
 // Health endpoints therefore remain independent of credential storage.
 app.UseAuthentication();

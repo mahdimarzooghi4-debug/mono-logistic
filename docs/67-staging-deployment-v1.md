@@ -17,6 +17,7 @@ The final Docker image runs as a non-root numeric user. Mono CI checks the image
 - /health/live reports process liveness without requiring PostgreSQL.
 - /health/ready checks PostgreSQL connectivity and reports unhealthy when the database cannot be reached.
 - `/` serves the compiled Operations Console from the same origin as `/operations/*`, avoiding browser CORS configuration. API authorization remains enforced by the API endpoints.
+- API, health, and static console responses include `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: strict-origin-when-cross-origin`; automated tests check the health responses.
 
 ## Owner-supplied Stage prerequisites
 
