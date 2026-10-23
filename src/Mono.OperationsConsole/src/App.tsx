@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import PolicyWorkbench from './PolicyWorkbench'
 import OnboardingWorkbench from './OnboardingWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
+import DashboardSummaryCards from './DashboardSummaryCards'
+import type { DashboardSummaryMetrics } from './DashboardSummaryCards'
 
 type Offer = {
   offerId?: string
@@ -39,20 +41,6 @@ type MissionRecord = {
   status: string
   committedDeliveryAt: string
   createdAt: string
-}
-type DashboardSummary = {
-  as_of: string
-  business_date: string
-  time_zone: string
-  sla_horizon_minutes: number
-  active_mission_count: number
-  unassigned_mission_count: number
-  online_courier_count: number
-  sla_at_risk_count: number
-  sla_overdue_count: number
-  delivered_today_count: number
-  on_time_delivered_today_count: number
-  on_time_delivery_rate_percent: number | null
 }
 type MissionPage = { items: MissionRecord[]; nextCursor: string | null }
 type SlaAlert = {
@@ -125,7 +113,7 @@ export default function App() {
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
-  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummaryMetrics | null>(null)
   const [dashboardError, setDashboardError] = useState('')
   const [missionItems, setMissionItems] = useState<MissionRecord[]>([])
   const [slaItems, setSlaItems] = useState<SlaAlert[]>([])
@@ -224,7 +212,7 @@ export default function App() {
         cache: 'no-store',
       })
       if (!response.ok) throw new Error(await readError(response))
-      const summary = await response.json() as DashboardSummary
+      const summary = await response.json() as DashboardSummaryMetrics
       if (!Number.isFinite(summary.active_mission_count) || !Number.isFinite(summary.online_courier_count) ||
           !Number.isFinite(summary.sla_at_risk_count) || !Number.isFinite(summary.unassigned_mission_count))
         throw new Error('ساختار پاسخ خلاصهٔ داشبورد با قرارداد API سازگار نیست.')
@@ -307,7 +295,7 @@ export default function App() {
     }
   }, [token, query, createdAfter, createdBefore])
 
-  const fetchSlaPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
+  const fetchSlaPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, minutesAhead = slaMinutesAhead) => {
     if (!token) {
       setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
       return
@@ -315,7 +303,7 @@ export default function App() {
     setLoading(true)
     setError('')
     setSlaItems([])
-    const params = new URLSearchParams({ limit: '50', minutes_ahead: slaMinutesAhead })
+    const params = new URLSearchParams({ limit: '50', minutes_ahead: minutesAhead })
     if (cursor) params.set('cursor', cursor)
     try {
       const response = await fetch(`/operations/v1/sla/delivery-alerts?${params}`, {
@@ -341,7 +329,7 @@ export default function App() {
     }
   }, [token, slaMinutesAhead])
 
-  const fetchPresencePage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
+  const fetchPresencePage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, status = presenceStatus, zoneId = presenceZoneId) => {
     if (!token) {
       setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
       return
@@ -350,8 +338,8 @@ export default function App() {
     setError('')
     setPresenceItems([])
     const params = new URLSearchParams({ limit: '50' })
-    if (presenceStatus) params.set('status', presenceStatus)
-    if (presenceZoneId.trim()) params.set('zone_id', presenceZoneId.trim())
+    if (status) params.set('status', status)
+    if (zoneId.trim()) params.set('zone_id', zoneId.trim())
     if (cursor) params.set('cursor', cursor)
     try {
       const response = await fetch(`/operations/v1/couriers/presence?${params}`, {
@@ -822,6 +810,26 @@ export default function App() {
     else void fetchZoneCapacity(cursor, previousStack, false)
   }
 
+  function openDashboardPresence() {
+    setViewMode('presence')
+    setPresenceStatus('ONLINE')
+    setPresenceZoneId('')
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    void fetchPresencePage(null, [null], 'ONLINE', '')
+  }
+
+  function openDashboardSla() {
+    const horizon = String(dashboardSummary?.sla_horizon_minutes ?? 15)
+    setViewMode('sla')
+    setSlaMinutesAhead(horizon)
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    void fetchSlaPage(null, [null], horizon)
+  }
+
   function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
     setViewMode(mode)
     setCursorStack([null])
@@ -987,13 +995,7 @@ export default function App() {
         {error && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
         {viewMode === 'dispatch' && dashboardError && <div className="error-banner" role="alert"><span>!</span><div><strong>خلاصهٔ سراسری داشبورد دریافت نشد</strong><p>{dashboardError}</p></div><button onClick={() => setDashboardError('')} aria-label="بستن">×</button></div>}
 
-        {viewMode === 'dispatch' && <section className="kpi-grid" aria-label="خلاصهٔ صفحهٔ جاری">
-          <article className="kpi-card"><span className="kpi-icon cyan">%</span><div><small>تحویل به‌موقع امروز</small><strong>{dashboardSummary?.on_time_delivery_rate_percent == null ? '—' : `${fa.format(dashboardSummary.on_time_delivery_rate_percent)}٪`}</strong><small>{dashboardSummary ? `${fa.format(dashboardSummary.on_time_delivered_today_count)} از ${fa.format(dashboardSummary.delivered_today_count)} · ${dashboardSummary.business_date}` : 'در انتظار دادهٔ API'}</small></div></article>
-          <article className="kpi-card"><span className="kpi-icon blue">●</span><div><small>پیک‌های آنلاین</small><strong>{dashboardSummary ? fa.format(dashboardSummary.online_courier_count) : '—'}</strong><small>حضور زندهٔ پیک فعال</small></div></article>
-          <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>بدون تخصیص پیک</small><strong>{dashboardSummary ? fa.format(dashboardSummary.unassigned_mission_count) : '—'}</strong><small>بدون پیشنهاد پذیرفته‌شده</small></div></article>
-          <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>در معرض نقض SLA</small><strong>{dashboardSummary ? fa.format(dashboardSummary.sla_at_risk_count) : '—'}</strong><small>{dashboardSummary ? `افق ${fa.format(dashboardSummary.sla_horizon_minutes)} دقیقه · گذشته از موعد ${fa.format(dashboardSummary.sla_overdue_count)}` : 'در انتظار دادهٔ API'}</small></div></article>
-          <article className="kpi-card"><span className="kpi-icon cyan">▦</span><div><small>مأموریت‌های فعال</small><strong>{dashboardSummary ? fa.format(dashboardSummary.active_mission_count) : '—'}</strong><small>{dashboardSummary ? `به‌روزرسانی ${formatDate(dashboardSummary.as_of)}` : 'در انتظار دادهٔ API'}</small></div></article>
-        </section>}
+        {viewMode === 'dispatch' && <DashboardSummaryCards summary={dashboardSummary} onOpenPresence={openDashboardPresence} onOpenDispatch={() => switchView('dispatch')} onOpenSla={openDashboardSla} onOpenMissions={() => switchView('missions')} />}
         {viewMode === 'presence' && <section className="kpi-grid" aria-label="خلاصهٔ حضور پیک‌های همین صفحه">
           <article className="kpi-card"><span className="kpi-icon cyan">●</span><div><small>آنلاین در این صفحه</small><strong>{fa.format(presenceItems.filter((item) => item.status === 'ONLINE').length)}</strong></div></article>
           <article className="kpi-card"><span className="kpi-icon amber">◯</span><div><small>آفلاین در این صفحه</small><strong>{fa.format(presenceItems.filter((item) => item.status === 'OFFLINE').length)}</strong></div></article>

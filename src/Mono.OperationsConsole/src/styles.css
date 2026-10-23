@@ -59,6 +59,11 @@ input:focus,select:focus { border-color: #00a8c6; box-shadow: 0 0 0 3px rgba(0,1
 .error-banner button { margin-right: auto; border: 0; background: transparent; color: inherit; font-size: 20px; }
 .kpi-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 13px; margin-bottom: 17px; }
 .kpi-card { display: flex; align-items: center; gap: 13px; min-height: 83px; padding: 15px 17px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); box-shadow: 0 2px 8px rgba(26,65,78,.025); }
+.kpi-card-action { width: 100%; color: inherit; font: inherit; text-align: right; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.kpi-card-action:hover { border-color: #a9ccd3; box-shadow: 0 5px 15px rgba(26,65,78,.09); transform: translateY(-1px); }
+.kpi-card-action:focus-visible { outline: 3px solid #227c8c; outline-offset: 2px; }
+.kpi-card-copy { display: block; flex: 1; min-width: 0; }
+.kpi-card .kpi-action-hint { margin-top: 5px; color: #227c8c; font-weight: 700; }
 .kpi-icon { display: grid; width: 39px; height: 39px; place-items: center; border-radius: 10px; font-size: 19px; }
 .kpi-icon.cyan { background: #e3f7fa; color: #008ca5; }
 .kpi-icon.blue { background: #eaf1ff; color: #517ddd; }
