@@ -115,7 +115,7 @@ public sealed class PostgresOperationsDashboardSummaryService(
         await readAudit.RecordAsync(PostgresMissionOperationsReadAuditService.DashboardSummary,
             null, 1, cancellationToken);
 
-        var onTimeRate = deliveredToday == 0
+        decimal? onTimeRate = deliveredToday == 0
             ? null
             : Math.Round(onTimeDeliveredToday * 100m / deliveredToday, 1, MidpointRounding.AwayFromZero);
         return new OperationsDashboardSummary(
