@@ -35,7 +35,7 @@ Required only for authenticated API tests:
 Required only for specific integration tests:
 
 - Payout-account encryption tests need a Stage-only 32-byte Base64 key at `MonoCourier__PayoutIbanEncryptionKey`. Webhook-secret tests need a separate Stage-only 32-byte Base64 key at `Mono__WebhookEncryptionKey`.
-- Live route-matrix tests need a chosen Maps provider and its Stage API credential. The current runtime deliberately uses `UnconfiguredMapsProvider`, so real route estimates are not available until a provider is selected and its adapter is implemented.
+- Live route-matrix tests need the owner-operated Valhalla service to be available to Stage on a private network, with an OSM dataset loaded for the selected area. Configure `MonoMaps__Provider=Valhalla` and `MonoMaps__Valhalla__BaseUrl` only after that service is ready. The default remains `UnconfiguredMapsProvider`; no public route endpoint or paid API credential is configured by this repository.
 - Webhook delivery tests need a Stage-only public HTTPS receiver on port 443. The API rejects local and non-public webhook hosts.
 
 ## Stage test checklist
