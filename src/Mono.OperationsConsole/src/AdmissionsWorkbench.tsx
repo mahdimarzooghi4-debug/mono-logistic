@@ -59,7 +59,7 @@ export default function AdmissionsWorkbench({ token, reloadKey, onConnected, onO
 
   useEffect(() => { void load() }, [load, reloadKey])
   const filtered = useMemo(() => rows.filter((row) => tab === 'all' || row.type === tab), [rows, tab])
-  const counts = useMemo(() => ({ businesses: rows.filter((row) => row.type === 'business').length, couriers: rows.filter((row) => row.type === 'courier').length, pending: rows.filter((row) => row.status !== 'ACTIVE' && row.status !== 'REJECTED').length, missing: rows.filter((row) => row.status === 'PENDING' || row.status === 'REGISTERED' || row.status === 'DOCUMENTS_SUBMITTED').length, ready: rows.filter((row) => row.status === 'MONO_APPROVED').length }), [rows])
+  const counts = useMemo(() => ({ businesses: rows.filter((row) => row.type === 'business').length, couriers: rows.filter((row) => row.type === 'courier').length, pending: rows.filter((row) => row.status !== 'ACTIVE' && row.status !== 'REJECTED').length, earlyStage: rows.filter((row) => row.status === 'PENDING' || row.status === 'REGISTERED' || row.status === 'DOCUMENTS_SUBMITTED').length, readyCouriers: rows.filter((row) => row.type === 'courier' && row.status === 'MONO_APPROVED').length }), [rows])
 
   function submitSearch(event: React.FormEvent) { event.preventDefault(); setSearch(searchDraft.trim()) }
 
@@ -71,8 +71,8 @@ export default function AdmissionsWorkbench({ token, reloadKey, onConnected, onO
         <article><span>پیک</span><strong>{fa.format(counts.couriers)}</strong><small>از صف پیک‌ها</small></article>
         <article><span>کسب‌وکار</span><strong>{fa.format(counts.businesses)}</strong><small>از صف مشتری‌ها</small></article>
         <article><span>در جریان پذیرش</span><strong>{fa.format(counts.pending)}</strong><small>به‌جز فعال و ردشده</small></article>
-        <article><span>نیازمند بررسی مدرک</span><strong>{fa.format(counts.missing)}</strong><small>بر اساس وضعیت ثبت‌شده</small></article>
-        <article><span>آمادهٔ فعال‌سازی</span><strong>{fa.format(counts.ready)}</strong><small>وضعیت MONO_APPROVED</small></article>
+        <article><span>در مراحل اولیه</span><strong>{fa.format(counts.earlyStage)}</strong><small>PENDING، REGISTERED یا DOCUMENTS_SUBMITTED</small></article>
+        <article><span>پیک آمادهٔ فعال‌سازی</span><strong>{fa.format(counts.readyCouriers)}</strong><small>وضعیت صریح MONO_APPROVED</small></article>
       </section>
       {sourceErrors.length > 0 && <div className="admissions-warning" role="status">{sourceErrors.map((message) => <p key={message}>{message}</p>)}</div>}
       {error && <div className="onboarding-error" role="alert">{error}</div>}

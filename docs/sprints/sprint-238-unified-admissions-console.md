@@ -20,5 +20,5 @@ Add the Figma `130:2` onboarding overview to the operations console without intr
 
 ## Verification
 
-- `npm test`: 10 tests passed.
+- `npm test`: 11 tests passed.
 - `npm run build`: TypeScript and Vite production build passed.
