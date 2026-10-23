@@ -108,7 +108,7 @@ if (string.Equals(mapsProviderName, "Valhalla", StringComparison.OrdinalIgnoreCa
         throw new InvalidOperationException(
             "MonoMaps:Valhalla:BaseUrl must be an absolute HTTP or HTTPS URL when Valhalla is selected.");
 
-    if (!valhallaBaseUri.AbsoluteUri.EndsWith('/', StringComparison.Ordinal))
+    if (!valhallaBaseUri.AbsoluteUri.EndsWith("/", StringComparison.Ordinal))
         valhallaBaseUri = new Uri(valhallaBaseUri.AbsoluteUri + "/", UriKind.Absolute);
 
     builder.Services.AddHttpClient<ValhallaMapsProvider>(client =>
