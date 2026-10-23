@@ -26,9 +26,13 @@ Mono already defines a provider-neutral Maps Gateway and trusted route evidence 
 
 The Phase 1 gateway already needs route estimates and matrices for multiple delivery modes, with map matching useful for noisy courier GPS. Valhalla's upstream project lists these capabilities in one OSM-based open-source engine. OSRM also supports configurable car, bike, and foot profiles, but the initial Mono evaluation benefits from testing Valhalla's broader matrix and map-matching feature set against the existing gateway contract. This is a candidate selection for implementation, not a claim that it has already passed coverage, latency, or quality tests.
 
+## Initial pilot area
+
+The initial routing pilot is Tehran. The exact extract boundary and representative delivery corridors must be set before loading data; tests must use real Tehran roads and courier-validated sample journeys.
+
 ## Required verification before Stage
 
-1. Choose the initial pilot city and extract boundary.
+1. Build the Tehran extract and document its source, boundary, timestamp, and reproducible refresh procedure.
 2. Build Valhalla from a pinned, reviewed image/version with a reproducible OSM data import.
 3. Contract-test route and matrix results for Car, Bike, and Walk, including unreachable pairs, cancellation, invalid coordinates, and empty results.
 4. Compare representative routes with local courier knowledge and record route-distance/ETA error; never treat synthetic tests as geographic quality evidence.
