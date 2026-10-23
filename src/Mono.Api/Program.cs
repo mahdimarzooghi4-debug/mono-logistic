@@ -70,6 +70,7 @@ builder.Services.AddScoped<PostgresCourierLivePresenceService>();
 builder.Services.AddScoped<PostgresCourierLivePresenceOperationsSearchService>();
 builder.Services.AddScoped<PostgresRoutePlanOperationsReadAuditService>();
 builder.Services.AddScoped<PostgresMissionCourierOfferService>();
+builder.Services.AddScoped<PostgresCourierMissionOfferRouteContextService>();
 builder.Services.AddScoped<PostgresMissionCourierIssueService>();
 builder.Services.AddScoped<PostgresMissionCourierIssueInboxService>();
 builder.Services.AddScoped<PostgresMissionSlaAlertService>();

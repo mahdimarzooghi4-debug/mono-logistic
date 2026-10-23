@@ -28,3 +28,12 @@ Mono uses one provider-neutral maps boundary. The logistics core depends on the 
 ## Provider boundary
 
 The repository defines `IMapsProvider` and `IMapsGateway` contracts plus input/output validation. It does not choose or configure a map provider, make network requests, or provide geocoding/routing results by itself. Provider implementation and runtime wiring remain separate work.
+
+## Courier offer map context
+
+- `GET /courier/v1/mission-offers/{offerId}/route-context` is available only to an authenticated courier.
+- The endpoint returns coordinates only when the offer belongs to that courier, remains unexpired and `OFFERED`, and its Mission remains `SEARCHING_COURIER`.
+- Pickup and drop-off coordinates are read from the current versioned route-location coordinate catalog. Missing coordinates remain `null` and set `coordinates_status` to `COORDINATES_PENDING`; the client must not invent a marker.
+- The response deliberately omits addresses, names, phone numbers, and contact details, and uses `Cache-Control: no-store`.
+- This read contract supplies map markers only. It does not return an estimated route line or live ETA. Those require configured routing evidence and are separate from OSM tile rendering.
+- Map tiles are loaded by the client from a configured OSM-derived tile source, not through the Maps Gateway. The client must display required attribution and support replacing the tile source without changing the courier API contract.
