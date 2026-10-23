@@ -336,6 +336,8 @@ function App() {
         <header className="topbar">
           <div className="page-title"><h1>{titles[view].title}</h1><p>{titles[view].subtitle}</p></div>
           <div className="topbar-actions">
+            {connected && <button className="secondary-button topbar-action" onClick={() => { setView('tracking'); setError('') }}>رهگیری سریع</button>}
+            {connected && <button className="primary-button topbar-action" onClick={() => { setView('create'); setCreateError(''); setNotice('') }}>＋ ارسال جدید</button>}
             <span className={`system-pill ${connected ? 'online' : ''}`}><i />{connected ? 'اتصال برقرار' : 'بدون اتصال'}</span>
             {connected && <button className="icon-button" onClick={() => void refresh()} disabled={loading} aria-label="به‌روزرسانی">↻</button>}
             {connected && <button className="text-button" onClick={disconnect}>قطع اتصال</button>}
@@ -357,19 +359,41 @@ function App() {
         {notice && <div className="message success" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="بستن پیام">×</button></div>}
 
         {connected && view === 'dashboard' && (
-          <>
-            <section className="welcome-banner">
-              <div><span className="eyebrow">{branches.length ? branches[0].name : 'حساب کسب‌وکار'}</span><h2>مدیریت ارسال‌های شهری</h2><p>ثبت درخواست، بررسی وضعیت و رهگیری ارسال‌های کسب‌وکار.</p></div>
-              <button className="primary-button" onClick={() => { setView('create'); setCreateError(''); setNotice('') }}>＋ ثبت ارسال جدید</button>
-            </section>
-            <section className="kpi-grid" aria-label="خلاصه صفحه جاری">
-              <Kpi icon="▤" label="ارسال در این صفحه" value={fa.format(pageSummary.count)} tone="cyan" />
-              <Kpi icon="⌖" label="دارای مأموریت" value={fa.format(pageSummary.missionCount)} tone="blue" />
-              <Kpi icon="✓" label="زمان تحویل ثبت‌شده" value={fa.format(pageSummary.promisedCount)} tone="green" />
-            </section>
-            <DeliveryPanel items={items.slice(0, 5)} loading={loading} onOpen={openDetail} onAll={() => setView('deliveries')} />
-            <p className="data-note">خلاصه‌ها فقط از همین صفحهٔ دریافت‌شده محاسبه شده‌اند؛ عدد کل کسب‌وکار یا صورتحساب از این API به‌دست نمی‌آید. {updatedAt && `به‌روزرسانی ${formatDate(updatedAt)}`}</p>
-          </>
+          <div className="merchant-dashboard">
+            <div className="dashboard-main-column">
+              <section className="kpi-grid" aria-label="خلاصه صفحه جاری">
+                <Kpi icon="▤" label="ارسال در این صفحه" value={fa.format(pageSummary.count)} tone="cyan" />
+                <Kpi icon="⌖" label="دارای مأموریت" value={fa.format(pageSummary.missionCount)} tone="blue" />
+                <Kpi icon="✓" label="زمان تحویل ثبت‌شده" value={fa.format(pageSummary.promisedCount)} tone="green" />
+              </section>
+              <DeliveryPanel items={items.slice(0, 6)} loading={loading} onOpen={openDetail} onAll={() => setView('deliveries')} />
+              <p className="data-note">این خلاصه فقط از صفحهٔ فعلی API محاسبه شده است، نه کل سوابق کسب‌وکار. {updatedAt && `به‌روزرسانی ${formatDate(updatedAt)}`}</p>
+            </div>
+            <aside className="dashboard-aside" aria-label="ابزارهای کسب‌وکار">
+              <section className="panel dashboard-widget quick-create-widget">
+                <div className="panel-heading"><div><span className="eyebrow">ارسال جدید</span><h2>درخواست ارسال ثبت کنید</h2></div></div>
+                <p>مبدا و مقصد را وارد کنید؛ هزینه و زمان تحویل پس از بررسی سرویس مشخص می‌شود.</p>
+                <button className="primary-button full-width" onClick={() => { setView('create'); setCreateError(''); setNotice('') }}>شروع ثبت ارسال</button>
+              </section>
+              <section className="panel dashboard-widget">
+                <div className="panel-heading"><div><span className="eyebrow">پیگیری وضعیت</span><h2>رهگیری سریع</h2></div></div>
+                <form className="quick-track-form" onSubmit={(event) => void track(event)}>
+                  <label className="sr-only" htmlFor="dashboard-tracking-id">شناسهٔ ارسال یا مأموریت</label>
+                  <input id="dashboard-tracking-id" value={trackingInput} onChange={(event) => setTrackingInput(event.target.value)} placeholder="شناسهٔ ارسال یا مأموریت" required />
+                  <button className="secondary-button" disabled={loading}>جست‌وجو</button>
+                </form>
+              </section>
+              <section className="panel dashboard-widget">
+                <div className="panel-heading"><div><span className="eyebrow">حساب کسب‌وکار</span><h2>وضعیت شعب</h2></div><button className="link-button" onClick={() => setView('branches')}>همهٔ شعب ←</button></div>
+                {branches.length ? <ul className="branch-status-list">{branches.slice(0, 4).map((branch) => <li key={branch.branchId}><span>{branch.name}</span><span className="badge success">فعال</span></li>)}</ul> : <p className="widget-empty">شعبهٔ فعالی برای این حساب ثبت نشده است.</p>}
+              </section>
+              <section className="panel dashboard-widget service-widget">
+                <div className="panel-heading"><div><span className="eyebrow">سرویس فعال</span><h2>ارسال شهری</h2></div></div>
+                <dl><div><dt>محدوده و ظرفیت</dt><dd>بر اساس شعبه و مرسوله بررسی می‌شود</dd></div><div><dt>هزینه و زمان</dt><dd>پس از ثبت درخواست، در API نمایش داده می‌شود</dd></div></dl>
+                <p>مونو ثبت درخواست، تعهد و وضعیت ارسال را بر اساس اطلاعات معتبر سرویس مدیریت می‌کند.</p>
+              </section>
+            </aside>
+          </div>
         )}
 
         {connected && view === 'deliveries' && (

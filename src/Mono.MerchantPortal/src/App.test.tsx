@@ -9,6 +9,38 @@ afterEach(() => {
 })
 
 describe('merchant portal delivery flow', () => {
+  it('renders the business dashboard tools from real account data and supports quick tracking', async () => {
+    const branchId = `br_${'c'.repeat(32)}`
+    const requestId = `drq_${'d'.repeat(32)}`
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/v1/branches') {
+        return new Response(JSON.stringify({ branches: [{ branchId, name: 'شعبه ونک', address: 'تهران', zoneId: 'central', status: 'ACTIVE' }] }), { status: 200 })
+      }
+      if (url.startsWith('/v1/delivery-requests?page_size=25')) {
+        return new Response(JSON.stringify({ items: [], next_cursor: null }), { status: 200 })
+      }
+      if (url === `/v1/delivery-requests/${requestId}`) {
+        return new Response(JSON.stringify({ delivery_request_id: requestId, external_reference: 'ORDER-17', status: 'RECEIVED', created_at: '2026-10-23T10:00:00Z', mission_id: null, mission_status: null, committed_delivery_at: null, quote: null, promise: null }), { status: 200 })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.type(screen.getByLabelText('کلید API'), 'customer-key-for-test')
+    await user.click(screen.getByRole('button', { name: 'اتصال به پنل' }))
+    expect(await screen.findByRole('heading', { name: 'وضعیت شعب' })).toBeInTheDocument()
+    expect(screen.getByText('شعبه ونک')).toBeInTheDocument()
+    expect(screen.getByText('ارسال شهری')).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('شناسهٔ ارسال یا مأموریت'), requestId)
+    await user.click(screen.getByRole('button', { name: 'جست‌وجو' }))
+    expect(await screen.findByRole('dialog')).toHaveTextContent('ORDER-17')
+    expect(fetchMock).toHaveBeenCalledWith(`/v1/delivery-requests/${requestId}`, expect.objectContaining({ cache: 'no-store' }))
+  })
+
   it('connects with a customer token and creates a scoped, idempotent delivery request', async () => {
     const branchId = `br_${'a'.repeat(32)}`
     const requestId = `drq_${'b'.repeat(32)}`
@@ -32,7 +64,7 @@ describe('merchant portal delivery flow', () => {
 
     await user.type(screen.getByLabelText('کلید API'), 'customer-key-for-test')
     await user.click(screen.getByRole('button', { name: 'اتصال به پنل' }))
-    expect(await screen.findByRole('heading', { name: 'مدیریت ارسال‌های شهری' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'داشبورد کسب‌وکار' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'ارسال جدید' }))
     await user.type(screen.getByLabelText('شمارهٔ سفارش کسب‌وکار'), 'ORDER-8421')
