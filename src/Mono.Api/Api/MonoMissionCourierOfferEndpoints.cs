@@ -224,6 +224,28 @@ public static class MonoMissionCourierOfferEndpoints
             Results.Ok(await offers.ListMyOffersAsync(courier.CourierId, cancellationToken)))
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
+        endpoints.MapGet("/courier/v1/mission-offers/{offerId}/route-context", async (
+                string offerId,
+                HttpResponse response,
+                IMonoCourierContext courier,
+                PostgresCourierMissionOfferRouteContextService routeContext,
+                CancellationToken cancellationToken) =>
+            {
+                response.Headers.CacheControl = "no-store";
+                try
+                {
+                    var context = await routeContext.FindAsync(courier.CourierId, offerId, cancellationToken);
+                    return context is null
+                        ? Results.NotFound(Error("MISSION_OFFER_NOT_FOUND", "The active mission offer was not found."))
+                        : Results.Ok(context);
+                }
+                catch (ArgumentException)
+                {
+                    return Results.BadRequest(Error("INVALID_REQUEST", "Offer ID is invalid."));
+                }
+            })
+            .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
+
         endpoints.MapPost("/courier/v1/mission-offers/{offerId}/accept", async (
                 string offerId,
                 HttpRequest request,
