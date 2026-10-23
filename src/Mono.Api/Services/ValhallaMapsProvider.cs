@@ -35,9 +35,12 @@ public sealed class ValhallaMapsProvider(HttpClient httpClient) : IMapsProvider
         }, cancellationToken);
 
         if (!document.RootElement.TryGetProperty("trip", out var trip) ||
+            trip.ValueKind != JsonValueKind.Object ||
             !trip.TryGetProperty("status", out var status) ||
-            status.ValueKind != JsonValueKind.Number ||
-            status.GetInt32() != 0)
+            status.ValueKind != JsonValueKind.Number)
+            throw new MapsProviderContractException("Valhalla route response did not include a valid trip status.");
+
+        if (status.GetInt32() != 0)
             return null;
 
         if (!trip.TryGetProperty("summary", out var summary))
