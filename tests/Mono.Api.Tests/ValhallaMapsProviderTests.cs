@@ -94,7 +94,7 @@ public sealed class ValhallaMapsProviderTests
     private static JsonDocument ParseRequest(Uri uri)
     {
         const string prefix = "?json=";
-        Assert.StartsWith(prefix, uri.Query, StringComparison.Ordinal);
+        Assert.True(uri.Query.StartsWith(prefix, StringComparison.Ordinal));
         return JsonDocument.Parse(Uri.UnescapeDataString(uri.Query[prefix.Length..]));
     }
 
