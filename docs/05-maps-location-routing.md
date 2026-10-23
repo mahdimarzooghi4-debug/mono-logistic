@@ -177,12 +177,8 @@ The new Route may be accepted only if all hard constraints remain valid, includi
 
 ## 10. Build vs Buy
 
-For the MVP:
+Mono will not build a map dataset or navigation engine from zero. The Phase 1 routing runtime decision is documented in [Self-Hosted OSM Routing Decision v1](68-self-hosted-osm-routing-decision-v1.md): use OSM data with a self-hosted Valhalla routing-engine candidate behind the provider-neutral Maps Gateway for server-side route and distance-matrix estimates.
 
-> **Mono should not build its own map dataset or navigation engine from zero.**
+This is an open-source component operated by Mono, not a managed external routing API. It still requires infrastructure, map-data updates, monitoring, and quality validation. Map rendering, tile hosting, geocoding, live traffic, and launching an external mobile navigation app remain separate decisions.
 
-Mono should consume external map/routing infrastructure through the Mono Maps Gateway.
-
-Later, if scale and economics justify it, Mono may bring parts of the stack in-house, for example using open map data and self-hosted routing infrastructure.
-
-The business and orchestration core must remain independent from the underlying map provider.
+The business and orchestration core must remain independent from the underlying map and routing implementation.
