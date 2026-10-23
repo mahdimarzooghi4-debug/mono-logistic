@@ -22,6 +22,7 @@ public sealed class MissionOperationsReadAuditTests
         await ExecuteMigrationAsync(dataSource, "087_mission_courier_issue_inbox_search.sql");
         await ExecuteMigrationAsync(dataSource, "088_mission_sla_alert_search.sql");
         await ExecuteMigrationAsync(dataSource, "089_mission_worker_status_read_audit.sql");
+        await ExecuteMigrationAsync(dataSource, "092_operations_dashboard_summary_audit.sql");
 
         var actorId = "mission-read-audit-test-" + Guid.NewGuid().ToString("N");
         var missionId = "mis_0123456789abcdef0123456789abcdef";
@@ -54,6 +55,7 @@ public sealed class MissionOperationsReadAuditTests
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionFareReview, null, 3);
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionCourierIssueInboxSearch, null, 0);
         await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionSlaAlertSearch, null, 1);
+        await service.RecordAsync(PostgresMissionOperationsReadAuditService.DashboardSummary, null, 1);
 
         await using var connection = await dataSource.OpenConnectionAsync();
         await using (var select = new NpgsqlCommand("""
@@ -69,12 +71,13 @@ public sealed class MissionOperationsReadAuditTests
             while (await reader.ReadAsync())
                 rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetInt32(2)));
 
-            Assert.Equal(9, rows.Count);
+            Assert.Equal(10, rows.Count);
             Assert.Equal(3, rows.Count(row => row.Action == "MISSION_AUDIT_INSPECTION"));
             Assert.Contains(rows, row => row == ("MISSION_SEARCH", null, 2));
             Assert.Contains(rows, row => row == ("MISSION_FARE_REVIEW", null, 3));
             Assert.Contains(rows, row => row == ("MISSION_COURIER_ISSUE_INBOX_SEARCH", null, 0));
             Assert.Contains(rows, row => row == ("MISSION_SLA_ALERT_SEARCH", null, 1));
+            Assert.Contains(rows, row => row == ("DASHBOARD_SUMMARY", null, 1));
             Assert.Contains(rows, row => row == ("MISSION_DETAIL", missionId, 1));
             Assert.Contains(rows, row => row == ("MISSION_TIMELINE", missionId, 0));
         }

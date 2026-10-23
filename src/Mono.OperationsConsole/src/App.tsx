@@ -40,6 +40,20 @@ type MissionRecord = {
   committedDeliveryAt: string
   createdAt: string
 }
+type DashboardSummary = {
+  as_of: string
+  business_date: string
+  time_zone: string
+  sla_horizon_minutes: number
+  active_mission_count: number
+  unassigned_mission_count: number
+  online_courier_count: number
+  sla_at_risk_count: number
+  sla_overdue_count: number
+  delivered_today_count: number
+  on_time_delivered_today_count: number
+  on_time_delivery_rate_percent: number | null
+}
 type MissionPage = { items: MissionRecord[]; nextCursor: string | null }
 type SlaAlert = {
   mission_id: string
@@ -111,6 +125,8 @@ export default function App() {
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
+  const [dashboardError, setDashboardError] = useState('')
   const [missionItems, setMissionItems] = useState<MissionRecord[]>([])
   const [slaItems, setSlaItems] = useState<SlaAlert[]>([])
   const [slaNextCursor, setSlaNextCursor] = useState<string | null>(null)
@@ -197,13 +213,27 @@ export default function App() {
   const availabilityCreateKey = useRef<{ fingerprint: string; key: string } | null>(null)
   const availabilityCancelKey = useRef<{ fingerprint: string; key: string } | null>(null)
 
-  const totals = useMemo(() => ({
-    rows: items.length,
-    offers: items.filter((item) => item.activeOffer).length,
-    overdue: items.filter((item) => item.deliveryOverdue).length,
-    lateOffers: items.filter((item) => item.activeOffer?.deadlinePassed).length,
-  }), [items])
   const capacityPeak = useMemo(() => Math.max(1, ...(capacityProjection?.buckets.map((bucket) => bucket.planned_courier_count) || [])), [capacityProjection])
+
+  const fetchDashboardSummary = useCallback(async (submittedToken = token) => {
+    if (!submittedToken) { setDashboardSummary(null); setDashboardError(''); return }
+    setDashboardError('')
+    try {
+      const response = await fetch('/operations/v1/dashboard/summary?sla_horizon_minutes=15', {
+        headers: { Authorization: `Bearer ${submittedToken}`, Accept: 'application/json' },
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const summary = await response.json() as DashboardSummary
+      if (!Number.isFinite(summary.active_mission_count) || !Number.isFinite(summary.online_courier_count) ||
+          !Number.isFinite(summary.sla_at_risk_count) || !Number.isFinite(summary.unassigned_mission_count))
+        throw new Error('ساختار پاسخ خلاصهٔ داشبورد با قرارداد API سازگار نیست.')
+      setDashboardSummary(summary)
+    } catch (cause) {
+      setDashboardSummary(null)
+      setDashboardError(cause instanceof Error ? cause.message : 'دریافت خلاصهٔ داشبورد ناموفق بود.')
+    }
+  }, [token])
 
   const fetchPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
     if (!token) {
@@ -737,6 +767,7 @@ export default function App() {
       setConnected(true)
       setUpdatedAt(new Date().toISOString())
       setError('')
+      void fetchDashboardSummary(submittedToken)
     } catch (cause) {
       setConnected(false)
       setError(cause instanceof Error ? cause.message : 'ارتباط با API برقرار نشد.')
@@ -747,7 +778,7 @@ export default function App() {
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (viewMode === 'dispatch') void fetchPage(null, [null])
+    if (viewMode === 'dispatch') { void fetchPage(null, [null]); void fetchDashboardSummary() }
     else if (viewMode === 'missions') void fetchMissionPage(null, [null])
     else if (viewMode === 'couriers') void fetchCourierPage(null, [null])
     else if (viewMode === 'finance') void fetchFinancePage(null, [null])
@@ -796,7 +827,7 @@ export default function App() {
     setCursorStack([null])
     setPageIndex(0)
     setError('')
-    if (mode === 'dispatch') void fetchPage(null, [null])
+    if (mode === 'dispatch') { void fetchPage(null, [null]); void fetchDashboardSummary() }
     else if (mode === 'missions') void fetchMissionPage(null, [null])
     else if (mode === 'couriers') void fetchCourierPage(null, [null])
     else if (mode === 'finance') void fetchFinancePage(null, [null])
@@ -885,6 +916,8 @@ export default function App() {
     availabilityCreateKey.current = null; availabilityCancelKey.current = null
     setToken('')
     setTokenDraft('')
+    setDashboardSummary(null)
+    setDashboardError('')
     setItems([])
     setMissionItems([])
     setCourierItems([])
@@ -936,7 +969,7 @@ export default function App() {
       <main className="workspace">
         <header className="topbar">
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? void fetchPage(cursorStack[pageIndex] || null) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
@@ -952,12 +985,14 @@ export default function App() {
         </section>}
 
         {error && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
+        {viewMode === 'dispatch' && dashboardError && <div className="error-banner" role="alert"><span>!</span><div><strong>خلاصهٔ سراسری داشبورد دریافت نشد</strong><p>{dashboardError}</p></div><button onClick={() => setDashboardError('')} aria-label="بستن">×</button></div>}
 
         {viewMode === 'dispatch' && <section className="kpi-grid" aria-label="خلاصهٔ صفحهٔ جاری">
-          <article className="kpi-card"><span className="kpi-icon cyan">▦</span><div><small>مأموریت‌های این صفحه</small><strong>{fa.format(totals.rows)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon blue">↗</span><div><small>پیشنهاد فعال در این صفحه</small><strong>{fa.format(totals.offers)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>موعد تحویل گذشته</small><strong>{fa.format(totals.overdue)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>پیشنهاد با مهلت گذشته</small><strong>{fa.format(totals.lateOffers)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon cyan">%</span><div><small>تحویل به‌موقع امروز</small><strong>{dashboardSummary?.on_time_delivery_rate_percent == null ? '—' : `${fa.format(dashboardSummary.on_time_delivery_rate_percent)}٪`}</strong><small>{dashboardSummary ? `${fa.format(dashboardSummary.on_time_delivered_today_count)} از ${fa.format(dashboardSummary.delivered_today_count)} · ${dashboardSummary.business_date}` : 'در انتظار دادهٔ API'}</small></div></article>
+          <article className="kpi-card"><span className="kpi-icon blue">●</span><div><small>پیک‌های آنلاین</small><strong>{dashboardSummary ? fa.format(dashboardSummary.online_courier_count) : '—'}</strong><small>حضور زندهٔ پیک فعال</small></div></article>
+          <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>بدون تخصیص پیک</small><strong>{dashboardSummary ? fa.format(dashboardSummary.unassigned_mission_count) : '—'}</strong><small>بدون پیشنهاد پذیرفته‌شده</small></div></article>
+          <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>در معرض نقض SLA</small><strong>{dashboardSummary ? fa.format(dashboardSummary.sla_at_risk_count) : '—'}</strong><small>{dashboardSummary ? `افق ${fa.format(dashboardSummary.sla_horizon_minutes)} دقیقه · گذشته از موعد ${fa.format(dashboardSummary.sla_overdue_count)}` : 'در انتظار دادهٔ API'}</small></div></article>
+          <article className="kpi-card"><span className="kpi-icon cyan">▦</span><div><small>مأموریت‌های فعال</small><strong>{dashboardSummary ? fa.format(dashboardSummary.active_mission_count) : '—'}</strong><small>{dashboardSummary ? `به‌روزرسانی ${formatDate(dashboardSummary.as_of)}` : 'در انتظار دادهٔ API'}</small></div></article>
         </section>}
         {viewMode === 'presence' && <section className="kpi-grid" aria-label="خلاصهٔ حضور پیک‌های همین صفحه">
           <article className="kpi-card"><span className="kpi-icon cyan">●</span><div><small>آنلاین در این صفحه</small><strong>{fa.format(presenceItems.filter((item) => item.status === 'ONLINE').length)}</strong></div></article>
