@@ -99,7 +99,30 @@ builder.Services.AddScoped<IRouteLocationCoordinateCatalog>(services =>
 builder.Services.AddScoped<IRouteLocationCoordinateResolver>(services =>
     services.GetRequiredService<PostgresRouteLocationCoordinateCatalog>());
 builder.Services.AddScoped<DeliveryRequestRouteLocationRegistrar>();
-builder.Services.AddScoped<IMapsProvider, UnconfiguredMapsProvider>();
+var mapsProviderName = builder.Configuration["MonoMaps:Provider"];
+if (string.Equals(mapsProviderName, "Valhalla", StringComparison.OrdinalIgnoreCase))
+{
+    var configuredBaseUrl = builder.Configuration["MonoMaps:Valhalla:BaseUrl"];
+    if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var valhallaBaseUri) ||
+        (valhallaBaseUri.Scheme != Uri.UriSchemeHttp && valhallaBaseUri.Scheme != Uri.UriSchemeHttps))
+        throw new InvalidOperationException(
+            "MonoMaps:Valhalla:BaseUrl must be an absolute HTTP or HTTPS URL when Valhalla is selected.");
+
+    if (!valhallaBaseUri.AbsoluteUri.EndsWith("/", StringComparison.Ordinal))
+        valhallaBaseUri = new Uri(valhallaBaseUri.AbsoluteUri + "/", UriKind.Absolute);
+
+    builder.Services.AddHttpClient<ValhallaMapsProvider>(client =>
+    {
+        client.BaseAddress = valhallaBaseUri;
+        client.Timeout = TimeSpan.FromSeconds(15);
+    });
+    builder.Services.AddScoped<IMapsProvider>(services =>
+        services.GetRequiredService<ValhallaMapsProvider>());
+}
+else
+{
+    builder.Services.AddScoped<IMapsProvider, UnconfiguredMapsProvider>();
+}
 builder.Services.AddScoped<IMapsGateway, MapsGateway>();
 builder.Services.AddScoped<IRouteTravelTimeEvidenceVerifier, ConfiguredRouteTravelTimeEvidenceVerifier>();
 builder.Services.AddScoped<IInitialRoutePlanEvidenceVerifier, ConfiguredInitialRoutePlanEvidenceVerifier>();
