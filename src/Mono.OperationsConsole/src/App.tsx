@@ -223,7 +223,7 @@ export default function App() {
     }
   }, [token])
 
-  const fetchPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
+  const fetchPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, resetFilters = false) => {
     if (!token) {
       setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
       return
@@ -232,11 +232,11 @@ export default function App() {
     setError('')
     setItems([])
     const params = new URLSearchParams({ page_size: '25', sort_by: sortBy })
-    if (query.trim()) params.set('query', query.trim())
-    if (customerId.trim()) params.set('customer_id', customerId.trim())
-    if (hasOffer) params.set('has_offer', hasOffer)
-    if (deliveryWindow) params.set('delivery_window_state', deliveryWindow)
-    if (createdBefore) params.set('created_before', new Date(createdBefore).toISOString())
+    if (!resetFilters && query.trim()) params.set('query', query.trim())
+    if (!resetFilters && customerId.trim()) params.set('customer_id', customerId.trim())
+    if (!resetFilters && hasOffer) params.set('has_offer', hasOffer)
+    if (!resetFilters && deliveryWindow) params.set('delivery_window_state', deliveryWindow)
+    if (!resetFilters && createdBefore) params.set('created_before', new Date(createdBefore).toISOString())
     if (cursor) params.set('cursor', cursor)
     try {
       const response = await fetch(`/operations/v1/dispatch/queue?${params}`, {
@@ -260,7 +260,7 @@ export default function App() {
     }
   }, [token, sortBy, query, customerId, hasOffer, deliveryWindow, createdBefore])
 
-  const fetchMissionPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
+  const fetchMissionPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, resetFilters = false) => {
     if (!token) {
       setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
       return
@@ -269,9 +269,9 @@ export default function App() {
     setError('')
     setMissionItems([])
     const params = new URLSearchParams({ page_size: '25' })
-    if (query.trim()) params.set('query', query.trim())
-    if (createdAfter) params.set('created_after', new Date(createdAfter).toISOString())
-    if (createdBefore) params.set('created_before', new Date(createdBefore).toISOString())
+    if (!resetFilters && query.trim()) params.set('query', query.trim())
+    if (!resetFilters && createdAfter) params.set('created_after', new Date(createdAfter).toISOString())
+    if (!resetFilters && createdBefore) params.set('created_before', new Date(createdBefore).toISOString())
     if (cursor) params.set('cursor', cursor)
     try {
       const response = await fetch(`/operations/v1/missions?${params}`, {
@@ -820,6 +820,31 @@ export default function App() {
     void fetchPresencePage(null, [null], 'ONLINE', '')
   }
 
+  function openDashboardDispatch() {
+    setViewMode('dispatch')
+    setQuery('')
+    setCustomerId('')
+    setHasOffer('')
+    setDeliveryWindow('')
+    setCreatedBefore('')
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    void fetchPage(null, [null], true)
+    void fetchDashboardSummary()
+  }
+
+  function openDashboardMissions() {
+    setViewMode('missions')
+    setQuery('')
+    setCreatedAfter('')
+    setCreatedBefore('')
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    void fetchMissionPage(null, [null], true)
+  }
+
   function openDashboardSla() {
     const horizon = String(dashboardSummary?.sla_horizon_minutes ?? 15)
     setViewMode('sla')
@@ -995,7 +1020,7 @@ export default function App() {
         {error && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
         {viewMode === 'dispatch' && dashboardError && <div className="error-banner" role="alert"><span>!</span><div><strong>خلاصهٔ سراسری داشبورد دریافت نشد</strong><p>{dashboardError}</p></div><button onClick={() => setDashboardError('')} aria-label="بستن">×</button></div>}
 
-        {viewMode === 'dispatch' && <DashboardSummaryCards summary={dashboardSummary} onOpenPresence={openDashboardPresence} onOpenDispatch={() => switchView('dispatch')} onOpenSla={openDashboardSla} onOpenMissions={() => switchView('missions')} />}
+        {viewMode === 'dispatch' && <DashboardSummaryCards summary={dashboardSummary} actionsDisabled={!token} onOpenPresence={openDashboardPresence} onOpenDispatch={openDashboardDispatch} onOpenSla={openDashboardSla} onOpenMissions={openDashboardMissions} />}
         {viewMode === 'presence' && <section className="kpi-grid" aria-label="خلاصهٔ حضور پیک‌های همین صفحه">
           <article className="kpi-card"><span className="kpi-icon cyan">●</span><div><small>آنلاین در این صفحه</small><strong>{fa.format(presenceItems.filter((item) => item.status === 'ONLINE').length)}</strong></div></article>
           <article className="kpi-card"><span className="kpi-icon amber">◯</span><div><small>آفلاین در این صفحه</small><strong>{fa.format(presenceItems.filter((item) => item.status === 'OFFLINE').length)}</strong></div></article>

@@ -62,6 +62,7 @@ input:focus,select:focus { border-color: #00a8c6; box-shadow: 0 0 0 3px rgba(0,1
 .kpi-card-action { width: 100%; color: inherit; font: inherit; text-align: right; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
 .kpi-card-action:hover { border-color: #a9ccd3; box-shadow: 0 5px 15px rgba(26,65,78,.09); transform: translateY(-1px); }
 .kpi-card-action:focus-visible { outline: 3px solid #227c8c; outline-offset: 2px; }
+.kpi-card-action:disabled { cursor: not-allowed; opacity: .65; transform: none; }
 .kpi-card-copy { display: block; flex: 1; min-width: 0; }
 .kpi-card .kpi-action-hint { margin-top: 5px; color: #227c8c; font-weight: 700; }
 .kpi-icon { display: grid; width: 39px; height: 39px; place-items: center; border-radius: 10px; font-size: 19px; }
