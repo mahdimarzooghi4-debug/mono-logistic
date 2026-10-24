@@ -1,0 +1,12 @@
+{
+  "dataset": "OpenStreetMap Iran extract",
+  "filename": "iran-261023.osm.pbf",
+  "source_url": "https://download.geofabrik.de/asia/iran-latest.osm.pbf",
+  "source_page": "https://download.geofabrik.de/asia/iran.html",
+  "osm_data_timestamp_utc": "2026-10-23T20:20:51Z",
+  "file_size_bytes": 229905951,
+  "sha256": "a1409610c0df9d3c930b93b1301084b25367d6815936d5646e1769b556704011",
+  "captured_at_utc": "2026-10-24",
+  "license": "Open Database License (ODbL) 1.0",
+  "attribution": "© OpenStreetMap contributors"
+}
