@@ -20,4 +20,4 @@ The intervals make exact band boundaries deterministic: for example, exactly 1,0
 
 ## Scope limits
 
-The fare is independent of Walk, Bike, or Car as specified in the Hana Phase-1 pricing decision. This calculator does not calculate quote expiry, courier compensation, Mono commission, VAT, route batching, or settlement. It does not apply weight, zone, flat-fee, contract, or minimum/maximum modifiers beyond enforcing the approved 5 km and 50,000-toman tariff cap. Those capabilities need separate product and technical decisions.
+The fare is independent of Walk, Bike (bicycle), Motorcycle, or Car as specified in the Hana Phase-1 pricing decision. This calculator does not calculate quote expiry, courier compensation, Mono commission, VAT, route batching, or settlement. It does not apply weight, zone, flat-fee, contract, or minimum/maximum modifiers beyond enforcing the approved 5 km and 50,000-toman tariff cap. Those capabilities need separate product and technical decisions.

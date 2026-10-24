@@ -5,7 +5,8 @@
 Phase 1 supports:
 
 - Walk
-- Bike
+- Bike (bicycle)
+- Motorcycle
 - Car
 
 Mono does not require its own fleet. Couriers participate in Mono's operating network.
@@ -23,7 +24,7 @@ Base onboarding data:
 - courier mode
 - acceptance of Mono contracts and rules
 
-Bike/Car may require vehicle and driving-related documents.
+Bike, Motorcycle, and Car may require the applicable vehicle and driving-related documents.
 
 A courier must be approved by Mono before receiving Missions.
 

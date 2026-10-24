@@ -99,7 +99,7 @@ The initial implementation of the [Mono Merchant Portal](src/Mono.MerchantPortal
 ## Current Phase-1 Decisions
 
 - Urban service radius: maximum 5 km
-- Modes: Walk, Bike, Car
+- Hana Phase 1 modes: Walk, Bike (bicycle), Motorcycle, Car
 - Maximum 5 Missions per Route when all committed delivery times remain feasible
 - Pickup dwell hard SLA: maximum 3 minutes
 - Pricing by distance only, capped at 50,000 toman

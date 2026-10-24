@@ -64,7 +64,8 @@ The API should remain reusable for future customers and must not be designed as 
 ```
 service_type = urban_delivery
 max_distance_km = 5
-enabled_modes = [walk, bike, car]
+enabled_modes = [walk, bike, motorcycle, car]
+bike = bicycle
 shipment_model = bag_based
 ```
 
@@ -194,12 +195,11 @@ Initial load classes:
 Enabled modes:
 
 - Walk
-- Bike
+- Bike (bicycle)
+- Motorcycle
 - Car
 
-Hana does not directly choose the execution mode.
-
-Mono determines the mode at runtime using:
+Hana Phase 1 enables Walk, Bike (bicycle), Motorcycle, and Car. Hana does not directly choose the execution mode. Mono determines the feasible mode at runtime using the shipment, route, service promise, and courier capacity; it does not assume every order can use every mode.
 
 ```
 Distance
@@ -227,7 +227,7 @@ Mono may require:
 
 - no-criminal-record certificate,
 - approved electronic promissory note / guarantee,
-- vehicle documentation for Bike / Car,
+- vehicle documentation for Bike / Motorcycle / Car,
 - performance eligibility.
 
 ## 12. Zone Policy
