@@ -6,7 +6,7 @@ describe('CourierPlanningEvidence', () => {
   afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
   it('loads audited planning evidence with the selected filters and paginates without treating presence as dispatch authority', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), 'https://mono.test')
       if (url.searchParams.get('cursor')) {
         return new Response(JSON.stringify({
