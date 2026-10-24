@@ -15,7 +15,7 @@ function App() {
   return <div className="site-shell">
     <header className="site-header" id="home">
       <div className="header-inner">
-        <a className="brand" href="#home" aria-label="مونو، صفحه اصلی"><span className="brand-mark" aria-hidden="true"><i /><b /></span><span>مونو</span></a>
+        <a className="brand" href="#home" aria-label="مونو، صفحه اصلی"><span>مونو</span></a>
         <button className="menu-toggle" type="button" aria-label={menuOpen ? 'بستن منو' : 'باز کردن منو'} aria-expanded={menuOpen} aria-controls="primary-navigation" onClick={() => setMenuOpen(open => !open)}><span /><span /><span /></button>
         <nav className={menuOpen ? 'primary-navigation is-open' : 'primary-navigation'} id="primary-navigation" aria-label="ناوبری اصلی">
           <a href="#home" onClick={closeMenu}>صفحهٔ اصلی</a>
@@ -30,7 +30,7 @@ function App() {
       <section className="hero-section" aria-labelledby="hero-title">
         <div className="hero-layout">
           <div className="hero-copy">
-            <p className="eyebrow"><span /> لجستیک قابل اتکا برای کسب‌وکارها</p>
+            
             <h1 id="hero-title">مسیرها تغییر می‌کنند.<br />تعهد مونو ثابت می‌ماند.</h1>
             <p className="hero-description">پیش از پذیرش، امکان اجرای واقعی را می‌سنجیم.<br className="desktop-break" /> پس از ثبت تعهد، مسیر را تا تحویل کنترل می‌کنیم.</p>
             <a className="primary-button hero-button" href="#registration">شروع همکاری</a>
@@ -68,7 +68,7 @@ function App() {
     <footer className="site-footer">
       <div className="footer-main">
         <div className="footer-brand">
-          <a className="brand footer-logo" href="#home"><span className="brand-mark" aria-hidden="true"><i /><b /></span><span>مونو</span></a>
+          <a className="brand footer-logo" href="#home"><span>مونو</span></a>
           <p>از امکان‌سنجی تا تعهد و تحویل؛ مسیر ارسال را با مونو روشن‌تر کنید.</p>
           <a className="footer-cta" href="#registration">شروع همکاری <span aria-hidden="true">←</span></a>
         </div>
@@ -76,7 +76,7 @@ function App() {
         <div className="footer-column"><h2>دسترسی سریع</h2><a href="#home">صفحهٔ اصلی</a><a href="#about">دربارهٔ مونو</a><a href="#registration">فرم شروع همکاری</a></div>
         <div className="footer-contact"><h2>شروع گفتگو</h2><p>برای ثبت درخواست همکاری، فرم را تکمیل کنید.</p><a href="#registration">رفتن به فرم ثبت‌نام <span aria-hidden="true">←</span></a></div>
       </div>
-      <div className="footer-bottom"><span>© {new Date().getFullYear()} مونو. تمامی حقوق محفوظ است.</span><a href="#registration">شرایط استفاده و حریم خصوصی</a></div>
+      <div className="footer-bottom"><span>© {new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric' }).format(new Date())} مونو. تمامی حقوق محفوظ است.</span><a href="#registration">شرایط استفاده و حریم خصوصی</a></div>
     </footer>
   </div>
 }
