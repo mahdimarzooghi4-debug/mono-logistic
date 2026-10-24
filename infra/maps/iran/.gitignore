@@ -1,0 +1,7 @@
+/data/*.osm.pbf
+/data/*.pmtiles
+/data/valhalla_tiles/
+/data/valhalla_tiles.tar
+/data/valhalla.json
+/data/admins.sqlite
+/data/timezones.sqlite
