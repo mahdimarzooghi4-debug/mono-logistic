@@ -92,10 +92,11 @@ Routing must be aware of delivery mode.
 Supported Phase-1 modes:
 
 - Walk
-- Bike
+- Bike (bicycle)
+- Motorcycle
 - Car
 
-The same origin and destination may produce different routes and ETAs for different modes.
+Bike means bicycle; Motorcycle is a separate motorized profile. The same origin and destination may produce different routes and ETAs for Walk, Bike, Motorcycle, and Car.
 
 Mono's Promise Engine and Batching Engine must therefore request routing using the actual candidate mode.
 
