@@ -21,7 +21,7 @@ infra/maps/iran/data/iran-261023.osm.pbf
 The local data directory is ignored by Git. The verification script rejects a different file until its source record and checksum are deliberately updated together:
 
 ```bash
-infra/maps/iran/scripts/verify-dataset.sh
+bash infra/maps/iran/scripts/verify-dataset.sh
 ```
 
 ## Build the visual map tiles
@@ -29,7 +29,7 @@ infra/maps/iran/scripts/verify-dataset.sh
 Planetiler builds an OSM-derived PMTiles archive from the local PBF. Its pinned image tag is `0.10.2`.
 
 ```bash
-infra/maps/iran/scripts/build-map-tiles.sh
+bash infra/maps/iran/scripts/build-map-tiles.sh
 ```
 
 The first Planetiler run may fetch its supporting basemap datasets. Allow at least 1 GB of free SSD space plus roughly 5–10 times the PBF size for build workspace and output, with additional capacity for Valhalla's routing graph. Planetiler's documented starting point for JVM heap is about half the input PBF size; the script defaults to a 2 GB heap to leave room for memory-mapped data.
