@@ -2,7 +2,7 @@
 
 ## 1. Hana Delivery Fare
 
-The delivery fare is based on distance and is independent of whether Mono executes the Mission by Walk, Bike, or Car.
+The delivery fare is based on distance and is independent of whether Mono executes the Mission by Walk, Bike (bicycle), Motorcycle, or Car.
 
 Initial MVP tariff:
 
