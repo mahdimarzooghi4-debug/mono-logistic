@@ -47,7 +47,7 @@ docker compose up -d
 - TileServer GL serves PMTiles locally on `127.0.0.1:8090`, suitable for a host reverse proxy. Do not expose the Valhalla port publicly.
 - The browser map still needs a MapLibre style configured against the tile service and visible OSM attribution. The TileServer GL local preview is available at `http://127.0.0.1:8090`.
 
-This compose file is a self-hosting foundation, not a Stage or Production deployment. No server is provisioned by this package. Before Stage, pin and review container digests, provide TLS/reverse proxy and resource limits, wire the Maps Gateway to the private Valhalla URL, verify supported Car/Bike/Walk profiles over real routes, and test the tile style on web and mobile.
+This compose file is a self-hosting foundation, not a Stage or Production deployment. No server is provisioned by this package. Before Stage, pin and review container digests, provide TLS/reverse proxy and resource limits, wire the Maps Gateway to the private Valhalla URL, verify supported Car/Bike/Walk/Motorcycle profiles over real routes, and test the tile style on web and mobile.
 
 ## Data handling
 
