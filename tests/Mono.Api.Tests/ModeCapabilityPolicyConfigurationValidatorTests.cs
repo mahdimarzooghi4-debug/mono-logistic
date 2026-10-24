@@ -10,7 +10,7 @@ public sealed class ModeCapabilityPolicyConfigurationValidatorTests
     public void AcceptsInitialModesAndFutureModesInOneCatalog()
     {
         using var definition = JsonDocument.Parse("""
-            { "modes": ["WALK", "BIKE", "CAR", "VAN", "PICKUP", "TRUCK"] }
+            { "modes": ["WALK", "BIKE", "MOTORCYCLE", "CAR", "VAN", "PICKUP", "TRUCK"] }
             """);
 
         ModeCapabilityPolicyConfigurationValidator.Validate(definition.RootElement);
