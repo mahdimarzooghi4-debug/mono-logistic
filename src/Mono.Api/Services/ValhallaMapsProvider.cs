@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Mono.Api.Domain;
 
@@ -110,8 +111,11 @@ public sealed class ValhallaMapsProvider(HttpClient httpClient) : IMapsProvider
         string service, object payload, CancellationToken cancellationToken)
     {
         var json = JsonSerializer.Serialize(payload, JsonOptions);
-        var uri = $"{service}?json={Uri.EscapeDataString(json)}";
-        using var response = await httpClient.GetAsync(uri, cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, service)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        using var response = await httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
