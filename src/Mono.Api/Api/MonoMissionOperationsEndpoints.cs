@@ -7,6 +7,10 @@ namespace Mono.Api.Api;
 
 public static class MonoMissionOperationsEndpoints
 {
+    private static bool IsValidCustomerId(string? customerId) => customerId is null ||
+        (customerId.Length == 36 && customerId.StartsWith("cus_", StringComparison.Ordinal) &&
+         customerId.Skip(4).All(character => char.IsAsciiHexDigit(character) && !char.IsUpper(character)));
+
     public static IEndpointRouteBuilder MapMonoMissionOperationsEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
@@ -40,6 +44,94 @@ public static class MonoMissionOperationsEndpoints
 
                 await readAudit.RecordAsync(
                     PostgresMissionOperationsReadAuditService.MissionSearch, null, page.Items.Count, cancellationToken);
+                return Results.Ok(page);
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet("/operations/v1/finance/mission-fares", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                string? status,
+                string? query,
+                [FromQuery(Name = "created_after")] DateTimeOffset? createdAfter,
+                [FromQuery(Name = "created_before")] DateTimeOffset? createdBefore,
+                string? cursor,
+                PostgresMissionOperationsService missions,
+                PostgresMissionOperationsReadAuditService readAudit,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100 ||
+                    !MissionOperationsInputValidator.IsValidStatus(status) ||
+                    !MissionOperationsInputValidator.IsValidQuery(query) ||
+                    !MissionOperationsInputValidator.IsValidDateRange(createdAfter, createdBefore) ||
+                    !MissionOperationsInputValidator.IsValidCursor(cursor))
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Mission fare review filters are invalid.")));
+
+                var page = await missions.ListFareReviewAsync(
+                    size, status, query, createdAfter, createdBefore, cursor, cancellationToken);
+                if (page is null)
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The Mission fare review cursor is invalid for these filters.")));
+
+                await readAudit.RecordAsync(
+                    PostgresMissionOperationsReadAuditService.MissionFareReview,
+                    null, page.Items.Count, cancellationToken);
+                return Results.Ok(page);
+            })
+            .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
+
+        endpoints.MapGet("/operations/v1/dispatch/queue", async (
+                [FromQuery(Name = "page_size")] int? pageSize,
+                [FromQuery(Name = "has_offer")] bool? hasOffer,
+                [FromQuery(Name = "deadline_passed")] bool? deadlinePassed,
+                [FromQuery(Name = "delivery_before")] DateTimeOffset? deliveryBefore,
+                [FromQuery(Name = "delivery_after")] DateTimeOffset? deliveryAfter,
+                [FromQuery(Name = "delivery_window_state")] string? deliveryWindowState,
+                [FromQuery(Name = "delivery_due_within_minutes")] int? deliveryDueWithinMinutes,
+                [FromQuery(Name = "customer_id")] string? customerId,
+                [FromQuery(Name = "created_before")] DateTimeOffset? createdBefore,
+                [FromQuery(Name = "last_attempt_before")] DateTimeOffset? lastAttemptBefore,
+                [FromQuery(Name = "delivery_overdue")] bool? deliveryOverdue,
+                [FromQuery(Name = "sort_by")] string? sortBy,
+                [FromQuery(Name = "min_attempt_count")] int? minAttemptCount,
+                [FromQuery(Name = "max_attempt_count")] int? maxAttemptCount,
+                [FromQuery(Name = "latest_action")] string? latestAction,
+                string? query,
+                string? cursor,
+                PostgresMissionDispatchQueueService dispatchQueue,
+                PostgresMissionOperationsReadAuditService readAudit,
+                CancellationToken cancellationToken) =>
+            {
+                var size = pageSize ?? 50;
+                if (size is < 1 or > 100 ||
+                    !MissionOperationsInputValidator.IsValidQuery(query) ||
+                    !MissionOperationsInputValidator.IsValidCursor(cursor) ||
+                    !IsValidCustomerId(customerId) ||
+                    latestAction is not (null or "OFFERED" or "ACCEPTED" or "DECLINED" or "WITHDRAWN" or
+                        "EXPIRED" or "RELEASED" or "CANCELLED" or "COMPLETED") ||
+                    (minAttemptCount.HasValue && minAttemptCount.Value < 0) ||
+                    (maxAttemptCount.HasValue && maxAttemptCount.Value < 0) ||
+                    sortBy is not (null or "created_at" or "delivery_due") ||
+                    deliveryWindowState is not (null or "upcoming" or "due_now" or "overdue") ||
+                    (deliveryDueWithinMinutes.HasValue &&
+                     (deliveryDueWithinMinutes.Value < 1 || deliveryDueWithinMinutes.Value > 10080)) ||
+                    (deliveryAfter.HasValue && deliveryBefore.HasValue && deliveryAfter.Value > deliveryBefore.Value) ||
+                    (minAttemptCount.HasValue && maxAttemptCount.HasValue &&
+                     minAttemptCount.Value > maxAttemptCount.Value))
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_REQUEST", "Dispatch queue filters are invalid.")));
+
+                var page = await dispatchQueue.ListAsync(
+                    size, hasOffer, query, cursor, cancellationToken, deadlinePassed, latestAction,
+                    deliveryBefore, minAttemptCount, maxAttemptCount, lastAttemptBefore, deliveryOverdue, sortBy, deliveryAfter, deliveryWindowState, deliveryDueWithinMinutes, customerId, createdBefore);
+                if (page is null)
+                    return Results.BadRequest(new ApiErrorResponse(
+                        new ApiError("INVALID_CURSOR", "The dispatch queue cursor is invalid for these filters.")));
+
+                await readAudit.RecordAsync(
+                    PostgresMissionOperationsReadAuditService.MissionDispatchQueue,
+                    null, page.Items.Count, cancellationToken);
                 return Results.Ok(page);
             })
             .RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);

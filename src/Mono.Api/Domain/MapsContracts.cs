@@ -15,7 +15,16 @@ public sealed record GeocodeResult(GeoCoordinate Location, string? FormattedAddr
 public sealed record RouteQuery(
     GeoCoordinate Origin,
     GeoCoordinate Destination,
+    RouteTravelMode Mode,
     IReadOnlyList<GeoCoordinate>? Waypoints = null);
+
+/// <summary>Travel profile requested from a maps provider.</summary>
+public enum RouteTravelMode
+{
+    Walk = 1,
+    Bike = 2,
+    Car = 3
+}
 
 /// <summary>Provider route estimate. Distance is in metres; duration is in whole seconds.</summary>
 public sealed record RouteEstimate(double DistanceMeters, int EstimatedDurationSeconds);
@@ -23,7 +32,8 @@ public sealed record RouteEstimate(double DistanceMeters, int EstimatedDurationS
 /// <summary>A matrix query; each returned row corresponds to an origin and each cell to a destination.</summary>
 public sealed record RouteMatrixQuery(
     IReadOnlyList<GeoCoordinate> Origins,
-    IReadOnlyList<GeoCoordinate> Destinations);
+    IReadOnlyList<GeoCoordinate> Destinations,
+    RouteTravelMode Mode);
 
 /// <summary>A matrix cell. Both values are null when no route is available.</summary>
 public sealed record RouteMatrixCell(double? DistanceMeters, int? EstimatedDurationSeconds);

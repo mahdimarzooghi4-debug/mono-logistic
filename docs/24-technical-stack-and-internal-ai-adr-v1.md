@@ -43,6 +43,7 @@ The MVP remains governed by `docs/19-mvp-scope-v1.md`. In particular, AI dispatc
 ## Decisions still open
 
 - Courier application framework.
+- Courier identity provider and verified mobile/account-binding workflow. Sprint 116 adds a configurable, fail-closed OIDC/JWT validation boundary; no authority or audience is configured.
 - Map and routing provider.
 - Queue/broker and cache selection.
 - Exact Python and ML library versions.

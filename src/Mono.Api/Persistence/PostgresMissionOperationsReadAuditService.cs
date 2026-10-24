@@ -15,6 +15,15 @@ public sealed class PostgresMissionOperationsReadAuditService(
     public const string MissionDetail = "MISSION_DETAIL";
     public const string MissionTimeline = "MISSION_TIMELINE";
     public const string MissionAuditInspection = "MISSION_AUDIT_INSPECTION";
+    public const string MissionCourierOfferHistory = "MISSION_COURIER_OFFER_HISTORY";
+    public const string MissionCourierIssueSearch = "MISSION_COURIER_ISSUE_SEARCH";
+    public const string MissionCourierIssueInboxSearch = "MISSION_COURIER_ISSUE_INBOX_SEARCH";
+    public const string MissionSlaAlertSearch = "MISSION_SLA_ALERT_SEARCH";
+    public const string MissionDispatchQueue = "MISSION_DISPATCH_QUEUE";
+    public const string MissionDispatchAttemptHistory = "MISSION_DISPATCH_ATTEMPT_HISTORY";
+    public const string MissionFareReview = "MISSION_FARE_REVIEW";
+    public const string MissionWorkerStatus = "MISSION_WORKER_STATUS";
+    public const string DashboardSummary = "DASHBOARD_SUMMARY";
 
     private static readonly Regex AuditIdPattern = new(
         @"\Amra_[0-9a-f]{32}\z", RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -25,11 +34,11 @@ public sealed class PostgresMissionOperationsReadAuditService(
         int resultCount,
         CancellationToken cancellationToken = default)
     {
-        if (action is not (MissionSearch or MissionDetail or MissionTimeline or MissionAuditInspection))
+        if (action is not (MissionSearch or MissionDetail or MissionTimeline or MissionAuditInspection or MissionCourierOfferHistory or MissionCourierIssueSearch or MissionCourierIssueInboxSearch or MissionSlaAlertSearch or MissionDispatchQueue or MissionDispatchAttemptHistory or MissionFareReview or MissionWorkerStatus or DashboardSummary))
             throw new ArgumentException("The Mission read audit action is invalid.", nameof(action));
         if (resultCount < 0 ||
-            ((action is MissionSearch or MissionAuditInspection) && missionId is not null) ||
-            ((action is MissionDetail or MissionTimeline) &&
+            ((action is MissionSearch or MissionAuditInspection or MissionCourierIssueInboxSearch or MissionSlaAlertSearch or MissionDispatchQueue or MissionFareReview or MissionWorkerStatus or DashboardSummary) && missionId is not null) ||
+            ((action is MissionDetail or MissionTimeline or MissionCourierOfferHistory or MissionCourierIssueSearch or MissionDispatchAttemptHistory) &&
              (missionId is null || !MissionHistoryInputValidator.IsValidMissionId(missionId))))
             throw new ArgumentException("The Mission read audit scope is invalid.");
 

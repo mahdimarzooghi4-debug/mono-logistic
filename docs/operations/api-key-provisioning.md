@@ -20,7 +20,7 @@ dotnet run --project tools/Mono.ApiKeyProvisioner -- \
 
 The command displays the customer, scopes, and expiry and requires typing `ISSUE`. It prints the complete API key only after PostgreSQL confirms the insert. The database stores only the SHA-256 hash of the complete key. Copy the value directly to the approved secret store; it cannot be retrieved later.
 
-Only scopes in the source-controlled scope catalog are accepted. The catalog contains `branches.read`, `delivery-requests.write`, and `delivery-requests.read`; grant only the scopes needed by each integration.
+Only scopes in the source-controlled scope catalog are accepted. The catalog contains `branches.read`, `delivery-requests.write`, `delivery-requests.read`, `missions.cancel`, and `webhooks.manage`; grant only the scopes needed by each integration. `webhooks.manage` is required to register callback endpoints and does not grant access to delivery or mission data.
 
 Do not run the command in CI, capture its output in build logs, or paste the key into source control, tickets, chat, or unapproved storage. Use HTTPS when sending the value to Hana.
 

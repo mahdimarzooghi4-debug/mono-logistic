@@ -342,20 +342,26 @@ REGISTERED
 -> ACTIVE
 ```
 - Sprint 109 adds a unit-tested ordered trust lifecycle with staff attribution and bounded evidence references; ACTIVE also requires an approved primary zone. Persistence, courier authentication, evidence verification, operations APIs, and dispatch integration remain future work.
-- Sprint 110 adds durable Mono-operations courier registration, cursor-paginated roster/detail reads, and MFA-gated stepwise trust transitions. The database rejects skipped status changes or status changes without immutable transition history; idempotent writes store only operational metadata and opaque evidence references. Courier self-authentication, document storage/verification, and dispatch integration remain future work.
+- Sprint 110 adds durable Mono-operations courier registration, cursor-paginated roster/detail reads, and MFA-gated stepwise trust transitions. The database rejects skipped status changes or status changes without immutable transition history; idempotent writes store only operational metadata and opaque evidence references.
 - Sprint 111 records privileged roster, detail, and audit-ledger reads in an append-only courier operations audit table. Reads fail closed if audit persistence fails, and administrators can inspect the ledger with bounded keyset pagination.
 - Sprint 112 adds staff-planned, zone-aware courier availability windows with overlap prevention, idempotent create/cancel, and audited bounded search. Planned windows support capacity planning; they do not represent live availability or dispatch eligibility.
 - Sprint 113 adds a bounded zone capacity projection over those planned windows, grouped into UTC time buckets and logged in the courier read-audit ledger. It reports scheduled planning counts only; it does not calculate live supply or assign Missions.
+- Sprint 114 adds append-only, idempotent Mono-operations suspension and reinstatement for ACTIVE couriers. Suspensions are separate from trust status, are visible in an audited operational-status read, and exclude suspended couriers from planned availability and capacity.
 
 ## 12. Epic E10 — Assignment
 
 ### E10.1 Candidate Generation
+- Sprint 115 adds an MFA-gated, audited planning-eligibility preview that explains per-courier inclusion or exclusion for a zone/time window using trust status, suspension, zone approval, and scheduled availability. It is planning-only and does not authorize assignment or dispatch.
+- Sprint 116 adds a separate, configurable OIDC/JWT courier authentication boundary and minimal self-session endpoint. Tokens are checked against current ACTIVE/unsuspended state; authority, verified mobile binding, and token provisioning remain unconfigured.
+- Sprint 117 adds MFA-gated, idempotent Mono-owned courier identity binding and revocation, append-only event history, and exact issuer+subject resolution during JWT validation. Provider setup, phone verification, OTP delivery, and token provisioning remain unconfigured.
 - available couriers
 - active routes
 - eligible modes
 - approved zones
 
 ### E10.2 Offer Lifecycle
+- Sprint 135 adds an administrator-only bounded batch API for explicit offers to distinct Missions, validating all commands before execution and preserving independent idempotency and per-item outcomes.
+- Sprint 136 adds a cursor-consistent operations queue filter for the latest courier-offer action, enabling manual dispatch recovery without changing Mission or offer state.
 - offer
 - accept
 - reject
@@ -398,6 +404,20 @@ max_missions_per_route = 5
 ### Acceptance
 - Adding a Mission reruns route simulation.
 - No existing Mission promise can be broken.
+
+### Progress — Sprint 150
+- A pure route insertion time-window planner now enumerates pickup/drop-off positions while preserving existing stop order and checking every active Mission's committed delivery deadline.
+- The first core module requires a complete, verified directed travel-time matrix, applies the five-Mission cap and three-minute pickup dwell, and returns `Unresolved` when routing evidence is incomplete or unverified.
+- Sprint 151 adds an immutable PostgreSQL route-plan version store with idempotent commands, expected-version concurrency checks, snapshot integrity, and insertion invariants that preserve existing Missions, committed delivery times, and stop order. Simulation, provider evidence, route lifecycle, and dispatch remain separate gates.
+- Sprint 152 couples simulation to version writes: it loads the expected snapshot, requires verified evidence and an explicit feasible position, then persists through the optimistic/idempotent store.
+- Sprint 153 binds a matrix attestation to the exact route snapshot, candidate Mission, and directed cells, then verifies the signature through the existing source registry and freshness rules.
+- Sprint 154 adds a provider-neutral matrix acquisition service: it resolves stable route location IDs, requests a directed matrix for an explicit travel mode, and maps responses back to location IDs. Evidence v2 binds mode and coordinates in the source signature; acquisition remains unsigned and cannot independently authorize planning.
+- Sprint 155 adds a versioned Postgres coordinate catalog for route location IDs, with append-only history, expected-version writes, idempotent command replays, and current-coordinate batch resolution.
+- Sprint 156 binds accepted DeliveryRequest coordinate pairs to deterministic opaque pickup/drop-off route location IDs and seeds them into the catalog. Address-only inputs report pending coordinates without invoking an unconfigured geocoder.
+- Sprint 157 adds evidence-gated initialization of a Route's first immutable plan version. It simulates the explicit start-to-pickup and pickup-to-drop-off legs against pickup readiness, dwell, service times, and the committed Promise before persistence.
+- Sprint 158 exposes protected Route plan initialization and current/historical immutable version reads through the MFA-gated operations API; writes remain behind the existing trusted-evidence and simulation orchestration.
+- Sprint 159 composes active-route inventory, effective Zone capacity, and route-insertion evidence with the other supplied E7.1 results through the existing feasibility gate. Zone mismatches remain unresolved; no capacity threshold or freshness policy is inferred.
+- A registered maps provider and trusted signer, an address geocoding workflow, route lifecycle APIs, capacity and Zone checks, broader feasibility-gate integration, Mission/Promise orchestration, and dispatch authorization remain open. This insertion path is not overall feasibility or dispatch authorization.
 
 ## 14. Epic E12 — Pickup & Handoff
 
@@ -521,6 +541,51 @@ Courier Net = 89% of Mission Fare
 
 ## 19. Epic E17 — Webhooks & Events
 
+- Sprint 161 adds tenant-scoped webhook endpoint registration through `POST /v1/webhook-endpoints`, HTTPS/event validation, a dedicated `webhooks.manage` API-key scope, and AES-256-GCM protected signing secrets.
+- Sprint 162 adds tenant-scoped endpoint listing/detail, idempotent disablement, one-time secret rotation, and append-only lifecycle history.
+- Sprint 163 adds a disabled-by-default Outbox fan-out worker, tenant-safe event payload allowlists, HMAC-SHA256 signatures, HTTPS-only direct connections with DNS/SSRF and redirect controls, bounded retries, lease recovery, dead-letter state, and immutable attempt history.
+- Sprint 164 exposes tenant-scoped delivery history and detail APIs, filter-bound keyset pagination, and immutable attempt timelines without returning endpoint URLs, payload bodies, or secrets.
+- Sprint 165 adds idempotent manual replay for dead-lettered deliveries, with separate delivery generations, append-only replay request records, an active-endpoint gate, and a three-replay limit.
+- Sprint 166 exposes a privileged aggregate queue-health API for internal operations dashboards and audits reads with the authenticated administrator identity.
+- Sprint 167 adds filterable operations delivery search and detail.
+- Sprint 168 adds idempotent administrator replay for dead-lettered deliveries.
+- Sprint 169 adds paginated, audited operations audit-history inspection.
+- Sprint 170 adds race-safe, idempotent, audited cancellation for queued webhook deliveries.
+- Sprint 171 adds a double-entry, append-only courier earning ledger, atomic delivery-completion posting under the approved 89% rule, and a courier-scoped available-balance API.
+- Sprint 172 exposes the authenticated courier's immutable mission earning history with bounded keyset pagination over ledger entries; withdrawal and payout remain separate policy-backed work.
+- Sprint 173 adds MFA-gated manual payout destination verification, encrypted courier IBAN storage, daily-limited idempotent withdrawal requests with reserved-balance accounting, and audited operator processing, rejection, and balanced payout posting.
+- Sprint 174 exposes the operator-only append-only withdrawal lifecycle timeline and records every history read, including not-found probes, without exposing payout IBANs.
+- Sprint 175 provides an audited, cursor-paginated operations view of payout destination verification/revocation and secret-access events, returning only masked IBANs.
+- Sprint 176 adds a courier-scoped, keyset-paginated read of posted available-ledger entries, covering both mission earning credits and completed payout debits.
+- Sprint 177 adds an audited operations search across all withdrawal states, with optional status/courier filters and filter-bound keyset cursors.
+- Sprint 178 makes PostgreSQL verify that a payout references a paid withdrawal and contains exactly the requested courier debit and matching Mono clearing credit.
+- Sprint 179 blocks the payout-integrity migration when historical payout rows do not satisfy the same settlement invariant.
+- Sprint 180 adds time-bounded courier ledger statements with stable, filter-bound pagination and period debit/credit totals.
+- Sprint 181 adds opening and closing posted balances to courier ledger statements so period movement can be reconciled without mixing pending reservations.
+- Sprint 182 breaks the live courier balance into posted ledger funds, active withdrawal reservations, and spendable funds.
+- Sprint 183 verifies concurrent withdrawal requests serialize against one courier balance, so simultaneous reservations cannot exceed available ledger funds.
+- Sprint 184 verifies the existing three-withdrawals-per-Tehran-day limit resets at local midnight and exact retries do not consume another daily slot.
+- Sprint 185 gives couriers an owner-scoped withdrawal event timeline with safe lifecycle fields, while keeping actor identities and idempotency keys private to operations.
+- Sprint 186 adds an authenticated, no-store courier read for the current payout-destination verification status and masked IBAN; full account data and verification writes remain operations-only.
+- Sprint 187 exposes the current Tehran-day withdrawal count, remaining count, and reset timestamp as advisory information; withdrawal creation remains the authoritative limit check.
+- Sprint 188 adds courier withdrawal history date-window filtering with an exclusive upper bound and cursors bound to the normalized filter.
+- Sprint 189 adds courier-scoped withdrawal status filtering across REQUESTED, PROCESSING, PAID, and REJECTED states, with validation and cursors bound to both status and date filters.
+- Sprint 190 adds inclusive minimum and maximum toman filters to courier withdrawal history, validates invalid ranges, and binds cursors to all active filters.
+- Sprint 191 adds an MFA-gated, idempotent operations API to revoke the current verified courier payout destination, with append-only evidence and safe blocking of new withdrawal requests until re-verification.
+- Sprint 192 adds creation-time and inclusive amount-range filters to the operations withdrawal search, binds cursors to all active filters, and stores those filters in the append-only search audit.
+- Sprint 193 adds an administrator API for paginated, filterable withdrawal-search audit history and an append-only ledger that records every history read.
+- Sprint 194 adds administrator-wide withdrawal lifecycle event search with actor, action, courier, and occurrence-time filters, filter-bound cursors, and append-only read auditing.
+- Sprint 195 adds administrator-wide payout-destination audit search across verification, revocation, and secret-access events, with filter-bound cursors and a dedicated append-only search-read ledger.
+- Sprint 196 adds a read-only, time-bounded payout reconciliation report that compares withdrawal lifecycle state with posted double-entry ledger transactions and audits each report page.
+- Sprint 197 adds an administrator-only, audited ledger drilldown for an individual withdrawal, showing safe transaction and double-entry details without payout secrets or idempotency keys.
+- Sprint 198 adds filterable administrator search over payout ledger drilldown audit history, with filter-bound keyset pagination and an immutable audit trail for every search page.
+- Sprint 199 adds an administrator reconciliation summary that aggregates withdrawal and discrepancy counts and toman amounts by reconciliation code, with an append-only audit for each bounded-time summary read.
+- Sprint 200 adds an administrator UTC-day reconciliation trend grouped by reconciliation code and toman value, with optional courier/status filters and an append-only summary-read audit.
+- Sprint 201 centralizes the payout reconciliation SQL projection so detailed reports, aggregate summaries, and daily trends apply identical lifecycle and double-entry rules.
+- Sprint 202 scopes reconciliation to withdrawals in the requested time/courier/status window before ledger aggregation and adds a partial reference index for payout transactions.
+- Sprint 203 adds a reconciliation-code filter to the administrator report, binds it into keyset cursors, and records the selected code in append-only page-read audit.
+- Sprint 204 adds administrator search and keyset pagination for payout reconciliation report-read history, with filter-bound cursors and a separate immutable search-read ledger.
+
 ### E17.1 Event Envelope
 - event ID
 - version
@@ -568,14 +633,30 @@ Dashboard must use the same application/core rules as API customers.
 - Sprint 079 adds an MFA-gated, read-only Mono operations Mission search, summary, and timeline across customer tenants, with keyset pagination and allowlisted event fields.
 - Sprint 080 extends operations search with case-insensitive prefix lookup by Mission ID, Delivery Request ID, or external reference, inclusive creation-time filters, and cursor/filter consistency.
 - Mission search
+- Sprint 137 adds a committed-delivery cutoff filter to the dispatch queue, with inclusive UTC semantics and cursor-consistent pagination.
+- Sprint 138 adds inclusive minimum and maximum offer-attempt count filters to the dispatch queue, with range validation and cursor-consistent pagination.
+- Sprint 139 adds an inclusive UTC cutoff on the latest courier-offer event, excluding Missions with no recorded offer history.
+- Sprint 140 adds an API-clock-consistent `delivery_overdue` signal and queue filter for searching Missions whose committed delivery time has passed, including cursor-consistent filtering.
+- Sprint 141 adds optional committed-delivery-first sorting to the dispatch queue while preserving the created-at default and cursor-consistent keyset pagination.
+- Sprint 142 adds an inclusive `delivery_after` lower bound that combines with `delivery_before` into a validated, cursor-consistent committed-delivery window.
+- Sprint 143 adds a UTC-clock-consistent `delivery_window_state` (`upcoming`, `due_now`, or `overdue`) to dispatch queue items while retaining the inclusive `delivery_overdue` contract.
+- Sprint 144 adds an optional `delivery_window_state` queue filter, consistent across cursor validation and page queries.
+- Sprint 145 adds an inclusive 1–10,080 minute relative delivery due horizon filter, applied consistently to queue pages and cursor validation.
+- Sprint 146 adds an optional exact `customer_id` scope to the dispatch queue, validates customer ID shape, and binds the scope to cursor validation and every page query.
+- Sprint 147 adds an inclusive `created_before` dispatch cutoff to find Missions waiting since before a UTC timestamp, consistently applied to cursor validation and all page queries; it also covers filtered keyset continuation across customer-owned Mission data.
 - Mission timeline
 - Route inspection
 - courier state
 - assignment
 - zone capacity
+- Sprint 208 adds a time-consistent, administrator-only delivery SLA alert feed for all active Missions, with an operator-selected lookahead window, assigned-courier context, stable filter-bound keyset pagination, and append-only read auditing.
+- Sprint 209 adds an opt-in background worker that expires only overdue OFFERED rows on Missions still searching for a courier, reusing the existing idempotent expiry rules and immutable event history; it never auto-selects a replacement courier.
+- Sprint 210 adds a no-store, administrator-only status endpoint for the optional offer-expiry worker, exposing safe in-process state and last successful batch details without changing API readiness.
+- Sprint 211 adds PostgreSQL integration coverage proving the expiry worker ignores not-yet-due offers, expires due offers through the audited transaction, records its system actor, and stops selecting the offer after expiry.
 - SLA alerts
 - re-dispatch
 - controlled exception handling
+- Sprint 207 adds an administrator-wide courier-issue inbox with status/code/Mission/courier/time filters, stable filter-bound keyset pagination, no-store responses, and append-only read auditing.
 - audit trail
 
 ## 22. Epic E20 — Security
@@ -589,9 +670,14 @@ Dashboard must use the same application/core rules as API customers.
 - location privacy
 - finance authorization
 - security tests
+- Sprint 230 adds and tests browser security headers on API, health, and Operations Console responses.
 
 ## 23. Epic E21 — Observability
 
+- Sprint 212 adds an administrator-only webhook worker status endpoint, including disabled/blocked/running state and last batch timestamps, alongside the existing delivery queue summary.
+- Sprint 213 adds append-only read-audit records when administrators inspect webhook delivery and mission offer-expiry worker status.
+- Sprint 214 adds process-local cumulative success/failure batch counters to webhook and Mission offer-expiry worker status snapshots.
+- Sprint 215 aligns the staging Blueprint with the cumulative candidate branch and records required external Stage setup; Render JSON Schema and exact-head CI checks pass, with no Render resources created.
 - structured logs
 - metrics
 - traces
@@ -614,6 +700,9 @@ Dashboard must use the same application/core rules as API customers.
 - backup
 - monitoring
 - CI checks
+- Sprint 227 pins every GitHub Actions dependency in CI workflows to immutable full commit SHAs and adds a regression check that rejects tag-based action references.
+- Sprint 228 adds executable CI contract tests to keep the Render Blueprint Stage-only, non-auto-deploying, and isolated from Production database access.
+- Sprint 229 verifies the built API image uses a non-root numeric runtime UID before running the staging container smoke test.
 - release approval
 
 ## 25. Epic E23 — Merchant Mobile App

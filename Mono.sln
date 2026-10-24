@@ -8,6 +8,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mono.Api.Tests", "tests/Mon
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mono.ApiKeyProvisioner", "tools/Mono.ApiKeyProvisioner/Mono.ApiKeyProvisioner.csproj", "{F873F1DE-2E68-4E3A-A740-F3B58518374D}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mono.DbMigrator", "tools/Mono.DbMigrator/Mono.DbMigrator.csproj", "{4D56BE3A-7B34-4C3F-AFF9-D93EB6DBB684}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,5 +28,9 @@ Global
 		{F873F1DE-2E68-4E3A-A740-F3B58518374D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F873F1DE-2E68-4E3A-A740-F3B58518374D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F873F1DE-2E68-4E3A-A740-F3B58518374D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4D56BE3A-7B34-4C3F-AFF9-D93EB6DBB684}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4D56BE3A-7B34-4C3F-AFF9-D93EB6DBB684}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4D56BE3A-7B34-4C3F-AFF9-D93EB6DBB684}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4D56BE3A-7B34-4C3F-AFF9-D93EB6DBB684}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

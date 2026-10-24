@@ -430,6 +430,21 @@ Example:
 
 Webhook URLs must be validated and secrets generated securely.
 
+Endpoint registration requires the `webhooks.manage` customer API-key scope. Mono returns the generated signing secret only in the creation response; persistence stores an AES-256-GCM encrypted value under a separately configured `Mono:WebhookEncryptionKey` (base64-encoded 32-byte key). Registration fails with `503` if that key is not configured. Only HTTPS DNS hostnames are accepted; IP literals, local-only hostnames, URL credentials, query strings, fragments, unsupported events, and duplicate event names are rejected. The eventual sender must validate resolved addresses and disable redirects at connection time.
+
+The endpoint registry also supports:
+
+- `GET /v1/webhook-endpoints?limit=50&cursor=...` — tenant-scoped keyset pagination; `limit` is 1–100 and the opaque cursor comes from the previous page's `next_cursor`.
+- `GET /v1/webhook-endpoints/{endpoint_id}` — tenant-scoped endpoint metadata. Responses never include the signing secret or ciphertext.
+- `POST /v1/webhook-endpoints/{endpoint_id}/disable` — disable an endpoint; repeating the request is safe and returns the disabled metadata.
+- `POST /v1/webhook-endpoints/{endpoint_id}/rotate-secret` — replace an active endpoint's signing secret. The new value is returned once; disabled endpoints return `409`, and missing encryption configuration returns `503`.
+
+Create, disable, and secret-rotation actions are written with append-only lifecycle history. These management APIs do not activate outbound event delivery.
+
+When the delivery worker is explicitly enabled, it fans out supported Outbox events to active subscriptions created before the event. The JSON envelope contains `event_id`, `event_type`, `event_version`, `occurred_at`, `correlation_id`, `aggregate`, and an event-specific allowlist of customer-safe `data` fields. Internal actor IDs, decision IDs, policy evidence, reason codes, and raw Outbox JSON are excluded. Requests use HTTPS on port 443, `X-Mono-Event-Id`, `X-Mono-Delivery-Id`, and `X-Mono-Signature: sha256=<hex HMAC-SHA256 of the exact UTF-8 body>`.
+
+Delivery is disabled by default (`Mono:WebhookDelivery:Enabled=false`) and also requires the configured 32-byte `Mono:WebhookEncryptionKey`. The worker disables proxies and redirects, resolves the host for each new connection, rejects a DNS answer set containing any non-public address, and connects directly to the validated address while TLS continues to validate the URL hostname. Only 2xx responses succeed. Network errors, timeouts, 408, 429, and 5xx responses retry up to five attempts with 30-second, 2-minute, 10-minute, and 30-minute delays; other HTTP responses are dead-lettered. Disablement cancels queued retries. See `docs/operations/webhook-delivery.md` for staging configuration and operations.
+
 ## 17. Webhook Security
 
 Recommended:
@@ -464,7 +479,15 @@ GET /v1/webhook-deliveries/{id}
 POST /v1/webhook-deliveries/{id}/retry
 ```
 
-The retry endpoint may be restricted to authorized customer/admin users.
+Delivery history is now available to customer API keys with `webhooks.manage`:
+
+- `GET /v1/webhook-deliveries?limit=50&endpoint_id=...&event_type=...&status=...&cursor=...` — tenant-scoped, keyset-paginated list (1–100 items). Cursors are bound to the active filters.
+- `GET /v1/webhook-deliveries/{delivery_id}` — tenant-scoped status and immutable attempt history. Responses omit destination URLs, payloads, and signing-secret material.
+- `POST /v1/webhook-deliveries/{delivery_id}/retry` — queues a new delivery generation for a dead-lettered delivery; requires a stable `Idempotency-Key` header and returns the queued generation. At most three manual replays are allowed while the endpoint remains active.
+
+Each manual replay has a distinct delivery ID and preserves the previous generation's status and attempts. Repeating a request with the same idempotency key returns the same generation.
+
+Internal operations dashboards can read `GET /operations/v1/webhook-deliveries/summary`. It requires the Mono administrator role with verified MFA and reports aggregate queue state, due deliveries, expired leases, recent dead letters, and the oldest open delivery. Every successful read is recorded in an append-only operations audit table; the response contains no customer payloads, callback URLs, or secrets.
 
 ## 19. Branches
 
@@ -758,3 +781,101 @@ These windows are staff-entered planning data. They are not courier-reported liv
 Mono administrators can request a projection for one active zone over a UTC range up to 24 hours, using 15, 30, or 60 minute buckets aligned to the selected interval. Each bucket counts distinct ACTIVE couriers whose scheduled window overlaps that period. Reads are appended to the courier operations audit ledger, and the API fails closed if the audit write fails.
 
 The projection represents staff-entered planned capacity only. It does not incorporate live courier reports, GPS freshness, route capacity, or Mission assignment decisions.
+
+
+### 34.4 Courier operational suspension
+
+Mono administrator operations may suspend or reinstate an ACTIVE courier:
+
+- `POST /operations/v1/couriers/{courier_id}/suspend`
+- `POST /operations/v1/couriers/{courier_id}/reinstate`
+- `GET /operations/v1/couriers/{courier_id}/operational-status`
+
+Write requests require the administrator MFA policy, one `Idempotency-Key`, and a canonical `reason_code`. Exact retries return the original result; reuse with changed content returns `409 IDEMPOTENCY_CONFLICT`. Invalid lifecycle changes return `409 COURIER_STATUS_TRANSITION_NOT_ALLOWED`.
+
+Operational suspension is recorded as an immutable event and does not rewrite the courier's trust status. In the same transaction, suspension cancels every scheduled availability window that ends after the suspension timestamp, recording `COURIER_SUSPENDED` as the cancellation reason; reinstatement does not restore those windows, so operators must schedule fresh availability. The status read returns trust status, operational status, and at most the latest 50 status events. The read is added to the courier operations detail audit before the response is returned. Suspended couriers cannot receive planned availability windows and do not contribute to planned zone capacity. GPS, dispatch, and courier self-authentication remain separate capabilities.
+
+
+### 34.5 Explainable courier planning eligibility
+
+Mono administrators can inspect the staff-planned capacity contributors for a zone and UTC time range:
+
+```
+GET /operations/v1/courier-planning-eligibility?zone_id=zone-central&from=2026-10-12T12:00:00Z&to=2026-10-12T13:00:00Z&page_size=50&cursor=crr_...
+```
+
+The range is limited to 24 hours; page size is 1–100 and results use keyset pagination by Courier ID. Each summary returns trust status, operational status, zone approval, whether a scheduled window overlaps the range, whether the courier contributes to planned capacity, and exclusion reason codes. Reads append a `COURIER_PLANNING_ELIGIBILITY_SEARCH` record to the immutable courier operations read-audit ledger; audit persistence failure prevents the response.
+
+The response is classified `PLANNED_CAPACITY_ONLY`. It is a staff planning explanation, not live availability, courier identity verification, candidate assignment, or dispatch authorization. It does not use GPS, route fit, Mission load, or courier acceptance.
+
+```json
+{
+  "zone_id": "zone-central",
+  "from": "2026-10-12T12:00:00Z",
+  "to": "2026-10-12T13:00:00Z",
+  "classification": "PLANNED_CAPACITY_ONLY",
+  "items": [{
+    "courier_id": "crr_...",
+    "mode": "BIKE",
+    "trust_status": "ACTIVE",
+    "operational_status": "ACTIVE",
+    "zone_approved": true,
+    "has_scheduled_window": true,
+    "planned_capacity_contributor": true,
+    "exclusion_reasons": []
+  }],
+  "next_cursor": null
+}
+```
+
+
+
+### 34.6 Courier self-service authentication
+
+Courier self-service APIs use a dedicated OIDC/JWT bearer scheme, isolated from customer API keys and Mono operations identities. The issuer and audience are configured as a pair using `MonoCourier:Authority` and `MonoCourier:Audience`; the authority must use HTTPS. With no configured authority, courier tokens fail closed.
+
+A validated token must contain exactly one non-empty `sub` and one `mono/role = COURIER` claim. The JWT must not provide Mono-reserved `mono/courier_id` or `mono/identity_domain` claims. After issuer, audience, signature, and lifetime validation, Mono resolves the exact `(issuer, sub)` pair through its own active identity-binding record and adds the internal Courier ID. Current trust and operational status are checked on every token validation; unknown, inactive, suspended, or revoked bindings are rejected.
+
+Mono administrators with the MFA-gated operations identity manage this binding through:
+```
+POST /operations/v1/couriers/{courierId}/identity-binding
+POST /operations/v1/couriers/{courierId}/identity-binding/revoke
+GET  /operations/v1/couriers/{courierId}/identity-binding
+```
+Writes require an `Idempotency-Key`, reason code, and opaque evidence reference. Read/write responses omit issuer and subject values. Binding is restricted to the configured HTTPS authority; no phone verification, OTP delivery, issuer, or credential provisioning is configured by this contract.
+
+The initial self-service route is:
+
+```
+GET /courier/v1/session
+Authorization: Bearer <courier access token>
+```
+
+It returns only the authenticated caller's internal Courier ID and identity domain. It exposes no identity, contact, financial, location, or trust-history fields. No identity provider, mobile verification or OTP delivery, credential provisioning, or deployment is configured by this contract. Authentication remains unavailable until those trusted issuer settings and account-binding controls exist.
+
+## Courier earnings and manual withdrawal
+
+Courier finance endpoints derive identity from the validated courier token. Clients cannot supply a Courier ID.
+
+- `GET /courier/v1/finance/balance` returns ledger-posted available earnings less withdrawals in `REQUESTED` or `PROCESSING`.
+- `GET /courier/v1/finance/earnings?limit=50&cursor=...` returns newest-first immutable Mission earning credits. Limit is 1–100; default is 50.
+- `POST /courier/v1/finance/withdrawals` accepts `{"amount_toman": 30000}` and requires `Idempotency-Key`. Amount must be a positive integer not exceeding the available balance. At most three withdrawal requests may be created per Asia/Tehran calendar day; rejected and paid requests count toward this cap. An exact idempotent retry returns the original request.
+- `GET /courier/v1/finance/withdrawals?limit=50&cursor=...` returns only the authenticated courier's withdrawal history, including status, masked destination, and any recorded rejection reason or bank reference.
+- `GET /operations/v1/courier-withdrawals?limit=50&cursor=...` lists open requests for MFA-verified Mono administrators.
+- `POST /operations/v1/courier-withdrawals/{withdrawalId}/processing`, `/paid`, and `/reject` append operator-attributed status events. Every write requires `Idempotency-Key`. The paid action also requires a bank reference; rejection requires a reason code. A paid status and its balanced ledger payout entry commit together.
+
+A payout destination is manually checked outside Mono by a Mono administrator with MFA, then registered with:
+```
+POST /operations/v1/couriers/{courierId}/payout-destination/verify
+Idempotency-Key: <unique key>
+{"iban":"IR…","evidence_reference":"case:bank-proof-001"}
+```
+The API validates the Iranian IBAN format and checksum, encrypts it with AES-256-GCM using `MonoCourier:PayoutIbanEncryptionKey` (32-byte key encoded as Base64), and stores a keyed fingerprint and masked form for safe reads. The courier-facing APIs never return the full IBAN. The active destination is captured by each withdrawal so later destination rotation does not redirect an existing request. Verification is unavailable until the dedicated encryption key is configured. MFA-verified operations staff can retrieve the full destination for manual transfer only through `GET /operations/v1/couriers/{courierId}/payout-destination`; every access outcome is written to an append-only audit table in the same transaction.
+
+Withdrawal status sequence:
+```
+REQUESTED -> PROCESSING -> PAID
+     |             |
+     +-> REJECTED <-+
+```
+Only Mono's manual operations workflow records payment completion. No bank API, transfer initiation, withdrawal fee, or minimum amount is configured. A rejected request releases its reserved amount; a paid request posts a debit from courier available earnings and a credit to Mono payout clearing in the same transaction.

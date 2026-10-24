@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
@@ -90,6 +92,21 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         Assert.Single(nextPage.Items);
         Assert.NotEqual(page.Items[0].CourierId, nextPage.Items[0].CourierId);
         Assert.Null(nextPage.NextCursor);
+
+        var activeMatches = await service.ListAsync(10, null, query: courierId[..12], status: "active");
+        Assert.NotNull(activeMatches);
+        Assert.Single(activeMatches.Items);
+        Assert.Equal(courierId, activeMatches.Items[0].CourierId);
+        Assert.Null(activeMatches.NextCursor);
+        var registeredMatches = await service.ListAsync(10, null, status: "REGISTERED");
+        Assert.NotNull(registeredMatches);
+        Assert.Single(registeredMatches.Items);
+        Assert.Equal(secondCourier.Snapshot!.CourierId, registeredMatches.Items[0].CourierId);
+        var noMatches = await service.ListAsync(10, null, query: "crr_000000000000000000000000");
+        Assert.NotNull(noMatches);
+        Assert.Empty(noMatches.Items);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.ListAsync(10, null, query: "crr_%"));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.ListAsync(10, null, status: "UNKNOWN"));
     }
 
     [Fact]
@@ -183,6 +200,154 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             "DELETE FROM courier_operations_idempotency WHERE actor_id = @actor_id;", connection);
         deleteIdempotency.Parameters.AddWithValue("actor_id", "staff-operations-1");
         await Assert.ThrowsAsync<PostgresException>(() => deleteIdempotency.ExecuteNonQueryAsync());
+    }
+
+
+    [Fact]
+    public async Task Operations_presence_search_filters_pages_and_audits_without_exposing_coordinates()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central", "zone-east");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(database.DataSource, context);
+        var presence = new PostgresCourierLivePresenceService(database.DataSource);
+        var readAudit = new PostgresCourierOperationsReadAuditService(database.DataSource, context);
+
+        async Task<string> CreateOnlineCourier(string key, string zone)
+        {
+            var registration = await onboarding.RegisterAsync("BIKE", [zone], key + "-register");
+            var courierId = registration.Snapshot!.CourierId;
+            var statuses = new[]
+            {
+                "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED",
+                "TRUST_REQUIREMENTS_VERIFIED", "MONO_APPROVED", "ACTIVE"
+            };
+            for (var index = 0; index < statuses.Length; index++)
+            {
+                var status = statuses[index];
+                var transition = await onboarding.AdvanceTrustAsync(
+                    courierId, status, status == "ACTIVE" ? [zone] : null,
+                    status == "ACTIVE" ? zone : null, "REVIEW_COMPLETED",
+                    key + ":" + status, key + "-transition-" + index);
+                Assert.Equal(CourierOperationsWriteOutcome.Applied, transition.Outcome);
+            }
+            var online = await presence.GoOnlineAsync(courierId, zone, key + "-online");
+            Assert.Equal(CourierLivePresenceOutcome.Applied, online.Outcome);
+            return courierId;
+        }
+
+        var centralOne = await CreateOnlineCourier("presence-central-one", "zone-central");
+        var centralTwo = await CreateOnlineCourier("presence-central-two", "zone-central");
+        var east = await CreateOnlineCourier("presence-east", "zone-east");
+        var offlineRegistration = await onboarding.RegisterAsync(
+            "WALK", ["zone-central"], "presence-offline-register");
+        var offlineId = offlineRegistration.Snapshot!.CourierId;
+
+        var first = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            1, "online", "zone-central", null, null, null);
+        Assert.Single(first.Items);
+        Assert.Equal("ONLINE", first.Items[0].Status);
+        Assert.Equal("zone-central", first.Items[0].ZoneId);
+        Assert.NotNull(first.NextCursor);
+        Assert.Contains(first.Items[0].CourierId, new[] { centralOne, centralTwo });
+        Assert.DoesNotContain(first.Items[0].CourierId, new[] { east, offlineId });
+
+        var second = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            1, "ONLINE", "zone-central", null, null, first.NextCursor);
+        Assert.Single(second.Items);
+        Assert.Null(second.NextCursor);
+        Assert.NotEqual(first.Items[0].CourierId, second.Items[0].CourierId);
+        Assert.Contains(second.Items[0].CourierId, new[] { centralOne, centralTwo });
+
+        var timeFiltered = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            10, "ONLINE", "zone-central", now, now.AddHours(1), null);
+        Assert.Equal(2, timeFiltered.Items.Count);
+        Assert.All(timeFiltered.Items, item => Assert.True(item.UpdatedAt >= now));
+        Assert.All(timeFiltered.Items, item => Assert.True(item.UpdatedAt < now.AddHours(1)));
+
+        var offline = await new PostgresCourierLivePresenceOperationsSearchService(
+            database.DataSource, context, readAudit).SearchAsync(
+            10, "OFFLINE", null, null, null, null);
+        Assert.Contains(offline.Items, item => item.CourierId == offlineId && item.UpdatedAt is null);
+        Assert.DoesNotContain(offline.Items, item => item.CourierId == east);
+
+        var auditPage = await readAudit.ListAsync(20, null);
+        Assert.NotNull(auditPage);
+        Assert.Equal(4, auditPage.Items.Count(item =>
+            item.Action == PostgresCourierOperationsReadAuditService.CourierPresenceSearch &&
+            item.CourierId is null));
+        Assert.DoesNotContain("Latitude", typeof(CourierLivePresenceOperationsSearchItem).GetProperties()
+            .Select(property => property.Name), StringComparer.OrdinalIgnoreCase);
+    }
+
+
+    [Fact]
+    public async Task Live_presence_is_idempotent_zone_approved_and_event_maintained()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central", "zone-east");
+        var onboarding = new PostgresCourierOnboardingService(database.DataSource, new TestOperationsContext());
+        var registered = await onboarding.RegisterAsync("BIKE", ["zone-central"], "presence-register");
+        var courierId = registered.Snapshot!.CourierId;
+        var statuses = new[]
+        {
+            "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED",
+            "TRUST_REQUIREMENTS_VERIFIED", "MONO_APPROVED", "ACTIVE"
+        };
+        for (var index = 0; index < statuses.Length; index++)
+        {
+            var status = statuses[index];
+            await onboarding.AdvanceTrustAsync(
+                courierId, status,
+                status == "ACTIVE" ? ["zone-central"] : null,
+                status == "ACTIVE" ? "zone-central" : null,
+                "REVIEW_COMPLETED", $"presence:{status}", $"presence-transition-{index}");
+        }
+
+        var presence = new PostgresCourierLivePresenceService(database.DataSource);
+        var online = await presence.GoOnlineAsync(courierId, "zone-central", "presence-online");
+        Assert.Equal(CourierLivePresenceOutcome.Applied, online.Outcome);
+        Assert.Equal("ONLINE", online.Snapshot!.Status);
+        Assert.Equal("zone-central", online.Snapshot.ZoneId);
+
+        var replay = await presence.GoOnlineAsync(courierId, "zone-central", "presence-online");
+        Assert.Equal(CourierLivePresenceOutcome.Replayed, replay.Outcome);
+        Assert.Equal(online.Snapshot, replay.Snapshot);
+        var conflict = await presence.GoOnlineAsync(courierId, "zone-east", "presence-online");
+        Assert.Equal(CourierLivePresenceOutcome.Conflict, conflict.Outcome);
+
+        var offline = await presence.GoOfflineAsync(courierId, "presence-offline");
+        Assert.Equal(CourierLivePresenceOutcome.Applied, offline.Outcome);
+        Assert.Equal("OFFLINE", offline.Snapshot!.Status);
+        Assert.Null(offline.Snapshot.ZoneId);
+        var offlineReplay = await presence.GoOfflineAsync(courierId, "presence-offline");
+        Assert.Equal(CourierLivePresenceOutcome.Replayed, offlineReplay.Outcome);
+
+        var invalidZone = await presence.GoOnlineAsync(courierId, "zone-east", "presence-unapproved-zone");
+        Assert.Equal(CourierLivePresenceOutcome.InvalidZone, invalidZone.Outcome);
+        await using var connection = await database.DataSource.OpenConnectionAsync();
+        await using var mutation = new NpgsqlCommand(
+            "UPDATE courier_live_presence SET is_online = TRUE WHERE courier_id = @courier_id;", connection);
+        mutation.Parameters.AddWithValue("courier_id", courierId);
+        await Assert.ThrowsAsync<PostgresException>(() => mutation.ExecuteNonQueryAsync());
     }
 
     private sealed class TestOperationsContext : IMonoOperationsContext
@@ -376,6 +541,375 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             item.ResultCount == 4 && item.CourierId is null);
     }
 
+    [Fact]
+    public async Task Courier_suspension_is_separate_audited_idempotent_and_excludes_planned_capacity()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var utcNow = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(
+            utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, (utcNow.Minute / 15) * 15, 0, TimeSpan.Zero);
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var registration = await onboarding.RegisterAsync("BIKE", ["zone-central"], "suspension-register");
+        var courierId = registration.Snapshot!.CourierId;
+        var statuses = new[]
+        {
+            "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+            "MONO_APPROVED", "ACTIVE"
+        };
+        for (var index = 0; index < statuses.Length; index++)
+        {
+            var status = statuses[index];
+            var transition = await onboarding.AdvanceTrustAsync(
+                courierId, status, status == "ACTIVE" ? ["zone-central"] : null,
+                status == "ACTIVE" ? "zone-central" : null, "REVIEW_COMPLETED",
+                $"review:{status}", $"suspension-transition-{index}");
+            Assert.Equal(CourierOperationsWriteOutcome.Applied, transition.Outcome);
+        }
+
+        var readAudit = new PostgresCourierOperationsReadAuditService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var availability = new PostgresCourierAvailabilityService(
+            database.DataSource, context, readAudit, new FixedTimeProvider(now));
+        var planned = await availability.CreateAsync(
+            courierId, "zone-central", now, now.AddMinutes(45), "suspension-window");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, planned.Outcome);
+
+        var suspension = new PostgresCourierSuspensionService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var suspended = await suspension.SuspendAsync(
+            courierId, "SAFETY_REVIEW", "suspend-courier");
+        Assert.Equal(CourierOperationalStatusOutcome.Applied, suspended.Outcome);
+        Assert.Equal("ACTIVE", suspended.Snapshot!.TrustStatus);
+        Assert.Equal("SUSPENDED", suspended.Snapshot.OperationalStatus);
+        Assert.Single(suspended.Snapshot.History);
+
+        var replay = await suspension.SuspendAsync(
+            courierId, "SAFETY_REVIEW", "suspend-courier");
+        Assert.Equal(CourierOperationalStatusOutcome.Replayed, replay.Outcome);
+        Assert.Equal(suspended.Snapshot.History[0].EventId, replay.Snapshot!.History[0].EventId);
+
+        var changedReplay = await suspension.SuspendAsync(
+            courierId, "OTHER_REASON", "suspend-courier");
+        Assert.Equal(CourierOperationalStatusOutcome.Conflict, changedReplay.Outcome);
+
+        var duplicateSuspension = await suspension.SuspendAsync(
+            courierId, "SAFETY_REVIEW", "suspend-again");
+        Assert.Equal(CourierOperationalStatusOutcome.InvalidState, duplicateSuspension.Outcome);
+
+        var rejectedWindow = await availability.CreateAsync(
+            courierId, "zone-central", now.AddHours(1), now.AddHours(2), "suspended-window");
+        Assert.Equal(CourierAvailabilityWriteOutcome.InvalidCourierState, rejectedWindow.Outcome);
+
+        await using (var cancellationCheckConnection = await database.DataSource.OpenConnectionAsync())
+        {
+            await using var cancelledWindow = new NpgsqlCommand(
+                """
+                SELECT status, cancellation_reason FROM courier_availability_windows
+                WHERE window_id = @window_id;
+                """, cancellationCheckConnection);
+            cancelledWindow.Parameters.AddWithValue("window_id", planned.Window!.WindowId);
+            await using var reader = await cancelledWindow.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("CANCELLED", reader.GetString(0));
+            Assert.Equal("COURIER_SUSPENDED", reader.GetString(1));
+        }
+
+        var projection = new PostgresCourierCapacityProjectionService(database.DataSource, context, readAudit);
+        var suspendedCapacity = await projection.ProjectAsync(
+            "zone-central", now, now.AddHours(1), 15);
+        Assert.All(suspendedCapacity.Buckets, bucket => Assert.Equal(0, bucket.PlannedCourierCount));
+
+        var reinstated = await suspension.ReinstateAsync(
+            courierId, "REVIEW_CLEARED", "reinstate-courier");
+        Assert.Equal(CourierOperationalStatusOutcome.Applied, reinstated.Outcome);
+        Assert.Equal("ACTIVE", reinstated.Snapshot!.OperationalStatus);
+        Assert.Equal(new[] { "REINSTATED", "SUSPENDED" },
+            reinstated.Snapshot.History.Select(item => item.Action));
+
+        var activeCapacity = await projection.ProjectAsync(
+            "zone-central", now, now.AddHours(1), 15);
+        Assert.All(activeCapacity.Buckets, bucket => Assert.Equal(0, bucket.PlannedCourierCount));
+
+        var replacementWindow = await availability.CreateAsync(
+            courierId, "zone-central", now.AddMinutes(45), now.AddHours(1), "reinstated-window");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, replacementWindow.Outcome);
+        var replacementCapacity = await projection.ProjectAsync(
+            "zone-central", now, now.AddHours(1), 15);
+        Assert.Equal(new[] { 0, 0, 0, 1 },
+            replacementCapacity.Buckets.Select(bucket => bucket.PlannedCourierCount));
+
+        var operationalStatusSnapshot = await suspension.FindAsync(courierId);
+        Assert.Equal("ACTIVE", operationalStatusSnapshot!.TrustStatus);
+        Assert.Equal("ACTIVE", operationalStatusSnapshot.OperationalStatus);
+        Assert.Equal(2, operationalStatusSnapshot.History.Count);
+
+        await using var connection = await database.DataSource.OpenConnectionAsync();
+        await using var mutation = new NpgsqlCommand(
+            "UPDATE courier_operational_status_events SET reason_code = 'TAMPERED' WHERE courier_id = @courier_id;",
+            connection);
+        mutation.Parameters.AddWithValue("courier_id", courierId);
+        await Assert.ThrowsAsync<PostgresException>(() => mutation.ExecuteNonQueryAsync());
+    }
+
+    [Fact]
+    public async Task Planning_eligibility_explains_capacity_contributors_and_uses_bounded_keyset_pages()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var utcNow = DateTimeOffset.UtcNow;
+        var now = new DateTimeOffset(
+            utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, utcNow.Minute, 0, TimeSpan.Zero);
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var readAudit = new PostgresCourierOperationsReadAuditService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        var availability = new PostgresCourierAvailabilityService(
+            database.DataSource, context, readAudit, new FixedTimeProvider(now));
+
+        async Task<string> CreateActiveCourier(string key)
+        {
+            var registration = await onboarding.RegisterAsync("BIKE", ["zone-central"], key + "-register");
+            var courierId = registration.Snapshot!.CourierId;
+            var statuses = new[]
+            {
+                "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+                "MONO_APPROVED", "ACTIVE"
+            };
+            for (var index = 0; index < statuses.Length; index++)
+            {
+                var status = statuses[index];
+                var result = await onboarding.AdvanceTrustAsync(
+                    courierId, status, status == "ACTIVE" ? ["zone-central"] : null,
+                    status == "ACTIVE" ? "zone-central" : null, "REVIEW_COMPLETED",
+                    "planning-preview:" + status, key + "-transition-" + index);
+                Assert.Equal(CourierOperationsWriteOutcome.Applied, result.Outcome);
+            }
+            return courierId;
+        }
+
+        var plannedCourier = await CreateActiveCourier("planning-has-window");
+        var noWindowCourier = await CreateActiveCourier("planning-no-window");
+        var suspendedCourier = await CreateActiveCourier("planning-suspended");
+        var livePresence = new PostgresCourierLivePresenceService(database.DataSource, new FixedTimeProvider(now));
+        var online = await livePresence.GoOnlineAsync(
+            plannedCourier, "zone-central", "planning-presence-online");
+        Assert.Equal(CourierLivePresenceOutcome.Applied, online.Outcome);
+        var registered = await onboarding.RegisterAsync("WALK", ["zone-central"], "planning-registered");
+        var registeredCourier = registered.Snapshot!.CourierId;
+
+        var scheduled = await availability.CreateAsync(
+            plannedCourier, "zone-central", now.AddMinutes(10), now.AddMinutes(30), "planning-window-active");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, scheduled.Outcome);
+        var toBeCancelled = await availability.CreateAsync(
+            suspendedCourier, "zone-central", now.AddMinutes(10), now.AddMinutes(30), "planning-window-suspended");
+        Assert.Equal(CourierAvailabilityWriteOutcome.Applied, toBeCancelled.Outcome);
+        var suspension = new PostgresCourierSuspensionService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        Assert.Equal(CourierOperationalStatusOutcome.Applied,
+            (await suspension.SuspendAsync(suspendedCourier, "SAFETY_REVIEW", "planning-suspend")).Outcome);
+
+        var eligibility = new PostgresCourierPlanningEligibilityService(database.DataSource, context, readAudit);
+        var firstPage = await eligibility.SearchAsync(
+            "zone-central", now, now.AddHours(1), 2, null);
+        Assert.NotNull(firstPage);
+        Assert.Equal("PLANNED_CAPACITY_AND_LIVE_PRESENCE_SIGNALS", firstPage.Classification);
+        Assert.Equal(2, firstPage.Items.Count);
+        Assert.NotNull(firstPage.NextCursor);
+
+        var secondPage = await eligibility.SearchAsync(
+            "zone-central", now, now.AddHours(1), 2, firstPage.NextCursor);
+        Assert.NotNull(secondPage);
+        Assert.Equal(2, secondPage.Items.Count);
+        Assert.Null(secondPage.NextCursor);
+        Assert.Equal(new[] { plannedCourier, noWindowCourier, suspendedCourier, registeredCourier }.Order(),
+            firstPage.Items.Concat(secondPage.Items).Select(item => item.CourierId));
+
+        var items = firstPage.Items.Concat(secondPage.Items).ToDictionary(item => item.CourierId);
+        Assert.True(items[plannedCourier].PlannedCapacityContributor);
+        Assert.Empty(items[plannedCourier].ExclusionReasons);
+        Assert.True(items[plannedCourier].IsOnline);
+        Assert.Equal("zone-central", items[plannedCourier].LivePresenceZoneId);
+        Assert.True(items[plannedCourier].LivePresenceCandidate);
+        Assert.Empty(items[plannedCourier].LivePresenceExclusionReasons);
+        Assert.False(items[noWindowCourier].PlannedCapacityContributor);
+        Assert.False(items[noWindowCourier].LivePresenceCandidate);
+        Assert.Contains("COURIER_NOT_ONLINE", items[noWindowCourier].LivePresenceExclusionReasons);
+        Assert.Contains("NO_SCHEDULED_WINDOW", items[noWindowCourier].ExclusionReasons);
+        Assert.Equal("SUSPENDED", items[suspendedCourier].OperationalStatus);
+        Assert.Contains("COURIER_SUSPENDED", items[suspendedCourier].ExclusionReasons);
+        Assert.False(items[suspendedCourier].LivePresenceCandidate);
+        Assert.Contains("COURIER_SUSPENDED", items[suspendedCourier].LivePresenceExclusionReasons);
+        Assert.False(items[suspendedCourier].HasScheduledWindow);
+        Assert.Contains("COURIER_NOT_ACTIVE", items[registeredCourier].ExclusionReasons);
+        Assert.Contains("ZONE_NOT_APPROVED", items[registeredCourier].ExclusionReasons);
+
+        var invalidCursor = await eligibility.SearchAsync(
+            "zone-central", now, now.AddHours(1), 2, "crr_00000000000000000000000000000000");
+        Assert.Null(invalidCursor);
+
+        var auditPage = await readAudit.ListAsync(50, null);
+        Assert.NotNull(auditPage);
+        Assert.Contains(auditPage.Items, item =>
+            item.Action == PostgresCourierOperationsReadAuditService.CourierPlanningEligibilitySearch &&
+            item.ResultCount == 2 && item.CourierId is null);
+    }
+
+    [Fact]
+    public async Task Courier_tokens_resolve_Mono_binding_and_reject_revoked_or_inactive_accounts()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        const string issuer = "https://issuer.example";
+        var now = DateTimeOffset.UtcNow;
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        await database.SeedActiveZonesAsync("zone-central");
+        var context = new TestOperationsContext();
+        var onboarding = new PostgresCourierOnboardingService(
+            database.DataSource, context, new FixedTimeProvider(now));
+
+        async Task<string> RegisterActive(string key)
+        {
+            var registration = await onboarding.RegisterAsync("BIKE", ["zone-central"], key + "-register");
+            var courierId = registration.Snapshot!.CourierId;
+            var statuses = new[]
+            {
+                "IDENTITY_VERIFIED", "DOCUMENTS_SUBMITTED", "TRUST_REQUIREMENTS_VERIFIED",
+                "MONO_APPROVED", "ACTIVE"
+            };
+            for (var index = 0; index < statuses.Length; index++)
+            {
+                var status = statuses[index];
+                var result = await onboarding.AdvanceTrustAsync(
+                    courierId, status, status == "ACTIVE" ? ["zone-central"] : null,
+                    status == "ACTIVE" ? "zone-central" : null, "REVIEW_COMPLETED",
+                    "courier-auth:" + status, key + "-transition-" + index);
+                Assert.Equal(CourierOperationsWriteOutcome.Applied, result.Outcome);
+            }
+            return courierId;
+        }
+
+        var activeCourierId = await RegisterActive("auth-active");
+        var suspendedCourierId = await RegisterActive("auth-suspended");
+        var registered = await onboarding.RegisterAsync("WALK", ["zone-central"], "auth-registered");
+        var registeredCourierId = registered.Snapshot!.CourierId;
+        var bindings = new PostgresCourierIdentityBindingService(
+            database.DataSource, context, issuer, new FixedTimeProvider(now));
+
+        var inactiveBinding = await bindings.BindIdentityAsync(registeredCourierId, "opaque-provider-subject-inactive",
+            "IDENTITY_VERIFIED", "test:evidence:inactive", "auth-bind-inactive");
+        Assert.Equal(CourierIdentityBindingOutcome.InvalidState, inactiveBinding.Outcome);
+
+        const string activeSubject = "opaque-provider-subject-active";
+        var bind = await bindings.BindIdentityAsync(activeCourierId, activeSubject,
+            "IDENTITY_VERIFIED", "test:evidence:active", "auth-bind-active");
+        Assert.Equal(CourierIdentityBindingOutcome.Applied, bind.Outcome);
+        Assert.Equal("BOUND", bind.Summary!.Status);
+        var replay = await bindings.BindIdentityAsync(activeCourierId, activeSubject,
+            "IDENTITY_VERIFIED", "test:evidence:active", "auth-bind-active");
+        Assert.Equal(CourierIdentityBindingOutcome.Replayed, replay.Outcome);
+        var conflict = await bindings.BindIdentityAsync(activeCourierId, activeSubject,
+            "IDENTITY_REVIEWED", "test:evidence:changed", "auth-bind-active");
+        Assert.Equal(CourierIdentityBindingOutcome.Conflict, conflict.Outcome);
+
+        var duplicateSubject = await bindings.BindIdentityAsync(suspendedCourierId, activeSubject,
+            "IDENTITY_VERIFIED", "test:evidence:duplicate", "auth-bind-duplicate");
+        Assert.Equal(CourierIdentityBindingOutcome.InvalidState, duplicateSubject.Outcome);
+        var suspendedSubject = "opaque-provider-subject-suspended";
+        Assert.Equal(CourierIdentityBindingOutcome.Applied,
+            (await bindings.BindIdentityAsync(suspendedCourierId, suspendedSubject,
+                "IDENTITY_VERIFIED", "test:evidence:suspended", "auth-bind-suspended")).Outcome);
+
+        var suspension = new PostgresCourierSuspensionService(
+            database.DataSource, context, new FixedTimeProvider(now));
+        Assert.Equal(CourierOperationalStatusOutcome.Applied,
+            (await suspension.SuspendAsync(suspendedCourierId, "SAFETY_REVIEW", "auth-suspend")).Outcome);
+
+        var validator = new MonoCourierTokenValidator(database.DataSource);
+        static ClaimsPrincipal Token(string subject) => new(new ClaimsIdentity(
+        [
+            new Claim(MonoCourierClaimTypes.Subject, subject),
+            new Claim(MonoCourierClaimTypes.Role, MonoCourierDefaults.RoleValue)
+        ], MonoCourierDefaults.Scheme));
+
+        var activeToken = Token(activeSubject);
+        Assert.True(await validator.ValidateAsync(activeToken, issuer));
+        Assert.Equal(activeCourierId,
+            activeToken.FindFirst(MonoCourierClaimTypes.CourierId)?.Value);
+        var httpContext = new DefaultHttpContext { User = activeToken };
+        var courierContext = new HttpMonoCourierContext(new HttpContextAccessor { HttpContext = httpContext });
+        Assert.Equal(activeCourierId, courierContext.CourierId);
+
+        Assert.False(await validator.ValidateAsync(Token(activeSubject), "https://untrusted.example"));
+        Assert.False(await validator.ValidateAsync(Token(suspendedSubject), issuer));
+        Assert.False(await validator.ValidateAsync(Token("not-bound"), issuer));
+        Assert.False(await validator.ValidateAsync(Token("not-bound"), "http://issuer.example"));
+
+        var reservedClaimToken = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(MonoCourierClaimTypes.Subject, activeSubject),
+            new Claim(MonoCourierClaimTypes.Role, MonoCourierDefaults.RoleValue),
+            new Claim(MonoCourierClaimTypes.CourierId, activeCourierId)
+        ], MonoCourierDefaults.Scheme));
+        Assert.False(await validator.ValidateAsync(reservedClaimToken, issuer));
+
+        var duplicateSubjectToken = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim(MonoCourierClaimTypes.Subject, activeSubject),
+            new Claim(MonoCourierClaimTypes.Subject, "second"),
+            new Claim(MonoCourierClaimTypes.Role, MonoCourierDefaults.RoleValue)
+        ], MonoCourierDefaults.Scheme));
+        Assert.False(await validator.ValidateAsync(duplicateSubjectToken, issuer));
+
+        Assert.Equal(CourierIdentityBindingOutcome.Applied,
+            (await bindings.RevokeAsync(activeCourierId, "ACCOUNT_CLOSED",
+                "test:evidence:revoke", "auth-revoke-active")).Outcome);
+        Assert.False(await validator.ValidateAsync(Token(activeSubject), issuer));
+        var revokeReplay = await bindings.RevokeAsync(activeCourierId, "ACCOUNT_CLOSED",
+            "test:evidence:revoke", "auth-revoke-active");
+        Assert.Equal(CourierIdentityBindingOutcome.Replayed, revokeReplay.Outcome);
+
+        var summary = await bindings.FindAsync(activeCourierId);
+        Assert.Equal("REVOKED", summary!.Status);
+        await using (var projectionConnection = await database.DataSource.OpenConnectionAsync())
+        {
+            await using var directProjectionWrite = new NpgsqlCommand(
+                "UPDATE courier_identity_bindings SET status = 'BOUND' WHERE courier_id = @courier_id;",
+                projectionConnection);
+            directProjectionWrite.Parameters.AddWithValue("courier_id", activeCourierId);
+            await Assert.ThrowsAsync<PostgresException>(() => directProjectionWrite.ExecuteNonQueryAsync());
+        }
+        Assert.DoesNotContain("Subject", typeof(CourierIdentityBindingSummary).GetProperties()
+            .Select(property => property.Name));
+        Assert.DoesNotContain("Issuer", typeof(CourierIdentityBindingSummary).GetProperties()
+            .Select(property => property.Name));
+        Assert.False(await validator.ValidateAsync(Token("not-bound"), issuer));
+        Assert.NotEqual(activeCourierId, registeredCourierId);
+    }
+
+
     private sealed class TestDatabase : IAsyncDisposable
     {
         private readonly string _adminConnectionString;
@@ -468,6 +1002,56 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var capacityAuditConnection = await DataSource.OpenConnectionAsync();
             await using var capacityAuditCommand = new NpgsqlCommand(capacityAuditSql, capacityAuditConnection);
             await capacityAuditCommand.ExecuteNonQueryAsync();
+
+            const string suspensionResourceName = "Mono.Api.Tests.Migrations.037_courier_operational_suspension.sql";
+            await using var suspensionStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(suspensionResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {suspensionResourceName}.");
+            using var suspensionReader = new StreamReader(suspensionStream);
+            var suspensionSql = await suspensionReader.ReadToEndAsync();
+            await using var suspensionConnection = await DataSource.OpenConnectionAsync();
+            await using var suspensionCommand = new NpgsqlCommand(suspensionSql, suspensionConnection);
+            await suspensionCommand.ExecuteNonQueryAsync();
+
+            const string planningEligibilityResourceName = "Mono.Api.Tests.Migrations.038_courier_planning_eligibility_audit_action.sql";
+            await using var planningEligibilityStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(planningEligibilityResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {planningEligibilityResourceName}.");
+            using var planningEligibilityReader = new StreamReader(planningEligibilityStream);
+            var planningEligibilitySql = await planningEligibilityReader.ReadToEndAsync();
+            await using var planningEligibilityConnection = await DataSource.OpenConnectionAsync();
+            await using var planningEligibilityCommand = new NpgsqlCommand(planningEligibilitySql, planningEligibilityConnection);
+            await planningEligibilityCommand.ExecuteNonQueryAsync();
+
+            const string identityBindingResourceName = "Mono.Api.Tests.Migrations.039_courier_identity_bindings.sql";
+            await using var identityBindingStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(identityBindingResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {identityBindingResourceName}.");
+            using var identityBindingReader = new StreamReader(identityBindingStream);
+            var identityBindingSql = await identityBindingReader.ReadToEndAsync();
+            await using var identityBindingConnection = await DataSource.OpenConnectionAsync();
+            await using var identityBindingCommand = new NpgsqlCommand(identityBindingSql, identityBindingConnection);
+            await identityBindingCommand.ExecuteNonQueryAsync();
+
+            const string livePresenceResourceName = "Mono.Api.Tests.Migrations.040_courier_live_presence.sql";
+            await using var livePresenceStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(livePresenceResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {livePresenceResourceName}.");
+            using var livePresenceReader = new StreamReader(livePresenceStream);
+            var livePresenceSql = await livePresenceReader.ReadToEndAsync();
+            await using var livePresenceConnection = await DataSource.OpenConnectionAsync();
+            await using var livePresenceCommand = new NpgsqlCommand(livePresenceSql, livePresenceConnection);
+            await livePresenceCommand.ExecuteNonQueryAsync();
+
+            const string operationsPresenceSearchResourceName = "Mono.Api.Tests.Migrations.085_courier_live_presence_operations_search.sql";
+            await using var operationsPresenceSearchStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(operationsPresenceSearchResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {operationsPresenceSearchResourceName}.");
+            using var operationsPresenceSearchReader = new StreamReader(operationsPresenceSearchStream);
+            var operationsPresenceSearchSql = await operationsPresenceSearchReader.ReadToEndAsync();
+            await using var operationsPresenceSearchConnection = await DataSource.OpenConnectionAsync();
+            await using var operationsPresenceSearchCommand = new NpgsqlCommand(operationsPresenceSearchSql, operationsPresenceSearchConnection);
+            await operationsPresenceSearchCommand.ExecuteNonQueryAsync();
         }
 
         public async ValueTask DisposeAsync()

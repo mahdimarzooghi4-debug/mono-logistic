@@ -30,9 +30,14 @@ jobs:
           --health-retries 5
     env:
       MONO_TEST_DATABASE: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_test
+      ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_test
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify GitHub Actions are pinned to immutable commits
+        run: bash tools/tests/github-actions-pinned.test.sh
+      - name: Test staging Render Blueprint safety contract
+        run: ruby tools/tests/render-blueprint.test.rb
       - name: Set up .NET
         uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
         with:
@@ -41,7 +46,68 @@ jobs:
         run: dotnet restore Mono.sln
       - name: Build
         run: dotnet build Mono.sln --no-restore --configuration Release
+      - name: Validate database migrations
+        env:
+          ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_migration_test
+        run: |
+          PGPASSWORD=mono createdb --host=localhost --port=5432 --username=mono mono_migration_test
+          dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
+          dotnet run --project tools/Mono.DbMigrator/Mono.DbMigrator.csproj --configuration Release --no-build
+      - name: Test staging smoke script URL/status handling
+        run: bash tools/tests/stage-smoke.test.sh
+      - name: Set up Node.js for Operations Console
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/Mono.OperationsConsole/package-lock.json
+      - name: Build Operations Console for same-origin smoke test
+        run: |
+          npm ci --prefix src/Mono.OperationsConsole
+          npm run build --prefix src/Mono.OperationsConsole
+          mkdir -p src/Mono.Api/wwwroot
+          cp -R src/Mono.OperationsConsole/dist/. src/Mono.Api/wwwroot/
+      - name: Smoke test API health endpoints
+        env:
+          ConnectionStrings__Mono: Host=localhost;Port=5432;Username=mono;Password=mono;Database=mono_migration_test
+        run: |
+          dotnet run --project src/Mono.Api/Mono.Api.csproj --configuration Release --no-build -- --urls http://127.0.0.1:5180 > /tmp/mono-api-health.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if tools/stage-smoke.sh http://127.0.0.1:5180; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/mono-api-health.log
+          exit 1
       - name: Test
         run: dotnet test Mono.sln --no-build --configuration Release --logger "trx;LogFileName=mono-tests.trx"
       - name: Build container image
         run: docker build --tag mono-api:ci .
+      - name: Smoke test staging container image
+        env:
+          ConnectionStrings__Mono: Host=127.0.0.1;Port=5432;Username=mono;Password=mono;Database=mono_container_stage_test
+        run: |
+          runtime_user="$(docker image inspect --format '{{.Config.User}}' mono-api:ci)"
+          runtime_uid="${runtime_user%%:*}"
+          if [[ ! "$runtime_uid" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Expected a non-root numeric container user; got '${runtime_user:-<empty>}'" >&2
+            exit 1
+          fi
+          PGPASSWORD=mono createdb --host=localhost --port=5432 --username=mono mono_container_stage_test
+          docker run --detach --name mono-container-stage-smoke --network host \
+            --env ASPNETCORE_ENVIRONMENT=Staging \
+            --env MONO_AUTO_MIGRATE=true \
+            --env "ConnectionStrings__Mono=$ConnectionStrings__Mono" \
+            mono-api:ci
+          trap 'docker rm -f mono-container-stage-smoke >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 60); do
+            if MONO_STAGE_BASE_URL=http://127.0.0.1:10000 tools/stage-smoke.sh; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs mono-container-stage-smoke
+          exit 1

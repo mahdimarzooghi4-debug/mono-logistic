@@ -58,6 +58,49 @@ public static class MonoMissionLifecycleEndpoints
             }
         }).RequireAuthorization(MonoOperationsAuthorizationPolicies.Administrator);
 
+        endpoints.MapPost("/courier/v1/missions/{missionId}/events", async (
+            string missionId,
+            MissionLifecycleInput input,
+            HttpRequest request,
+            IMonoCourierContext courier,
+            PostgresMissionLifecycleRepository lifecycle,
+            CancellationToken cancellationToken) =>
+        {
+            var idempotencyValues = request.Headers["Idempotency-Key"];
+            if (idempotencyValues.Count != 1 ||
+                !DeliveryRequestInputValidator.IsValidIdempotencyKey(idempotencyValues[0]))
+            {
+                return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                    "INVALID_REQUEST", "A valid Idempotency-Key header is required.")));
+            }
+            try
+            {
+                var result = await lifecycle.ApplyForCourierAsync(
+                    courier.CourierId, missionId, input.EventType ?? string.Empty,
+                    input.Reason ?? string.Empty, idempotencyValues[0]!, cancellationToken);
+                return result.Outcome switch
+                {
+                    MissionLifecycleOutcome.Applied or MissionLifecycleOutcome.Replayed =>
+                        Results.Ok(result.Transition),
+                    MissionLifecycleOutcome.Conflict =>
+                        Results.Conflict(new ApiErrorResponse(new ApiError(
+                            "IDEMPOTENCY_CONFLICT", "The Idempotency-Key was already used for another Mission event."))),
+                    MissionLifecycleOutcome.MissionNotFound =>
+                        Results.NotFound(new ApiErrorResponse(new ApiError(
+                            "ASSIGNED_MISSION_NOT_FOUND", "No assigned Mission was found for this courier."))),
+                    MissionLifecycleOutcome.InvalidTransition =>
+                        Results.Conflict(new ApiErrorResponse(new ApiError(
+                            "MISSION_TRANSITION_NOT_ALLOWED", "The requested event is not valid for the Mission's current state."))),
+                    _ => throw new ArgumentOutOfRangeException(nameof(result.Outcome))
+                };
+            }
+            catch (ArgumentException)
+            {
+                return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                    "INVALID_REQUEST", "Courier Mission, event, reason, or idempotency fields are invalid.")));
+            }
+        }).RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
+
         return endpoints;
     }
 }

@@ -13,7 +13,8 @@ public static class MonoApiKeyScopeCatalog
         "branches.read",
         "delivery-requests.write",
         "delivery-requests.read",
-        "missions.cancel"
+        "missions.cancel",
+        "webhooks.manage"
     }.ToFrozenSet(StringComparer.Ordinal);
 
     public static IReadOnlySet<string> All => SupportedScopes;

@@ -18,6 +18,11 @@ public sealed class MissionOperationsReadAuditTests
         await using var dataSource = NpgsqlDataSource.Create(connectionString);
         await ExecuteMigrationAsync(dataSource, "024_mission_operations_read_audit.sql");
         await ExecuteMigrationAsync(dataSource, "025_mission_operations_read_audit_inspection.sql");
+        await ExecuteMigrationAsync(dataSource, "051_mission_fare_review_audit.sql");
+        await ExecuteMigrationAsync(dataSource, "087_mission_courier_issue_inbox_search.sql");
+        await ExecuteMigrationAsync(dataSource, "088_mission_sla_alert_search.sql");
+        await ExecuteMigrationAsync(dataSource, "089_mission_worker_status_read_audit.sql");
+        await ExecuteMigrationAsync(dataSource, "092_operations_dashboard_summary_audit.sql");
 
         var actorId = "mission-read-audit-test-" + Guid.NewGuid().ToString("N");
         var missionId = "mis_0123456789abcdef0123456789abcdef";
@@ -47,6 +52,11 @@ public sealed class MissionOperationsReadAuditTests
         await Assert.ThrowsAsync<ArgumentException>(() =>
             service.ListAsync(10, null, actorId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddDays(-1), null));
 
+        await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionFareReview, null, 3);
+        await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionCourierIssueInboxSearch, null, 0);
+        await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionSlaAlertSearch, null, 1);
+        await service.RecordAsync(PostgresMissionOperationsReadAuditService.DashboardSummary, null, 1);
+
         await using var connection = await dataSource.OpenConnectionAsync();
         await using (var select = new NpgsqlCommand("""
             SELECT action, mission_id, result_count
@@ -61,9 +71,13 @@ public sealed class MissionOperationsReadAuditTests
             while (await reader.ReadAsync())
                 rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetInt32(2)));
 
-            Assert.Equal(6, rows.Count);
+            Assert.Equal(10, rows.Count);
             Assert.Equal(3, rows.Count(row => row.Action == "MISSION_AUDIT_INSPECTION"));
             Assert.Contains(rows, row => row == ("MISSION_SEARCH", null, 2));
+            Assert.Contains(rows, row => row == ("MISSION_FARE_REVIEW", null, 3));
+            Assert.Contains(rows, row => row == ("MISSION_COURIER_ISSUE_INBOX_SEARCH", null, 0));
+            Assert.Contains(rows, row => row == ("MISSION_SLA_ALERT_SEARCH", null, 1));
+            Assert.Contains(rows, row => row == ("DASHBOARD_SUMMARY", null, 1));
             Assert.Contains(rows, row => row == ("MISSION_DETAIL", missionId, 1));
             Assert.Contains(rows, row => row == ("MISSION_TIMELINE", missionId, 0));
         }
@@ -78,6 +92,64 @@ public sealed class MissionOperationsReadAuditTests
             dataSource, new FixedOperationsContext(actorId, ["MONO_OPERATOR"]));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             nonAdmin.RecordAsync(PostgresMissionOperationsReadAuditService.MissionSearch, null, 0));
+    }
+
+    [Fact]
+    public async Task Mission_worker_status_read_is_recorded_in_an_isolated_audit_ledger()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return;
+
+        await using var rootDataSource = NpgsqlDataSource.Create(connectionString);
+        var schema = "mission_worker_audit_" + Guid.NewGuid().ToString("N");
+        await using (var connection = await rootDataSource.OpenConnectionAsync())
+        await using (var createSchema = new NpgsqlCommand($"CREATE SCHEMA \"{schema}\";", connection))
+            await createSchema.ExecuteNonQueryAsync();
+
+        try
+        {
+            var isolatedConnectionString = new NpgsqlConnectionStringBuilder(connectionString)
+            {
+                SearchPath = schema
+            }.ConnectionString;
+            await using var dataSource = NpgsqlDataSource.Create(isolatedConnectionString);
+            foreach (var migration in new[]
+                     {
+                         "024_mission_operations_read_audit.sql",
+                         "025_mission_operations_read_audit_inspection.sql",
+                         "051_mission_fare_review_audit.sql",
+                         "087_mission_courier_issue_inbox_search.sql",
+                         "088_mission_sla_alert_search.sql",
+                         "089_mission_worker_status_read_audit.sql"
+                     })
+                await ExecuteMigrationAsync(dataSource, migration);
+
+            var actorId = "mission-worker-audit-" + Guid.NewGuid().ToString("N");
+            var service = new PostgresMissionOperationsReadAuditService(
+                dataSource, new FixedOperationsContext(actorId, [MonoOperationsRoles.Administrator]));
+            await service.RecordAsync(PostgresMissionOperationsReadAuditService.MissionWorkerStatus,
+                null, 1, CancellationToken.None);
+
+            await using var connection = await dataSource.OpenConnectionAsync();
+            await using var select = new NpgsqlCommand("""
+                SELECT action, mission_id, result_count
+                FROM mission_operations_read_audit WHERE actor_id = @actor_id;
+                """, connection);
+            select.Parameters.AddWithValue("actor_id", actorId);
+            await using var reader = await select.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("MISSION_WORKER_STATUS", reader.GetString(0));
+            Assert.True(reader.IsDBNull(1));
+            Assert.Equal(1, reader.GetInt32(2));
+            Assert.False(await reader.ReadAsync());
+        }
+        finally
+        {
+            await using var connection = await rootDataSource.OpenConnectionAsync();
+            await using var dropSchema = new NpgsqlCommand($"DROP SCHEMA IF EXISTS \"{schema}\" CASCADE;", connection);
+            await dropSchema.ExecuteNonQueryAsync();
+        }
     }
 
     private static async Task ExecuteMigrationAsync(NpgsqlDataSource dataSource, string migrationFile)

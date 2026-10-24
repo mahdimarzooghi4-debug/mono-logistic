@@ -21,7 +21,8 @@ public sealed record RouteInsertionEvidence(
     DateTimeOffset EvaluatedAt,
     RouteInsertionEvidenceCompleteness Completeness,
     RouteInsertionFeasibility Feasibility,
-    IReadOnlyList<string> ReasonCodes);
+    IReadOnlyList<string> ReasonCodes,
+    string? ZoneId = null);
 
 /// <summary>
 /// Maps an explicitly supplied, request-wide route-insertion evaluation to E7.1 evidence.
@@ -46,6 +47,9 @@ public static class RouteInsertionFeasibilityCriterion
             evidence.EvaluatedAt == default ||
             !Enum.IsDefined(evidence.Completeness) ||
             !Enum.IsDefined(evidence.Feasibility) ||
+            (evidence.ZoneId is not null &&
+                (string.IsNullOrWhiteSpace(evidence.ZoneId) || evidence.ZoneId.Length > 128 ||
+                 evidence.ZoneId.Any(char.IsControl))) ||
             evidence.ReasonCodes is null)
         {
             throw new ArgumentException("Route insertion evidence is malformed.", nameof(evidence));
