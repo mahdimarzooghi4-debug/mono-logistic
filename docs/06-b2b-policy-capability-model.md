@@ -51,7 +51,7 @@ Example:
 ```
 FMCG Profile
   -> bag-oriented shipment defaults
-  -> Walk / Bike / Car
+  -> Walk / Bike (bicycle) / Motorcycle / Car
   -> batching enabled
 ```
 
