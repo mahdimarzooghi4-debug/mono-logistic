@@ -137,6 +137,7 @@ public sealed class ValhallaMapsProvider(HttpClient httpClient) : IMapsProvider
         RouteTravelMode.Walk => "pedestrian",
         RouteTravelMode.Bike => "bicycle",
         RouteTravelMode.Car => "auto",
+        RouteTravelMode.Motorcycle => "motor_scooter",
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported route travel mode.")
     };
 
