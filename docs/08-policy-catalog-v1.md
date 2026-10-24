@@ -61,7 +61,8 @@ Typical enforcement: HARD
 Controls allowed execution modes:
 
 - Walk
-- Bike
+- Bike (bicycle)
+- Motorcycle
 - Car
 - Van
 - Pickup
@@ -82,11 +83,13 @@ Current `MODE_CAPABILITY` draft definition:
 
 ```json
 {
-  "modes": ["WALK", "BIKE", "CAR"]
+  "modes": ["WALK", "BIKE", "MOTORCYCLE", "CAR"]
 }
 ```
 
 The authoring validator accepts 1–32 unique uppercase mode identifiers, including future identifiers such as `VAN`, `PICKUP`, and `TRUCK`. Draft data records the catalog only; it does not enable a mode or establish live vehicle/courier availability. HARD policy preview checks a candidate's normalized `mode` fact against the effective catalog and excludes candidates whose mode is absent. The administrator-only `POST /operations/v1/policies/modes/eligible` preview evaluates each distinct mode from effective catalogs against all applicable HARD policies and returns both candidate outcomes and the eligible mode list. This preview does not establish live vehicle/courier availability or connect to delivery intake.
+Bike identifies the bicycle profile; Motorcycle identifies the separate motorized profile. For Hana Phase 1, the approved mode set is Walk, Bike, Motorcycle, and Car. A policy draft remains inactive until the authorized Mono operations lifecycle activates it; the example does not represent a live Hana tenant configuration.
+
 ## 5. Vehicle Policy
 
 Controls:
