@@ -23,7 +23,8 @@ public enum RouteTravelMode
 {
     Walk = 1,
     Bike = 2,
-    Car = 3
+    Car = 3,
+    Motorcycle = 4
 }
 
 /// <summary>Provider route estimate. Distance is in metres; duration is in whole seconds.</summary>
