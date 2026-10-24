@@ -43,7 +43,7 @@ cd infra/maps/iran
 docker compose up -d
 ```
 
-- Valhalla serves its routing API on container port `8002`, with no host port published. Attach the Mono API container to Docker network `mono-maps-private`; its internal URL is `http://valhalla:8002`.
+- Valhalla serves its routing API on container port `8002`, with no host port published. Attach the Mono API container to Docker network `mono-maps-private`; set `MonoMaps__Provider=Valhalla` and `MonoMaps__Valhalla__BaseUrl=http://valhalla:8002/`.
 - TileServer GL serves PMTiles locally on `127.0.0.1:8090`, suitable for a host reverse proxy. Do not expose the Valhalla port publicly.
 - The browser map still needs a MapLibre style configured against the tile service and visible OSM attribution. The TileServer GL local preview is available at `http://127.0.0.1:8090`.
 
@@ -53,4 +53,4 @@ This compose file is a self-hosting foundation, not a Stage or Production deploy
 
 - Do not commit the PBF, generated PMTiles, or Valhalla graph artifacts.
 - Refresh only by choosing a new dated OSM snapshot, recording its data timestamp, byte size and SHA-256, then updating the manifest/check script in review.
-- Keep live courier/customer coordinates inside Mono-controlled services. Do not send them to public tile or routing services.
+- Keep live courier/customer coordinates inside Mono-controlled services. Do not send them to public tile or routing services; Valhalla requests use JSON POST bodies rather than URL query strings.
