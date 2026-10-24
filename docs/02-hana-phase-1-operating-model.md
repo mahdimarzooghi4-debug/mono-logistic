@@ -8,7 +8,8 @@
 - Goods: primarily supermarket orders carried in bags
 - Execution modes:
   - Walk
-  - Bike
+  - Bike (bicycle)
+  - Motorcycle
   - Car
 
 ## 2. Mission Trigger
@@ -67,7 +68,7 @@ Initial load classes:
 
 ## 5. Mode Selection
 
-Mode is determined by Mono, not Hana.
+All four modes are enabled for Hana Phase 1. Mode is determined by Mono, not Hana; Mono evaluates shipment, route, SLA, courier eligibility, and available capacity without assuming one mode is always available.
 
 Indicative rules:
 
@@ -76,14 +77,16 @@ Indicative rules:
 - small/light shipment
 - best for dense micro-zones
 
-### Bike
-- default mode for many urban orders
-- suitable through the 0–5 km range when load permits
+### Bike (bicycle)
+- suitable for light shipments and routes supported by the bicycle profile
+
+### Motorcycle
+- suitable for urban delivery when shipment load and courier capacity permit
 
 ### Car
 - heavy/bulky orders
 - large bag count
-- special handling or cases where Walk/Bike are not suitable
+- special handling or cases where Walk/Bike/Motorcycle are not suitable
 
 Mode selection must consider:
 
