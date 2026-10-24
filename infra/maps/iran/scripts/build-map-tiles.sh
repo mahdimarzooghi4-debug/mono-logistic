@@ -9,7 +9,7 @@ OUTPUT_PATH="$DATA_DIR/iran.pmtiles"
 PLANETILER_IMAGE="${PLANETILER_IMAGE:-ghcr.io/onthegomap/planetiler:0.10.2}"
 PLANETILER_JVM_HEAP="${PLANETILER_JVM_HEAP:-2g}"
 
-"$SCRIPT_DIR/verify-dataset.sh" "$PBF_PATH"
+bash "$SCRIPT_DIR/verify-dataset.sh" "$PBF_PATH"
 mkdir -p "$DATA_DIR"
 
 docker run --rm --pull=missing \
