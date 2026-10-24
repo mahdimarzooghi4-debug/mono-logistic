@@ -31,6 +31,8 @@ The repository defines `IMapsProvider` and `IMapsGateway` contracts plus input/o
 
 ## Courier offer map context
 
+- Valhalla route and matrix requests send coordinate payloads in JSON POST bodies, not URL query strings; keep request-body logging disabled in the routing service and any reverse proxy.
+
 - `GET /courier/v1/mission-offers/{offerId}/route-context` is available only to an authenticated courier.
 - The endpoint returns coordinates only when the offer belongs to that courier, remains unexpired and `OFFERED`, and its Mission remains `SEARCHING_COURIER`.
 - Pickup and drop-off coordinates are read from the current versioned route-location coordinate catalog. Missing coordinates remain `null` and set `coordinates_status` to `COORDINATES_PENDING`; the client must not invent a marker.

@@ -1,0 +1,3 @@
+/data/*
+!/data/iran-261023.osm.pbf.sha256
+!/data/snapshot.json

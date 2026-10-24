@@ -24,7 +24,10 @@ public sealed class ValhallaMapsProviderTests
 
         Assert.Equal(1250d, result!.DistanceMeters);
         Assert.Equal(81, result.EstimatedDurationSeconds);
-        using var request = ParseRequest(handler.RequestUri!);
+        Assert.Equal(HttpMethod.Post, handler.RequestMethod);
+        Assert.Equal("/route", handler.RequestUri!.AbsolutePath);
+        Assert.Empty(handler.RequestUri.Query);
+        using var request = ParseRequest(handler.RequestBody!);
         Assert.Equal("pedestrian", request.RootElement.GetProperty("costing").GetString());
         Assert.Equal("kilometers", request.RootElement.GetProperty("units").GetString());
         var locations = request.RootElement.GetProperty("locations");
@@ -36,6 +39,7 @@ public sealed class ValhallaMapsProviderTests
     [Theory]
     [InlineData(RouteTravelMode.Car, "auto")]
     [InlineData(RouteTravelMode.Bike, "bicycle")]
+    [InlineData(RouteTravelMode.Motorcycle, "motor_scooter")]
     [InlineData(RouteTravelMode.Walk, "pedestrian")]
     public async Task MatrixUsesCostingForRequestedModeAndPreservesUnreachablePairs(
         RouteTravelMode mode, string expectedCosting)
@@ -53,7 +57,10 @@ public sealed class ValhallaMapsProviderTests
         Assert.Equal(2, result[0].Count);
         Assert.Equal(new RouteMatrixCell(null, null), result[0][1]);
         Assert.Equal(new RouteMatrixCell(870, 43), result[1][0]);
-        using var request = ParseRequest(handler.RequestUri!);
+        Assert.Equal(HttpMethod.Post, handler.RequestMethod);
+        Assert.Equal("/sources_to_targets", handler.RequestUri!.AbsolutePath);
+        Assert.Empty(handler.RequestUri.Query);
+        using var request = ParseRequest(handler.RequestBody!);
         Assert.Equal(expectedCosting, request.RootElement.GetProperty("costing").GetString());
         Assert.False(request.RootElement.GetProperty("verbose").GetBoolean());
     }
@@ -98,34 +105,52 @@ public sealed class ValhallaMapsProviderTests
                 RouteTravelMode.Car)));
     }
 
+    [Fact]
+    public async Task RoutePassesCancellationToThePrivateServiceRequest()
+    {
+        var handler = new StubHttpMessageHandler("""{"trip":{"status":0,"summary":{"length":1,"time":60}}}""");
+        var provider = CreateProvider(handler);
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            provider.GetRouteAsync(new RouteQuery(
+                new GeoCoordinate(35.7, 51.4),
+                new GeoCoordinate(35.8, 51.5),
+                RouteTravelMode.Car), cancellation.Token));
+
+        Assert.Null(handler.RequestUri);
+    }
+
     private static ValhallaMapsProvider CreateProvider(StubHttpMessageHandler handler)
     {
         var client = new HttpClient(handler) { BaseAddress = new Uri("http://valhalla.test:8002/") };
         return new ValhallaMapsProvider(client);
     }
 
-    private static JsonDocument ParseRequest(Uri uri)
-    {
-        const string prefix = "?json=";
-        Assert.True(uri.Query.StartsWith(prefix, StringComparison.Ordinal));
-        return JsonDocument.Parse(Uri.UnescapeDataString(uri.Query[prefix.Length..]));
-    }
+    private static JsonDocument ParseRequest(string body) => JsonDocument.Parse(body);
 
     private sealed class StubHttpMessageHandler(
         string responseBody,
         HttpStatusCode statusCode = HttpStatusCode.OK) : HttpMessageHandler
     {
         public Uri? RequestUri { get; private set; }
+        public HttpMethod? RequestMethod { get; private set; }
+        public string? RequestBody { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             RequestUri = request.RequestUri;
-            return Task.FromResult(new HttpResponseMessage(statusCode)
+            RequestMethod = request.Method;
+            RequestBody = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
-            });
+            };
         }
     }
 }
