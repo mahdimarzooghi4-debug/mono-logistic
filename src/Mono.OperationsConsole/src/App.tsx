@@ -1191,8 +1191,8 @@ export default function App() {
                 return <div className="capacity-bar-column" key={bucket.from} title={`${formatDate(bucket.from)} · ${fa.format(bucket.planned_courier_count)} پیک برنامه‌ریزی‌شده`}><strong>{fa.format(bucket.planned_courier_count)}</strong><span style={{ height: `${Math.max(4, bucket.planned_courier_count / capacityPeak * 76)}px` }} /><small>{new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(bucket.from))}</small></div>
               })}</div>
               <p className="data-note">این مقدار فقط از پنجره‌های برنامه‌ریزی‌شده محاسبه شده و نشان‌دهندهٔ حضور لحظه‌ای یا مجوز تخصیص نیست.</p>
-            </section>
-            <CourierPlanningEvidence token={token} zoneId={zoneId} fromLocal={capacityFrom} toLocal={capacityTo} refreshKey={planningRefreshKey} />}
+            </section>}
+            <CourierPlanningEvidence token={token} zoneId={zoneId} fromLocal={capacityFrom} toLocal={capacityTo} refreshKey={planningRefreshKey} />
           </>}
 
           <div className="table-wrap">
