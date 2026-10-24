@@ -10,7 +10,7 @@ describe('Mono public landing', () => {
     expect(screen.getByRole('heading', { name: /مسیرها تغییر می‌کنند/ })).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'شروع همکاری' })[0]).toHaveAttribute('href', '#registration')
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'برای سفیران' })).toHaveAttribute('href', '#courier')
+    expect(screen.getAllByRole('link', { name: 'برای سفیران' })[0]).toHaveAttribute('href', '#courier')
   })
   it('switches between business and courier forms', async () => {
     const user = userEvent.setup()
