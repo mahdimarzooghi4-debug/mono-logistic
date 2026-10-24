@@ -39,6 +39,7 @@ public sealed class ValhallaMapsProviderTests
     [Theory]
     [InlineData(RouteTravelMode.Car, "auto")]
     [InlineData(RouteTravelMode.Bike, "bicycle")]
+    [InlineData(RouteTravelMode.Motorcycle, "motor_scooter")]
     [InlineData(RouteTravelMode.Walk, "pedestrian")]
     public async Task MatrixUsesCostingForRequestedModeAndPreservesUnreachablePairs(
         RouteTravelMode mode, string expectedCosting)
