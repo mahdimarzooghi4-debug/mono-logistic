@@ -15,7 +15,7 @@ Mono already defines a provider-neutral Maps Gateway and trusted route evidence 
 - Continue using OpenStreetMap as the base geographic dataset.
 - Run an open-source route engine inside Mono-controlled infrastructure for server-side route and distance-matrix calculations. Use Valhalla as the first implementation candidate because its upstream project provides route, time/distance matrix, map-matching, and route-optimization capabilities over OSM data.
 - Keep all use behind `IMapsProvider` / `IMapsGateway`. Provider-specific fields must not enter domain or pricing contracts.
-- Support the Phase 1 modes Car, Bike, and Walk only after route-profile behavior is validated for the selected pilot area. A mode that is unsupported or cannot produce valid evidence remains unavailable; do not silently substitute another mode.
+- Support the Phase 1 modes Car, Bike, Walk, and Motorcycle only after route-profile behavior is validated for the selected pilot area. Bike maps to a bicycle profile; Motorcycle maps to Valhalla's `motor_scooter` costing as the initial candidate, subject to Tehran route-quality validation. A mode that is unsupported or cannot produce valid evidence remains unavailable; do not silently substitute another mode.
 - The courier-facing map is for viewing pickup/drop-off and route estimates. The “Navigate” action may launch an installed external navigation app by coordinates. The external app is not an authority for Mono pricing, feasibility, committed ETA, or route evidence.
 - Treat ETA from the OSM route engine as a route-model estimate without live traffic unless a separately approved, trusted traffic source is added. Label it as approximate and do not claim real-time traffic accuracy.
 - Keep map rendering and tile hosting as a separate decision. MapLibre may be evaluated as a renderer; it does not itself supply OSM tiles or route calculations.
@@ -34,7 +34,7 @@ The initial routing pilot is Tehran. The exact extract boundary and representati
 
 1. Build the Tehran extract and document its source, boundary, timestamp, and reproducible refresh procedure.
 2. Build Valhalla from a pinned, reviewed image/version with a reproducible OSM data import.
-3. Contract-test route and matrix results for Car, Bike, and Walk, including unreachable pairs, cancellation, invalid coordinates, and empty results.
+3. Contract-test route and matrix results for Car, Bike, Walk, and Motorcycle, including unreachable pairs, cancellation, invalid coordinates, and empty results.
 4. Compare representative routes with local courier knowledge and record route-distance/ETA error; never treat synthetic tests as geographic quality evidence.
 5. Load-test expected dispatch and matrix volume; set resource limits, readiness checks, update/rollback procedure, and monitoring.
 6. Verify the route evidence source attestation is bound to the internal Valhalla service and preserves existing verification gates.
