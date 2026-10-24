@@ -4,6 +4,7 @@ import PolicyWorkbench from './PolicyWorkbench'
 import OnboardingWorkbench from './OnboardingWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
 import DashboardSummaryCards from './DashboardSummaryCards'
+import CourierPlanningEvidence from './CourierPlanningEvidence'
 import type { DashboardSummaryMetrics } from './DashboardSummaryCards'
 
 type Offer = {
@@ -176,6 +177,7 @@ export default function App() {
   const [bucketMinutes, setBucketMinutes] = useState('30')
   const [capacityProjection, setCapacityProjection] = useState<CapacityProjection | null>(null)
   const [availabilityPage, setAvailabilityPage] = useState<AvailabilityPage | null>(null)
+  const [planningRefreshKey, setPlanningRefreshKey] = useState(0)
   const [availabilityCourierId, setAvailabilityCourierId] = useState('')
   const [cancelWindowId, setCancelWindowId] = useState<string | null>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -667,6 +669,7 @@ export default function App() {
       setError('زمان شروع و پایان در UTC باید با گام انتخاب‌شده هم‌تراز باشند.'); return
     }
     setLoading(true); setError(''); setCapacityError(''); setAvailabilityError('')
+    setPlanningRefreshKey((value) => value + 1)
     const params = new URLSearchParams({ zone_id: zoneId.trim(), from: fromUtc, to: toUtc, page_size: '50' })
     if (cursor) params.set('cursor', cursor)
     const availabilityRequest = fetch(`/operations/v1/courier-availability-windows?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
@@ -1189,6 +1192,7 @@ export default function App() {
               })}</div>
               <p className="data-note">این مقدار فقط از پنجره‌های برنامه‌ریزی‌شده محاسبه شده و نشان‌دهندهٔ حضور لحظه‌ای یا مجوز تخصیص نیست.</p>
             </section>}
+            <CourierPlanningEvidence token={token} zoneId={zoneId} fromLocal={capacityFrom} toLocal={capacityTo} refreshKey={planningRefreshKey} />
           </>}
 
           <div className="table-wrap">

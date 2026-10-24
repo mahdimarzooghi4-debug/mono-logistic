@@ -148,6 +148,7 @@ Business decisions should be documented here before they become product or imple
 - [Sprint 145 — Dispatch due horizon](docs/sprints/sprint-145-dispatch-due-horizon.md)
 - [Sprint 146 — Dispatch customer filter](docs/sprints/sprint-146-dispatch-customer-filter.md)
 - [Sprint 147 — Dispatch waiting cutoff](docs/sprints/sprint-147-dispatch-waiting-cutoff.md)
+- [Sprint 241 — Operations courier planning evidence](docs/sprints/sprint-241-operations-courier-planning-evidence.md)
 - [Policy Draft Authoring API](docs/operations/policy-authoring-api.md)
 - [Mono Policy Framework v1](docs/07-policy-framework.md)
 - [Mono Policy Catalog v1](docs/08-policy-catalog-v1.md)

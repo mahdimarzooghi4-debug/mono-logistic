@@ -644,6 +644,7 @@ Dashboard must use the same application/core rules as API customers.
 - Sprint 145 adds an inclusive 1–10,080 minute relative delivery due horizon filter, applied consistently to queue pages and cursor validation.
 - Sprint 146 adds an optional exact `customer_id` scope to the dispatch queue, validates customer ID shape, and binds the scope to cursor validation and every page query.
 - Sprint 147 adds an inclusive `created_before` dispatch cutoff to find Missions waiting since before a UTC timestamp, consistently applied to cursor validation and all page queries; it also covers filtered keyset continuation across customer-owned Mission data.
+- Sprint 241 adds the read-only, paginated Operations Console view for planned courier capacity and separately reported online-presence evidence; it preserves page-scoped counts and does not authorize dispatch.
 - Mission timeline
 - Route inspection
 - courier state
