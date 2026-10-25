@@ -1,0 +1,1425 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mono B2B Delivery API",
+    "version": "1.0.0",
+    "description": "Machine-readable consumer contract for Mono's existing customer-scoped delivery API. Paths are derived from the current implementation and docs/12-api-contract-v1.md. The API host must be configured per environment; this specification does not indicate that a sandbox, customer credentials, quote evidence verifier, or outbound webhook worker is configured."
+  },
+  "security": [
+    {
+      "MonoApiKey": []
+    }
+  ],
+  "paths": {
+    "/v1/branches": {
+      "get": {
+        "operationId": "listCustomerBranches",
+        "summary": "List branches owned by the authenticated customer",
+        "description": "Requires branches.read. Customer identity is resolved from the API key, never from query/body data.",
+        "responses": {
+          "200": {
+            "description": "Customer-scoped branch summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/delivery-requests": {
+      "post": {
+        "operationId": "createDeliveryRequest",
+        "summary": "Submit a delivery request",
+        "description": "Requires delivery-requests.write. A successful response means RECEIVED only; it does not mean feasibility, quote, promise, acceptance, or mission creation. Idempotent by customer-scoped Idempotency-Key and normalized body.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryRequestInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request received or exact idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRequestCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Active branch not found for authenticated customer"
+          },
+          "409": {
+            "$ref": "#/components/responses/IdempotencyConflict"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listDeliveryRequests",
+        "summary": "List the authenticated customer's requests",
+        "description": "Requires delivery-requests.read. Cursor-paginated; summaries omit pickup/dropoff/contact data.",
+        "parameters": [
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer-scoped page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRequestPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/delivery-requests/{deliveryRequestId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DeliveryRequestId"
+        }
+      ],
+      "get": {
+        "operationId": "getDeliveryRequest",
+        "summary": "Read request, latest quote, promise, and mission summary",
+        "description": "Requires delivery-requests.read. Tenant-scoped; request payload, contacts, raw locations, and internal feasibility evidence are not returned.",
+        "responses": {
+          "200": {
+            "description": "Safe customer view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryRequestDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Request not found for authenticated customer"
+          }
+        }
+      }
+    },
+    "/v1/delivery-requests/{deliveryRequestId}/timeline": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DeliveryRequestId"
+        }
+      ],
+      "get": {
+        "operationId": "getDeliveryRequestTimeline",
+        "summary": "Read allowlisted request event metadata",
+        "description": "Requires delivery-requests.read. Payloads and personal/location data are omitted. Current event types include quote.issued, promise.committed, promise.revised, and mission.created.",
+        "responses": {
+          "200": {
+            "description": "Ordered event metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventTimeline"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Request not found for authenticated customer"
+          }
+        }
+      }
+    },
+    "/v1/delivery-requests/{deliveryRequestId}/quote": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DeliveryRequestId"
+        }
+      ],
+      "post": {
+        "operationId": "issueDeliveryQuote",
+        "summary": "Request initial delivery quote",
+        "description": "Requires delivery-requests.write. Mono calculates fare; clients cannot set fare, quote ID, version, or digest. Quote issuance fails closed with 422 QUOTE_EVIDENCE_UNVERIFIED until a source-specific distance evidence verifier is configured.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuoteIssuanceInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Issued quote or exact replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryQuote"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Request not found for authenticated customer"
+          },
+          "409": {
+            "$ref": "#/components/responses/IdempotencyConflict"
+          },
+          "422": {
+            "description": "Evidence rejected or unverified; no quote issued"
+          }
+        }
+      }
+    },
+    "/v1/delivery-requests/{deliveryRequestId}/promise": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DeliveryRequestId"
+        }
+      ],
+      "post": {
+        "operationId": "commitDeliveryPromise",
+        "summary": "Evaluate and commit delivery promise",
+        "description": "Requires delivery-requests.write. Requires complete valid feasibility evidence, a matching proposal, and a verified evidence source. This endpoint is not a promise of courier assignment.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromiseCommitInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed promise or exact replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryPromise"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Request not found for authenticated customer"
+          },
+          "409": {
+            "description": "Promise or idempotency conflict"
+          },
+          "422": {
+            "description": "Rejected, unresolved, mismatched, or unverified evidence"
+          }
+        }
+      }
+    },
+    "/v1/delivery-requests/{deliveryRequestId}/confirm": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DeliveryRequestId"
+        }
+      ],
+      "post": {
+        "operationId": "confirmDeliveryMission",
+        "summary": "Confirm quote and create one mission",
+        "description": "Requires delivery-requests.write, an unexpired quote, current promise version, and Idempotency-Key. A request can produce at most one mission.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionConfirmationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mission created or exact replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mission"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Request, quote, or promise not found for authenticated customer"
+          },
+          "409": {
+            "description": "Idempotency conflict or mission already confirmed"
+          },
+          "422": {
+            "description": "Quote expired"
+          }
+        }
+      }
+    },
+    "/v1/missions/{missionId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MissionId"
+        }
+      ],
+      "get": {
+        "operationId": "getMission",
+        "summary": "Read a customer-scoped mission summary",
+        "description": "Requires delivery-requests.read. Does not expose pickup/dropoff contacts or internal evidence.",
+        "responses": {
+          "200": {
+            "description": "Mission summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mission"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Mission not found for authenticated customer"
+          }
+        }
+      }
+    },
+    "/v1/missions/{missionId}/timeline": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MissionId"
+        }
+      ],
+      "get": {
+        "operationId": "getMissionTimeline",
+        "summary": "Read allowlisted mission lifecycle event metadata",
+        "description": "Requires delivery-requests.read. The timeline currently exposes mission.created; later lifecycle events appear as those operations are implemented.",
+        "responses": {
+          "200": {
+            "description": "Mission event metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventTimeline"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Mission not found for authenticated customer"
+          }
+        }
+      }
+    },
+    "/v1/missions/{missionId}/cancel": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MissionId"
+        }
+      ],
+      "post": {
+        "operationId": "cancelMission",
+        "summary": "Cancel mission before handoff",
+        "description": "Requires missions.cancel and Idempotency-Key. Cancellation is allowed only before HANDED_TO_COURIER; cancellation after handoff is rejected. The only current reason code is CUSTOMER_CANCELLED.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MissionCancellationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mission cancelled or exact replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MissionCancellationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Mission not found for authenticated customer"
+          },
+          "409": {
+            "description": "Idempotency conflict or cancellation not allowed"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "MonoApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Mono-API-Key",
+        "description": "Per-customer key provisioned internally. Use least-privilege scopes; key issuance is not public."
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._~-]+$"
+        }
+      },
+      "DeliveryRequestId": {
+        "name": "deliveryRequestId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^drq_[0-9a-f]{32}$"
+        }
+      },
+      "MissionId": {
+        "name": "missionId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^mis_[0-9a-f]{32}$"
+        }
+      }
+    },
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "DeliveryLocation": {
+        "type": "object",
+        "properties": {
+          "address_text": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "contact_name": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "contact_phone": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "recipient_name": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "recipient_phone": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "address_details": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "description": "At least address_text or a complete latitude/longitude pair is required; exact validation is enforced by API.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "address_text"
+                ]
+              },
+              {
+                "required": [
+                  "latitude",
+                  "longitude"
+                ]
+              }
+            ]
+          },
+          {
+            "not": {
+              "required": [
+                "latitude"
+              ],
+              "not": {
+                "required": [
+                  "longitude"
+                ]
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      },
+      "Shipment": {
+        "type": "object",
+        "required": [
+          "shipment_model",
+          "bag_count",
+          "load_class"
+        ],
+        "properties": {
+          "shipment_model": {
+            "const": "BAG_BASED"
+          },
+          "bag_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "estimated_weight_kg": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "load_class": {
+            "type": "string",
+            "enum": [
+              "S",
+              "M",
+              "L"
+            ]
+          },
+          "fragile": {
+            "type": "boolean"
+          },
+          "liquid": {
+            "type": "boolean"
+          },
+          "keep_upright": {
+            "type": "boolean"
+          },
+          "package_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "estimated_volume_m3": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "temperature_class": {
+            "type": "string",
+            "enum": [
+              "AMBIENT",
+              "CHILLED",
+              "FROZEN"
+            ]
+          }
+        }
+      },
+      "DeliveryRequestInput": {
+        "type": "object",
+        "required": [
+          "external_reference",
+          "branch_id",
+          "pickup",
+          "dropoff",
+          "shipment",
+          "requested_service",
+          "requested_priority"
+        ],
+        "properties": {
+          "external_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "branch_id": {
+            "type": "string",
+            "pattern": "^br_[0-9a-f]{32}$"
+          },
+          "pickup": {
+            "$ref": "#/components/schemas/DeliveryLocation"
+          },
+          "dropoff": {
+            "$ref": "#/components/schemas/DeliveryLocation"
+          },
+          "shipment": {
+            "$ref": "#/components/schemas/Shipment"
+          },
+          "requested_service": {
+            "const": "URBAN_DELIVERY"
+          },
+          "requested_priority": {
+            "const": "STANDARD"
+          },
+          "estimated_ready_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeliveryRequestCreated": {
+        "type": "object",
+        "properties": {
+          "delivery_request_id": {
+            "type": "string"
+          },
+          "status": {
+            "const": "RECEIVED"
+          },
+          "pickup_location_id": {
+            "type": "string"
+          },
+          "dropoff_location_id": {
+            "type": "string"
+          },
+          "route_location_coordinates_status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "delivery_request_id",
+          "status",
+          "pickup_location_id",
+          "dropoff_location_id",
+          "route_location_coordinates_status"
+        ]
+      },
+      "DeliveryRequestSummary": {
+        "type": "object",
+        "properties": {
+          "delivery_request_id": {
+            "type": "string",
+            "pattern": "^drq_[0-9a-f]{32}$"
+          },
+          "external_reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mission_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mission_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "committed_delivery_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "delivery_request_id",
+          "external_reference",
+          "status",
+          "created_at"
+        ]
+      },
+      "DeliveryRequestPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeliveryRequestSummary"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ]
+      },
+      "DeliveryQuote": {
+        "type": "object",
+        "description": "Customer-safe quote snapshot. Monetary unit and field names follow current Mono API v1 contract.",
+        "properties": {
+          "quote_id": {
+            "type": "string"
+          },
+          "delivery_request_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "is_expired": {
+            "type": "boolean"
+          },
+          "distance_meters": {
+            "type": "number"
+          },
+          "fare_toman": {
+            "type": "integer"
+          },
+          "buyer_share_toman": {
+            "type": "integer"
+          },
+          "seller_share_toman": {
+            "type": "integer"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "quote_id",
+          "delivery_request_id",
+          "version",
+          "issued_at",
+          "expires_at",
+          "is_expired"
+        ]
+      },
+      "QuoteIssuanceInput": {
+        "type": "object",
+        "required": [
+          "expires_at",
+          "distance_evidence"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "distance_evidence": {
+            "type": "object",
+            "required": [
+              "evidence_id",
+              "observed_at",
+              "distance_meters",
+              "source_id",
+              "source_attestation"
+            ],
+            "properties": {
+              "evidence_id": {
+                "type": "string"
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "distance_meters": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "source_id": {
+                "type": "string"
+              },
+              "source_attestation": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PromiseEvidenceIntegrity": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {
+            "type": "string"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "payload_sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "source_attestation": {
+            "type": "string"
+          },
+          "source_payload_sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          }
+        }
+      },
+      "PromiseCriterion": {
+        "type": "object",
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "description": "Canonical FeasibilityCriterion enum value accepted by Mono v1"
+          },
+          "status": {
+            "type": "string",
+            "description": "Canonical FeasibilityCriterionStatus enum value accepted by Mono v1"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "integrity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromiseEvidenceIntegrity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "criterion",
+          "status"
+        ]
+      },
+      "PromiseAlternativeSearch": {
+        "type": "object",
+        "properties": {
+          "search_id": {
+            "type": "string"
+          },
+          "searched_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "proposed_delivery_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PromiseCriterion"
+            }
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "search_id",
+          "status"
+        ]
+      },
+      "PromiseProposal": {
+        "type": "object",
+        "properties": {
+          "promise_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional in transport type; API validation requires a semantically valid proposal."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evaluated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "committed_delivery_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "safety_buffer": {
+            "type": "string",
+            "description": "System.TimeSpan JSON representation"
+          },
+          "safety_buffer_policy_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "policy_versions": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "reason_codes": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "version",
+          "safety_buffer"
+        ]
+      },
+      "PromiseCommitInput": {
+        "type": "object",
+        "properties": {
+          "requested_criteria": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/PromiseCriterion"
+            }
+          },
+          "requested_delivery_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "alternative_search": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromiseAlternativeSearch"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/PromiseProposal"
+          }
+        },
+        "required": [
+          "proposal"
+        ]
+      },
+      "DeliveryPromise": {
+        "type": "object",
+        "properties": {
+          "promise_id": {
+            "type": "string"
+          },
+          "delivery_request_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "committed_delivery_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "outcome": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "promise_id",
+          "delivery_request_id",
+          "version",
+          "committed_delivery_at",
+          "outcome"
+        ]
+      },
+      "MissionConfirmationInput": {
+        "type": "object",
+        "properties": {
+          "quote_id": {
+            "type": "string"
+          },
+          "promise_version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "quote_id",
+          "promise_version"
+        ],
+        "additionalProperties": false
+      },
+      "Mission": {
+        "type": "object",
+        "properties": {
+          "mission_id": {
+            "type": "string"
+          },
+          "delivery_request_id": {
+            "type": "string"
+          },
+          "quote_id": {
+            "type": "string"
+          },
+          "quote_version": {
+            "type": "integer"
+          },
+          "promise_id": {
+            "type": "string"
+          },
+          "promise_version": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "committed_delivery_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "mission_id",
+          "delivery_request_id",
+          "status",
+          "created_at"
+        ]
+      },
+      "DeliveryRequestDetail": {
+        "type": "object",
+        "properties": {
+          "delivery_request_id": {
+            "type": "string",
+            "pattern": "^drq_[0-9a-f]{32}$"
+          },
+          "external_reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "mission_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mission_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "committed_delivery_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryQuote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "promise": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryPromise"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "delivery_request_id",
+          "external_reference",
+          "status",
+          "created_at"
+        ]
+      },
+      "EventTimeline": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event_id": {
+                  "type": "string"
+                },
+                "event_type": {
+                  "type": "string"
+                },
+                "aggregate_type": {
+                  "type": "string"
+                },
+                "sequence": {
+                  "type": "integer"
+                },
+                "occurred_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "event_id",
+                "event_type",
+                "aggregate_type",
+                "sequence",
+                "occurred_at"
+              ]
+            }
+          }
+        },
+        "required": [
+          "events"
+        ]
+      },
+      "MissionCancellationInput": {
+        "type": "object",
+        "properties": {
+          "reason_code": {
+            "const": "CUSTOMER_CANCELLED"
+          },
+          "external_reference": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._~-]+$"
+          }
+        },
+        "required": [
+          "reason_code"
+        ],
+        "additionalProperties": false
+      },
+      "MissionCancellationResult": {
+        "type": "object",
+        "properties": {
+          "mission_id": {
+            "type": "string"
+          },
+          "status": {
+            "const": "CANCELLED"
+          }
+        },
+        "required": [
+          "mission_id",
+          "status"
+        ]
+      },
+      "BranchList": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchSummary"
+            }
+          }
+        },
+        "required": [
+          "branches"
+        ]
+      },
+      "BranchSummary": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "pattern": "^br_[0-9a-f]{32}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latitude": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -180,
+            "maximum": 180
+          },
+          "zoneId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "branchId",
+          "name",
+          "status"
+        ]
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, invalid, expired, revoked, inactive, or unscoped API key"
+      },
+      "Forbidden": {
+        "description": "Authenticated customer credential lacks required scope"
+      },
+      "IdempotencyConflict": {
+        "description": "Idempotency-Key reused with a different normalized request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
+      }
+    }
+  }
+}
