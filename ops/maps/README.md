@@ -14,7 +14,7 @@ MAP_DATA_DIR='/srv/mono/maps' \
 bash ops/maps/build-iran-tiles.sh /path/to/iran.osm.pbf 2026-10-25
 ```
 
-The script writes a new archive under `releases/`, validates SQLite integrity and the MBTiles tile table, and records source/archive checksums and build metadata. It never overwrites an existing release or switches the active service. Failed staging files are retained for diagnosis. Planetiler performs full snapshot builds; refresh the archive from a new dated PBF rather than expecting live diffs.
+The script writes a new release directory under `releases/iran-<release-id>/`, validates SQLite integrity and the MBTiles tile table, and records source/archive checksums and build metadata. It publishes the archive and manifest together only after validation, never overwrites an existing release, and does not switch the active service. Failed staging files are retained for diagnosis. Planetiler performs full snapshot builds; refresh the archive from a new dated PBF rather than expecting live diffs.
 
 Planetiler accepts OSM PBF and writes MBTiles. Its upstream guide notes that processing needs temporary disk and RAM that scale with input size; measure the actual Iran extract before selecting server resources: [Planetiler README](https://github.com/onthegomap/planetiler#run).
 
@@ -27,7 +27,7 @@ docker run --detach --name mono-tiles --restart unless-stopped \
   --volume /srv/mono/maps/releases:/data:ro \
   --publish 127.0.0.1:8080:8080 \
   'maptiler/tileserver-gl:<reviewed-version>' \
-  --file iran-2026-10-25.mbtiles
+  --file iran-2026-10-25/iran-2026-10-25.mbtiles
 ```
 
 Replace the sample image version and archive filename with the reviewed values. TileServer GL documents Docker use with an MBTiles file: [TileServer GL README](https://github.com/maptiler/tileserver-gl#getting-started-with-docker).
