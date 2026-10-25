@@ -47,6 +47,13 @@ builder.Services.AddScoped<PostgresCourierPayoutDestinationAuditReadService>();
 builder.Services.AddScoped<PostgresCourierPayoutDestinationAuditSearchService>();
 builder.Services.AddSingleton(_ => new CourierPayoutIbanProtector(builder.Configuration["MonoCourier:PayoutIbanEncryptionKey"]));
 builder.Services.AddScoped<PostgresCourierOnboardingService>();
+var publicRegistrationProtector = new PublicRegistrationProtector(
+    builder.Configuration["Mono:PublicRegistration:EncryptionKey"]);
+builder.Services.AddSingleton(publicRegistrationProtector);
+builder.Services.AddScoped<PostgresPublicRegistrationService>();
+if (publicRegistrationProtector.IsConfigured &&
+    !string.IsNullOrWhiteSpace(builder.Configuration["Mono:PublicRegistration:PrivacyNoticeVersion"]))
+    builder.Services.AddHostedService<PublicRegistrationRetentionWorker>();
 builder.Services.AddScoped<PostgresWebhookEndpointRepository>();
 builder.Services.AddSingleton(_ => new WebhookSecretProtector(builder.Configuration["Mono:WebhookEncryptionKey"]));
 builder.Services.AddSingleton<IWebhookDnsResolver, SystemWebhookDnsResolver>();
@@ -182,6 +189,7 @@ app.UseStaticFiles();
 // Liveness is process-only; readiness includes registered infrastructure dependencies.
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+app.MapPublicRegistrationEndpoints();
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapWebhookEndpointEndpoints();

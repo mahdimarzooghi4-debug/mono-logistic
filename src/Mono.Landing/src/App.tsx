@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import PrivacyNotice, { PUBLIC_REGISTRATION_PRIVACY_NOTICE_VERSION } from './privacy-notice'
 
 type RegistrationKind = 'business' | 'courier'
 
@@ -7,10 +8,52 @@ function App() {
   const [kind, setKind] = useState<RegistrationKind>('business')
   const [menuOpen, setMenuOpen] = useState(false)
   const [previewMessage, setPreviewMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const idempotencyKey = useRef<{ payload: string; key: string } | null>(null)
   const closeMenu = () => setMenuOpen(false)
-  function submitPreview(event: FormEvent<HTMLFormElement>) {
+  async function submitRegistration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setPreviewMessage('فرم آماده است؛ ارسال درخواست پس از اتصال بک‌اند فعال می‌شود.')
+    const form = event.currentTarget
+    const data = new FormData(form)
+    setSubmitting(true)
+    setPreviewMessage('')
+    try {
+      const apiBaseUrl = (import.meta.env.VITE_MONO_API_BASE_URL || '').replace(/\/+$/, '')
+      const payload = JSON.stringify({
+        type: kind === 'business' ? 'BUSINESS' : 'COURIER',
+        full_name: String(data.get('fullName') || ''),
+        phone: String(data.get('phone') || ''),
+        business_name: kind === 'business' ? String(data.get('businessName') || '') : null,
+        privacy_notice_version: PUBLIC_REGISTRATION_PRIVACY_NOTICE_VERSION,
+        consent: data.get('privacyConsent') === 'on',
+      })
+      const previousKey = idempotencyKey.current
+      const requestKey = previousKey && previousKey.payload === payload
+        ? previousKey.key
+        : globalThis.crypto.randomUUID()
+      idempotencyKey.current = { payload, key: requestKey }
+      const response = await fetch(`${apiBaseUrl}/v1/public-registration-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': requestKey, Accept: 'application/json' },
+        body: payload,
+      })
+      if (!response.ok) {
+        let message = response.status === 503 ? 'ثبت درخواست همکاری هنوز برای این محیط فعال نشده است.' : `ثبت درخواست انجام نشد (${response.status}).`
+        try {
+          const body = await response.json() as { title?: string; error?: string }
+          if (response.status !== 503 && body.title) message = body.title
+          if (body.error === 'INVALID_REGISTRATION') message = 'اطلاعات واردشده را بررسی کنید.'
+        } catch { /* Keep the safe status-specific message. */ }
+        throw new Error(message)
+      }
+      idempotencyKey.current = null
+      form.reset()
+      setPreviewMessage('درخواست شما برای بررسی ثبت شد. این ثبت، حساب یا همکاری فعال ایجاد نمی‌کند.')
+    } catch (cause) {
+      setPreviewMessage(cause instanceof Error ? cause.message : 'ارتباط با سرویس ثبت درخواست برقرار نشد؛ دوباره تلاش کنید.')
+    } finally {
+      setSubmitting(false)
+    }
   }
   return <div className="site-shell">
     <header className="site-header" id="home">
@@ -53,18 +96,19 @@ function App() {
               <button className={kind === 'business' ? 'registration-tab active' : 'registration-tab'} type="button" role="tab" aria-selected={kind === 'business'} id="business" onClick={() => { setKind('business'); setPreviewMessage('') }}>کسب‌وکار</button>
               <button className={kind === 'courier' ? 'registration-tab active' : 'registration-tab'} type="button" role="tab" aria-selected={kind === 'courier'} id="courier" onClick={() => { setKind('courier'); setPreviewMessage('') }}>ثبت‌نام سفیران</button>
             </div>
-            <form className="registration-form" onSubmit={submitPreview} aria-label={kind === 'business' ? 'فرم همکاری کسب‌وکار' : 'فرم ثبت‌نام سفیر'}>
+            <form className="registration-form" onSubmit={event => void submitRegistration(event)} aria-label={kind === 'business' ? 'فرم همکاری کسب‌وکار' : 'فرم ثبت‌نام سفیر'}>
               <label className="field"><span>نام و نام خانوادگی</span><input name="fullName" autoComplete="name" placeholder="نام شما" required /></label>
               <label className="field"><span>شمارهٔ همراه</span><input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="۰۹۱۲ ۱۲۳ ۴۵۶۷" required /></label>
               {kind === 'business' && <label className="field"><span>نام کسب‌وکار</span><input name="businessName" autoComplete="organization" placeholder="مثلاً فروشگاه سپهر" required /></label>}
-              <button className="primary-button submit-button" type="submit">ادامهٔ ثبت‌نام</button>
-              <p className="legal-note">با ادامه، شرایط استفاده و حریم خصوصی مونو را می‌پذیرید.</p>
+              <label className="privacy-consent"><input name="privacyConsent" type="checkbox" required /><span>با استفاده از اطلاعات این فرم برای بررسی و پیگیری درخواست همکاری موافقم. <a href="#privacy">اطلاعیهٔ حریم خصوصی، نسخهٔ {PUBLIC_REGISTRATION_PRIVACY_NOTICE_VERSION}</a></span></label>
+              <button className="primary-button submit-button" type="submit" disabled={submitting}>{submitting ? 'در حال ثبت…' : 'ارسال درخواست همکاری'}</button>
               <p className="form-feedback" role="status" aria-live="polite">{previewMessage}</p>
             </form>
           </div>
         </div>
       </section>
     </main>
+    <PrivacyNotice />
     <footer className="site-footer">
       <div className="footer-main">
         <div className="footer-brand">
@@ -76,7 +120,7 @@ function App() {
         <div className="footer-column"><h2>دسترسی سریع</h2><a href="#home">صفحهٔ اصلی</a><a href="#about">دربارهٔ مونو</a><a href="#registration">فرم شروع همکاری</a></div>
         <div className="footer-contact"><h2>شروع گفتگو</h2><p>برای ثبت درخواست همکاری، فرم را تکمیل کنید.</p><a href="#registration">رفتن به فرم ثبت‌نام <span aria-hidden="true">←</span></a></div>
       </div>
-      <div className="footer-bottom"><span>© {new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric' }).format(new Date())} مونو. تمامی حقوق محفوظ است.</span><a href="#registration">شرایط استفاده و حریم خصوصی</a></div>
+      <div className="footer-bottom"><span>© {new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric' }).format(new Date())} مونو. تمامی حقوق محفوظ است.</span><a href="#privacy">اطلاعیهٔ حریم خصوصی</a></div>
     </footer>
   </div>
 }

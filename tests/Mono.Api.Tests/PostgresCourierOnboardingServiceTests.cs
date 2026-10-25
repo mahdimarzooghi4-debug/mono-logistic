@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Mono.Api.Domain;
 using Mono.Api.Persistence;
 using Mono.Api.Security;
@@ -202,6 +203,81 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         await Assert.ThrowsAsync<PostgresException>(() => deleteIdempotency.ExecuteNonQueryAsync());
     }
 
+    [Fact]
+    public async Task Public_registration_submission_replay_queue_audit_transitions_and_retention_work()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var now = new DateTimeOffset(2026, 10, 20, 12, 0, 0, TimeSpan.Zero);
+        await using var database = await TestDatabase.CreateAsync(connectionString);
+        var context = new TestOperationsContext();
+        var protector = new PublicRegistrationProtector(Convert.ToBase64String(Enumerable.Range(0, 32).Select(x => (byte)x).ToArray()));
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Mono:PublicRegistration:PrivacyNoticeVersion"] = "2026-10-25-v1"
+        }).Build();
+        var time = new FixedTimeProvider(now);
+        var service = new PostgresPublicRegistrationService(database.DataSource, protector, context, configuration, time);
+        Assert.True(service.IsEnabled);
+        var incompleteConfiguration = new ConfigurationBuilder().Build();
+        Assert.False(new PostgresPublicRegistrationService(database.DataSource, protector, context,
+            incompleteConfiguration, time).IsEnabled);
+
+        var submitted = await service.SubmitAsync("BUSINESS", new("کاربر نمونه", "+98 912 123 4567", "فروشگاه نمونه"),
+            true, "2026-10-25-v1", "landing-submit-key-0001", CancellationToken.None);
+        Assert.Equal(PublicRegistrationWriteOutcome.Created, submitted.Outcome);
+        Assert.Equal("SUBMITTED", submitted.Receipt.Status);
+
+        var replay = await service.SubmitAsync("BUSINESS", new("کاربر نمونه", "09121234567", "فروشگاه نمونه"),
+            true, "2026-10-25-v1", "landing-submit-key-0001", CancellationToken.None);
+        Assert.Equal(PublicRegistrationWriteOutcome.Replayed, replay.Outcome);
+        Assert.Equal(submitted.Receipt.RequestId, replay.Receipt.RequestId);
+
+        var conflict = await service.SubmitAsync("BUSINESS", new("کاربر نمونه", "09121234567", "فروشگاه دیگر"),
+            true, "2026-10-25-v1", "landing-submit-key-0001", CancellationToken.None);
+        Assert.Equal(PublicRegistrationWriteOutcome.Conflict, conflict.Outcome);
+
+        var queue = await service.ListAsync(10, CancellationToken.None);
+        var item = Assert.Single(queue);
+        Assert.Equal("کاربر نمونه", item.FullName);
+        Assert.Equal("09121234567", item.Phone);
+        Assert.Equal("فروشگاه نمونه", item.BusinessName);
+        Assert.Equal("2026-10-25-v1", item.PrivacyNoticeVersion);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+            await new PostgresPublicRegistrationService(database.DataSource, protector,
+                new NonAdminOperationsContext(), configuration, time).ListAsync(10, CancellationToken.None));
+
+        Assert.True(await service.TransitionAsync(submitted.Receipt.RequestId, "CONTACT_ATTEMPTED", null, CancellationToken.None));
+        Assert.True(await service.TransitionAsync(submitted.Receipt.RequestId, "CLOSED", null, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.TransitionAsync(
+            submitted.Receipt.RequestId, "CONTACT_ATTEMPTED", null, CancellationToken.None));
+
+        await using var connection = await database.DataSource.OpenConnectionAsync();
+        await using (var verify = new NpgsqlCommand("""
+            SELECT r.status, r.expires_at, count(e.event_id),
+                   (SELECT count(*) FROM public_registration_request_access_audit a)
+            FROM public_registration_requests r
+            LEFT JOIN public_registration_request_events e ON e.request_id = r.request_id
+            WHERE r.request_id = @id
+            GROUP BY r.request_id
+            """, connection))
+        {
+            verify.Parameters.AddWithValue("id", submitted.Receipt.RequestId);
+            await using var reader = await verify.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("CLOSED", reader.GetString(0));
+            Assert.Equal(now.AddDays(30), reader.GetFieldValue<DateTimeOffset>(1));
+            Assert.Equal(2L, reader.GetInt64(2));
+            Assert.Equal(1L, reader.GetInt64(3));
+        }
+    }
+
 
     [Fact]
     public async Task Operations_presence_search_filters_pages_and_audits_without_exposing_coordinates()
@@ -354,6 +430,12 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
     {
         public string ActorId => "staff-operations-1";
         public IReadOnlyCollection<string> Roles => [MonoOperationsRoles.Administrator];
+    }
+
+    private sealed class NonAdminOperationsContext : IMonoOperationsContext
+    {
+        public string ActorId => "staff-observer-1";
+        public IReadOnlyCollection<string> Roles => ["MONO_SUPPORT"];
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
@@ -1052,6 +1134,16 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
             await using var operationsPresenceSearchConnection = await DataSource.OpenConnectionAsync();
             await using var operationsPresenceSearchCommand = new NpgsqlCommand(operationsPresenceSearchSql, operationsPresenceSearchConnection);
             await operationsPresenceSearchCommand.ExecuteNonQueryAsync();
+
+            const string registrationResourceName = "Mono.Api.Tests.Migrations.093_public_registration_requests.sql";
+            await using var registrationStream = typeof(PostgresCourierOnboardingServiceTests).Assembly
+                .GetManifestResourceStream(registrationResourceName)
+                ?? throw new InvalidOperationException($"Missing embedded migration resource {registrationResourceName}.");
+            using var registrationReader = new StreamReader(registrationStream);
+            var registrationSql = await registrationReader.ReadToEndAsync();
+            await using var registrationConnection = await DataSource.OpenConnectionAsync();
+            await using var registrationCommand = new NpgsqlCommand(registrationSql, registrationConnection);
+            await registrationCommand.ExecuteNonQueryAsync();
         }
 
         public async ValueTask DisposeAsync()

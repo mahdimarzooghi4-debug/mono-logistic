@@ -1,0 +1,14 @@
+.public-registration-queue{display:grid;gap:12px;padding:18px;background:#fff;border:1px solid var(--line,#e1e7ee);border-radius:16px;min-width:0}
+.public-registration-queue>header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.public-registration-queue h2{font-size:18px;margin:5px 0}.public-registration-queue header p{margin:0;color:#64748b;font-size:12px;line-height:1.8}
+.public-registration-count{font-size:12px;color:#475569}.public-registration-count strong{font-size:17px;color:#172033}.public-registration-count small{color:#64748b;margin-inline-start:8px}
+.public-registration-table-wrap{overflow:auto}.public-registration-table-wrap table{width:100%;border-collapse:collapse;min-width:880px;text-align:right}
+.public-registration-table-wrap th,.public-registration-table-wrap td{padding:11px 12px;border-bottom:1px solid #eef1f5;font-size:12px;vertical-align:top}
+.public-registration-table-wrap th{color:#64748b;background:#f8fafc;font-weight:600;white-space:nowrap}
+.public-registration-actions{display:flex;gap:8px;flex-wrap:wrap}.public-registration-queue .text-button{font:inherit;background:none;border:0;color:#1d4ed8;cursor:pointer;padding:3px}.public-registration-queue .text-button.danger{color:#b91c1c}
+.public-registration-queue button:disabled{opacity:.55;cursor:not-allowed}
+.public-registration-decline{display:grid;grid-template-columns:minmax(100px,1fr) auto auto;gap:5px;align-items:end;margin-top:8px}
+.public-registration-decline label{display:grid;gap:4px;font-size:10px;color:#64748b}.public-registration-decline input{min-width:100px;padding:6px;border:1px solid #dbe2ea;border-radius:7px;font:inherit}
+.public-registration-empty{text-align:center!important;padding:24px!important;color:#64748b}
+.public-registration-queue footer{font-size:11px;color:#64748b}
+@media(max-width:700px){.public-registration-queue>header{flex-direction:column;align-items:stretch}.public-registration-decline{grid-template-columns:1fr 1fr}.public-registration-decline label{grid-column:1/-1}}

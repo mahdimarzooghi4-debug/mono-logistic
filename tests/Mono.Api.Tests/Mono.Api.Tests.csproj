@@ -112,4 +112,7 @@
     <EmbeddedResource Include="../../db/migrations/091_courier_current_location.sql" LogicalName="Mono.Api.Tests.Migrations.091_courier_current_location.sql" />
     <EmbeddedResource Include="../../db/migrations/092_operations_dashboard_summary_audit.sql" LogicalName="Mono.Api.Tests.Migrations.092_operations_dashboard_summary_audit.sql" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../db/migrations/093_public_registration_requests.sql" LogicalName="Mono.Api.Tests.Migrations.093_public_registration_requests.sql" />
+  </ItemGroup>
 </Project>
