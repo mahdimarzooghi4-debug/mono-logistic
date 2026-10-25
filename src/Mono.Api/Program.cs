@@ -191,7 +191,9 @@ app.UseStaticFiles();
 // Liveness is process-only; readiness includes registered infrastructure dependencies.
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
+Console.WriteLine("Mono API: mapping public registration endpoints.");
 app.MapPublicRegistrationEndpoints();
+Console.WriteLine("Mono API: public registration endpoints mapped.");
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapWebhookEndpointEndpoints();
