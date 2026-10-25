@@ -52,10 +52,7 @@ var publicRegistrationProtector = new PublicRegistrationProtector(
 builder.Services.AddSingleton(publicRegistrationProtector);
 builder.Services.AddScoped<PostgresPublicRegistrationService>();
 if (publicRegistrationProtector.IsConfigured &&
-    !string.IsNullOrWhiteSpace(builder.Configuration["Mono:PublicRegistration:PrivacyNoticeVersion"]) &&
-    !string.IsNullOrWhiteSpace(builder.Configuration["Mono:PublicRegistration:ControllerName"]) &&
-    !string.IsNullOrWhiteSpace(builder.Configuration["Mono:PublicRegistration:PrivacyContact"]) &&
-    !string.IsNullOrWhiteSpace(builder.Configuration["Mono:PublicRegistration:HostingDisclosure"]))
+    !string.IsNullOrWhiteSpace(builder.Configuration["Mono:PublicRegistration:PrivacyNoticeVersion"]))
     builder.Services.AddHostedService<PublicRegistrationRetentionWorker>();
 builder.Services.AddScoped<PostgresWebhookEndpointRepository>();
 builder.Services.AddSingleton(_ => new WebhookSecretProtector(builder.Configuration["Mono:WebhookEncryptionKey"]));

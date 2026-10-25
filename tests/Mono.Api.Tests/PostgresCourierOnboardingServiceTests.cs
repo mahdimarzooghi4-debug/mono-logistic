@@ -219,18 +219,12 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var protector = new PublicRegistrationProtector(Convert.ToBase64String(Enumerable.Range(0, 32).Select(x => (byte)x).ToArray()));
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Mono:PublicRegistration:PrivacyNoticeVersion"] = "2026-10-25-v1",
-            ["Mono:PublicRegistration:ControllerName"] = "Mono Logistics Ltd.",
-            ["Mono:PublicRegistration:PrivacyContact"] = "privacy@example.test",
-            ["Mono:PublicRegistration:HostingDisclosure"] = "Test hosting, Germany"
+            ["Mono:PublicRegistration:PrivacyNoticeVersion"] = "2026-10-25-v1"
         }).Build();
         var time = new FixedTimeProvider(now);
         var service = new PostgresPublicRegistrationService(database.DataSource, protector, context, configuration, time);
         Assert.True(service.IsEnabled);
-        var incompleteConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Mono:PublicRegistration:PrivacyNoticeVersion"] = "2026-10-25-v1"
-        }).Build();
+        var incompleteConfiguration = new ConfigurationBuilder().Build();
         Assert.False(new PostgresPublicRegistrationService(database.DataSource, protector, context,
             incompleteConfiguration, time).IsEnabled);
 

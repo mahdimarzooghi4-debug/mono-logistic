@@ -21,10 +21,7 @@ public sealed class PostgresPublicRegistrationService(
     TimeProvider timeProvider)
 {
     public bool IsEnabled => protector.IsConfigured &&
-        !string.IsNullOrWhiteSpace(configuration["Mono:PublicRegistration:PrivacyNoticeVersion"]) &&
-        !string.IsNullOrWhiteSpace(configuration["Mono:PublicRegistration:ControllerName"]) &&
-        !string.IsNullOrWhiteSpace(configuration["Mono:PublicRegistration:PrivacyContact"]) &&
-        !string.IsNullOrWhiteSpace(configuration["Mono:PublicRegistration:HostingDisclosure"]);
+        !string.IsNullOrWhiteSpace(configuration["Mono:PublicRegistration:PrivacyNoticeVersion"]);
 
     public async Task<(PublicRegistrationWriteOutcome Outcome, PublicRegistrationReceipt Receipt)> SubmitAsync(
         string type, PublicRegistrationPayload payload, bool consent, string noticeVersion,
