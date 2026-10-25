@@ -8,6 +8,8 @@ public sealed class PublicRegistrationRetentionWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Let Kestrel finish starting before the first database cleanup attempt.
+        await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
