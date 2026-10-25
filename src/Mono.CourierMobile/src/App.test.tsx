@@ -11,6 +11,7 @@ vi.mock('maplibre-gl', () => ({
 
 const offer = { offer_id: 'ofr_123', mission_id: 'mis_123', courier_id: 'cur_123', zone_id: 'zone_1', status: 'OFFERED', created_at: '2026-10-25T10:00:00Z', updated_at: '2026-10-25T10:00:00Z', expires_at: '2026-10-25T10:05:00Z' }
 const route = { offer_id: offer.offer_id, mission_id: offer.mission_id, expires_at: offer.expires_at, coordinates_status: 'COMPLETE', pickup: { location_id: 'loc_pickup', coordinate: { latitude: 35.7, longitude: 51.4 } }, dropoff: { location_id: 'loc_dropoff', coordinate: { latitude: 35.71, longitude: 51.42 } } }
+const originalGeolocation = Object.getOwnPropertyDescriptor(navigator, 'geolocation')
 function connectedApi(routeContext: unknown = route) {
   let responded = false
   let activeMission: Record<string, unknown> | null = null
@@ -19,6 +20,8 @@ function connectedApi(routeContext: unknown = route) {
     if (url === '/courier/v1/session') return new Response(JSON.stringify({ courier_id: 'cur_123', identity_domain: 'mono' }), { status: 200 })
     if (url === '/courier/v1/mission-offers') return new Response(JSON.stringify(responded ? [] : [offer]), { status: 200 })
     if (url === '/courier/v1/missions/active') return new Response(JSON.stringify({ mission: activeMission }), { status: 200 })
+    if (url === '/courier/v1/location' && init?.method === 'POST') return new Response(JSON.stringify({ applied: true }), { status: 200 })
+    if (url === '/courier/v1/location' && init?.method === 'DELETE') return new Response(null, { status: 204 })
     if (url.endsWith('/route-context')) return new Response(JSON.stringify(routeContext), { status: 200 })
     if (/\/(accept|decline)$/.test(url) && init?.method === 'POST') { responded = true; if (url.endsWith('/accept')) activeMission = { ...route, status: 'COURIER_ASSIGNED' }; return new Response(JSON.stringify({ offer: { ...offer, status: url.endsWith('/accept') ? 'ACCEPTED' : 'DECLINED' } }), { status: 200 }) }
     if (url.endsWith('/events') && init?.method === 'POST' && activeMission) {
@@ -37,7 +40,11 @@ async function connect(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'اتصال' }))
 }
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks() })
+afterEach(() => {
+  cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks()
+  if (originalGeolocation) Object.defineProperty(navigator, 'geolocation', originalGeolocation)
+  else Reflect.deleteProperty(navigator, 'geolocation')
+})
 
 describe('Courier offer mobile', () => {
   it('does not show invented offer details before connection', () => {
@@ -83,6 +90,45 @@ describe('Courier offer mobile', () => {
     await user.click(await screen.findByRole('button', { name: 'رسیدم به مبدأ' }))
     const [, request] = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/events'))!
     expect(request?.headers).toMatchObject({ 'Idempotency-Key': expect.stringMatching(/^mono-/) })
+  })
+
+  it('shares courier GPS only after consent, throttles it to the active mission, and stops the browser watch', async () => {
+    const onPosition: PositionCallback[] = []
+    const watchPosition = vi.fn((success: PositionCallback) => { onPosition.push(success); return 17 })
+    const clearWatch = vi.fn()
+    Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { watchPosition, clearWatch } })
+    const fetchMock = connectedApi()
+    const user = userEvent.setup(); render(<App />); await connect(user)
+    await user.click(await screen.findByRole('button', { name: 'قبول مأموریت' }))
+    await screen.findByRole('button', { name: 'اشتراک موقعیت زنده' })
+    const deleteCalls = () => fetchMock.mock.calls.filter(([url, init]) => String(url) === '/courier/v1/location' && init?.method === 'DELETE').length
+    await waitFor(() => expect(deleteCalls()).toBe(1))
+    expect(watchPosition).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'اشتراک موقعیت زنده' }))
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), expect.objectContaining({ enableHighAccuracy: true, maximumAge: 5_000 })))
+    onPosition[0]({
+      coords: { latitude: 35.72, longitude: 51.43, accuracy: 12, altitude: null, altitudeAccuracy: null, heading: 180, speed: 4 },
+      timestamp: Date.now(),
+    } as GeolocationPosition)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/courier/v1/location', expect.objectContaining({ method: 'POST' })))
+    const [, request] = fetchMock.mock.calls.find(([url, init]) => String(url) === '/courier/v1/location' && init?.method === 'POST')!
+    expect(JSON.parse(String(request?.body))).toMatchObject({ latitude: 35.72, longitude: 51.43, accuracy_meters: 12, heading_degrees: 180, speed_meters_per_second: 4, active_route_id: null })
+    expect(request?.headers).toMatchObject({ Authorization: 'Bearer dev-courier-token' })
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(clearWatch).toHaveBeenCalledWith(17))
+    const deletesBeforeBackground = deleteCalls()
+    expect(deletesBeforeBackground).toBe(1)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(2))
+
+    await user.click(await screen.findByRole('button', { name: 'توقف اشتراک موقعیت' }))
+    await waitFor(() => expect(clearWatch).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(deleteCalls()).toBe(deletesBeforeBackground + 1))
+    expect(fetchMock).toHaveBeenCalledWith('/courier/v1/location', expect.objectContaining({ method: 'DELETE', keepalive: true }))
   })
 
 
