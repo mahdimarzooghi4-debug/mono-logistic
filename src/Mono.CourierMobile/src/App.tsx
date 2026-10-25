@@ -22,6 +22,7 @@ class ApiRequestError extends Error {
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const MAP_STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || ''
 const OFFER_REFRESH_INTERVAL_MS = 15_000
+const LOCATION_UPDATE_INTERVAL_MS = 15_000
 const datetime = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' })
 let fallbackKeySequence = 0
 
@@ -36,6 +37,7 @@ async function api<T>(path: string, token: string, init?: RequestInit): Promise<
     try { const body = await response.json() as ApiError; message = body.error?.message || body.error?.code || message } catch { /* keep generic message */ }
     throw new ApiRequestError(response.status, message)
   }
+  if (response.status === 204) return undefined as T
   return await response.json() as T
 }
 function validCoordinate(value: Coordinate): value is NonNullable<Coordinate> {
@@ -60,9 +62,13 @@ export default function App() {
   const [notice, setNotice] = useState('')
   const [authMessage, setAuthMessage] = useState('')
   const [mapError, setMapError] = useState('')
+  const [locationSharing, setLocationSharing] = useState(false)
+  const [locationStatus, setLocationStatus] = useState('idle')
+  const [isVisible, setIsVisible] = useState(() => document.visibilityState === 'visible')
   const sequence = useRef(0)
   const busyRef = useRef(false)
   const actionKeys = useRef(new globalThis.Map<string, string>())
+  const missionLocationActive = Boolean(mission && nextEvents[mission.status])
 
   function expireSession() {
     sequence.current++
@@ -100,6 +106,66 @@ export default function App() {
   }, [])
 
   useEffect(() => { if (token) void refresh(token) }, [token, refresh])
+  useEffect(() => {
+    const updateVisibility = () => setIsVisible(document.visibilityState === 'visible')
+    document.addEventListener('visibilitychange', updateVisibility)
+    return () => document.removeEventListener('visibilitychange', updateVisibility)
+  }, [])
+
+  useEffect(() => {
+    if (!mission?.mission_id) {
+      setLocationSharing(false); setLocationStatus('idle')
+      return
+    }
+    setLocationSharing(false); setLocationStatus('idle')
+  }, [mission?.mission_id])
+
+  useEffect(() => {
+    if (!token || !mission || !missionLocationActive || !locationSharing) return
+    if (!isVisible) { setLocationStatus('paused'); return }
+    if (!navigator.geolocation) { setLocationStatus('unsupported'); setLocationSharing(false); return }
+
+    let active = true
+    let lastSentAt = 0
+    const controller = new AbortController()
+    setLocationStatus('requesting')
+    const watchId = navigator.geolocation.watchPosition(position => {
+      if (!active) return
+      const now = Date.now()
+      if (now - lastSentAt < LOCATION_UPDATE_INTERVAL_MS) return
+      lastSentAt = now
+      setLocationStatus('sending')
+      void api('/courier/v1/location', token, {
+        method: 'POST', signal: controller.signal,
+        body: JSON.stringify({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy_meters: position.coords.accuracy,
+          heading_degrees: position.coords.heading,
+          speed_meters_per_second: position.coords.speed,
+          observed_at: new Date(position.timestamp || now).toISOString(),
+          active_route_id: null,
+        }),
+      }).then(() => { if (active) setLocationStatus('sent') }).catch(cause => {
+        if (!active || (cause instanceof Error && cause.name === 'AbortError')) return
+        if (cause instanceof ApiRequestError && cause.status === 401) expireSession()
+        else { setLocationStatus('error'); setError(cause instanceof Error ? cause.message : 'ارسال موقعیت انجام نشد.') }
+      })
+    }, cause => {
+      if (!active) return
+      if (cause.code === cause.PERMISSION_DENIED) {
+        setLocationStatus('denied'); setLocationSharing(false)
+      } else setLocationStatus('unavailable')
+    }, { enableHighAccuracy: true, maximumAge: 5_000, timeout: 15_000 })
+
+    return () => {
+      active = false
+      controller.abort()
+      navigator.geolocation.clearWatch(watchId)
+      void api('/courier/v1/location', token, { method: 'DELETE', keepalive: true }).catch(() => undefined)
+    }
+  }, [token, mission?.mission_id, missionLocationActive, locationSharing, isVisible])
+
   useEffect(() => {
     if (!token || mission) return
     const refreshWhenVisible = () => {
@@ -190,6 +256,7 @@ export default function App() {
           <div className="location-list"><div><i className="pickup-pin" /><span><b>مبدأ</b><small>محل دریافت مرسوله</small></span></div><div><i className="dropoff-pin" /><span><b>مقصد</b><small>محل تحویل مرسوله</small></span></div></div>
           {navigationPoint && validCoordinate(navigationPoint) && nextEvents[mission.status] && <a className="primary mission-navigation" href={`geo:${navigationPoint.latitude},${navigationPoint.longitude}?q=${navigationPoint.latitude},${navigationPoint.longitude}`} aria-label={navigationLabel}>{navigationLabel}</a>}
           <div className="mission-progress"><span className="eyebrow">مرحلهٔ جاری</span><strong>{missionLabels[mission.status] || mission.status}</strong></div>
+          {nextEvents[mission.status] && <div className="mission-location-sharing"><p>موقعیت فقط با اجازهٔ شما، هنگام بازبودن اپ و فعال‌بودن این مأموریت ارسال می‌شود؛ فقط آخرین نقطه نگهداری می‌شود.</p><button className="secondary" onClick={() => { if (locationSharing) { setLocationSharing(false); setLocationStatus('stopped') } else { setLocationSharing(true); setLocationStatus('requesting') } }}>{locationSharing ? 'توقف اشتراک موقعیت' : 'اشتراک موقعیت زنده'}</button>{locationStatus !== 'idle' && <small role="status">{{ requesting: 'در انتظار دریافت موقعیت…', paused: 'با رفتن اپ به پس‌زمینه، ارسال متوقف است.', stopped: 'اشتراک موقعیت متوقف شد.', unsupported: 'مرورگر این دستگاه موقعیت‌یابی را پشتیبانی نمی‌کند.', denied: 'اجازهٔ موقعیت‌یابی داده نشد؛ تنظیمات مرورگر را بررسی کنید.', unavailable: 'موقعیت دستگاه فعلاً در دسترس نیست.', sending: 'در حال ثبت آخرین موقعیت…', sent: 'آخرین موقعیت ثبت شد.', error: 'ارسال موقعیت ناموفق بود.' }[locationStatus] || 'وضعیت موقعیت نامشخص است.'}</small>}</div>}
           {nextEvents[mission.status] ? <button className="primary mission-action" disabled={responding} onClick={() => void advanceMission()}>{responding ? 'در حال ثبت…' : nextEvents[mission.status].label}</button> : <div className="pending-note">این مأموریت پایان یافته است.</div>}
         </article>}
         {offer && !mission && <article className="offer-card">

@@ -56,6 +56,16 @@ public static class MonoCourierLocationEndpoints
             })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
+        endpoints.MapDelete("/courier/v1/location", async (
+                IMonoCourierContext courier,
+                PostgresCourierCurrentLocationService locations,
+                CancellationToken cancellationToken) =>
+            {
+                await locations.ClearAsync(courier.CourierId, cancellationToken);
+                return Results.NoContent();
+            })
+            .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
+
         return endpoints;
     }
 }

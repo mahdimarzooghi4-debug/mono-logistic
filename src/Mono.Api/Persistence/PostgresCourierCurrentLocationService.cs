@@ -11,6 +11,16 @@ public sealed class PostgresCourierCurrentLocationService(
     NpgsqlDataSource dataSource,
     TimeProvider timeProvider)
 {
+    public async Task ClearAsync(string courierId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(courierId);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM courier_current_locations WHERE courier_id = @courier_id;", connection);
+        command.Parameters.AddWithValue("courier_id", NpgsqlDbType.Text, courierId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<CourierCurrentLocationWriteResult> UpdateAsync(
         string courierId,
         CourierLocationUpdate update,
