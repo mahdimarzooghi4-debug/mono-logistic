@@ -13,7 +13,7 @@ public sealed class PublicRegistrationProtectorTests
         var ciphertext = protector.Protect("reg_123", "{\"phone\":\"09121234567\"}");
         Assert.DoesNotContain("09121234567", ciphertext);
         Assert.Equal("{\"phone\":\"09121234567\"}", protector.Unprotect("reg_123", ciphertext));
-        Assert.Throws<CryptographicException>(() => protector.Unprotect("reg_456", ciphertext));
+        Assert.ThrowsAny<CryptographicException>(() => protector.Unprotect("reg_456", ciphertext));
     }
 
     [Fact]
