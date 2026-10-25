@@ -224,6 +224,16 @@ public static class MonoMissionCourierOfferEndpoints
             Results.Ok(await offers.ListMyOffersAsync(courier.CourierId, cancellationToken)))
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
+        endpoints.MapGet("/courier/v1/missions/active", async (
+                HttpResponse response, IMonoCourierContext courier,
+                PostgresCourierMissionOfferRouteContextService routeContext, CancellationToken cancellationToken) =>
+            {
+                response.Headers.CacheControl = "no-store";
+                try { return Results.Ok(new { mission = await routeContext.FindActiveAsync(courier.CourierId, cancellationToken) }); }
+                catch (ArgumentException) { return Results.BadRequest(Error("INVALID_REQUEST", "Courier identity is invalid.")); }
+            })
+            .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
+
         endpoints.MapGet("/courier/v1/mission-offers/{offerId}/route-context", async (
                 string offerId,
                 HttpResponse response,

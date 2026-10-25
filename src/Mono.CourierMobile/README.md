@@ -35,3 +35,6 @@ npm run dev
 - HTTPS و دامنهٔ اپ برای نصب‌پذیری PWA.
 - دریافت پیشنهاد در این مرحله با refresh دستی انجام می‌شود؛ push یا polling هنوز به این اپ اضافه نشده است.
 - مسیریابی با اپ خارجی در این slice نیست؛ API فعلی تنها مختصات دو نقطه را می‌دهد.
+
+- After acceptance, restores the courier's assigned active mission from `GET /courier/v1/missions/active`, opens supported mobile map apps through `geo:` coordinates, and advances the existing authenticated mission lifecycle one event at a time.
+- Mission lifecycle actions are manual courier confirmations; the app does not infer arrival from GPS or geofence.
