@@ -11,6 +11,7 @@ type DeliveryPage = { items: Delivery[]; next_cursor: string | null }
 type Quote = { quote_id: string; version: number; expires_at: string; is_expired: boolean; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number }
 type PromiseRecord = { promise_id: string; version: number; committed_delivery_at: string; outcome: string }
 type Detail = Delivery & { quote: Quote | null; promise: PromiseRecord | null }
+type CourierLocation = { latitude: number; longitude: number; accuracy_meters: number | null; observed_at: string }
 type View = 'home' | 'deliveries' | 'create' | 'notifications' | 'more'
 type ApiError = { error?: { code?: string; message?: string } }
 
@@ -61,6 +62,8 @@ export default function App() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [items, setItems] = useState<Delivery[]>([])
   const [detail, setDetail] = useState<Detail | null>(null)
+  const [courierLocation, setCourierLocation] = useState<CourierLocation | null>(null)
+  const [locationState, setLocationState] = useState<'loading' | 'available' | 'unavailable'>('unavailable')
   const [selectedBranch, setSelectedBranch] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -91,6 +94,27 @@ export default function App() {
   }, [])
 
   useEffect(() => { if (token) void refresh(token) }, [token, refresh])
+
+  useEffect(() => {
+    const missionId = detail?.mission_id
+    if (!token || !missionId || ['DELIVERED', 'FAILED', 'CANCELLED'].includes((detail.mission_status || '').toUpperCase())) {
+      setCourierLocation(null); setLocationState('unavailable')
+      return
+    }
+    let active = true
+    const loadLocation = async () => {
+      try {
+        const position = await api<CourierLocation>(`/v1/missions/${encodeURIComponent(missionId)}/courier-location`, token)
+        if (active) { setCourierLocation(position); setLocationState('available') }
+      } catch {
+        if (active) { setCourierLocation(null); setLocationState('unavailable') }
+      }
+    }
+    setLocationState('loading')
+    void loadLocation()
+    const timer = window.setInterval(() => void loadLocation(), 15_000)
+    return () => { active = false; window.clearInterval(timer) }
+  }, [token, detail?.mission_id, detail?.mission_status])
 
   const selectedBranchName = branches.find(branch => branch.branchId === selectedBranch)?.name || branches[0]?.name || 'شعبه‌ای انتخاب نشده'
   const activeItems = items.filter(item => !['DELIVERED', 'CANCELLED', 'FAILED'].includes((item.mission_status || item.status).toUpperCase()))
@@ -229,6 +253,16 @@ export default function App() {
     {detail && <div className="detail-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setDetail(null) }}><section className="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="detail-heading">
       <div className="sheet-grabber" /><header><div><span className="eyebrow">جزئیات ارسال</span><h2 id="detail-heading">سفارش {detail.external_reference}</h2></div><button className="round-button" onClick={() => setDetail(null)} aria-label="بستن">×</button></header>
       <div className="status-callout"><span className="status-dot" /><span><strong>{statusText(detail.mission_status || detail.status)}</strong><small>{detail.mission_id ? `شناسه مأموریت: ${detail.mission_id}` : `شناسه ارسال: ${detail.delivery_request_id}`}</small></span></div>
+      {detail.mission_id && <section className="courier-location" aria-live="polite">
+        <div className="courier-location-heading"><span className="eyebrow">موقعیت پیک</span><span className={`location-indicator ${locationState}`} /></div>
+        {courierLocation ? <>
+          <strong>موقعیت به‌روز پیک</strong>
+          <p>آخرین دریافت: {formatDate(courierLocation.observed_at)}{courierLocation.accuracy_meters != null ? ` · دقت حدود ${fa.format(Math.round(courierLocation.accuracy_meters))} متر` : ''}</p>
+          <div className="location-coordinates" dir="ltr">{courierLocation.latitude.toFixed(5)}, {courierLocation.longitude.toFixed(5)}</div>
+          <a href={`geo:${courierLocation.latitude},${courierLocation.longitude}?q=${courierLocation.latitude},${courierLocation.longitude}`} className="location-map-link">بازکردن موقعیت در نقشهٔ دستگاه</a>
+        </> : <p>{locationState === 'loading' ? 'در حال دریافت موقعیت پیک…' : 'موقعیت تازه‌ای برای این مأموریت در دسترس نیست.'}</p>}
+        <small className="location-privacy">فقط آخرین موقعیت پیکِ مأموریت فعال نمایش داده می‌شود.</small>
+      </section>}
       <dl className="detail-grid"><div><dt>زمان ثبت</dt><dd>{formatDate(detail.created_at)}</dd></div><div><dt>تعهد تحویل</dt><dd>{formatDate(detail.promise?.committed_delivery_at || detail.committed_delivery_at)}</dd></div></dl>
       <div className="timeline"><span className="timeline-line" /><div className="timeline-step done"><i /><span><b>ثبت درخواست</b><small>{formatDate(detail.created_at)}</small></span></div><div className={`timeline-step ${detail.quote ? 'done' : ''}`}><i /><span><b>پیشنهاد مونو</b><small>{detail.quote ? 'پیشنهاد آمادهٔ بررسی' : 'در انتظار آماده‌شدن پیشنهاد'}</small></span></div><div className={`timeline-step ${detail.mission_id ? 'done' : ''}`}><i /><span><b>تخصیص پیک</b><small>{detail.mission_id ? statusText(detail.mission_status) : 'پس از تأیید پیشنهاد'}</small></span></div></div>
       {detail.quote && <div className="offer-card"><span className="eyebrow">پیشنهاد مونو · نسخهٔ {fa.format(detail.quote.version)}</span><strong>{money.format(detail.quote.fare_toman)} تومان</strong><div><span>مسافت</span><b>{fa.format(detail.quote.distance_meters)} متر</b></div><div><span>سهم شما</span><b>{money.format(detail.quote.seller_share_toman)} تومان</b></div><div><span>اعتبار</span><b>{detail.quote.is_expired ? 'منقضی شده' : formatDate(detail.quote.expires_at)}</b></div><div><span>تعهد تحویل</span><b>{formatDate(detail.promise?.committed_delivery_at)}</b></div></div>}
