@@ -219,24 +219,33 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         var protector = new PublicRegistrationProtector(Convert.ToBase64String(Enumerable.Range(0, 32).Select(x => (byte)x).ToArray()));
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Mono:PublicRegistration:PrivacyNoticeVersion"] = "privacy-2026-01"
+            ["Mono:PublicRegistration:PrivacyNoticeVersion"] = "2026-10-25-v1",
+            ["Mono:PublicRegistration:ControllerName"] = "Mono Logistics Ltd.",
+            ["Mono:PublicRegistration:PrivacyContact"] = "privacy@example.test",
+            ["Mono:PublicRegistration:HostingDisclosure"] = "Test hosting, Germany"
         }).Build();
         var time = new FixedTimeProvider(now);
         var service = new PostgresPublicRegistrationService(database.DataSource, protector, context, configuration, time);
         Assert.True(service.IsEnabled);
+        var incompleteConfiguration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Mono:PublicRegistration:PrivacyNoticeVersion"] = "2026-10-25-v1"
+        }).Build();
+        Assert.False(new PostgresPublicRegistrationService(database.DataSource, protector, context,
+            incompleteConfiguration, time).IsEnabled);
 
         var submitted = await service.SubmitAsync("BUSINESS", new("کاربر نمونه", "+98 912 123 4567", "فروشگاه نمونه"),
-            true, "privacy-2026-01", "landing-submit-key-0001", CancellationToken.None);
+            true, "2026-10-25-v1", "landing-submit-key-0001", CancellationToken.None);
         Assert.Equal(PublicRegistrationWriteOutcome.Created, submitted.Outcome);
         Assert.Equal("SUBMITTED", submitted.Receipt.Status);
 
         var replay = await service.SubmitAsync("BUSINESS", new("کاربر نمونه", "09121234567", "فروشگاه نمونه"),
-            true, "privacy-2026-01", "landing-submit-key-0001", CancellationToken.None);
+            true, "2026-10-25-v1", "landing-submit-key-0001", CancellationToken.None);
         Assert.Equal(PublicRegistrationWriteOutcome.Replayed, replay.Outcome);
         Assert.Equal(submitted.Receipt.RequestId, replay.Receipt.RequestId);
 
         var conflict = await service.SubmitAsync("BUSINESS", new("کاربر نمونه", "09121234567", "فروشگاه دیگر"),
-            true, "privacy-2026-01", "landing-submit-key-0001", CancellationToken.None);
+            true, "2026-10-25-v1", "landing-submit-key-0001", CancellationToken.None);
         Assert.Equal(PublicRegistrationWriteOutcome.Conflict, conflict.Outcome);
 
         var queue = await service.ListAsync(10, CancellationToken.None);
@@ -244,7 +253,7 @@ public sealed class PostgresCourierOnboardingServiceTests(ITestOutputHelper outp
         Assert.Equal("کاربر نمونه", item.FullName);
         Assert.Equal("09121234567", item.Phone);
         Assert.Equal("فروشگاه نمونه", item.BusinessName);
-        Assert.Equal("privacy-2026-01", item.PrivacyNoticeVersion);
+        Assert.Equal("2026-10-25-v1", item.PrivacyNoticeVersion);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
             await new PostgresPublicRegistrationService(database.DataSource, protector,
