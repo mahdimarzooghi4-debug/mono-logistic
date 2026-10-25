@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './admissions-workbench.css'
+import PublicRegistrationQueue from './PublicRegistrationQueue'
 
 type Customer = { customerId: string; legalName: string; displayName: string | null; status: string; createdAt: string }
 type Courier = { courier_id: string; status: string; mode: string; created_at: string; updated_at: string }
@@ -66,6 +67,7 @@ export default function AdmissionsWorkbench({ token, reloadKey, onConnected, onO
   return <main className="admissions-workbench">
     <div className="admissions-intro"><div><span className="eyebrow">پذیرش و راه‌اندازی</span><h2>صف یکپارچهٔ پذیرش</h2><p>داده‌ها از صف مشتری‌ها و پیک‌ها خوانده می‌شوند. اعداد، فقط رکوردهای دریافت‌شده در این صفحه را نشان می‌دهند.</p></div><button className="secondary-button" onClick={() => void load()} disabled={!token || busy}>{busy ? 'در حال دریافت…' : 'تازه‌سازی'}</button></div>
     {!token ? <div className="admissions-empty">برای مشاهدهٔ صف‌ها با توکن مدیر عملیات متصل شوید.</div> : <>
+      <PublicRegistrationQueue token={token} />
       <section className="admissions-metrics" aria-label="خلاصه صف پذیرش">
         <article><span>پرونده در این صفحه</span><strong>{fa.format(rows.length)}</strong><small>دادهٔ فعلی API</small></article>
         <article><span>پیک</span><strong>{fa.format(counts.couriers)}</strong><small>از صف پیک‌ها</small></article>
