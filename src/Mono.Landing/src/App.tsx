@@ -27,11 +27,14 @@ function App() {
         privacy_notice_version: PUBLIC_REGISTRATION_PRIVACY_NOTICE_VERSION,
         consent: data.get('privacyConsent') === 'on',
       })
-      if (idempotencyKey.current?.payload !== payload)
-        idempotencyKey.current = { payload, key: globalThis.crypto.randomUUID() }
+      const previousKey = idempotencyKey.current
+      const requestKey = previousKey && previousKey.payload === payload
+        ? previousKey.key
+        : globalThis.crypto.randomUUID()
+      idempotencyKey.current = { payload, key: requestKey }
       const response = await fetch(`${apiBaseUrl}/v1/public-registration-requests`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey.current.key, Accept: 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': requestKey, Accept: 'application/json' },
         body: payload,
       })
       if (!response.ok) {
