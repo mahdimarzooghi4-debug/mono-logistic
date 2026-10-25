@@ -121,6 +121,12 @@ export default function App() {
   }, [mission?.mission_id])
 
   useEffect(() => {
+    if (!token || !mission?.mission_id) return
+    if (locationSharing && missionLocationActive) return
+    void api('/courier/v1/location', token, { method: 'DELETE', keepalive: true }).catch(() => undefined)
+  }, [token, mission?.mission_id, missionLocationActive, locationSharing])
+
+  useEffect(() => {
     if (!token || !mission || !missionLocationActive || !locationSharing) return
     if (!isVisible) { setLocationStatus('paused'); return }
     if (!navigator.geolocation) { setLocationStatus('unsupported'); setLocationSharing(false); return }
@@ -162,7 +168,6 @@ export default function App() {
       active = false
       controller.abort()
       navigator.geolocation.clearWatch(watchId)
-      void api('/courier/v1/location', token, { method: 'DELETE', keepalive: true }).catch(() => undefined)
     }
   }, [token, mission?.mission_id, missionLocationActive, locationSharing, isVisible])
 
@@ -186,6 +191,7 @@ export default function App() {
     setOffers([]); setMission(null); setRoute(null); setNotice(''); setError(''); setAuthMessage(''); setToken(value); setTokenDraft('')
   }
   function disconnect() {
+    if (token) void api('/courier/v1/location', token, { method: 'DELETE', keepalive: true }).catch(() => undefined)
     sequence.current++; actionKeys.current.clear(); setToken(''); setOffers([]); setMission(null); setRoute(null); setError(''); setNotice(''); setAuthMessage('')
   }
   async function respond(action: 'accept' | 'decline') {

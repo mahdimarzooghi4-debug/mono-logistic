@@ -101,6 +101,8 @@ describe('Courier offer mobile', () => {
     const user = userEvent.setup(); render(<App />); await connect(user)
     await user.click(await screen.findByRole('button', { name: 'قبول مأموریت' }))
     await screen.findByRole('button', { name: 'اشتراک موقعیت زنده' })
+    const deleteCalls = () => fetchMock.mock.calls.filter(([url, init]) => String(url) === '/courier/v1/location' && init?.method === 'DELETE').length
+    await waitFor(() => expect(deleteCalls()).toBe(1))
     expect(watchPosition).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: 'اشتراک موقعیت زنده' }))
@@ -110,12 +112,23 @@ describe('Courier offer mobile', () => {
       timestamp: Date.now(),
     } as GeolocationPosition)
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/courier/v1/location', expect.objectContaining({ method: 'POST' })))
-    const [, request] = fetchMock.mock.calls.find(([url]) => String(url) === '/courier/v1/location')!
+    const [, request] = fetchMock.mock.calls.find(([url, init]) => String(url) === '/courier/v1/location' && init?.method === 'POST')!
     expect(JSON.parse(String(request?.body))).toMatchObject({ latitude: 35.72, longitude: 51.43, accuracy_meters: 12, heading_degrees: 180, speed_meters_per_second: 4, active_route_id: null })
     expect(request?.headers).toMatchObject({ Authorization: 'Bearer dev-courier-token' })
-    await user.click(await screen.findByRole('button', { name: 'توقف اشتراک موقعیت' }))
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
     await waitFor(() => expect(clearWatch).toHaveBeenCalledWith(17))
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/courier/v1/location', expect.objectContaining({ method: 'DELETE', keepalive: true })))
+    const deletesBeforeBackground = deleteCalls()
+    expect(deletesBeforeBackground).toBe(1)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(watchPosition).toHaveBeenCalledTimes(2))
+
+    await user.click(await screen.findByRole('button', { name: 'توقف اشتراک موقعیت' }))
+    await waitFor(() => expect(clearWatch).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(deleteCalls()).toBe(deletesBeforeBackground + 1))
+    expect(fetchMock).toHaveBeenCalledWith('/courier/v1/location', expect.objectContaining({ method: 'DELETE', keepalive: true }))
   })
 
 
