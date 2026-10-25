@@ -47,9 +47,13 @@ builder.Services.AddScoped<PostgresCourierPayoutDestinationAuditReadService>();
 builder.Services.AddScoped<PostgresCourierPayoutDestinationAuditSearchService>();
 builder.Services.AddSingleton(_ => new CourierPayoutIbanProtector(builder.Configuration["MonoCourier:PayoutIbanEncryptionKey"]));
 builder.Services.AddScoped<PostgresCourierOnboardingService>();
-builder.Services.AddSingleton(_ => new PublicRegistrationProtector(builder.Configuration["Mono:PublicRegistration:EncryptionKey"]));
+var publicRegistrationProtector = new PublicRegistrationProtector(
+    builder.Configuration["Mono:PublicRegistration:EncryptionKey"]);
+builder.Services.AddSingleton(publicRegistrationProtector);
 builder.Services.AddScoped<PostgresPublicRegistrationService>();
-builder.Services.AddHostedService<PublicRegistrationRetentionWorker>();
+if (publicRegistrationProtector.IsConfigured &&
+    !string.IsNullOrWhiteSpace(builder.Configuration["Mono:PublicRegistration:PrivacyNoticeVersion"]))
+    builder.Services.AddHostedService<PublicRegistrationRetentionWorker>();
 builder.Services.AddScoped<PostgresWebhookEndpointRepository>();
 builder.Services.AddSingleton(_ => new WebhookSecretProtector(builder.Configuration["Mono:WebhookEncryptionKey"]));
 builder.Services.AddSingleton<IWebhookDnsResolver, SystemWebhookDnsResolver>();
