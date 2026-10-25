@@ -16,6 +16,9 @@ const nextEvents: Record<string, { type: string; label: string }> = {
 const dropoffStatuses = new Set(['PICKED_UP', 'IN_TRANSIT', 'ARRIVED_DROPOFF'])
 const missionLabels: Record<string, string> = { COURIER_ASSIGNED: 'پیک تخصیص‌یافته', ARRIVED_PICKUP: 'رسیده به مبدأ', HANDED_TO_COURIER: 'تحویل از فروشگاه تأییدشده', PICKED_UP: 'مرسوله دریافت‌شده', IN_TRANSIT: 'در مسیر مقصد', ARRIVED_DROPOFF: 'رسیده به مقصد' }
 type ApiError = { error?: { code?: string; message?: string } }
+class ApiRequestError extends Error {
+  constructor(readonly status: number, message: string) { super(message); this.name = 'ApiRequestError' }
+}
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const MAP_STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || ''
 const OFFER_REFRESH_INTERVAL_MS = 15_000
@@ -30,7 +33,7 @@ async function api<T>(path: string, token: string, init?: RequestInit): Promise<
   if (!response.ok) {
     let message = `خطای سرور (${response.status})`
     try { const body = await response.json() as ApiError; message = body.error?.message || body.error?.code || message } catch { /* keep generic message */ }
-    throw new Error(message)
+    throw new ApiRequestError(response.status, message)
   }
   return await response.json() as T
 }
@@ -53,10 +56,20 @@ export default function App() {
   const [responding, setResponding] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [authMessage, setAuthMessage] = useState('')
   const [mapError, setMapError] = useState('')
   const sequence = useRef(0)
   const busyRef = useRef(false)
   const actionKeys = useRef(new globalThis.Map<string, string>())
+
+  function expireSession() {
+    sequence.current++
+    busyRef.current = false
+    actionKeys.current.clear()
+    setToken(''); setTokenDraft(''); setOffers([]); setMission(null); setRoute(null)
+    setBusy(false); setResponding(false); setError(''); setNotice('')
+    setAuthMessage('نشست شما معتبر نیست یا منقضی شده است. برای ادامه دوباره متصل شوید.')
+  }
 
   const refresh = useCallback(async (activeToken: string) => {
     const current = ++sequence.current
@@ -79,7 +92,8 @@ export default function App() {
         setRoute(previous => JSON.stringify(previous) === JSON.stringify(context) ? previous : context)
       }
     } catch (cause) {
-      if (current === sequence.current) { setError(cause instanceof Error ? cause.message : 'دریافت پیشنهاد انجام نشد.'); setOffers([]); setMission(null); setRoute(null) }
+      if (current === sequence.current && cause instanceof ApiRequestError && cause.status === 401) expireSession()
+      else if (current === sequence.current) { setError(cause instanceof Error ? cause.message : 'دریافت پیشنهاد انجام نشد.'); setOffers([]); setMission(null); setRoute(null) }
     } finally { busyRef.current = false; if (current === sequence.current) setBusy(false) }
   }, [])
 
@@ -101,10 +115,10 @@ export default function App() {
     event.preventDefault()
     const value = tokenDraft.trim()
     if (!value) return
-    setOffers([]); setMission(null); setRoute(null); setNotice(''); setToken(value); setTokenDraft('')
+    setOffers([]); setMission(null); setRoute(null); setNotice(''); setError(''); setAuthMessage(''); setToken(value); setTokenDraft('')
   }
   function disconnect() {
-    sequence.current++; actionKeys.current.clear(); setToken(''); setOffers([]); setMission(null); setRoute(null); setError(''); setNotice('')
+    sequence.current++; actionKeys.current.clear(); setToken(''); setOffers([]); setMission(null); setRoute(null); setError(''); setNotice(''); setAuthMessage('')
   }
   async function respond(action: 'accept' | 'decline') {
     const offer = offers[0]
@@ -119,7 +133,10 @@ export default function App() {
       actionKeys.current.delete(keyId)
       setNotice(action === 'accept' ? 'پیشنهاد پذیرفته شد.' : 'پیشنهاد رد شد.')
       await refresh(token)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'ثبت پاسخ انجام نشد.') }
+    } catch (cause) {
+      if (cause instanceof ApiRequestError && cause.status === 401) expireSession()
+      else setError(cause instanceof Error ? cause.message : 'ثبت پاسخ انجام نشد.')
+    }
     finally { setResponding(false) }
   }
 
@@ -139,7 +156,10 @@ export default function App() {
         body: JSON.stringify({ event_type: event.type, reason: 'COURIER_MOBILE_CONFIRMED' }),
       })
       actionKeys.current.delete(keyId); setNotice('وضعیت مأموریت ثبت شد.'); await refresh(token)
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'ثبت وضعیت مأموریت انجام نشد.') }
+    } catch (cause) {
+      if (cause instanceof ApiRequestError && cause.status === 401) expireSession()
+      else setError(cause instanceof Error ? cause.message : 'ثبت وضعیت مأموریت انجام نشد.')
+    }
     finally { setResponding(false) }
   }
 
@@ -155,7 +175,7 @@ export default function App() {
   return <main className="courier-shell" dir="rtl">
     <header className="topbar"><div className="brand">م</div><div className="brand-copy"><strong>مونو پیک</strong><span>{token ? 'پیشنهادهای مأموریت' : 'ورود پیک'}</span></div>{token && <><button className="icon-button" onClick={() => void refresh(token)} disabled={busy} aria-label="به‌روزرسانی پیشنهادها">↻</button><button className="logout" onClick={disconnect}>خروج</button></>}</header>
     <section className="content" aria-live="polite">
-      {!token ? <section className="login-card"><span className="eyebrow">پنل پیک</span><h1>آمادهٔ دریافت مأموریت</h1><p>توکن دسترسی آزمایشی را وارد کنید. توکن فقط در حافظهٔ این صفحه نگهداری می‌شود و پس از بستن یا بارگذاری دوباره پاک خواهد شد.</p><form onSubmit={connect}><label htmlFor="access-token">توکن دسترسی</label><input id="access-token" type="password" autoComplete="off" value={tokenDraft} onChange={event => setTokenDraft(event.target.value)} required /><button className="primary" type="submit">اتصال</button></form></section> : <>
+      {!token ? <section className="login-card"><span className="eyebrow">پنل پیک</span><h1>آمادهٔ دریافت مأموریت</h1><p>توکن دسترسی آزمایشی را وارد کنید. توکن فقط در حافظهٔ این صفحه نگهداری می‌شود و پس از بستن یا بارگذاری دوباره پاک خواهد شد.</p>{authMessage && <div className="notice error" role="alert">{authMessage}</div>}<form onSubmit={connect}><label htmlFor="access-token">توکن دسترسی</label><input id="access-token" type="password" autoComplete="off" value={tokenDraft} onChange={event => setTokenDraft(event.target.value)} required /><button className="primary" type="submit">اتصال</button></form></section> : <>
         {error && <div className="notice error" role="alert">{error}</div>}{notice && <div className="notice success" role="status">{notice}</div>}
         <div className="page-heading"><div><span className="eyebrow">مأموریت‌های شما</span><h1>{mission ? 'مأموریت در حال اجرا' : offer ? 'پیشنهاد جدید' : 'پیشنهادی ندارید'}</h1></div><span className={`live-dot ${busy ? 'loading' : ''}`}>{busy ? 'در حال دریافت' : mission ? 'مأموریت فعال' : 'بررسی هر ۱۵ ثانیه'}</span></div>
         {busy && !offer && !mission && <div className="empty-card">در حال بررسی پیشنهادهای تازه…</div>}

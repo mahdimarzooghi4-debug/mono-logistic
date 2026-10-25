@@ -138,4 +138,22 @@ describe('Courier offer mobile', () => {
     await user.click(await screen.findByRole('button', { name: 'رد پیشنهاد' }))
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/courier/v1/mission-offers/${offer.offer_id}/decline`, expect.objectContaining({ method: 'POST' })))
   })
+
+  it('clears an expired in-memory token and stops polling until the courier reconnects', async () => {
+    const fetchMock = connectedApi()
+    const user = userEvent.setup(); render(<App />); await connect(user)
+    await screen.findByRole('heading', { name: 'پیشنهاد جدید' })
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input) === '/courier/v1/session') return new Response(JSON.stringify({ error: { code: 'TOKEN_EXPIRED' } }), { status: 401 })
+      return new Response(JSON.stringify({ mission: null }), { status: 200 })
+    })
+
+    await user.click(screen.getByRole('button', { name: 'به‌روزرسانی پیشنهادها' }))
+    expect(await screen.findByRole('heading', { name: 'آمادهٔ دریافت مأموریت' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('نشست شما معتبر نیست یا منقضی شده است')
+    expect(screen.getByLabelText('توکن دسترسی')).toHaveValue('')
+    const sessionCalls = fetchMock.mock.calls.filter(([url]) => String(url) === '/courier/v1/session').length
+    await new Promise(resolve => setTimeout(resolve, 30))
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/courier/v1/session')).toHaveLength(sessionCalls)
+  })
 })

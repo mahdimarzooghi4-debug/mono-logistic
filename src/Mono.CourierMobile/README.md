@@ -1,6 +1,6 @@
 # Mono Courier Mobile
 
-مشتری وب موبایل پیک برای دیدن یک پیشنهاد فعال، مشاهدهٔ مبدأ و مقصد روی نقشه و قبول یا رد پیشنهاد. رابط فعلی، ورود آزمایشی با توکن دستی دارد؛ توکن فقط در حافظهٔ تب نگهداری می‌شود.
+مشتری وب موبایل پیک برای دیدن پیشنهاد، مشاهدهٔ مبدأ و مقصد روی نقشه، قبول یا رد مأموریت و ثبت دستی مراحل تحویل. رابط فعلی، ورود آزمایشی با توکن دستی دارد؛ توکن فقط در حافظهٔ صفحه نگهداری می‌شود. با پاسخ 401 توکن پاک می‌شود و پیک باید دوباره متصل شود.
 
 ## اجرا و بررسی
 
@@ -27,15 +27,19 @@ npm run dev
 - `GET /courier/v1/mission-offers` برای پیشنهادها
 - `GET /courier/v1/mission-offers/{offerId}/route-context` برای مختصات محدود مبدأ/مقصد
 - `POST /courier/v1/mission-offers/{offerId}/accept` و `/decline` با `Idempotency-Key`
+- `GET /courier/v1/missions/active` برای بازیابی مأموریت فعال
+- `POST /courier/v1/missions/{missionId}/events` برای ثبت دستی مراحل مأموریت با `Idempotency-Key`
 
 ## پیش‌نیازهای بیرونی برای محصول
 
 - اتصال OIDC واقعی پیک و توکن کوتاه‌عمر؛ endpoint ورود در این نسخه وجود ندارد.
 - سرویس کاشی و Style JSON خودمیزبان روی محیط Stage/Production.
 - HTTPS و دامنهٔ اپ برای نصب‌پذیری PWA.
-- دریافت پیشنهاد در این مرحله با refresh دستی انجام می‌شود؛ push یا polling هنوز به این اپ اضافه نشده است.
-- مسیریابی با اپ خارجی در این slice نیست؛ API فعلی تنها مختصات دو نقطه را می‌دهد.
 
-- After acceptance, restores the courier's assigned active mission from `GET /courier/v1/missions/active`, opens supported mobile map apps through `geo:` coordinates, and advances the existing authenticated mission lifecycle one event at a time.
-- Mission lifecycle actions are manual courier confirmations; the app does not infer arrival from GPS or geofence.
-- Pending offers are refreshed every 15 seconds while the app is visible, and immediately when it returns to the foreground. Polling pauses in the background and while an accepted mission is active; manual refresh remains available.
+## رفتار نشست و مأموریت
+
+- توکن آزمایشی در حافظهٔ صفحه می‌ماند، ذخیرهٔ پایدار نمی‌شود و پس از بارگذاری مجدد باید دوباره وارد شود.
+- در پاسخ HTTP 401، توکن پاک و ورودی اتصال دوباره نمایش داده می‌شود؛ 401های متوالی در پس‌زمینه ایجاد نمی‌شوند.
+- بعد از پذیرش، مأموریت از `GET /courier/v1/missions/active` بازیابی می‌شود و مراحل چرخهٔ موجود با تأیید دستی پیک ثبت می‌شوند؛ وضعیت از روی GPS حدس زده نمی‌شود.
+- پیشنهادها هر ۱۵ ثانیه در حالت نمایان و بدون مأموریت فعال تازه می‌شوند، هنگام بازگشت اپ فوراً به‌روز می‌شوند و در پس‌زمینه polling ندارند.
+- مسیریابی با `geo:` به اپ نقشهٔ نصب‌شده واگذار می‌شود.
