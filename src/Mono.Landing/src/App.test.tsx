@@ -4,6 +4,17 @@ import userEvent from '@testing-library/user-event'
 import App from './App'
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
+function stubRandomUuid(value: string) {
+  const original = globalThis.crypto
+  vi.stubGlobal('crypto', new Proxy(original, {
+    get(target, property) {
+      if (property === 'randomUUID') return () => value
+      const result = Reflect.get(target, property, target)
+      return typeof result === 'function' ? result.bind(target) : result
+    },
+  }))
+}
+
 describe('Mono public landing', () => {
   it('renders the hero, registration choices, and footer navigation', () => {
     render(<App />)
@@ -35,7 +46,7 @@ describe('Mono public landing', () => {
   })
 
   it('submits an explicitly consented application with the displayed notice version', async () => {
-    vi.stubGlobal('crypto', { randomUUID: () => '00000000-0000-4000-8000-000000000001' })
+    stubRandomUuid('00000000-0000-4000-8000-000000000001')
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ requestId: 'reg_0123456789abcdef0123456789abcdef', status: 'SUBMITTED' }), { status: 202 }))
     vi.stubGlobal('fetch', fetchMock)
     const user = userEvent.setup()
@@ -56,7 +67,7 @@ describe('Mono public landing', () => {
   })
 
   it('keeps the intake closed when the backend is not configured', async () => {
-    vi.stubGlobal('crypto', { randomUUID: () => '00000000-0000-4000-8000-000000000002' })
+    stubRandomUuid('00000000-0000-4000-8000-000000000002')
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ title: 'Registration is temporarily unavailable.' }), { status: 503 })))
     const user = userEvent.setup()
     render(<App />)

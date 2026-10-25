@@ -117,7 +117,7 @@ function App() {
         <div className="footer-column"><h2>دسترسی سریع</h2><a href="#home">صفحهٔ اصلی</a><a href="#about">دربارهٔ مونو</a><a href="#registration">فرم شروع همکاری</a></div>
         <div className="footer-contact"><h2>شروع گفتگو</h2><p>برای ثبت درخواست همکاری، فرم را تکمیل کنید.</p><a href="#registration">رفتن به فرم ثبت‌نام <span aria-hidden="true">←</span></a></div>
       </div>
-          <div className="footer-bottom"><span>© {new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric' }).format(new Date())} مونو. تمامی حقوق محفوظ است.</span><a href="#privacy">اطلاعیهٔ حریم خصوصی</a></div>
+      <div className="footer-bottom"><span>© {new Intl.DateTimeFormat('fa-IR-u-ca-persian', { year: 'numeric' }).format(new Date())} مونو. تمامی حقوق محفوظ است.</span><a href="#privacy">اطلاعیهٔ حریم خصوصی</a></div>
     </footer>
   </div>
 }
