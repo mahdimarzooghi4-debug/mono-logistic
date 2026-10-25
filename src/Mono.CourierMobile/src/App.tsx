@@ -13,6 +13,7 @@ const nextEvents: Record<string, { type: string; label: string }> = {
   HANDED_TO_COURIER: { type: 'mission.picked_up', label: 'مرسوله را تحویل گرفتم' }, PICKED_UP: { type: 'mission.in_transit', label: 'حرکت به سمت مقصد' },
   IN_TRANSIT: { type: 'mission.arrived_dropoff', label: 'رسیدم به مقصد' }, ARRIVED_DROPOFF: { type: 'mission.delivered', label: 'تحویل به گیرنده انجام شد' },
 }
+const dropoffStatuses = new Set(['PICKED_UP', 'IN_TRANSIT', 'ARRIVED_DROPOFF'])
 const missionLabels: Record<string, string> = { COURIER_ASSIGNED: 'پیک تخصیص‌یافته', ARRIVED_PICKUP: 'رسیده به مبدأ', HANDED_TO_COURIER: 'تحویل از فروشگاه تأییدشده', PICKED_UP: 'مرسوله دریافت‌شده', IN_TRANSIT: 'در مسیر مقصد', ARRIVED_DROPOFF: 'رسیده به مقصد' }
 type ApiError = { error?: { code?: string; message?: string } }
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
@@ -144,6 +145,12 @@ export default function App() {
 
   const offer = offers[0]
   const readyRoute = route?.coordinates_status === 'COMPLETE' && validCoordinate(route.pickup.coordinate) && validCoordinate(route.dropoff.coordinate)
+  const navigationPoint = mission
+    ? dropoffStatuses.has(mission.status) ? mission.dropoff.coordinate : mission.pickup.coordinate
+    : null
+  const navigationLabel = mission
+    ? dropoffStatuses.has(mission.status) ? 'مسیریابی تا مشتری' : 'مسیریابی تا فروشگاه'
+    : ''
 
   return <main className="courier-shell" dir="rtl">
     <header className="topbar"><div className="brand">م</div><div className="brand-copy"><strong>مونو پیک</strong><span>{token ? 'پیشنهادهای مأموریت' : 'ورود پیک'}</span></div>{token && <><button className="icon-button" onClick={() => void refresh(token)} disabled={busy} aria-label="به‌روزرسانی پیشنهادها">↻</button><button className="logout" onClick={disconnect}>خروج</button></>}</header>
@@ -158,7 +165,8 @@ export default function App() {
           <div className="map-wrap">{MAP_STYLE_URL && validCoordinate(mission.pickup.coordinate) && validCoordinate(mission.dropoff.coordinate) ? <Suspense fallback={<div className="map-canvas map-loading">در حال بارگذاری نقشه…</div>}><RouteMap route={mission} styleUrl={MAP_STYLE_URL} onError={setMapError} /></Suspense> : <div className="map-canvas" role="img" aria-label="پیش‌نمایش مسیر مأموریت"><span className="map-placeholder">{MAP_STYLE_URL ? 'نقشه پس از دریافت مختصات معتبر نمایش داده می‌شود' : 'نقشه پس از تنظیم سرویس اختصاصی نمایش داده می‌شود'}</span></div>}<div className="map-legend"><span><i className="pickup-pin" /> مبدأ</span><span><i className="dropoff-pin" /> مقصد</span></div></div>
           {!MAP_STYLE_URL && <div className="map-warning" role="status">سرویس نقشهٔ اختصاصی تنظیم نشده است.</div>}
           {mission.coordinates_status !== 'COMPLETE' && <div className="pending-note" role="status">مختصات مبدأ یا مقصد هنوز آماده نیست؛ تا تکمیل مختصات، مسیریابی فعال نمی‌شود.</div>}
-          <div className="location-list"><div><i className="pickup-pin" /><span><b>مبدأ</b><small>محل دریافت مرسوله</small></span>{validCoordinate(mission.pickup.coordinate) && <a href={`geo:${mission.pickup.coordinate.latitude},${mission.pickup.coordinate.longitude}?q=${mission.pickup.coordinate.latitude},${mission.pickup.coordinate.longitude}`} aria-label="مسیریابی تا مبدأ">مسیریابی</a>}</div><div><i className="dropoff-pin" /><span><b>مقصد</b><small>محل تحویل مرسوله</small></span>{validCoordinate(mission.dropoff.coordinate) && <a href={`geo:${mission.dropoff.coordinate.latitude},${mission.dropoff.coordinate.longitude}?q=${mission.dropoff.coordinate.latitude},${mission.dropoff.coordinate.longitude}`} aria-label="مسیریابی تا مقصد">مسیریابی</a>}</div></div>
+          <div className="location-list"><div><i className="pickup-pin" /><span><b>مبدأ</b><small>محل دریافت مرسوله</small></span></div><div><i className="dropoff-pin" /><span><b>مقصد</b><small>محل تحویل مرسوله</small></span></div></div>
+          {navigationPoint && validCoordinate(navigationPoint) && nextEvents[mission.status] && <a className="primary mission-navigation" href={`geo:${navigationPoint.latitude},${navigationPoint.longitude}?q=${navigationPoint.latitude},${navigationPoint.longitude}`} aria-label={navigationLabel}>{navigationLabel}</a>}
           <div className="mission-progress"><span className="eyebrow">مرحلهٔ جاری</span><strong>{missionLabels[mission.status] || mission.status}</strong></div>
           {nextEvents[mission.status] ? <button className="primary mission-action" disabled={responding} onClick={() => void advanceMission()}>{responding ? 'در حال ثبت…' : nextEvents[mission.status].label}</button> : <div className="pending-note">این مأموریت پایان یافته است.</div>}
         </article>}

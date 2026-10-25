@@ -72,7 +72,7 @@ describe('Courier offer mobile', () => {
     expect(request?.headers).toMatchObject({ 'Idempotency-Key': expect.any(String) })
     expect(await screen.findByRole('heading', { name: 'مأموریت در حال اجرا' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'رسیدم به مبدأ' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'مسیریابی تا مبدأ' })).toHaveAttribute('href', 'geo:35.7,51.4?q=35.7,51.4')
+    expect(screen.getByRole('link', { name: 'مسیریابی تا فروشگاه' })).toHaveAttribute('href', 'geo:35.7,51.4?q=35.7,51.4')
   })
 
 
@@ -86,6 +86,33 @@ describe('Courier offer mobile', () => {
     expect(JSON.parse(String(request?.body))).toMatchObject({ event_type: 'mission.arrived_pickup', reason: 'COURIER_MOBILE_CONFIRMED' })
     expect(request?.headers).toMatchObject({ 'Idempotency-Key': expect.any(String) })
     expect(await screen.findByRole('button', { name: 'تحویل مرسوله را تأیید می‌کنم' })).toBeInTheDocument()
+  })
+
+  it('routes to the shop before pickup, to the customer after pickup, and completes the whole mission lifecycle', async () => {
+    const fetchMock = connectedApi()
+    const user = userEvent.setup(); render(<App />); await connect(user)
+    await user.click(await screen.findByRole('button', { name: 'قبول مأموریت' }))
+
+    const steps = [
+      { button: 'رسیدم به مبدأ', event: 'mission.arrived_pickup', status: 'ARRIVED_PICKUP', route: 'geo:35.7,51.4?q=35.7,51.4', label: 'مسیریابی تا فروشگاه' },
+      { button: 'تحویل مرسوله را تأیید می‌کنم', event: 'mission.handed_to_courier', status: 'HANDED_TO_COURIER', route: 'geo:35.7,51.4?q=35.7,51.4', label: 'مسیریابی تا فروشگاه' },
+      { button: 'مرسوله را تحویل گرفتم', event: 'mission.picked_up', status: 'PICKED_UP', route: 'geo:35.71,51.42?q=35.71,51.42', label: 'مسیریابی تا مشتری' },
+      { button: 'حرکت به سمت مقصد', event: 'mission.in_transit', status: 'IN_TRANSIT', route: 'geo:35.71,51.42?q=35.71,51.42', label: 'مسیریابی تا مشتری' },
+      { button: 'رسیدم به مقصد', event: 'mission.arrived_dropoff', status: 'ARRIVED_DROPOFF', route: 'geo:35.71,51.42?q=35.71,51.42', label: 'مسیریابی تا مشتری' },
+      { button: 'تحویل به گیرنده انجام شد', event: 'mission.delivered', status: 'DELIVERED', route: null, label: null },
+    ]
+    for (const step of steps) {
+      await user.click(await screen.findByRole('button', { name: step.button }))
+      await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/events'))).toHaveLength(steps.indexOf(step) + 1))
+      const [, request] = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/events')).at(-1)!
+      expect(JSON.parse(String(request?.body))).toMatchObject({ event_type: step.event, reason: 'COURIER_MOBILE_CONFIRMED' })
+      if (step.label) {
+        expect(await screen.findByRole('link', { name: step.label })).toHaveAttribute('href', step.route)
+      } else {
+        expect(await screen.findByText('این مأموریت پایان یافته است.')).toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: /مسیریابی/ })).not.toBeInTheDocument()
+      }
+    }
   })
 
 
