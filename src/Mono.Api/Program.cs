@@ -161,9 +161,7 @@ builder.Services.AddScoped<IHanaDistanceEvidenceSourceVerifier>(services =>
     services.GetRequiredService<ConfiguredEvidenceSourceVerifier>());
 builder.Services.AddScoped<PromiseCommitApplicationService>();
 
-Console.WriteLine("Mono API: building application host.");
 var app = builder.Build();
-Console.WriteLine("Mono API: application host built.");
 
 // Apply browser-facing response protections to API, health, and static console responses.
 app.Use(async (context, next) =>
@@ -191,9 +189,7 @@ app.UseStaticFiles();
 // Liveness is process-only; readiness includes registered infrastructure dependencies.
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
-Console.WriteLine("Mono API: mapping public registration endpoints.");
 app.MapPublicRegistrationEndpoints();
-Console.WriteLine("Mono API: public registration endpoints mapped.");
 app.MapBranchEndpoints();
 app.MapDeliveryRequestEndpoints();
 app.MapWebhookEndpointEndpoints();
@@ -201,7 +197,6 @@ app.MapWebhookDeliveryHistoryEndpoints();
 app.MapWebhookOperationsEndpoints();
 app.MapMissionConfirmationEndpoints();
 app.MapMonoMissionLifecycleEndpoints();
-Console.WriteLine("Mono API: mapped route batch 1 (10).");
 app.MapMissionCancellationEndpoints();
 app.MapMissionHistoryEndpoints();
 app.MapMonoMissionOperationsEndpoints();
@@ -212,7 +207,6 @@ app.MapMonoRoutePlanReadAuditEndpoints();
 app.MapMonoCourierOperationsEndpoints();
 app.MapMonoCourierSuspensionEndpoints();
 app.MapMonoCourierSessionEndpoints();
-Console.WriteLine("Mono API: mapped route batch 2 (20).");
 app.MapMonoCourierFinanceEndpoints();
 app.MapMonoCourierWithdrawalEndpoints();
 app.MapMonoCourierWithdrawalHistoryEndpoints();
@@ -223,7 +217,6 @@ app.MapMonoCourierPayoutReconciliationSummaryEndpoints();
 app.MapMonoCourierPayoutReconciliationTrendEndpoints();
 app.MapMonoCourierPayoutLedgerDetailEndpoints();
 app.MapMonoCourierPayoutLedgerDetailAuditSearchEndpoints();
-Console.WriteLine("Mono API: mapped route batch 3 (30).");
 app.MapMonoCourierPayoutDestinationAuditEndpoints();
 app.MapMonoCourierIdentityBindingEndpoints();
 app.MapMonoCourierLivePresenceEndpoints();
@@ -234,7 +227,6 @@ app.MapMissionCourierOfferExpiryWorkerStatusEndpoint();
 app.MapMonoMissionCourierIssueEndpoints();
 app.MapMonoMissionCourierIssueInboxEndpoints();
 app.MapMonoMissionSlaAlertEndpoints();
-Console.WriteLine("Mono API: mapped route batch 4 (40).");
 app.MapCustomerServiceConfigurationInspectionEndpoints();
 app.MapCustomerServiceConfigurationAuthoringEndpoints();
 app.MapMonoCustomerOperationsEndpoints();
@@ -245,20 +237,17 @@ app.MapMonoPolicyDraftOperationsEndpoints();
 app.MapMonoHardPolicyEvaluationEndpoints();
 app.MapMonoZoneGeometryReviewEndpoints();
 app.MapMonoZoneGeometryActivationEndpoints();
-Console.WriteLine("Mono API: mapped route batch 5 (50).");
 app.MapMonoZoneCoveragePreviewEndpoints();
-Console.WriteLine("Mono API: mapped route 51.");
 app.MapMonoZoneGeometryCatalogEndpoints();
-Console.WriteLine("Mono API: mapped route 52.");
 app.MapMonoZoneGeometryHistoryEndpoints();
-Console.WriteLine("Mono API: mapped route 53.");
 app.MapMonoZoneGeometryQualityEndpoints();
-Console.WriteLine("Mono API: mapped route 54.");
 app.MapMonoZoneContainmentEndpoints();
-Console.WriteLine("Mono API: mapped route 55.");
 app.MapMonoZoneCoverageCompletenessEndpoints();
-Console.WriteLine("Mono API: mapped route 56.");
 app.MapMonoZoneGeometryGeoJsonEndpoints();
-Console.WriteLine("Mono API: mapped route 57.");
 app.MapMonoActiveZoneGeoJsonLayerEndpoints();
-Console.WriteLine("Mono API: mapped route 58.");
+
+app.Run();
+
+public partial class Program
+{
+}
