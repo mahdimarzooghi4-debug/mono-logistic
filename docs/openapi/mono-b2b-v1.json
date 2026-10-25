@@ -3,14 +3,8 @@
   "info": {
     "title": "Mono B2B Delivery API",
     "version": "1.0.0",
-    "description": "Machine-readable consumer contract for Mono's existing customer-scoped delivery API. Paths are derived from the current implementation and docs/12-api-contract-v1.md. This specification does not indicate that a sandbox, customer credentials, quote evidence verifier, or outbound webhook worker is configured."
+    "description": "Machine-readable consumer contract for Mono's existing customer-scoped delivery API. Paths are derived from the current implementation and docs/12-api-contract-v1.md. The API host must be configured per environment; this specification does not indicate that a sandbox, customer credentials, quote evidence verifier, or outbound webhook worker is configured."
   },
-  "servers": [
-    {
-      "url": "https://api.example.invalid",
-      "description": "Placeholder only. Replace with the approved environment URL; this is not a live endpoint."
-    }
-  ],
   "security": [
     {
       "MonoApiKey": []
@@ -24,7 +18,14 @@
         "description": "Requires branches.read. Customer identity is resolved from the API key, never from query/body data.",
         "responses": {
           "200": {
-            "description": "Customer-scoped branch summaries"
+            "description": "Customer-scoped branch summaries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BranchList"
+                }
+              }
+            }
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -513,7 +514,8 @@
         "in": "path",
         "required": true,
         "schema": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^drq_[0-9a-f]{32}$"
         }
       },
       "MissionId": {
@@ -521,7 +523,8 @@
         "in": "path",
         "required": true,
         "schema": {
-          "type": "string"
+          "type": "string",
+          "pattern": "^mis_[0-9a-f]{32}$"
         }
       }
     },
@@ -553,7 +556,8 @@
         "type": "object",
         "properties": {
           "address_text": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           },
           "latitude": {
             "type": "number",
@@ -566,22 +570,57 @@
             "maximum": 180
           },
           "contact_name": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           },
           "contact_phone": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           },
           "recipient_name": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           },
           "recipient_phone": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           },
           "address_details": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 500
           }
         },
-        "description": "At least address_text or a complete latitude/longitude pair is required; exact validation is enforced by API."
+        "description": "At least address_text or a complete latitude/longitude pair is required; exact validation is enforced by API.",
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "address_text"
+                ]
+              },
+              {
+                "required": [
+                  "latitude",
+                  "longitude"
+                ]
+              }
+            ]
+          },
+          {
+            "not": {
+              "required": [
+                "latitude"
+              ],
+              "not": {
+                "required": [
+                  "longitude"
+                ]
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
       },
       "Shipment": {
         "type": "object",
@@ -655,7 +694,8 @@
             "maxLength": 128
           },
           "branch_id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^br_[0-9a-f]{32}$"
           },
           "pickup": {
             "$ref": "#/components/schemas/DeliveryLocation"
@@ -694,20 +734,24 @@
           "dropoff_location_id": {
             "type": "string"
           },
-          "location_registration_status": {
+          "route_location_coordinates_status": {
             "type": "string"
           }
         },
         "required": [
           "delivery_request_id",
-          "status"
+          "status",
+          "pickup_location_id",
+          "dropoff_location_id",
+          "route_location_coordinates_status"
         ]
       },
       "DeliveryRequestSummary": {
         "type": "object",
         "properties": {
           "delivery_request_id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^drq_[0-9a-f]{32}$"
           },
           "external_reference": {
             "type": "string"
@@ -905,7 +949,14 @@
             }
           },
           "integrity": {
-            "$ref": "#/components/schemas/PromiseEvidenceIntegrity"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromiseEvidenceIntegrity"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -920,14 +971,20 @@
             "type": "string"
           },
           "searched_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "status": {
             "type": "string"
           },
           "proposed_delivery_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "criteria": {
@@ -952,38 +1009,60 @@
         "type": "object",
         "properties": {
           "promise_id": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional in transport type; API validation requires a semantically valid proposal."
           },
           "version": {
             "type": "integer",
             "minimum": 1
           },
           "evaluated_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "committed_delivery_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "outcome": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "safety_buffer": {
             "type": "string",
             "description": "System.TimeSpan JSON representation"
           },
           "safety_buffer_policy_version": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "policy_versions": {
-            "type": "object",
+            "type": [
+              "object",
+              "null"
+            ],
             "additionalProperties": {
               "type": "string"
             }
           },
           "reason_codes": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "type": "string"
             }
@@ -998,17 +1077,30 @@
         "type": "object",
         "properties": {
           "requested_criteria": {
-            "type": "array",
+            "type": [
+              "array",
+              "null"
+            ],
             "items": {
               "$ref": "#/components/schemas/PromiseCriterion"
             }
           },
           "requested_delivery_at": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "date-time"
           },
           "alternative_search": {
-            "$ref": "#/components/schemas/PromiseAlternativeSearch"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromiseAlternativeSearch"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "proposal": {
             "$ref": "#/components/schemas/PromiseProposal"
@@ -1107,7 +1199,8 @@
         "type": "object",
         "properties": {
           "delivery_request_id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^drq_[0-9a-f]{32}$"
           },
           "external_reference": {
             "type": "string"
@@ -1234,6 +1327,68 @@
         },
         "required": [
           "mission_id",
+          "status"
+        ]
+      },
+      "BranchList": {
+        "type": "object",
+        "properties": {
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchSummary"
+            }
+          }
+        },
+        "required": [
+          "branches"
+        ]
+      },
+      "BranchSummary": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "pattern": "^br_[0-9a-f]{32}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latitude": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -180,
+            "maximum": 180
+          },
+          "zoneId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "branchId",
+          "name",
           "status"
         ]
       }
