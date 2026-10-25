@@ -34,6 +34,28 @@ The response is `201 Created` with a generated `pol_...` ID and version 1 in `DR
 
 Policy types are normalized to uppercase identifiers. Enforcement types are `HARD`, `OPTIMIZATION`, `COMMERCIAL`, `CONFIGURATION`, `CONTRACTUAL`, `WORKFLOW`, `FINANCIAL`, and `RISK`. Definitions must be JSON objects. If both effective dates are provided, `effectiveTo` must be later than `effectiveFrom`.
 
+## Hana Phase-1 mode capability draft
+
+The approved Hana Phase-1 mode set is Walk, Bike (bicycle), Motorcycle, and Car. A Mono administrator can represent the set as a customer-scoped `MODE_CAPABILITY` draft:
+
+```json
+{
+  "policyType": "MODE_CAPABILITY",
+  "scope": "CUSTOMER",
+  "scopeId": "<verified Hana customer ID>",
+  "enforcementType": "HARD",
+  "priority": 10,
+  "effectiveFrom": null,
+  "effectiveTo": null,
+  "definition": {
+    "modes": ["WALK", "BIKE", "MOTORCYCLE", "CAR"]
+  },
+  "reason": "Hana Phase-1 approved courier modes"
+}
+```
+
+Use the actual verified customer ID; the placeholder above is not an identifier. Creating the draft does not activate it or apply it to delivery intake. After creation, review it, activate through the administrator lifecycle, and verify the effective-policy preview. This is a documented operator procedure, not a claim that a Hana customer record or active policy currently exists.
+
 ## Inspect a policy and its versions
 
 `GET /operations/v1/policies/{policyId}`

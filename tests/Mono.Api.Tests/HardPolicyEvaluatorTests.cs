@@ -128,6 +128,21 @@ public sealed class HardPolicyEvaluatorTests
     }
 
     [Fact]
+    public void EligibleModePreviewReturnsAllFourHanaPhaseOneModesFromConfiguredPolicy()
+    {
+        using var facts = JsonDocument.Parse("""{"weight_kg":4,"distance_km":2.5}""");
+        var response = EligibleModeEvaluator.Evaluate(Resolution(
+            Policy("hana-modes", "HARD",
+                """{"modes":["WALK","BIKE","MOTORCYCLE","CAR"]}""",
+                "MODE_CAPABILITY")),
+            facts.RootElement);
+
+        Assert.Equal(new[] { "WALK", "BIKE", "MOTORCYCLE", "CAR" }, response.EligibleModes);
+        Assert.All(response.Candidates, candidate => Assert.True(candidate.Eligible));
+        Assert.Empty(response.ReasonCodes);
+    }
+
+    [Fact]
     public void EligibleModePreviewAppliesOtherHardConstraintsPerCandidate()
     {
         using var facts = JsonDocument.Parse("""{"distance_km":3}""");
