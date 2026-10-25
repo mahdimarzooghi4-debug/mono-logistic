@@ -66,6 +66,31 @@ public static class MonoCourierLocationEndpoints
             })
             .RequireAuthorization(MonoCourierAuthorizationPolicies.Courier);
 
+        endpoints.MapGet("/v1/missions/{missionId}/courier-location", async (
+                string missionId,
+                ICustomerContext customer,
+                PostgresCourierCurrentLocationService locations,
+                CancellationToken cancellationToken) =>
+            {
+                if (!MissionHistoryInputValidator.IsValidMissionId(missionId))
+                    return Results.BadRequest(new ApiErrorResponse(new ApiError(
+                        "INVALID_REQUEST", "Mission ID is invalid.")));
+
+                var position = await locations.FindForCustomerMissionAsync(
+                    customer.CustomerId, missionId, cancellationToken);
+                return position is null
+                    ? Results.NotFound(new ApiErrorResponse(new ApiError(
+                        "COURIER_LOCATION_UNAVAILABLE", "No fresh courier location is available for this Mission.")))
+                    : Results.Ok(new
+                    {
+                        latitude = position.Location.Latitude,
+                        longitude = position.Location.Longitude,
+                        accuracy_meters = position.AccuracyMeters,
+                        observed_at = position.ObservedAt
+                    });
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.DeliveryRequestsRead);
+
         return endpoints;
     }
 }

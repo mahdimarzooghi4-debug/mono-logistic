@@ -11,6 +11,43 @@ public sealed class PostgresCourierCurrentLocationService(
     NpgsqlDataSource dataSource,
     TimeProvider timeProvider)
 {
+    private static readonly TimeSpan MaximumLiveAge = TimeSpan.FromSeconds(60);
+
+    /// <summary>Returns a fresh position only for a customer's actively assigned mission.</summary>
+    public async Task<CourierCurrentPosition?> FindForCustomerMissionAsync(
+        string customerId,
+        string missionId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(customerId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(missionId);
+        const string sql = """
+            SELECT location.courier_id, location.latitude, location.longitude,
+                location.accuracy_meters, location.heading_degrees,
+                location.speed_meters_per_second, location.observed_at, location.active_route_id
+            FROM missions mission
+            JOIN mission_courier_offers offer
+              ON offer.mission_id = mission.mission_id AND offer.status = 'ACCEPTED'
+            JOIN courier_current_locations location ON location.courier_id = offer.courier_id
+            WHERE mission.mission_id = @mission_id
+              AND mission.customer_id = @customer_id
+              AND mission.status IN ('COURIER_ASSIGNED', 'ARRIVED_PICKUP', 'HANDED_TO_COURIER',
+                  'PICKED_UP', 'IN_TRANSIT', 'ARRIVED_DROPOFF')
+              AND location.observed_at > @fresh_after
+              AND location.observed_at <= @now
+            LIMIT 1;
+            """;
+        var now = timeProvider.GetUtcNow();
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("mission_id", NpgsqlDbType.Text, missionId);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+        command.Parameters.AddWithValue("fresh_after", NpgsqlDbType.TimestampTz, now - MaximumLiveAge);
+        command.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, now);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadPosition(reader) : null;
+    }
+
     public async Task ClearAsync(string courierId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(courierId);
