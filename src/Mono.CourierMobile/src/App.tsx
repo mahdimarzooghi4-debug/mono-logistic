@@ -23,6 +23,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const MAP_STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || ''
 const OFFER_REFRESH_INTERVAL_MS = 15_000
 const datetime = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' })
+let fallbackKeySequence = 0
 
 async function api<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -42,8 +43,9 @@ function validCoordinate(value: Coordinate): value is NonNullable<Coordinate> {
 }
 function date(value?: string) { const parsed = value ? new Date(value) : null; return parsed && !Number.isNaN(parsed.valueOf()) ? datetime.format(parsed) : '—' }
 function idempotencyKey() {
-  if (!globalThis.crypto?.randomUUID) throw new Error('مرورگر امن برای ثبت پاسخ در دسترس نیست.')
-  return globalThis.crypto.randomUUID()
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  fallbackKeySequence++
+  return `mono-${Date.now().toString(36)}-${fallbackKeySequence.toString(36)}-${Math.random().toString(36).slice(2)}`
 }
 
 export default function App() {

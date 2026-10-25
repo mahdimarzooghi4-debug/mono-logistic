@@ -75,6 +75,16 @@ describe('Courier offer mobile', () => {
     expect(screen.getByRole('link', { name: 'مسیریابی تا فروشگاه' })).toHaveAttribute('href', 'geo:35.7,51.4?q=35.7,51.4')
   })
 
+  it('can create lifecycle idempotency keys when a LAN browser has no secure-context UUID API', async () => {
+    const fetchMock = connectedApi()
+    const user = userEvent.setup(); render(<App />); await connect(user)
+    await user.click(await screen.findByRole('button', { name: 'قبول مأموریت' }))
+    vi.stubGlobal('crypto', {})
+    await user.click(await screen.findByRole('button', { name: 'رسیدم به مبدأ' }))
+    const [, request] = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/events'))!
+    expect(request?.headers).toMatchObject({ 'Idempotency-Key': expect.stringMatching(/^mono-/) })
+  })
+
 
   it('reports an accepted mission milestone and refreshes its current status', async () => {
     const fetchMock = connectedApi()
