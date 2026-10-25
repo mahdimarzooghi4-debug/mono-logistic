@@ -9,6 +9,68 @@ namespace Mono.Api.Tests;
 public sealed class CourierCurrentLocationPersistenceTests(ITestOutputHelper output)
 {
     [Fact]
+    public async Task Customer_can_read_only_fresh_location_for_its_active_assigned_mission()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            output.WriteLine("Skipped database integration coverage: MONO_TEST_DATABASE is not configured.");
+            return;
+        }
+
+        var schema = "courier_location_read_" + Guid.NewGuid().ToString("N");
+        await using var admin = new NpgsqlConnection(connectionString);
+        await admin.OpenAsync();
+        await using (var createSchema = new NpgsqlCommand($"CREATE SCHEMA {schema};", admin))
+            await createSchema.ExecuteNonQueryAsync();
+        var scopedConnectionString = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema }.ConnectionString;
+        await using var dataSource = NpgsqlDataSource.Create(scopedConnectionString);
+        try
+        {
+            const string setup = """
+                CREATE TABLE missions (mission_id text, customer_id text, status text);
+                CREATE TABLE mission_courier_offers (mission_id text, courier_id text, status text);
+                CREATE TABLE courier_current_locations (
+                    courier_id text, latitude double precision, longitude double precision,
+                    accuracy_meters double precision, heading_degrees double precision,
+                    speed_meters_per_second double precision, observed_at timestamptz,
+                    active_route_id text);
+                INSERT INTO missions VALUES
+                    ('mis_11111111111111111111111111111111', 'cus_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'IN_TRANSIT'),
+                    ('mis_22222222222222222222222222222222', 'cus_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'IN_TRANSIT'),
+                    ('mis_33333333333333333333333333333333', 'cus_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'DELIVERED');
+                INSERT INTO mission_courier_offers VALUES
+                    ('mis_11111111111111111111111111111111', 'crr_one', 'ACCEPTED'),
+                    ('mis_22222222222222222222222222222222', 'crr_two', 'ACCEPTED'),
+                    ('mis_33333333333333333333333333333333', 'crr_three', 'ACCEPTED');
+                INSERT INTO courier_current_locations VALUES
+                    ('crr_one', 35.7, 51.4, 12, NULL, NULL, now(), NULL),
+                    ('crr_two', 35.8, 51.5, 12, NULL, NULL, now(), NULL),
+                    ('crr_three', 35.9, 51.6, 12, NULL, NULL, now(), NULL);
+                """;
+            await using (var connection = await dataSource.OpenConnectionAsync())
+            await using (var command = new NpgsqlCommand(setup, connection))
+                await command.ExecuteNonQueryAsync();
+
+            var service = new PostgresCourierCurrentLocationService(dataSource, TimeProvider.System);
+            var own = await service.FindForCustomerMissionAsync(
+                "cus_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mis_11111111111111111111111111111111");
+            Assert.NotNull(own);
+            Assert.Equal(51.4, own.Location.Longitude);
+            Assert.Null(await service.FindForCustomerMissionAsync(
+                "cus_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mis_22222222222222222222222222222222"));
+            Assert.Null(await service.FindForCustomerMissionAsync(
+                "cus_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "mis_33333333333333333333333333333333"));
+        }
+        finally
+        {
+            await dataSource.DisposeAsync();
+            await using var dropSchema = new NpgsqlCommand($"DROP SCHEMA {schema} CASCADE;", admin);
+            await dropSchema.ExecuteNonQueryAsync();
+        }
+    }
+
+    [Fact]
     public async Task Courier_can_clear_only_its_own_current_position()
     {
         var connectionString = Environment.GetEnvironmentVariable("MONO_TEST_DATABASE");
