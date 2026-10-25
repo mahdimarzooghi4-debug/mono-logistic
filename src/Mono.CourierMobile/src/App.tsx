@@ -17,6 +17,7 @@ const missionLabels: Record<string, string> = { COURIER_ASSIGNED: 'پیک تخص
 type ApiError = { error?: { code?: string; message?: string } }
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const MAP_STYLE_URL = import.meta.env.VITE_MAP_STYLE_URL || ''
+const OFFER_REFRESH_INTERVAL_MS = 15_000
 const datetime = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' })
 
 async function api<T>(path: string, token: string, init?: RequestInit): Promise<T> {
@@ -53,11 +54,12 @@ export default function App() {
   const [notice, setNotice] = useState('')
   const [mapError, setMapError] = useState('')
   const sequence = useRef(0)
+  const busyRef = useRef(false)
   const actionKeys = useRef(new globalThis.Map<string, string>())
 
   const refresh = useCallback(async (activeToken: string) => {
     const current = ++sequence.current
-    setBusy(true); setError(''); setMapError('')
+    busyRef.current = true; setBusy(true); setError(''); setMapError('')
     try {
       const [session, response, activeResponse] = await Promise.all([
         api<{ courier_id: string; identity_domain: string }>('/courier/v1/session', activeToken),
@@ -71,13 +73,28 @@ export default function App() {
       const active = list.find(item => item.status.toUpperCase() === 'OFFERED')
       if (!active) { if (current === sequence.current) { setOffers([]); setRoute(null) }; return }
       const context = await api<RouteContext>(`/courier/v1/mission-offers/${encodeURIComponent(active.offer_id)}/route-context`, activeToken)
-      if (current === sequence.current) { setOffers([active]); setRoute(context) }
+      if (current === sequence.current) {
+        setOffers([active])
+        setRoute(previous => JSON.stringify(previous) === JSON.stringify(context) ? previous : context)
+      }
     } catch (cause) {
       if (current === sequence.current) { setError(cause instanceof Error ? cause.message : 'دریافت پیشنهاد انجام نشد.'); setOffers([]); setMission(null); setRoute(null) }
-    } finally { if (current === sequence.current) setBusy(false) }
+    } finally { busyRef.current = false; if (current === sequence.current) setBusy(false) }
   }, [])
 
   useEffect(() => { if (token) void refresh(token) }, [token, refresh])
+  useEffect(() => {
+    if (!token || mission) return
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible' && !busyRef.current) void refresh(token)
+    }
+    const timer = window.setInterval(refreshWhenVisible, OFFER_REFRESH_INTERVAL_MS)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [token, mission, refresh])
 
   function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -133,7 +150,7 @@ export default function App() {
     <section className="content" aria-live="polite">
       {!token ? <section className="login-card"><span className="eyebrow">پنل پیک</span><h1>آمادهٔ دریافت مأموریت</h1><p>توکن دسترسی آزمایشی را وارد کنید. توکن فقط در حافظهٔ این صفحه نگهداری می‌شود و پس از بستن یا بارگذاری دوباره پاک خواهد شد.</p><form onSubmit={connect}><label htmlFor="access-token">توکن دسترسی</label><input id="access-token" type="password" autoComplete="off" value={tokenDraft} onChange={event => setTokenDraft(event.target.value)} required /><button className="primary" type="submit">اتصال</button></form></section> : <>
         {error && <div className="notice error" role="alert">{error}</div>}{notice && <div className="notice success" role="status">{notice}</div>}
-        <div className="page-heading"><div><span className="eyebrow">مأموریت‌های شما</span><h1>{mission ? 'مأموریت در حال اجرا' : offer ? 'پیشنهاد جدید' : 'پیشنهادی ندارید'}</h1></div><span className={`live-dot ${busy ? 'loading' : ''}`}>{busy ? 'در حال دریافت' : 'همگام‌شده'}</span></div>
+        <div className="page-heading"><div><span className="eyebrow">مأموریت‌های شما</span><h1>{mission ? 'مأموریت در حال اجرا' : offer ? 'پیشنهاد جدید' : 'پیشنهادی ندارید'}</h1></div><span className={`live-dot ${busy ? 'loading' : ''}`}>{busy ? 'در حال دریافت' : mission ? 'مأموریت فعال' : 'بررسی هر ۱۵ ثانیه'}</span></div>
         {busy && !offer && !mission && <div className="empty-card">در حال بررسی پیشنهادهای تازه…</div>}
         {!busy && !offer && !mission && <div className="empty-card"><span className="empty-icon">⌁</span><strong>فعلاً مأموریتی برای شما نیست</strong><p>برای بررسی دوباره، دکمهٔ به‌روزرسانی را بزنید.</p><button className="secondary" onClick={() => void refresh(token)}>بررسی دوباره</button></div>}
         {mission && <article className="offer-card active-mission-card">

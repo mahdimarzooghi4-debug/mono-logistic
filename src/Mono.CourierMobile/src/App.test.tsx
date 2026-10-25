@@ -37,7 +37,7 @@ async function connect(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'اتصال' }))
 }
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks() })
 
 describe('Courier offer mobile', () => {
   it('does not show invented offer details before connection', () => {
@@ -86,6 +86,23 @@ describe('Courier offer mobile', () => {
     expect(JSON.parse(String(request?.body))).toMatchObject({ event_type: 'mission.arrived_pickup', reason: 'COURIER_MOBILE_CONFIRMED' })
     expect(request?.headers).toMatchObject({ 'Idempotency-Key': expect.any(String) })
     expect(await screen.findByRole('button', { name: 'تحویل مرسوله را تأیید می‌کنم' })).toBeInTheDocument()
+  })
+
+
+  it('refreshes offers when the courier returns to the visible app', async () => {
+    const intervalSpy = vi.spyOn(window, 'setInterval')
+    const fetchMock = connectedApi()
+    const user = userEvent.setup(); render(<App />); await connect(user)
+    await screen.findByRole('heading', { name: 'پیشنهاد جدید' })
+    expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 15_000)
+    const offersCalls = () => fetchMock.mock.calls.filter(([url]) => String(url) === '/courier/v1/mission-offers').length
+    const before = offersCalls()
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    expect(offersCalls()).toBe(before)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await waitFor(() => expect(offersCalls()).toBe(before + 1))
   })
 
   it('declines the offer through its API action', async () => {
