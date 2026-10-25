@@ -37,10 +37,11 @@ map_data_dir=$(cd "$map_data_dir" && pwd)
 stage_dir="$map_data_dir/staging/iran-$release_id"
 archive_name="iran-$release_id.mbtiles"
 stage_archive="$stage_dir/$archive_name"
-release_archive="$map_data_dir/releases/$archive_name"
+release_dir="$map_data_dir/releases/iran-$release_id"
+release_archive="$release_dir/$archive_name"
 
 [[ ! -e "$stage_dir" ]] || fail "Staging directory already exists: $stage_dir"
-[[ ! -e "$release_archive" ]] || fail "Release already exists: $release_archive"
+[[ ! -e "$release_dir" ]] || fail "Release already exists: $release_dir"
 
 mkdir -m 0750 "$stage_dir"
 cleanup() {
@@ -85,9 +86,8 @@ built_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
   printf 'tile_count\t%s\n' "$tile_count"
 } > "$stage_dir/build-manifest.tsv"
 
-mv "$stage_archive" "$release_archive"
-mv "$stage_dir/build-manifest.tsv" "$map_data_dir/releases/iran-$release_id.manifest.tsv"
-rmdir "$stage_dir"
+# Publish the archive and manifest together by renaming one directory on the same filesystem.
+mv "$stage_dir" "$release_dir"
 
 printf 'Validated map archive: %s\n' "$release_archive"
 printf 'Tiles: %s | bytes: %s | sha256: %s\n' "$tile_count" "$archive_bytes" "$archive_sha"
