@@ -161,7 +161,9 @@ builder.Services.AddScoped<IHanaDistanceEvidenceSourceVerifier>(services =>
     services.GetRequiredService<ConfiguredEvidenceSourceVerifier>());
 builder.Services.AddScoped<PromiseCommitApplicationService>();
 
+Console.WriteLine("Mono API: building application host.");
 var app = builder.Build();
+Console.WriteLine("Mono API: application host built.");
 
 // Apply browser-facing response protections to API, health, and static console responses.
 app.Use(async (context, next) =>
