@@ -17,6 +17,7 @@ function mockConnectedApi(detail: unknown = { ...baseDelivery, quote: null, prom
     if (url === '/v1/branches') return new Response(JSON.stringify({ branches: [{ branchId, name: 'شعبه ونک', address: 'تهران', status: 'ACTIVE' }] }), { status: 200 })
     if (url === '/v1/delivery-requests?page_size=50') return new Response(JSON.stringify({ items: [baseDelivery], next_cursor: null }), { status: 200 })
     if (url === `/v1/delivery-requests/${requestId}`) return new Response(JSON.stringify(detail), { status: 200 })
+    if (url.endsWith('/courier-location')) return new Response(JSON.stringify({ latitude: 35.71, longitude: 51.42, accuracy_meters: 8, observed_at: '2026-10-25T10:00:00Z' }), { status: 200 })
     if (url === '/v1/delivery-requests' && init?.method === 'POST') return new Response(JSON.stringify({ delivery_request_id: requestId }), { status: 200 })
     if (url.endsWith('/confirm') && init?.method === 'POST') return new Response(JSON.stringify({ mission_id: 'mission-real-api-response' }), { status: 200 })
     return new Response(JSON.stringify({ error: { code: 'NOT_FOUND' } }), { status: 404 })
@@ -89,5 +90,19 @@ describe('Mono merchant mobile P0', () => {
     const [, request] = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/confirm'))!
     expect(JSON.parse(String(request?.body))).toEqual({ quote_id: 'quote-17', promise_version: 4 })
     expect(screen.getByText('۸۵٬۰۰۰ تومان')).toBeInTheDocument()
+  })
+
+  it('shows fresh courier location only for an assigned mission', async () => {
+    const detail = { ...baseDelivery, mission_id: `mis_${'c'.repeat(32)}`, mission_status: 'IN_TRANSIT', quote: null, promise: null }
+    const fetchMock = mockConnectedApi(detail)
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(screen.getByLabelText('توکن دسترسی'), 'customer-access-token')
+    await user.click(screen.getByRole('button', { name: 'اتصال به حساب' }))
+    await user.click(await screen.findByRole('button', { name: /سفارش ORDER-8421/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('35.71000, 51.42000')).toBeInTheDocument()
+    expect(within(dialog).getByRole('link', { name: 'بازکردن موقعیت در نقشهٔ دستگاه' })).toHaveAttribute('href', 'geo:35.71,51.42?q=35.71,51.42')
+    expect(fetchMock).toHaveBeenCalledWith(`/v1/missions/${detail.mission_id}/courier-location`, expect.objectContaining({ cache: 'no-store' }))
   })
 })
