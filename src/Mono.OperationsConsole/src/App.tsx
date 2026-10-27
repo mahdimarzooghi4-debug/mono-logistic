@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import DemoMode from './DemoMode'
 import PolicyWorkbench from './PolicyWorkbench'
 import OnboardingWorkbench from './OnboardingWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
@@ -108,7 +109,7 @@ async function readError(response: Response) {
   }
 }
 
-export default function App() {
+function OperationsConsole() {
   const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('dispatch')
   const [policyReloadKey, setPolicyReloadKey] = useState(0)
   const [token, setToken] = useState('')
@@ -1310,4 +1311,10 @@ export default function App() {
       </>}</section></div>}
     </div>
   )
+}
+
+
+export default function App() {
+  const demoMode = new URLSearchParams(window.location.search).get('demo') === '1'
+  return demoMode ? <DemoMode /> : <OperationsConsole />
 }
