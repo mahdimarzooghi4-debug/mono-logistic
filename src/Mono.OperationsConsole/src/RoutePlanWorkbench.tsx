@@ -171,7 +171,16 @@ export default function RoutePlanWorkbench({ token, reloadKey, onConnected }: Pr
             {audit?.items.map((item) => <tr key={item.audit_id}><td>{formatDate(item.occurred_at)}</td><td dir="ltr">{item.actor_id}</td><td>{actionLabels[item.action] || item.action}</td><td>{item.version ? fa.format(item.version) : '—'}</td><td dir="ltr">{item.outcome}</td><td>{fa.format(item.result_count)}</td></tr>)}
             {(!audit || audit.items.length === 0) && <tr><td colSpan={6} className="state-cell">در ۳۰ روز گذشته سابقه‌ای برای این مسیر پیدا نشد.</td></tr>}
           </tbody></table></div>{auditCursor && <div className="route-plan-audit-footer"><span>۵۰ رویداد اخیر نمایش داده شده</span><button className="secondary-button" onClick={() => void load(plan.snapshot.routeId, auditCursor)} disabled={loading}>رویدادهای قدیمی‌تر</button></div>}</details>
-        </> : <div className="route-detail-empty"><span>⌖</span><h3>یک مسیر را جست‌وجو کنید</h3><p>پس از وارد کردن شناسه، اطلاعات برنامهٔ ثبت‌شده و ترتیب توقف‌ها اینجا نمایش داده می‌شود.</p></div>}
+        </> : <>
+          <section className="route-summary-card route-summary-empty"><header className="route-detail-heading"><div><h3>مسیر انتخاب‌شده</h3><p>برای دیدن جزئیات، یک مسیر ثبت‌شده را جست‌وجو کنید.</p></div><span className="route-status-pill muted">نامشخص</span></header><div className="route-metrics">
+            <div><span>پایان تخمینی</span><strong>—</strong></div><div><span>انحراف فعلی</span><strong>—</strong></div><div><span>ظرفیت استفاده‌شده</span><strong>—</strong></div><div><span>ریسک استاندارد</span><strong>—</strong></div>
+          </div></section>
+          <div className="route-detail-overview">
+            <section className="route-map-placeholder" aria-label="نقشهٔ مسیر"><span className="route-map-icon">⌖</span><strong>نقشهٔ مسیر</strong><p>پس از دریافت مختصات مسیر از API، نقشه در این بخش نمایش داده می‌شود.</p></section>
+            <section className="route-optimization-card"><h3>فرصت بهینه‌سازی</h3><span className="route-status-pill muted">در دسترس نیست</span><p>برای پیشنهاد یا افزودن مأموریت، مسیر و دادهٔ ارزیابی استاندارد لازم است.</p><dl><div><dt>مأموریت‌های مسیر</dt><dd>—</dd></div><div><dt>توقف‌های ثبت‌شده</dt><dd>—</dd></div><div><dt>اثر بر زمان مسیر</dt><dd>—</dd></div></dl><button disabled title="ابتدا یک مسیر را بارگیری کنید">افزودن به مسیر</button></section>
+          </div>
+          <section className="route-stop-section"><header><div><h3>ترتیب توقف‌ها</h3><p>پس از بارگیری برنامهٔ مسیر</p></div><span className="route-status-pill muted">— توقف</span></header><div className="table-wrap"><table><thead><tr><th>ترتیب</th><th>نوع</th><th>مأموریت</th><th>مکان</th><th>ETA</th><th>استاندارد خدمت</th><th>وضعیت</th></tr></thead><tbody><tr><td colSpan={7} className="state-cell">برای نمایش توقف‌ها، یک مسیر را جست‌وجو کنید.</td></tr></tbody></table></div></section>
+        </>}
       </section>
     </div>
   </main>
