@@ -45,7 +45,7 @@ Merchant Mobile prototype copies are duplicates, not additional unique screens. 
 | `607:2` | Policies and configurations | **Design added:** policy catalog/version lifecycle, effective-policy preview and bounded HARD evaluation. | Policy authoring/effective/evaluate APIs exist, but previews do not apply policy to delivery requests or Missions. Activation/retirement need Mono-admin MFA, reason and audit; connect real API states before production use. |
 | `607:353` | Audit operations | **UI partial:** a domain selector displays authorized Mission, Courier, Route-plan and Webhook audit APIs with each source's supported filters and pagination. | The current audit APIs primarily record privileged reads and webhook actions. A unified event stream for manual dispatch decisions, policy evaluations, settlement, before/after state and correlation-chain evidence remains unavailable. |
 | `100:2` | Finance | **UI partial:** read-only mission fare review from recorded quote snapshots. | Actual ledger, collection, VAT remittance, invoices, payouts, wallet, adjustments and withdrawals are absent. Requires approved financial contracts and authorized provider/custodian. |
-| `102:2` | Integrations | **UI partial:** webhook delivery operations and audit, plus per-customer API-key metadata and key audit. | Webhook endpoint creation/editing, API-key issuance/revocation controls, signing/rotation workflows, and delivery-health linkage by customer remain absent. No secret material is rendered. |
+| `102:2` | Integrations | **UI partial:** webhook delivery operations/audit, per-customer API-key metadata/audit, and customer-side endpoint registration, disablement, and secret rotation. New signing secrets are revealed once in the connected Merchant Portal session. | Endpoint management requires a customer API key with `webhooks.manage`; delivery-health linkage by customer, endpoint lifecycle history UI, and key issuance/revocation remain absent. |
 | `104:2` | Tracking | **UI partial:** mission directory, exact detail and timeline. | Map/live tracking needs verified location events and provider; presence is not live GPS. |
 | `106:2` | Overview | **UI partial / mapping unclear:** data is distributed across workbenches. | Decide if this is a distinct cross-domain overview or overlaps `72:4`; define source-backed KPIs. |
 | `108:2` | Vehicles | **No UI found.** | Confirm scope and whether a vehicle API/domain is required. |
@@ -98,10 +98,10 @@ Merchant Mobile prototype copies are duplicates, not additional unique screens. 
 | `237:2` | Workspace settings | **No UI found.** | Define workspace ownership, persistence and permissions. |
 | `238:2` | Members and access | **No UI found.** | Needs identity provider, roles, invitations, revocation and session policies. |
 | `239:2` | Notification settings | **No UI found.** | Needs supported channels, preference and delivery APIs. |
-| `241:2` | Integration settings | **No UI found.** | Needs secure credential/webhook configuration, rotation/reveal policy and audit. |
+| `241:2` | Integration settings | **UI partial:** connects the current customer key and opens endpoint management. | No separate user identity or member-scoped roles exist; API key scope currently gates endpoint access. Delivery health is not surfaced in settings. |
 | `243:2` | Add branch | **No UI found.** | Confirm branch API create/update, validation, authorization and idempotency. |
 | `244:2` | Invite member | **No UI found.** | Depends on the access flow and configured identity/email provider. |
-| `245:2` | Add webhook endpoint | **No UI found.** | Delivery operations exist, but endpoint creation and secret management are separate capabilities. |
+| `245:2` | Add webhook endpoint | **UI present:** create HTTPS endpoint, choose supported events, list/disable endpoints and rotate signing secret through customer-scoped APIs. | Verify all Figma validation and confirmation states in visual QA. A signing secret is shown once; endpoint audit history is not exposed by a read API. |
 
 ## 5. Merchant Mobile — 15 unique screens
 
@@ -161,7 +161,7 @@ This is a Figma/repository inventory, not pixel-level visual QA or release appro
 - The Audit panel now reads the existing Mission, Courier, Route-plan and Webhook audit endpoints. Source selection and filters follow each API's real contract; the screen does not claim to search all operational events.
 - These labels do not imply that every Figma screen is complete. Route directory/map and route planning actions, live GPS tracking, vehicle inventory, a unified cross-domain operational-event search, and telephony caller context still require their own authoritative APIs/providers or additional UI. Customer and policy audit views remain scoped to their current domain workbenches.
 - The Onboarding Console remains a set of API-backed admissions and customer/branch workbenches inside Operations. Its Figma concepts for courier document review and onboarding tracking cannot be completed safely with the current API contracts.
-- Merchant Dashboard settings navigation is available for review in [PR #258](https://github.com/mahdimarzooghi4-debug/mono-logistic/pull/258). It is a UI scaffold, not a claim that billing, workspace persistence, members, notification preferences, webhook endpoint setup, or branch creation are backed by APIs.
+- Merchant Dashboard settings navigation is available for review in [PR #258](https://github.com/mahdimarzooghi4-debug/mono-logistic/pull/258). Webhook endpoint management now uses the existing customer-scoped API; billing, workspace persistence, members, notification preferences and branch creation remain unconnected.
 - The mobile shell and courier demo are separate review artifacts. The merchant mobile shell has only its currently implemented views; the courier demo uses sample data and local interactions. Neither completes the corresponding authenticated mobile product.
 
 The Operations Console TypeScript/Vite production build and its 19 tests passed after the shell, route-plan and domain-scoped audit workbench updates. This is a code/build check, not a pixel-level verification of every Figma frame.
