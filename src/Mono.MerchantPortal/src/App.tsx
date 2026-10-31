@@ -322,21 +322,22 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="ناوبری اصلی">
-        <div className="brand-zone">
+        <div className="merchant-brand-card">
           <div className="brand-mark" aria-hidden="true">م</div>
-          <div><strong>مونو</strong><small>MONO LOGISTICS</small></div>
+          <div><strong>پنل کسب‌وکار</strong><small>ارسال و لجستیک مونو</small><em>Powered by Mono</em></div>
         </div>
-        <div className="workspace-name"><span className="store-avatar">س</span><span><strong>پنل کسب‌وکار</strong><small>{connected ? `${branches.length} شعبهٔ فعال` : 'اتصال به حساب مشتری'}</small></span></div>
         <nav className="navigation">
-          <p className="nav-caption">مدیریت ارسال</p>
           {navigation.map((item) => (
             <button className={`nav-item ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); setError('') }}>
               <span className="nav-icon" aria-hidden="true">{item.icon}</span>{item.label}
             </button>
           ))}
-          <p className="nav-caption secondary-caption">حساب کسب‌وکار</p>
         </nav>
-        <div className="sidebar-footer"><span className={`status-dot ${connected ? 'on' : ''}`} />{connected ? 'متصل به API مونو' : 'هنوز متصل نشده'}</div>
+        <div className="sidebar-footer">
+          <span className={`status-dot ${connected ? 'on' : ''}`} />
+          <span>{connected ? `${fa.format(branches.length)} شعبهٔ فعال` : 'اتصال به حساب مشتری'}</span>
+          {connected && <button className="sidebar-logout" onClick={disconnect}>خروج</button>}
+        </div>
       </aside>
 
       <main className="workspace">
