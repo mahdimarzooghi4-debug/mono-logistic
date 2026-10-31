@@ -45,7 +45,7 @@ Merchant Mobile prototype copies are duplicates, not additional unique screens. 
 | `607:2` | Policies and configurations | **Design added:** policy catalog/version lifecycle, effective-policy preview and bounded HARD evaluation. | Policy authoring/effective/evaluate APIs exist, but previews do not apply policy to delivery requests or Missions. Activation/retirement need Mono-admin MFA, reason and audit; connect real API states before production use. |
 | `607:353` | Audit operations | **UI partial:** a domain selector displays authorized Mission, Courier, Route-plan and Webhook audit APIs with each source's supported filters and pagination. | The current audit APIs primarily record privileged reads and webhook actions. A unified event stream for manual dispatch decisions, policy evaluations, settlement, before/after state and correlation-chain evidence remains unavailable. |
 | `100:2` | Finance | **UI partial:** read-only mission fare review from recorded quote snapshots. | Actual ledger, collection, VAT remittance, invoices, payouts, wallet, adjustments and withdrawals are absent. Requires approved financial contracts and authorized provider/custodian. |
-| `102:2` | Integrations | **UI partial:** webhook delivery operations including replay/cancel. | API-client credentials and endpoint configuration are separate from delivery operations. Review secret lifecycle and customer configuration. |
+| `102:2` | Integrations | **UI partial:** webhook delivery operations and audit, plus per-customer API-key metadata and key audit. | Webhook endpoint creation/editing, API-key issuance/revocation controls, signing/rotation workflows, and delivery-health linkage by customer remain absent. No secret material is rendered. |
 | `104:2` | Tracking | **UI partial:** mission directory, exact detail and timeline. | Map/live tracking needs verified location events and provider; presence is not live GPS. |
 | `106:2` | Overview | **UI partial / mapping unclear:** data is distributed across workbenches. | Decide if this is a distinct cross-domain overview or overlaps `72:4`; define source-backed KPIs. |
 | `108:2` | Vehicles | **No UI found.** | Confirm scope and whether a vehicle API/domain is required. |
@@ -168,7 +168,7 @@ The Operations Console TypeScript/Vite production build and its 19 tests passed 
 
 ## Implementation update — 2026-10-21
 
-The Operations Console now includes an API-backed customer/branch onboarding workbench. It covers the customer queue, Pending customer registration, reasoned customer activation, active-customer branch registration/editing, customer/branch audit inspection, and API-key metadata inspection. Customer creation does not issue API credentials. Document verification, courier onboarding review, and cross-entity onboarding analytics remain gaps.
+The Operations Console now includes an API-backed customer/branch onboarding workbench. It covers the customer queue, Pending customer registration, reasoned customer activation, active-customer branch registration/editing, and customer/branch audit inspection. API-key metadata and per-key audit are available in the Integrations panel and customer detail view. Customer creation does not issue API credentials. Document verification, courier onboarding review, and cross-entity onboarding analytics remain gaps.
 
 ## Customer panel sync — 2026-10-31
 
