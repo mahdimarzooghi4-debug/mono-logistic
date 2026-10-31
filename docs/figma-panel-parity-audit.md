@@ -87,7 +87,7 @@ Merchant Mobile prototype copies are duplicates, not additional unique screens. 
 
 | Figma node | Screen | Current implementation | Gap / follow-up |
 |---|---|---|---|
-| `207:3` | Dashboard | **UI partial:** live delivery/branch portal. | Compare summary cards with source-backed aggregates; current counts are scoped to returned pages. |
+| `207:3` | Dashboard | **UI partial:** live delivery/branch portal; the Merchant shell now follows the Figma teal rail, white account card and active navigation treatment, with quick create/tracking and branch widgets. | Figma KPI values and sample recipient/branch rows are not API-backed; counts remain explicitly limited to the returned page. Delivery/branch aggregates, recipient and branch joins, and SLA action rows need authoritative API fields before those Figma areas can be populated. |
 | `212:2` | Create delivery | **UI partial:** request creation exists. | Feasibility/quote requires verified coordinates and authoritative API. Never fabricate quote or promise. |
 | `214:2` | Delivery detail and tracking | **UI partial:** exact-ID details and recorded tracking data. | Compare event timeline, help actions and map behavior; provider remains a dependency. |
 | `216:2` | Deliveries list | **UI present:** paginated customer-scoped list. | Verify filters, sorting and state coverage against Figma. |
@@ -162,6 +162,7 @@ This is a Figma/repository inventory, not pixel-level visual QA or release appro
 - These labels do not imply that every Figma screen is complete. Route directory/map and route planning actions, live GPS tracking, vehicle inventory, a unified cross-domain operational-event search, and telephony caller context still require their own authoritative APIs/providers or additional UI. Customer and policy audit views remain scoped to their current domain workbenches.
 - The Onboarding Console remains a set of API-backed admissions and customer/branch workbenches inside Operations. Its Figma concepts for courier document review and onboarding tracking cannot be completed safely with the current API contracts.
 - Merchant Dashboard settings navigation is available for review in [PR #258](https://github.com/mahdimarzooghi4-debug/mono-logistic/pull/258). Webhook endpoint management now uses the existing customer-scoped API; billing, workspace persistence, members, notification preferences and branch creation remain unconnected.
+- The Merchant Dashboard sidebar now matches the Figma teal rail, white merchant identity card, navigation spacing, white active item and footer action. Dashboard content stays sourced from the current API page; the Figma's sample KPI totals, recipient names and SLA rows are not presented as live data.
 - The mobile shell and courier demo are separate review artifacts. The merchant mobile shell has only its currently implemented views; the courier demo uses sample data and local interactions. Neither completes the corresponding authenticated mobile product.
 
 The Operations Console TypeScript/Vite production build and its 19 tests passed after the shell, route-plan and domain-scoped audit workbench updates. This is a code/build check, not a pixel-level verification of every Figma frame.
