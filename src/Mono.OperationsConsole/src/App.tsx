@@ -105,6 +105,29 @@ function statusLabel(state: string) {
   return 'در بازه'
 }
 
+function NavIcon({ type }: { type: string }) {
+  const common = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const }
+  switch (type) {
+    case 'dashboard': return <svg {...common}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    case 'mission': return <svg {...common}><path d="M5 19 19 5M7 5h12v12"/></svg>
+    case 'route': return <svg {...common}><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h3a3 3 0 0 0 3-3V9a3 3 0 0 1 3-3"/></svg>
+    case 'courier': return <svg {...common}><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="m6 17 4-8h4l4 8M10 9l-2-3H5m5 3 4 4h4M13 7h3"/></svg>
+    case 'vehicle': return <svg {...common}><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="18" cy="18" r="1.8"/></svg>
+    case 'zone': return <svg {...common}><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    case 'policy': return <svg {...common}><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+    case 'customers': return <svg {...common}><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5v1"/></svg>
+    case 'support': return <svg {...common}><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M12 8v4m0 3h.01"/></svg>
+    case 'finance': return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18m-5 5h2"/></svg>
+    case 'integration': return <svg {...common}><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="m8 7 3 8m5-8-3 8m-5-9h8"/></svg>
+    case 'tracking': return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="m15 9-2 5-5 2 2-5z"/></svg>
+    case 'audit': return <svg {...common}><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6m-6 4h6"/></svg>
+    case 'alert': return <svg {...common}><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M12 8v4m0 3h.01"/></svg>
+    case 'presence': return <svg {...common}><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1m2-12h4m-2-2v4"/></svg>
+    case 'admissions': return <svg {...common}><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5h6M9 11h6m-6 4h6"/></svg>
+    default: return <svg {...common}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1-1.6 2.8-.2-.1a1.7 1.7 0 0 0-1.8-.2 1.7 1.7 0 0 0-1 1.5v.2h-3.2v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.2l-.2.1-1.6-2.8.1-.1A1.7 1.7 0 0 0 8 15a1.7 1.7 0 0 0-1.5-1H6v-3h.5A1.7 1.7 0 0 0 8 10a1.7 1.7 0 0 0-.3-1.8l-.1-.1 1.6-2.8.2.1a1.7 1.7 0 0 0 1.8.2 1.7 1.7 0 0 0 1-1.5v-.2h3.2v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.2l.2-.1 1.6 2.8-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.5v3h-.5a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+  }
+}
+
 async function readError(response: Response) {
   try {
     const body = (await response.json()) as ApiError
@@ -121,6 +144,7 @@ export default function App() {
   const [auditReloadKey, setAuditReloadKey] = useState(0)
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
+  const [connectionDialogOpen, setConnectionDialogOpen] = useState(false)
   const [items, setItems] = useState<Mission[]>([])
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummaryMetrics | null>(null)
   const [dashboardError, setDashboardError] = useState('')
@@ -710,8 +734,11 @@ export default function App() {
 
   function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setToken(tokenDraft.trim())
+    const value = tokenDraft.trim()
+    if (!value) return
+    setToken(value)
     setTokenDraft('')
+    setConnectionDialogOpen(false)
     setItems([])
     setMissionItems([])
     setCourierItems([])
@@ -1015,29 +1042,29 @@ export default function App() {
   return (
     <div className="app-shell" dir="rtl">
       <aside className="sidebar">
-        <div className="brand-lockup"><span className="brand-mark">م</span><span><strong>مونو</strong><small>LOGISTICS</small></span></div>
+        <div className="sidebar-brand-card"><div className="brand-lockup"><span><strong>مونو</strong><small>لجستیک هوشمند</small></span><svg className="brand-symbol" viewBox="0 0 48 48" aria-hidden="true"><path d="M5 24h38M24 4v40M8 21l-3 3 3 3M40 21l3 3-3 3"/><circle cx="24" cy="24" r="3"/><circle cx="13" cy="12" r="1.5"/></svg></div></div>
         <div className="side-caption">فضای عملیات</div>
         <nav className="navigation" aria-label="ناوبری اصلی">
-          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon">▦</span>داشبورد</button>
-          <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon">↗</span>مأموریت‌ها</button>
-          <button className={`nav-item ${viewMode === 'routes' ? 'active' : ''}`} onClick={() => switchView('routes')}><span className="nav-icon">⌁</span>مسیرها</button>
-          <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon">⌁</span>پیک‌ها</button>
-          <button className="nav-item" disabled title="فهرست و API مستقل وسایل نقلیه هنوز در دسترس نیست"><span className="nav-icon">▰</span>وسایل نقلیه</button>
-          <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>مناطق و ظرفیت</button>
-          <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon">⚖</span>استانداردها</button>
-          <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon">＋</span>مشتریان و شعب</button>
-          <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon">!</span>پشتیبانی</button>
-          <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon">▤</span>مالی</button>
-          <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon">↻</span>یکپارچه‌سازی</button>
-          <button className="nav-item" disabled title="نمای ردیابی زنده به رویدادهای مکان معتبر و به‌روزرسانی GPS نیاز دارد"><span className="nav-icon">⌖</span>ردیابی</button>
-          <button className={`nav-item ${viewMode === 'audit' ? 'active' : ''}`} onClick={() => switchView('audit')}><span className="nav-icon">▤</span>ممیزی</button>
+          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon"><NavIcon type="dashboard" /></span>داشبورد</button>
+          <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon"><NavIcon type="mission" /></span>مأموریت‌ها</button>
+          <button className={`nav-item ${viewMode === 'routes' ? 'active' : ''}`} onClick={() => switchView('routes')}><span className="nav-icon"><NavIcon type="route" /></span>مسیرها</button>
+          <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon"><NavIcon type="courier" /></span>پیک‌ها</button>
+          <button className="nav-item" disabled title="فهرست و API مستقل وسایل نقلیه هنوز در دسترس نیست"><span className="nav-icon"><NavIcon type="vehicle" /></span>وسایل نقلیه</button>
+          <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon"><NavIcon type="zone" /></span>مناطق و ظرفیت</button>
+          <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon"><NavIcon type="policy" /></span>سیاست‌ها و پیکربندی</button>
+          <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon"><NavIcon type="customers" /></span>مشتریان</button>
+          <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon"><NavIcon type="support" /></span>پشتیبانی</button>
+          <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon"><NavIcon type="finance" /></span>مالی</button>
+          <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon"><NavIcon type="integration" /></span>یکپارچه‌سازی</button>
+          <button className="nav-item" disabled title="نمای ردیابی زنده به رویدادهای مکان معتبر و به‌روزرسانی GPS نیاز دارد"><span className="nav-icon"><NavIcon type="tracking" /></span>ردیابی</button>
+          <button className={`nav-item ${viewMode === 'audit' ? 'active' : ''}`} onClick={() => switchView('audit')}><span className="nav-icon"><NavIcon type="audit" /></span>ممیزی</button>
           <div className="nav-divider">ابزارهای داخلی عملیات</div>
-          <button className={`nav-item ${viewMode === 'sla' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon">!</span>استثناهای SLA</button>
-          <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon">●</span>حضور پیک‌ها</button>
-          <button className={`nav-item ${viewMode === 'admissions' ? 'active' : ''}`} onClick={() => switchView('admissions')}><span className="nav-icon">▤</span>پذیرش</button>
-          <button className={`nav-item ${viewMode === 'workers' ? 'active' : ''}`} onClick={() => switchView('workers')}><span className="nav-icon">⚙</span>سلامت پردازش‌ها</button>
+          <button className={`nav-item ${viewMode === 'sla' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon"><NavIcon type="alert" /></span>استثناهای SLA</button>
+          <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon"><NavIcon type="presence" /></span>حضور پیک‌ها</button>
+          <button className={`nav-item ${viewMode === 'admissions' ? 'active' : ''}`} onClick={() => switchView('admissions')}><span className="nav-icon"><NavIcon type="admissions" /></span>پذیرش</button>
+          <button className={`nav-item ${viewMode === 'workers' ? 'active' : ''}`} onClick={() => switchView('workers')}><span className="nav-icon"><NavIcon type="settings" /></span>سلامت پردازش‌ها</button>
         </nav>
-        <div className="sidebar-footer"><span className="online-dot" />نسخهٔ عملیاتی داخلی</div>
+        <div className="sidebar-footer"><div className="sidebar-operator"><span className="operator-avatar">م</span><span>اپراتور مونو<small>تیم عملیات</small></span><i className={`operator-status ${token ? 'connected' : ''}`} /></div><button className="sidebar-access" onClick={() => token ? disconnect() : setConnectionDialogOpen(true)}>{token ? 'خروج' : 'اتصال API'}</button></div>
       </aside>
 
       <main className="workspace">
@@ -1045,22 +1072,16 @@ export default function App() {
           <div className="topbar-actions">
             <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'routes' ? setRouteReloadKey((value) => value + 1) : viewMode === 'audit' ? setAuditReloadKey((value) => value + 1) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             {viewMode === 'dispatch' && <span className="overview-updated-at">آخرین به‌روزرسانی: {updatedAt ? new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(updatedAt)) : '—'}</span>}
-            <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'سیستم آنلاین' : 'اتصال برقرار نیست'}</span>
+            <button type="button" className={`system-pill ${connected ? 'is-online' : ''}`} onClick={() => !token && setConnectionDialogOpen(true)}><i />{connected ? 'سیستم آنلاین' : 'اتصال API'}</button>
             {viewMode === 'dispatch' && <button className="primary-button create-mission-action" type="button" disabled title="مأموریت از تأیید ارسال ایجاد می‌شود؛ API ایجاد دستی مأموریت در دسترس نیست.">ایجاد مأموریت ＋</button>}
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
           <div className="page-heading"><h1>{viewMode === 'dispatch' ? 'مرکز کنترل عملیات' : panelTitles[viewMode]}</h1><p>{viewMode === 'dispatch' ? 'نمای زندهٔ مأموریت‌ها، پیک‌ها، مسیرها و وضعیت استاندارد' : panelDescriptions[viewMode]}</p></div>
         </header>}
 
-        {!token && <section className="connect-card">
-          <div><span className="eyebrow">دسترسی امن</span><h2>اتصال به API عملیات</h2><p>توکن معتبر مدیر عملیات را وارد کنید. توکن فقط در حافظهٔ همین صفحه نگهداری می‌شود.</p></div>
-          <form className="connect-form" onSubmit={connect}>
-            <label>توکن Bearer <input type="password" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} placeholder="توکن دسترسی عملیات" dir="ltr" autoComplete="off" /></label>
-            <button className="primary-button" disabled={loading}>اتصال و دریافت داده</button>
-          </form>
-        </section>}
+        {connectionDialogOpen && <div className="api-access-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setConnectionDialogOpen(false)}><section className="api-access-dialog" role="dialog" aria-modal="true" aria-labelledby="api-access-title"><header><div><span className="eyebrow">دسترسی امن</span><h2 id="api-access-title">اتصال به API عملیات</h2></div><button type="button" className="icon-button" onClick={() => setConnectionDialogOpen(false)} aria-label="بستن">×</button></header><p>توکن فقط در حافظهٔ همین صفحه نگهداری می‌شود.</p><form className="api-access-form" onSubmit={connect}><label>توکن Bearer<input type="password" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} placeholder="توکن دسترسی عملیات" dir="ltr" autoComplete="off" autoFocus /></label><div><button className="primary-button" disabled={loading || !tokenDraft.trim()}>اتصال و دریافت داده</button><button className="secondary-button" type="button" onClick={() => setConnectionDialogOpen(false)}>انصراف</button></div></form></section></div>}
 
-        {error && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
+        {error && token && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
         {viewMode === 'dispatch' && dashboardError && <div className="error-banner" role="alert"><span>!</span><div><strong>خلاصهٔ سراسری داشبورد دریافت نشد</strong><p>{dashboardError}</p></div><button onClick={() => setDashboardError('')} aria-label="بستن">×</button></div>}
 
         {viewMode === 'dispatch' && <DashboardSummaryCards summary={dashboardSummary} actionsDisabled={!token} onOpenPresence={openDashboardPresence} onOpenDispatch={openDashboardDispatch} onOpenSla={openDashboardSla} onOpenMissions={openDashboardMissions} />}
