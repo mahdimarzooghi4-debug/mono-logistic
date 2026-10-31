@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import newDeliveryIcon from './assets/figma-dashboard/icon-1.svg'
+import trackingIcon from './assets/figma-dashboard/icon-2.svg'
+import branchesIcon from './assets/figma-dashboard/icon-3.svg'
+import billingIcon from './assets/figma-dashboard/icon-4.svg'
+import settingsIcon from './assets/figma-dashboard/icon-5.svg'
 
 type PreviewView = 'dashboard' | 'deliveries' | 'create' | 'tracking' | 'branches' | 'billing' | 'settings'
 type PreviewDelivery = { order: string; recipient: string; branch: string; status: string; mission: string; deadline: string }
@@ -12,13 +17,14 @@ const initialDeliveries: PreviewDelivery[] = [
   { order: 'ORD-۰۳۷۴', recipient: 'رضا موسوی', branch: 'ونک', status: 'تحویل', mission: 'MIS-۱۰۴۹۸', deadline: '۱۲:۳۲' },
   { order: 'ORD-۰۳۷۱', recipient: 'آرش کاظمی', branch: 'جردن', status: 'نیازمند اقدام', mission: 'MIS-۱۰۴۹۳', deadline: '۱۲:۴۰' },
   { order: 'ORD-۰۳۶۸', recipient: 'الهام یوسفی', branch: 'میرداماد', status: 'در مسیر', mission: 'MIS-۱۰۵۰۲', deadline: '۱۳:۱۲' },
+  { order: 'ORD-۰۳۶۵', recipient: 'پریسا کریمی', branch: 'ونک', status: 'دریافت', mission: 'MIS-۱۰۵۰۰', deadline: '۱۳:۲۰' },
 ]
 
-const menu: Array<{ id: PreviewView; label: string; icon: string }> = [
-  { id: 'dashboard', label: 'داشبورد', icon: '⌂' }, { id: 'create', label: 'ارسال جدید', icon: '+' },
-  { id: 'deliveries', label: 'ارسال‌ها', icon: '▤' }, { id: 'tracking', label: 'رهگیری', icon: '⌖' },
-  { id: 'branches', label: 'شعب', icon: '⌘' }, { id: 'billing', label: 'صورتحساب', icon: '◷' },
-  { id: 'settings', label: 'تنظیمات', icon: '⚙' },
+const menu: Array<{ id: PreviewView; label: string; icon: string | null }> = [
+  { id: 'dashboard', label: 'داشبورد', icon: null }, { id: 'create', label: 'ارسال جدید', icon: newDeliveryIcon },
+  { id: 'deliveries', label: 'ارسال‌ها', icon: null }, { id: 'tracking', label: 'رهگیری', icon: trackingIcon },
+  { id: 'branches', label: 'شعب', icon: branchesIcon }, { id: 'billing', label: 'صورتحساب', icon: billingIcon },
+  { id: 'settings', label: 'تنظیمات', icon: settingsIcon },
 ]
 
 export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) {
@@ -31,7 +37,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
     dashboard: 'داشبورد کسب‌وکار', deliveries: 'ارسال‌های شما', create: 'ثبت ارسال جدید',
     tracking: 'رهگیری ارسال', branches: 'شعب کسب‌وکار', billing: 'صورتحساب', settings: 'تنظیمات Workspace',
   }
-  const activeCount = useMemo(() => deliveries.filter(item => item.status !== 'تحویل').length, [deliveries])
+  const activeCount = useMemo(() => 24 + Math.max(0, deliveries.length - initialDeliveries.length), [deliveries])
 
   function createSample(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -45,29 +51,30 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
 
   return <div className="app-shell demo-shell">
     <aside className="sidebar" aria-label="ناوبری اصلی نسخهٔ نمایشی">
-      <div className="merchant-brand-card"><div className="brand-mark" aria-hidden="true">م</div><div><strong>پنل کسب‌وکار</strong><small>ارسال و لجستیک مونو</small><em>Powered by Mono</em></div></div>
-      <nav className="navigation">{menu.map((item, index) => <button key={`${item.id}-${index}`} className={`nav-item ${view === item.id ? 'active' : ''}`} onClick={() => { setView(item.id); setNotice('') }}><span className="nav-icon" aria-hidden="true">{item.icon}</span>{item.label}</button>)}</nav>
-      <div className="sidebar-footer"><span className="status-dot on" /><span>محیط نمایشی</span><button className="sidebar-logout" onClick={onExit}>خروج</button></div>
+      <div className="merchant-brand-card"><div className="brand-mark" aria-hidden="true">س</div><div><strong>فروشگاه سپهر</strong><small>پنل ارسال و لجستیک</small><em>Powered by Mono</em></div></div>
+      <nav className="navigation">{menu.map((item, index) => <button key={`${item.id}-${index}`} className={`nav-item ${view === item.id ? 'active' : ''}`} onClick={() => { setView(item.id); setNotice('') }}><span className={`nav-icon ${item.id === 'dashboard' ? 'dashboard-icon' : item.id === 'deliveries' ? 'deliveries-icon' : ''}`} aria-hidden="true">{item.icon ? <img src={item.icon} alt="" /> : item.id === 'dashboard' ? <><i /><i /><i /><i /></> : <i />}</span>{item.label}</button>)}</nav>
+      <div className="sidebar-footer demo-account"><div><strong>مدیر حساب سپهر</strong><small>Workspace فروشگاه سپهر</small><small className="demo-label">محیط نمایشی · داده‌های ساختگی</small></div><button className="sidebar-logout" onClick={onExit}>خروج</button></div>
     </aside>
 
     <main className="workspace">
-      <div className="demo-ribbon"><span>پیش‌نمایش تعاملی</span><b>تمام داده‌ها ساختگی‌اند؛ هیچ درخواستی به API ارسال نمی‌شود.</b><button onClick={onExit}>اتصال به حساب واقعی</button></div>
-      <header className="topbar"><div className="topbar-actions"><button className="secondary-button topbar-action" onClick={() => setView('tracking')}>رهگیری سریع</button><button className="primary-button topbar-action" onClick={() => setView('create')}>＋ ارسال جدید</button></div><div className="page-title"><h1>{title[view]}</h1><p>فروشگاه نمونه • محیط نمایشی Mono</p></div></header>
+      <header className="topbar"><div className="topbar-actions"><button className="secondary-button topbar-action" onClick={() => setView('tracking')}>رهگیری سریع</button><button className="primary-button topbar-action" onClick={() => setView('create')}>ارسال جدید</button></div><div className="page-title"><h1>{title[view]}</h1><p>{view === 'dashboard' ? 'فروشگاه سپهر • مدیریت ارسال‌های شهری و شعب' : 'فروشگاه سپهر • محیط نمایشی'}</p></div></header>
       {notice && <div className="message success" role="status">{notice}</div>}
 
-      {view === 'dashboard' && <div className="merchant-dashboard">
+      {view === 'dashboard' && <>
+        <section className="demo-kpi-strip" aria-label="شاخص‌های نمایشی"><DemoKpi label="ارسال فعال" value={fa.format(activeCount)} /><DemoKpi label="نیازمند اقدام" value="۲" tone="red" /><DemoKpi label="تحویل امروز" value="۵۸" tone="green" /><DemoKpi label="شعب فعال" value="۳" /><DemoKpi label="میانگین تحویل" value="۲۶ دقیقه" /></section>
+        <div className="merchant-dashboard">
         <div className="dashboard-main-column">
-          <section className="demo-kpi-strip" aria-label="شاخص‌های ساختگی نمایشی"><DemoKpi label="ارسال فعال" value={fa.format(activeCount)} /><DemoKpi label="نیازمند اقدام" value="۲" tone="red" /><DemoKpi label="تحویل امروز" value="۵۸" tone="green" /><DemoKpi label="شعب فعال" value="۳" /><DemoKpi label="میانگین تحویل" value="۲۶ دقیقه" /></section>
-          <section className="panel"><div className="panel-heading"><div><span className="eyebrow">ارسال‌های فعال</span><h2>درخواست‌های اخیر</h2></div><span className="badge">{fa.format(activeCount)} فعال</span></div><PreviewTable items={deliveries.slice(0, 6)} onSelect={item => { setTrackingResult(item); setView('tracking') }} /></section>
-          <section className="panel demo-alerts"><div className="panel-heading"><div><span className="eyebrow">هشدارهای نمونه</span><h2>نیازمند پیگیری</h2></div><span className="badge danger">۲ مورد</span></div><p>گیرنده در دسترس نیست <b>ORD-۰۳۷۱</b></p><p>تأخیر آماده‌سازی شعبه <b>ORD-۰۳۸۲</b></p></section>
+          <section className="panel demo-active-panel"><div className="active-panel-heading"><h2>ارسال‌های فعال</h2><span className="badge">{fa.format(activeCount)} فعال</span></div><PreviewTable items={deliveries.slice(0, 7)} onSelect={item => { setTrackingResult(item); setView('tracking') }} /></section>
+          <section className="panel demo-alerts"><div className="exceptions-heading"><span className="badge danger">۲ مورد</span><h2>موارد نیازمند اقدام</h2></div><div className="issue-row"><span className="badge open">باز</span><span className="issue-age">پشتیبانی در حال بررسی</span><div><strong>گیرنده در دسترس نیست</strong><small>ORD-۰۳۷۱ • MIS-۱۰۴۹۳</small></div></div><div className="issue-row"><span className="badge open">باز</span><span className="issue-age">بیش از ۳ دقیقه</span><div><strong>تأخیر آماده‌سازی شعبه</strong><small>ORD-۰۳۸۲ • MIS-۱۰۵۰۹</small></div></div></section>
         </div>
         <aside className="dashboard-aside">
-          <section className="panel dashboard-widget"><div className="panel-heading"><div><span className="eyebrow">ارسال جدید</span><h2>درخواست ارسال ثبت کنید</h2></div></div><p>مبدأ و مقصد را وارد کنید؛ هزینه و زمان در نسخهٔ عملیاتی از سرویس دریافت می‌شود.</p><button className="primary-button full-width" onClick={() => setView('create')}>شروع ثبت ارسال</button></section>
-          <section className="panel dashboard-widget"><div className="panel-heading"><div><span className="eyebrow">پیگیری وضعیت</span><h2>رهگیری سریع</h2></div></div><form className="quick-track-form" onSubmit={event => { event.preventDefault(); setTrackingResult(deliveries.find(item => item.order === tracking || item.mission === tracking) || null); setView('tracking') }}><input aria-label="شناسهٔ ارسال" value={tracking} onChange={event => setTracking(event.target.value)} /><button className="secondary-button">جست‌وجو</button></form></section>
-          <section className="panel dashboard-widget"><div className="panel-heading"><div><span className="eyebrow">حساب کسب‌وکار</span><h2>وضعیت شعب</h2></div><button className="link-button" onClick={() => setView('branches')}>همهٔ شعب ←</button></div><ul className="branch-status-list">{['ونک', 'جردن', 'میرداماد'].map(name => <li key={name}><span>{name}</span><span className="badge success">فعال</span></li>)}</ul></section>
-          <section className="panel dashboard-widget service-widget"><div className="panel-heading"><div><span className="eyebrow">سرویس فعال</span><h2>ارسال شهری</h2></div></div><dl><div><dt>حد شعاع</dt><dd>۵ کیلومتر</dd></div><div><dt>تعداد بسته در مسیر</dt><dd>۵</dd></div><div><dt>تعهد تحویل</dt><dd>حداکثر ۲۶ دقیقه</dd></div></dl></section>
+          <section className="panel dashboard-widget quick-create"><h2>ارسال جدید</h2><p>مبدا، مقصد و بسته را وارد کن؛ مونو قبل از پذیرش، امکان‌سنجی، کرایه و تعهد تحویل را محاسبه می‌کند.</p><div className="quick-create-fields"><button onClick={() => setView('create')}><small>مبدا</small><span>شعبه را انتخاب کن</span></button><button onClick={() => setView('create')}><small>مقصد</small><span>آدرس گیرنده</span></button></div><button className="primary-button full-width" onClick={() => setView('create')}>شروع ثبت ارسال</button></section>
+          <section className="panel dashboard-widget quick-track"><h2>رهگیری سریع</h2><form className="quick-track-form" onSubmit={event => { event.preventDefault(); setTrackingResult(deliveries.find(item => item.order === tracking || item.mission === tracking) || null); setView('tracking') }}><input aria-label="شناسهٔ سفارش یا مأموریت" placeholder="شناسه سفارش یا مأموریت" value={tracking} onChange={event => setTracking(event.target.value)} /><button className="secondary-button">جست‌وجو</button></form></section>
+          <section className="panel dashboard-widget branch-widget"><h2>وضعیت شعب</h2><ul className="branch-status-list">{['ونک', 'جردن', 'میرداماد'].map(name => <li key={name}><span className="branch-active">فعال</span><span>{name}</span></li>)}</ul></section>
+          <section className="panel dashboard-widget service-widget"><h2>سرویس فعال</h2><dl><div><dt>سرویس</dt><dd>ارسال شهری</dd></div><div><dt>حد شعاع</dt><dd>۵ کیلومتر</dd></div><div><dt>حد بسته در مسیر</dt><dd>۵</dd></div><div><dt>تعهد دریافت</dt><dd>حداکثر ۲۶ دقیقه</dd></div><div><dt>شعب فعال</dt><dd>۳</dd></div></dl><div className="service-note"><strong>مدیریت ارسال با مونو</strong><span>تعهد تحویل، تخصیص پیک، مسیر و استثناها توسط مونو مدیریت می‌شود.</span></div></section>
         </aside>
-      </div>}
+        </div>
+      </>}
 
       {view === 'deliveries' && <section className="panel"><div className="panel-heading"><div><span className="eyebrow">فهرست نمایشی</span><h2>ارسال‌ها</h2></div><button className="primary-button" onClick={() => setView('create')}>＋ ارسال جدید</button></div><PreviewTable items={deliveries} onSelect={item => { setTrackingResult(item); setView('tracking') }} /></section>}
       {view === 'create' && <section className="panel form-panel"><div className="panel-heading"><div><span className="eyebrow">مرحلهٔ ۱ از ۲</span><h2>اطلاعات ارسال</h2></div><span className="panel-meta">فرم نمایشی</span></div><form className="delivery-form demo-create-form" onSubmit={createSample}><div className="form-grid two"><label>شمارهٔ سفارش<input name="order" required defaultValue="ORD-۰۳۹۰" /></label><label>شعبهٔ مبدأ<select defaultValue="ونک"><option>ونک</option><option>جردن</option><option>میرداماد</option></select></label><label className="wide">نشانی مبدأ<input required defaultValue="تهران، خیابان ولیعصر" /></label><label className="wide">نشانی گیرنده<input required defaultValue="تهران، میدان ونک" /></label><label>نام گیرنده<input name="recipient" defaultValue="مشتری نمونه" /></label><label>تلفن گیرنده<input inputMode="tel" defaultValue="۰۹۱۲۰۰۰۰۰۰۰" /></label><label>تعداد بسته<input type="number" min="1" defaultValue="1" /></label></div><p className="form-note">این ثبت فقط در حافظهٔ پیش‌نمایش انجام می‌شود.</p><button className="primary-button">ثبت نمونهٔ ارسال</button></form></section>}
@@ -84,5 +91,5 @@ function DemoKpi({ label, value, tone = 'cyan' }: { label: string; value: string
 }
 
 function PreviewTable({ items, onSelect }: { items: PreviewDelivery[]; onSelect: (item: PreviewDelivery) => void }) {
-  return <div className="table-wrap"><table className="demo-delivery-table"><thead><tr><th>وضعیت</th><th>گیرنده</th><th>شعبه</th><th>تعهد تحویل</th><th>مأموریت</th><th>سفارش</th></tr></thead><tbody>{items.map(item => <tr key={item.order} onClick={() => onSelect(item)} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter') onSelect(item) }}><td><span className={`badge ${item.status === 'تحویل' ? 'success' : item.status === 'نیازمند اقدام' ? 'danger' : 'info'}`}>{item.status}</span></td><td>{item.recipient}</td><td>{item.branch}</td><td>{item.deadline}</td><td dir="ltr">{item.mission}</td><td dir="ltr">{item.order}</td></tr>)}</tbody></table></div>
+  return <div className="table-wrap"><table className="demo-delivery-table"><thead><tr><th>وضعیت</th><th>گیرنده</th><th>شعبه</th><th>تعهد تحویل</th><th>مأموریت</th><th>سفارش</th></tr></thead><tbody>{items.map(item => <tr key={item.order} onClick={() => onSelect(item)} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter') onSelect(item) }}><td><span className={`badge ${item.status === 'تحویل' ? 'success' : item.status === 'دریافت' ? 'received' : item.status === 'نیازمند اقدام' ? 'danger' : 'info'}`}>{item.status}</span></td><td>{item.recipient}</td><td>{item.branch}</td><td>{item.deadline}</td><td dir="ltr">{item.mission}</td><td dir="ltr">{item.order}</td></tr>)}</tbody></table></div>
 }
