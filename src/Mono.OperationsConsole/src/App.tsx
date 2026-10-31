@@ -1338,7 +1338,7 @@ export default function App() {
         {webhookActionError && <div className="webhook-inline-error" role="alert">{webhookActionError}<small>در صورت نامشخص‌بودن نتیجه، دکمهٔ تلاش مجدد همان کلید idempotency را حفظ می‌کند.</small></div>}
         <div className="capacity-actions"><button className="primary-button" onClick={() => void performWebhookAction()} disabled={webhookActionLoading}>{webhookActionLoading ? 'در حال ارسال…' : webhookActionError ? 'تلاش مجدد' : 'تأیید عملیات'}</button><button className="secondary-button" onClick={() => setWebhookAction(null)} disabled={webhookActionLoading}>انصراف</button></div>
       </section></div>}
-      {timelineTitle && <div className="modal-backdrop" role="presentation" onClick={closeDetails}><section className="timeline-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}><header><div><span className="eyebrow">جزئیات و سوابق عملیاتی</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></header>{timelineLoading ? <p className="modal-state">در حال دریافت اطلاعات…</p> : viewMode === 'couriers' || viewMode === 'presence' ? <>
+      {timelineTitle && <div className={`modal-backdrop${viewMode !== 'couriers' && viewMode !== 'presence' ? ' mission-drawer-backdrop' : ''}`} role="presentation" onClick={closeDetails}><section className={`timeline-modal detail-modal${viewMode !== 'couriers' && viewMode !== 'presence' ? ' mission-detail-drawer' : ''}`} role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}><header><div><span className="eyebrow">{viewMode !== 'couriers' && viewMode !== 'presence' ? 'جزئیات مأموریت' : 'جزئیات و سوابق عملیاتی'}</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></header>{timelineLoading ? <p className="modal-state">در حال دریافت اطلاعات…</p> : viewMode === 'couriers' || viewMode === 'presence' ? <>
         {detailErrors.length > 0 && <div className="detail-errors">{detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
         <section className="detail-section"><h3>مشخصات پیک</h3>{courierDetail ? <dl className="detail-grid">
           <div><dt>شناسه پیک</dt><dd dir="ltr">{courierDetail.courier_id}</dd></div><div><dt>نوع عملیات</dt><dd dir="ltr">{courierDetail.mode}</dd></div><div><dt>وضعیت اعتماد</dt><dd>{courierDetail.status}</dd></div>
@@ -1349,16 +1349,23 @@ export default function App() {
         <section className="detail-section"><h3>سوابق خواندن پیک</h3>{courierAudit.length ? <div className="audit-list">{courierAudit.map((record) => <article key={record.audit_id}><div><strong>{record.action}</strong><small>{record.actor_id}</small></div><span>{formatDate(record.occurred_at)}</span><em>{fa.format(record.result_count)} نتیجه</em></article>)}</div> : <p className="modal-state">در ۱۰۰ رویداد اخیر، سابقه‌ای برای این پیک پیدا نشد.</p>}</section>
       </> : <>
         {detailErrors.length > 0 && <div className="detail-errors">{detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
-        <section className="detail-section"><h3>مشخصات مأموریت</h3>{missionDetail ? <dl className="detail-grid">
-          <div><dt>وضعیت</dt><dd><span className="badge neutral">{missionDetail.status}</span></dd></div>
-          <div><dt>مشتری</dt><dd dir="ltr">{missionDetail.customerId}</dd></div>
-          <div><dt>درخواست تحویل</dt><dd dir="ltr">{missionDetail.deliveryRequestId}</dd></div>
-          <div><dt>ایجاد</dt><dd>{formatDate(missionDetail.createdAt)}</dd></div>
-          <div><dt>موعد تحویل متعهدشده</dt><dd>{formatDate(missionDetail.committedDeliveryAt)}</dd></div>
-        </dl> : <p className="modal-state">جزئیات مأموریت در دسترس نیست.</p>}</section>
-        <section className="detail-section"><h3>رویدادهای مأموریت</h3>{missionTimeline.length ? <ol className="event-list">{missionTimeline.map((event) => <li key={event.eventId}><span className="event-dot"/><div><strong>{event.eventType}</strong><small>{formatDate(event.occurredAt)} · {fa.format(event.sequence)}</small></div></li>)}</ol> : <p className="modal-state">رویدادی در timeline ثبت نشده است.</p>}</section>
+        <section className="detail-section"><h3>وضعیت و تعهد</h3>{missionDetail ? <div className="drawer-info-list">
+          <div><strong>{formatDate(missionDetail.committedDeliveryAt)}</strong><span>زمان تعهدشده</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>زمان تخمینی فعلی</span></div>
+          <div><strong><span className="badge neutral">{missionDetail.status}</span></strong><span>وضعیت مأموریت</span></div>
+          <div><strong className="unavailable-value">قابل محاسبه نیست</strong><span>زمان باقیمانده</span></div>
+        </div> : <p className="modal-state">جزئیات مأموریت در دسترس نیست.</p>}</section>
+        <section className="detail-section"><h3>اجرا و مسیر</h3>{missionDetail ? <div className="drawer-info-list">
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>پیک تخصیص‌یافته</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>شیوهٔ حمل</span></div>
+          <div><strong dir="ltr">{missionDetail.deliveryRequestId}</strong><span>درخواست تحویل</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مبدأ و مقصد</span></div>
+          <div><strong dir="ltr">{missionDetail.customerId}</strong><span>شناسه مشتری</span></div>
+        </div> : <p className="modal-state">اطلاعات اجرا در دسترس نیست.</p>}</section>
+        <section className="detail-section decision-evidence"><h3>دلیل تصمیم سیستم</h3><p>دادهٔ دلیل تخصیص در API فعلی موجود نیست.</p></section>
+        <section className="detail-section"><h3>تاریخچه مأموریت</h3>{missionTimeline.length ? <ol className="drawer-timeline">{[...missionTimeline].sort((a,b) => a.sequence-b.sequence).map((event) => <li key={event.eventId}><time>{formatDate(event.occurredAt)}</time><span className="event-dot"/><div><strong>{event.eventType}</strong><small>رویداد {fa.format(event.sequence)}</small></div></li>)}</ol> : <p className="modal-state">رویدادی در timeline ثبت نشده است.</p>}</section>
         <section className="detail-section"><h3>سوابق دسترسی عملیات</h3>{missionAudit.length ? <div className="audit-list">{missionAudit.map((record) => <article key={record.auditId}><div><strong>{record.action}</strong><small>{record.actorId}</small></div><span>{formatDate(record.occurredAt)}</span><em>{fa.format(record.resultCount)} نتیجه</em></article>)}</div> : <p className="modal-state">سابقه‌ای برای نمایش برنگشت.</p>}</section>
-      </>}</section></div>}
+      </>}</section><footer className="drawer-actions"><div className="drawer-action-row"><button disabled title="API فعلی مسیر فعال مأموریت را ارائه نمی‌کند">مشاهده مسیر</button><button disabled title="اطلاعات تماس پیک در API مأموریت موجود نیست">تماس با پیک</button></div><div className="drawer-action-row"><button disabled title="API عملیات ثبت استثنا را ارائه نمی‌کند">ثبت استثنا</button><button disabled title="API عملیات تخصیص مجدد را ارائه نمی‌کند">تخصیص مجدد</button></div><button className="drawer-cancel" disabled title="لغو مأموریت از این پنل در API پشتیبانی نمی‌شود">لغو مأموریت</button><small>اقدام‌های عملیاتی تا زمان پشتیبانی API غیرفعال هستند.</small></footer></section></div>}
     </div>
   )
 }
