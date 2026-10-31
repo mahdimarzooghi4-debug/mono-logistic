@@ -53,7 +53,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
     <aside className="sidebar" aria-label="ناوبری اصلی نسخهٔ نمایشی">
       <div className="merchant-brand-card"><div className="brand-mark" aria-hidden="true">س</div><div><strong>فروشگاه سپهر</strong><small>پنل ارسال و لجستیک</small><em>Powered by Mono</em></div></div>
       <nav className="navigation">{menu.map((item, index) => <button key={`${item.id}-${index}`} className={`nav-item ${view === item.id ? 'active' : ''}`} onClick={() => { setView(item.id); setNotice('') }}><span className={`nav-icon ${item.id === 'dashboard' ? 'dashboard-icon' : item.id === 'deliveries' ? 'deliveries-icon' : ''}`} aria-hidden="true">{item.icon ? <img src={item.icon} alt="" /> : item.id === 'dashboard' ? <><i /><i /><i /><i /></> : <i />}</span>{item.label}</button>)}</nav>
-      <div className="sidebar-footer demo-account"><div><strong>مدیر حساب سپهر</strong><small>Workspace فروشگاه سپهر</small><small className="demo-label">محیط نمایشی · داده‌های ساختگی</small></div><button className="sidebar-logout" onClick={onExit}>خروج</button></div>
+      <div className="sidebar-footer demo-account"><div><strong>مدیر حساب سپهر</strong><small>Workspace فروشگاه سپهر</small><small className="demo-label sr-only">محیط نمایشی · داده‌های ساختگی</small></div><button className="sidebar-logout" onClick={onExit}>خروج</button></div>
     </aside>
 
     <main className="workspace">
@@ -64,7 +64,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
         <section className="demo-kpi-strip" aria-label="شاخص‌های نمایشی"><DemoKpi label="ارسال فعال" value={fa.format(activeCount)} /><DemoKpi label="نیازمند اقدام" value="۲" tone="red" /><DemoKpi label="تحویل امروز" value="۵۸" tone="green" /><DemoKpi label="شعب فعال" value="۳" /><DemoKpi label="میانگین تحویل" value="۲۶ دقیقه" /></section>
         <div className="merchant-dashboard">
         <div className="dashboard-main-column">
-          <section className="panel demo-active-panel"><div className="active-panel-heading"><h2>ارسال‌های فعال</h2><span className="badge">{fa.format(activeCount)} فعال</span></div><PreviewTable items={deliveries.slice(0, 7)} onSelect={item => { setTrackingResult(item); setView('tracking') }} /></section>
+          <section className="panel demo-active-panel"><div className="active-panel-heading"><span className="badge">{fa.format(activeCount)} فعال</span><h2>ارسال‌های فعال</h2></div><PreviewTable items={deliveries.slice(0, 7)} onSelect={item => { setTrackingResult(item); setView('tracking') }} /></section>
           <section className="panel demo-alerts"><div className="exceptions-heading"><span className="badge danger">۲ مورد</span><h2>موارد نیازمند اقدام</h2></div><div className="issue-row"><span className="badge open">باز</span><span className="issue-age">پشتیبانی در حال بررسی</span><div><strong>گیرنده در دسترس نیست</strong><small>ORD-۰۳۷۱ • MIS-۱۰۴۹۳</small></div></div><div className="issue-row"><span className="badge open">باز</span><span className="issue-age">بیش از ۳ دقیقه</span><div><strong>تأخیر آماده‌سازی شعبه</strong><small>ORD-۰۳۸۲ • MIS-۱۰۵۰۹</small></div></div></section>
         </div>
         <aside className="dashboard-aside">
