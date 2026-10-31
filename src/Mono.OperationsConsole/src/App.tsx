@@ -1053,16 +1053,10 @@ export default function App() {
           <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon"><NavIcon type="zone" /></span>مناطق و ظرفیت</button>
           <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon"><NavIcon type="policy" /></span>سیاست‌ها و پیکربندی</button>
           <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon"><NavIcon type="customers" /></span>مشتریان</button>
-          <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon"><NavIcon type="support" /></span>پشتیبانی</button>
+          <button className={`nav-item ${viewMode === 'sla' || viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon"><NavIcon type="support" /></span>SLA و استثناها</button>
           <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon"><NavIcon type="finance" /></span>مالی</button>
           <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon"><NavIcon type="integration" /></span>یکپارچه‌سازی</button>
-          <button className="nav-item" disabled title="نمای ردیابی زنده به رویدادهای مکان معتبر و به‌روزرسانی GPS نیاز دارد"><span className="nav-icon"><NavIcon type="tracking" /></span>ردیابی</button>
           <button className={`nav-item ${viewMode === 'audit' ? 'active' : ''}`} onClick={() => switchView('audit')}><span className="nav-icon"><NavIcon type="audit" /></span>ممیزی</button>
-          <div className="nav-divider">ابزارهای داخلی عملیات</div>
-          <button className={`nav-item ${viewMode === 'sla' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon"><NavIcon type="alert" /></span>استثناهای SLA</button>
-          <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon"><NavIcon type="presence" /></span>حضور پیک‌ها</button>
-          <button className={`nav-item ${viewMode === 'admissions' ? 'active' : ''}`} onClick={() => switchView('admissions')}><span className="nav-icon"><NavIcon type="admissions" /></span>پذیرش</button>
-          <button className={`nav-item ${viewMode === 'workers' ? 'active' : ''}`} onClick={() => switchView('workers')}><span className="nav-icon"><NavIcon type="settings" /></span>سلامت پردازش‌ها</button>
         </nav>
         <div className="sidebar-footer"><div className="sidebar-operator"><span className="operator-avatar">م</span><span>اپراتور مونو<small>تیم عملیات</small></span><i className={`operator-status ${token ? 'connected' : ''}`} /></div><button className="sidebar-access" onClick={() => token ? disconnect() : setConnectionDialogOpen(true)}>{token ? 'خروج' : 'اتصال API'}</button></div>
       </aside>
@@ -1349,7 +1343,6 @@ export default function App() {
           <footer className="table-footer"><span>{fa.format(viewMode === 'dispatch' ? items.length : viewMode === 'missions' ? missionItems.length : viewMode === 'couriers' ? courierItems.length : viewMode === 'presence' ? presenceItems.length : viewMode === 'issues' ? issueItems.length : viewMode === 'finance' ? financeItems.length : viewMode === 'sla' ? slaItems.length : availabilityPage?.items.length || 0)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !(viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : viewMode === 'presence' ? presenceNextCursor : availabilityNextCursor)}>بعدی</button></div></footer>
           </section>
         </div>}
-        {viewMode === 'dispatch' && <p className="data-note">آمار بالا فقط از ردیف‌های صفحهٔ جاری محاسبه شده است؛ API فعلاً شمار کل صف را برنمی‌گرداند.</p>}
         {viewMode === 'issues' && <p className="data-note">این صندوق فقط فرادادهٔ ساختاریافتهٔ گزارش را نشان می‌دهد؛ متن آزاد یا موقعیت مکانی پیک در این API ارائه نمی‌شود. این نما گزارش را resolve یا وضعیت مأموریت را تغییر نمی‌دهد.</p>}
         {viewMode === 'presence' && <p className="data-note">آمار فقط از ردیف‌های صفحهٔ جاری محاسبه شده و وضعیت براساس snapshot API است؛ این نما polling خودکار یا موقعیت GPS ارائه نمی‌کند.</p>}
         {viewMode === 'workers' && <p className="data-note">این وضعیت درون‌فرایندی و مخصوص همین نمونهٔ API است؛ در استقرار چندنمونه‌ای، وضعیت سایر نمونه‌ها را پوشش نمی‌دهد و health کلی API محسوب نمی‌شود. دریافت خودکار انجام نمی‌شود.</p>}
