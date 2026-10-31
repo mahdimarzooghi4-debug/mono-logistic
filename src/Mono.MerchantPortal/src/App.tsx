@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import WebhookEndpointWorkbench from './WebhookEndpointWorkbench'
+import MerchantDemoPreview from './MerchantDemoPreview'
 
 type Branch = {
   branchId: string
@@ -105,6 +106,7 @@ function App() {
   const [connected, setConnected] = useState(false)
   const [view, setView] = useState<View>('dashboard')
   const [settingsTab, setSettingsTab] = useState<'integrations' | 'notifications' | 'members' | 'workspace' | 'branding'>('integrations')
+  const [demoPreview, setDemoPreview] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
   const [items, setItems] = useState<DeliveryRequest[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -319,6 +321,8 @@ function App() {
     webhook: { title: 'افزودن Webhook', subtitle: 'اتصال رویدادهای Mono به سیستم کسب‌وکار' },
   }
 
+  if (demoPreview) return <MerchantDemoPreview onExit={() => setDemoPreview(false)} />
+
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="ناوبری اصلی">
@@ -360,6 +364,7 @@ function App() {
               <input id="api-token" type="password" autoComplete="off" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} placeholder="کلید مشتری با دسترسی شعب و ارسال‌ها" required />
               <button className="primary-button" disabled={loading}>{loading ? 'در حال اتصال…' : 'اتصال به پنل'}</button>
             </form>
+            <button className="demo-preview-button" type="button" onClick={() => setDemoPreview(true)}>مشاهدهٔ نسخهٔ نمایشی</button>
           </section>
         )}
 
