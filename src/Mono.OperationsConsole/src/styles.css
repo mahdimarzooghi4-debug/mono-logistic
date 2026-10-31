@@ -247,3 +247,56 @@ tbody tr:hover { background: #fbfdfd; }
   .webhook-filters { grid-template-columns: 1fr; }
   .webhook-confirm .capacity-actions { flex-direction: column; }
 }
+
+/* Operations overview — Figma node 72:4 compact five-metric strip. */
+.dashboard-summary-strip {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  min-height: 56px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+.dashboard-summary-strip .kpi-card {
+  position: relative;
+  min-width: 0;
+  min-height: 54px;
+  justify-content: flex-start;
+  padding: 5px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.dashboard-summary-strip .kpi-card:not(:last-child)::after {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  content: '';
+}
+.dashboard-summary-strip .kpi-card small { font-size: 10px; }
+.dashboard-summary-strip .kpi-card strong { margin-top: 2px; font-size: 20px; }
+.dashboard-summary-strip .kpi-card:first-child strong { color: #168552; }
+.dashboard-summary-strip .kpi-card:nth-child(2) strong { color: #087e95; }
+.dashboard-summary-strip .kpi-card:nth-child(3) strong { color: #c1841e; }
+.dashboard-summary-strip .kpi-card:nth-child(4) strong { color: #cd554c; }
+.dashboard-summary-strip .kpi-card:nth-child(5) strong { color: #18252b; }
+.dashboard-summary-strip .kpi-card-action:hover { border-color: transparent; box-shadow: none; transform: none; background: #f9fcfc; }
+.dashboard-summary-strip .kpi-card-action:focus-visible { z-index: 1; outline: 2px solid #227c8c; outline-offset: -3px; }
+@media (max-width: 1050px) {
+  .dashboard-summary-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .dashboard-summary-strip .kpi-card { gap: 0; padding-inline: 10px; }
+  .dashboard-summary-strip .kpi-card small { font-size: 8px; }
+  .dashboard-summary-strip .kpi-card strong { font-size: 17px; }
+}
+@media (max-width: 720px) {
+  .dashboard-summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-summary-strip .kpi-card { min-height: 62px; padding: 8px 11px; }
+  .dashboard-summary-strip .kpi-card:nth-child(odd)::after { display: none; }
+  .dashboard-summary-strip .kpi-card:nth-child(even)::after { top: 10px; height: 42px; }
+}
