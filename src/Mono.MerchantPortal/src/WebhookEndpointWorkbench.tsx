@@ -5,6 +5,8 @@ import './webhook-endpoint-workbench.css'
 type Endpoint = { endpoint_id: string; url: string; events: string[]; status: string; created_at: string }
 type Action = { endpoint: Endpoint; kind: 'disable' | 'rotate' }
 type SecretReveal = { heading: string; endpointId: string; secret: string }
+type LifecycleEvent = { event_id: number; action: string; occurred_at: string }
+type LifecyclePage = { items: LifecycleEvent[]; next_cursor: string | null; cursorStack: Array<string | null> }
 
 const events = [
   ['mission.accepted', 'پذیرش مأموریت'], ['mission.rejected', 'رد مأموریت'], ['promise.committed', 'ثبت تعهد تحویل'],
@@ -28,6 +30,9 @@ export default function WebhookEndpointWorkbench({ token, onBack }: { token: str
   const [notice, setNotice] = useState('')
   const [pendingAction, setPendingAction] = useState<Action | null>(null)
   const [secretReveal, setSecretReveal] = useState<SecretReveal | null>(null)
+  const [auditByEndpoint, setAuditByEndpoint] = useState<Record<string, LifecyclePage>>({})
+  const [auditLoading, setAuditLoading] = useState('')
+  const [auditError, setAuditError] = useState<Record<string, string>>({})
   const requestSequence = useRef(0)
 
   const load = useCallback(async (cursor: string | null = null, stack: Array<string | null> = [null]) => {
@@ -90,6 +95,30 @@ export default function WebhookEndpointWorkbench({ token, onBack }: { token: str
     finally { setBusy(false) }
   }
 
+  async function loadEndpointAudit(endpoint: Endpoint, cursor: string | null = null, cursorStack: Array<string | null> = [null]) {
+    setAuditLoading(endpoint.endpoint_id)
+    setAuditError((current) => ({ ...current, [endpoint.endpoint_id]: '' }))
+    try {
+      const query = new URLSearchParams({ limit: '50' })
+      if (cursor) query.set('cursor', cursor)
+      const response = await fetch(`/v1/webhook-endpoints/${encodeURIComponent(endpoint.endpoint_id)}/audit?${query}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+      if (!response.ok) throw new Error(await readError(response))
+      const result = await response.json() as { items?: LifecycleEvent[]; next_cursor?: string | null }
+      if (!Array.isArray(result.items)) throw new Error('پاسخ سابقهٔ Endpoint با قرارداد API سازگار نیست.')
+      setAuditByEndpoint((current) => ({ ...current, [endpoint.endpoint_id]: { items: result.items!, next_cursor: result.next_cursor || null, cursorStack } }))
+    } catch (cause) {
+      setAuditError((current) => ({ ...current, [endpoint.endpoint_id]: cause instanceof Error ? cause.message : 'دریافت سابقه ناموفق بود.' }))
+    } finally { setAuditLoading('') }
+  }
+
+  function toggleEndpointAudit(endpoint: Endpoint) {
+    if (auditByEndpoint[endpoint.endpoint_id]) {
+      setAuditByEndpoint((current) => { const next = { ...current }; delete next[endpoint.endpoint_id]; return next })
+      return
+    }
+    void loadEndpointAudit(endpoint)
+  }
+
   return <section className="panel settings-content webhook-endpoint-workbench">
     <div className="panel-heading"><div><span className="eyebrow">یکپارچه‌سازی</span><h2>مدیریت Webhook Endpoint</h2></div><button className="text-button" onClick={onBack}>بازگشت</button></div>
     <p className="data-note">درخواست‌ها با کلید مشتری و scope ‏<code dir="ltr">webhooks.manage</code> اجرا می‌شوند. URL فقط HTTPS پذیرفته می‌شود و سیاست مقصد در API اعتبارسنجی می‌شود. Secret فقط هنگام ثبت یا چرخش نمایش داده می‌شود.</p>
@@ -105,7 +134,10 @@ export default function WebhookEndpointWorkbench({ token, onBack }: { token: str
     <div className="webhook-endpoint-list">{endpoints.map((endpoint) => <article className="webhook-endpoint-card" key={endpoint.endpoint_id}>
       <header><strong dir="ltr">{endpoint.endpoint_id}</strong><span className={`badge ${endpoint.status === 'ACTIVE' ? 'success' : 'neutral'}`}>{endpoint.status === 'ACTIVE' ? 'فعال' : 'غیرفعال'}</span></header>
       <p dir="ltr">{endpoint.url}</p><small>ثبت: {formatDate(endpoint.created_at)}</small><div className="webhook-endpoint-events">{endpoint.events.map((item) => <code dir="ltr" key={item}>{item}</code>)}</div>
-      <div className="webhook-endpoint-actions">{endpoint.status === 'ACTIVE' && <><button className="secondary-button" disabled={busy} onClick={() => setPendingAction({ endpoint, kind: 'rotate' })}>چرخش secret</button><button className="secondary-button danger-action" disabled={busy} onClick={() => setPendingAction({ endpoint, kind: 'disable' })}>غیرفعال‌سازی</button></>}</div>
+      <div className="webhook-endpoint-actions"><button className="secondary-button" disabled={busy || auditLoading === endpoint.endpoint_id} onClick={() => toggleEndpointAudit(endpoint)}>{auditByEndpoint[endpoint.endpoint_id] ? 'بستن سابقه' : 'مشاهدهٔ سابقه'}</button>{endpoint.status === 'ACTIVE' && <><button className="secondary-button" disabled={busy} onClick={() => setPendingAction({ endpoint, kind: 'rotate' })}>چرخش secret</button><button className="secondary-button danger-action" disabled={busy} onClick={() => setPendingAction({ endpoint, kind: 'disable' })}>غیرفعال‌سازی</button></>}</div>
+      {auditLoading === endpoint.endpoint_id && <p className="webhook-endpoint-audit-state">در حال دریافت سابقه…</p>}
+      {auditError[endpoint.endpoint_id] && <p className="webhook-inline-error" role="alert">{auditError[endpoint.endpoint_id]}</p>}
+      {auditByEndpoint[endpoint.endpoint_id] && <div className="webhook-endpoint-audit"><strong>سابقهٔ تغییرات</strong>{auditByEndpoint[endpoint.endpoint_id].items.length ? auditByEndpoint[endpoint.endpoint_id].items.map((entry) => <article key={entry.event_id}><span>{entry.action === 'CREATED' ? 'ایجاد Endpoint' : entry.action === 'DISABLED' ? 'غیرفعال‌سازی' : 'چرخش secret'}</span><time>{formatDate(entry.occurred_at)}</time></article>) : <small>رویدادی ثبت نشده است.</small>}{auditByEndpoint[endpoint.endpoint_id].next_cursor && <button className="history-button" disabled={auditLoading === endpoint.endpoint_id} onClick={() => { const page = auditByEndpoint[endpoint.endpoint_id]; void loadEndpointAudit(endpoint, page.next_cursor, [...page.cursorStack, page.next_cursor]) }}>رویدادهای قدیمی‌تر</button>}</div>}
     </article>)}</div>
     <footer className="table-footer"><span>صفحهٔ {new Intl.NumberFormat('fa-IR').format(cursorStack.length)}</span><div className="pagination"><button disabled={loading || cursorStack.length <= 1} onClick={() => void load(cursorStack.at(-2) || null, cursorStack.slice(0, -1))}>قبلی</button><button disabled={loading || !nextCursor} onClick={() => void load(nextCursor, [...cursorStack, nextCursor])}>بعدی</button></div></footer>
     {pendingAction && <div className="modal-backdrop" role="presentation"><section className="timeline-modal" role="dialog" aria-modal="true" aria-labelledby="webhook-endpoint-action-title"><header><div><span className="eyebrow">تأیید تغییر تنظیمات</span><h2 id="webhook-endpoint-action-title">{pendingAction.kind === 'disable' ? 'غیرفعال‌کردن Endpoint' : 'چرخش signing secret'}</h2></div><button className="icon-button" disabled={busy} onClick={() => setPendingAction(null)} aria-label="بستن">×</button></header><p>{pendingAction.kind === 'disable' ? 'Endpoint غیرفعال می‌شود و دیگر مقصد ارسال رویدادهای جدید نخواهد بود.' : 'Secret جدید فقط یک بار نمایش داده می‌شود. پس از تأیید، secret قبلی باطل و secret جدید باید در سامانهٔ مقصد جایگزین شود.'}</p><div className="form-actions"><button className="primary-button" disabled={busy} onClick={() => void confirmAction()}>{busy ? 'در حال انجام…' : 'تأیید'}</button><button className="secondary-button" disabled={busy} onClick={() => setPendingAction(null)}>انصراف</button></div></section></div>}

@@ -74,4 +74,23 @@ describe('Merchant webhook endpoint management', () => {
     expect(screen.queryByText('whsec_rotated_once')).not.toBeInTheDocument()
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/whk_abc123/rotate-secret'))).toBe(true)
   })
+
+  it('reads customer-scoped lifecycle audit and renders only action and timestamp', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer merchant-key')
+      if (url.startsWith('/v1/webhook-endpoints?')) return json({ items: [endpoint], next_cursor: null })
+      if (url.startsWith('/v1/webhook-endpoints/whk_abc123/audit?')) return json({ items: [{ event_id: 7, action: 'SECRET_ROTATED', occurred_at: '2026-10-31T11:00:00Z' }], next_cursor: null })
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<WebhookEndpointWorkbench token="merchant-key" onBack={vi.fn()} />)
+    await screen.findByText('whk_abc123')
+    await user.click(screen.getByRole('button', { name: 'مشاهدهٔ سابقه' }))
+    expect(await screen.findByText('سابقهٔ تغییرات')).toBeInTheDocument()
+    expect(screen.getAllByText('چرخش secret')).toHaveLength(2)
+    expect(screen.getAllByText(/۱۴۰۵/)).toHaveLength(2)
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/whk_abc123/audit?limit=50')
+  })
 })
