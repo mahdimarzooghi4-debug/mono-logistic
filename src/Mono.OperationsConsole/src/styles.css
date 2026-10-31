@@ -376,9 +376,9 @@ tbody tr:hover { background: #fbfdfd; }
 .capacity-overview-empty strong { color: #465960; font-size: 9px; }
 .capacity-overview-empty p { margin: 6px 0; color: #829096; font-size: 8px; line-height: 1.8; }
 .operations-primary-card { min-height: 749px; direction: rtl; }
-.operations-primary-card .dashboard-panel-heading { position: relative; min-height: 49px; align-items: flex-start; padding: 20px 20px 0; }
+.operations-primary-card .dashboard-panel-heading { position: relative; display: grid; grid-template-columns: 1fr 1fr; min-height: 49px; align-items: flex-start; padding: 20px 20px 0; }
 .operations-primary-card .dashboard-panel-heading h2 { margin: 0; font-size: 15px; line-height: 1.5; }
-.dashboard-panel-actions { display: flex; direction: ltr; gap: 8px; position: relative; }
+.dashboard-panel-actions { display: flex; grid-column: 2; justify-self: start; direction: ltr; gap: 8px; position: relative; }
 .dashboard-toolbar-button,.dashboard-filter-details > summary { display: inline-flex; height: 29px; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid #e4eaec; border-radius: 6px; background: #fff; color: #65757b; font: inherit; font-size: 9px; cursor: pointer; list-style: none; }
 .dashboard-toolbar-button:disabled { opacity: .55; cursor: not-allowed; }
 .dashboard-filter-details { position: relative; direction: rtl; }
@@ -391,21 +391,22 @@ tbody tr:hover { background: #fbfdfd; }
 .operations-primary-card .dashboard-search-row .search-field { height: 36px; max-width: 320px; flex: 0 1 320px; }
 .operations-primary-card .dashboard-search-row .search-field input { height: 36px; font-size: 10px; }
 .operations-primary-card .table-wrap { margin-top: 16px; }
-.operations-primary-card .dashboard-missions-table { width: 100%; min-width: 796px; table-layout: fixed; }
+.operations-primary-card .dashboard-missions-table { width: 100%; min-width: 0; table-layout: fixed; }
 .operations-primary-card .dashboard-missions-table th,
 .operations-primary-card .dashboard-missions-table td { overflow: hidden; padding: 0 8px; text-overflow: ellipsis; }
 .operations-primary-card .dashboard-missions-table th { height: 36px; }
 .operations-primary-card .dashboard-missions-table td { height: 48px; }
-.operations-primary-card .dashboard-missions-table th:nth-child(1),.operations-primary-card .dashboard-missions-table td:nth-child(1) { width: 50px; text-align: center; }
-.operations-primary-card .dashboard-missions-table th:nth-child(2),.operations-primary-card .dashboard-missions-table td:nth-child(2) { width: 146px; }
-.operations-primary-card .dashboard-missions-table th:nth-child(3),.operations-primary-card .dashboard-missions-table td:nth-child(3) { width: 65px; }
-.operations-primary-card .dashboard-missions-table th:nth-child(4),.operations-primary-card .dashboard-missions-table td:nth-child(4) { width: 90px; }
-.operations-primary-card .dashboard-missions-table th:nth-child(5),.operations-primary-card .dashboard-missions-table td:nth-child(5) { width: 90px; }
-.operations-primary-card .dashboard-missions-table th:nth-child(6),.operations-primary-card .dashboard-missions-table td:nth-child(6) { width: 75px; }
-.operations-primary-card .dashboard-missions-table th:nth-child(7),.operations-primary-card .dashboard-missions-table td:nth-child(7) { width: 110px; }
-.operations-primary-card .dashboard-missions-table th:nth-child(8),.operations-primary-card .dashboard-missions-table td:nth-child(8) { width: 70px; }
-.operations-primary-card .dashboard-missions-table th:nth-child(9),.operations-primary-card .dashboard-missions-table td:nth-child(9) { width: 100px; }
+.operations-primary-card .dashboard-missions-table th:nth-child(1),.operations-primary-card .dashboard-missions-table td:nth-child(1) { width: 6.28%; text-align: center; }
+.operations-primary-card .dashboard-missions-table th:nth-child(2),.operations-primary-card .dashboard-missions-table td:nth-child(2) { width: 18.34%; }
+.operations-primary-card .dashboard-missions-table th:nth-child(3),.operations-primary-card .dashboard-missions-table td:nth-child(3) { width: 8.17%; }
+.operations-primary-card .dashboard-missions-table th:nth-child(4),.operations-primary-card .dashboard-missions-table td:nth-child(4) { width: 11.31%; }
+.operations-primary-card .dashboard-missions-table th:nth-child(5),.operations-primary-card .dashboard-missions-table td:nth-child(5) { width: 11.31%; }
+.operations-primary-card .dashboard-missions-table th:nth-child(6),.operations-primary-card .dashboard-missions-table td:nth-child(6) { width: 9.42%; }
+.operations-primary-card .dashboard-missions-table th:nth-child(7),.operations-primary-card .dashboard-missions-table td:nth-child(7) { width: 13.82%; }
+.operations-primary-card .dashboard-missions-table th:nth-child(8),.operations-primary-card .dashboard-missions-table td:nth-child(8) { width: 8.79%; }
+.operations-primary-card .dashboard-missions-table th:nth-child(9),.operations-primary-card .dashboard-missions-table td:nth-child(9) { width: 12.56%; }
 .dashboard-row-action { border: 0; background: transparent; color: #74848a; font-size: 13px; letter-spacing: 1px; cursor: pointer; }
+.topbar-actions:has(.create-mission-action) > .icon-button { display: none; }
 
 .overview-updated-at { color: #75848a; font-size: 9px; white-space: nowrap; }
 .create-mission-action { height: 35px; padding: 0 12px; font-size: 9px; }
