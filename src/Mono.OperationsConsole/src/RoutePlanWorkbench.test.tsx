@@ -57,5 +57,7 @@ describe('Operations route plan workbench', () => {
     fireEvent.submit(screen.getByLabelText('جست‌وجوی مسیر یا پیک').closest('form')!)
     expect(await screen.findByRole('alert')).toHaveTextContent('The Route plan was not found.')
     expect(screen.queryByText(/RTE-۰۷۱/)).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'ترتیب توقف‌ها' })).toBeInTheDocument()
+    expect(screen.getByText('برای نمایش توقف‌ها، یک مسیر را جست‌وجو کنید.')).toBeInTheDocument()
   })
 })
