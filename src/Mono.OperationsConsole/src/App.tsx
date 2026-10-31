@@ -1039,7 +1039,7 @@ export default function App() {
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
-          <div className="page-heading"><h1>{panelTitles[viewMode]}</h1><p>{panelDescriptions[viewMode]}</p></div>
+          <div className="page-heading"><h1>{viewMode === 'dispatch' ? 'مرکز کنترل عملیات' : panelTitles[viewMode]}</h1><p>{viewMode === 'dispatch' ? 'نمای زندهٔ مأموریت‌ها، پیک‌ها، مسیرها و وضعیت استاندارد' : panelDescriptions[viewMode]}</p></div>
         </header>
 
         {!token && <section className="connect-card">
@@ -1165,7 +1165,22 @@ export default function App() {
         {viewMode === 'audit' && <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />}
         {viewMode === 'admissions' && <AdmissionsWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} onOpenBusinesses={() => switchView('onboarding')} onOpenCouriers={() => switchView('couriers')} />}
         {viewMode === 'onboarding' && <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
-        {viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && <section className="queue-panel">
+        {viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && <div className={viewMode === 'dispatch' ? 'operations-overview-layout' : ''}>
+          {viewMode === 'dispatch' && <aside className="operations-overview-aside">
+            <section className="operations-overview-card action-overview-card">
+              <header><strong>نیازمند اقدام</strong><span>{dashboardSummary ? fa.format([dashboardSummary.unassigned_mission_count, dashboardSummary.sla_at_risk_count, dashboardSummary.sla_overdue_count].filter((count) => count > 0).length) : '—'}</span></header>
+              <div className="overview-action-list">
+                <button onClick={openDashboardSla} disabled={!token}><span><strong>در معرض نقض SLA</strong><small>هشدارهای نیازمند پایش</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.sla_at_risk_count) : '—'}</b></button>
+                <button onClick={openDashboardSla} disabled={!token}><span><strong>از موعد گذشته</strong><small>در بازهٔ جاری API</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.sla_overdue_count) : '—'}</b></button>
+                <button onClick={openDashboardDispatch} disabled={!token}><span><strong>بدون تخصیص پیک</strong><small>در انتظار پیشنهاد پذیرفته‌شده</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.unassigned_mission_count) : '—'}</b></button>
+              </div>
+            </section>
+            <section className="operations-overview-card capacity-overview-card">
+              <header><strong>ظرفیت مناطق</strong><button onClick={() => switchView('zones')}>برنامه‌ریزی</button></header>
+              <div className="capacity-overview-empty"><span>◷</span><strong>ظرفیت منطقه‌ای این نما موجود نیست</strong><p>API ظرفیت را فقط برای زون و بازهٔ انتخاب‌شده برمی‌گرداند؛ اینجا مقدار منطقه‌ای حدس زده نمی‌شود.</p><button onClick={() => switchView('zones')}>مشاهدهٔ ظرفیت برنامه‌ریزی‌شده ←</button></div>
+            </section>
+          </aside>}
+          <section className={`queue-panel ${viewMode === 'dispatch' ? 'operations-primary-card' : ''}`}>
           <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
           {viewMode === 'dispatch' ? <form className="filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجوی شناسهٔ مأموریت" /></label>
@@ -1304,7 +1319,8 @@ export default function App() {
             </table>
           </div>
           <footer className="table-footer"><span>{fa.format(viewMode === 'dispatch' ? items.length : viewMode === 'missions' ? missionItems.length : viewMode === 'couriers' ? courierItems.length : viewMode === 'presence' ? presenceItems.length : viewMode === 'issues' ? issueItems.length : viewMode === 'finance' ? financeItems.length : viewMode === 'sla' ? slaItems.length : availabilityPage?.items.length || 0)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !(viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : viewMode === 'presence' ? presenceNextCursor : availabilityNextCursor)}>بعدی</button></div></footer>
-        </section>}
+          </section>
+        </div>}
         {viewMode === 'dispatch' && <p className="data-note">آمار بالا فقط از ردیف‌های صفحهٔ جاری محاسبه شده است؛ API فعلاً شمار کل صف را برنمی‌گرداند.</p>}
         {viewMode === 'issues' && <p className="data-note">این صندوق فقط فرادادهٔ ساختاریافتهٔ گزارش را نشان می‌دهد؛ متن آزاد یا موقعیت مکانی پیک در این API ارائه نمی‌شود. این نما گزارش را resolve یا وضعیت مأموریت را تغییر نمی‌دهد.</p>}
         {viewMode === 'presence' && <p className="data-note">آمار فقط از ردیف‌های صفحهٔ جاری محاسبه شده و وضعیت براساس snapshot API است؛ این نما polling خودکار یا موقعیت GPS ارائه نمی‌کند.</p>}
