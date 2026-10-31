@@ -8,7 +8,8 @@ describe('SlaExceptionsWorkbench', () => {
   it('keeps counts blank until the operations API is authenticated', () => {
     render(<SlaExceptionsWorkbench token="" onConnected={vi.fn()} onOpenMission={vi.fn()} />)
     expect(screen.getByText('برای شروع به API عملیات متصل شوید.')).toBeInTheDocument()
-    expect(screen.getByText('از موعد گذشته').parentElement).toHaveTextContent('—')
+    expect(screen.getByText('بحرانی').parentElement).toHaveTextContent('—')
+    expect(screen.getByText('میانگین ریسک').parentElement).toHaveTextContent('—')
     expect(screen.getByRole('button', { name: 'ثبت استثنا' })).toBeDisabled()
   })
 
