@@ -6,6 +6,7 @@ import AdmissionsWorkbench from './AdmissionsWorkbench'
 import DashboardSummaryCards from './DashboardSummaryCards'
 import CourierPlanningEvidence from './CourierPlanningEvidence'
 import RoutePlanWorkbench from './RoutePlanWorkbench'
+import AuditWorkbench from './AuditWorkbench'
 import type { DashboardSummaryMetrics } from './DashboardSummaryCards'
 
 type Offer = {
@@ -110,9 +111,10 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'routes' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('dispatch')
+  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('dispatch')
   const [policyReloadKey, setPolicyReloadKey] = useState(0)
   const [routeReloadKey, setRouteReloadKey] = useState(0)
+  const [auditReloadKey, setAuditReloadKey] = useState(0)
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [items, setItems] = useState<Mission[]>([])
@@ -860,7 +862,7 @@ export default function App() {
     void fetchSlaPage(null, [null], horizon)
   }
 
-  function switchView(mode: 'dispatch' | 'missions' | 'routes' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
+  function switchView(mode: 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
@@ -875,6 +877,7 @@ export default function App() {
     else if (mode === 'workers') void fetchWorkerStatus()
     else if (mode === 'webhooks') { setWebhookTab('deliveries'); void fetchWebhookOps(null) }
     else if (mode === 'routes') setRouteReloadKey((value) => value + 1)
+    else if (mode === 'audit') setAuditReloadKey((value) => value + 1)
     else if (mode === 'policies') setPolicyReloadKey((value) => value + 1)
     else if (mode === 'onboarding') setPolicyReloadKey((value) => value + 1)
     else if (mode === 'admissions') setPolicyReloadKey((value) => value + 1)
@@ -986,10 +989,10 @@ export default function App() {
     dispatch: 'داشبورد عملیات', missions: 'مأموریت‌ها', couriers: 'پیک‌ها', zones: 'مناطق و ظرفیت',
     finance: 'مالی و بررسی کرایه', sla: 'استثناهای SLA', presence: 'وضعیت حضور پیک‌ها',
     issues: 'پشتیبانی و گزارش مشکلات', workers: 'سلامت پردازش‌ها', webhooks: 'یکپارچه‌سازی‌ها',
-    policies: 'استانداردها و پیکربندی', onboarding: 'مشتریان و شعب', admissions: 'پذیرش و راه‌اندازی', routes: 'مسیرها',
+    policies: 'استانداردها و پیکربندی', onboarding: 'مشتریان و شعب', admissions: 'پذیرش و راه‌اندازی', routes: 'مسیرها', audit: 'ممیزی عملیات',
   }
   const panelDescriptions: Record<typeof viewMode, string> = {
-    dispatch: 'صف مأموریت‌های در انتظار تخصیص پیک', missions: 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده', routes: 'برنامهٔ مسیر و ترتیب توقف‌های ذخیره‌شده؛ بدون نقشه و موقعیت زنده',
+    dispatch: 'صف مأموریت‌های در انتظار تخصیص پیک', missions: 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده', routes: 'برنامهٔ مسیر و ترتیب توقف‌های ذخیره‌شده؛ بدون نقشه و موقعیت زنده', audit: 'بررسی سابقهٔ قابل‌دسترسی هر دامنه از APIهای مستقل',
     couriers: 'فهرست پیک‌ها و سوابق اعتماد', zones: 'ظرفیت برنامه‌ریزی‌شده و پنجره‌های کاری زون',
     finance: 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت', sla: 'مأموریت‌های نزدیک موعد یا عبورکرده از SLA',
     presence: 'وضعیت آنلاین یا آفلاین و آخرین زمان ثبت حضور',
@@ -1018,7 +1021,7 @@ export default function App() {
           <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon">▤</span>مالی</button>
           <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon">↻</span>یکپارچه‌سازی</button>
           <button className="nav-item" disabled title="نمای ردیابی زنده به رویدادهای مکان معتبر و به‌روزرسانی GPS نیاز دارد"><span className="nav-icon">⌖</span>ردیابی</button>
-          <button className="nav-item" disabled title="جست‌وجوی ممیزی یکپارچه هنوز API ندارد؛ تاریخچه‌ها داخل پنل هر دامنه هستند"><span className="nav-icon">▤</span>گزارش ممیزی</button>
+          <button className={`nav-item ${viewMode === 'audit' ? 'active' : ''}`} onClick={() => switchView('audit')}><span className="nav-icon">▤</span>ممیزی</button>
           <div className="nav-divider">ابزارهای داخلی عملیات</div>
           <button className={`nav-item ${viewMode === 'sla' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon">!</span>استثناهای SLA</button>
           <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon">●</span>حضور پیک‌ها</button>
@@ -1031,7 +1034,7 @@ export default function App() {
       <main className="workspace">
         <header className="topbar">
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'routes' ? setRouteReloadKey((value) => value + 1) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'routes' ? setRouteReloadKey((value) => value + 1) : viewMode === 'audit' ? setAuditReloadKey((value) => value + 1) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
@@ -1157,9 +1160,10 @@ export default function App() {
         </div>}
         {viewMode === 'policies' && <PolicyWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
         {viewMode === 'routes' && <RoutePlanWorkbench token={token} reloadKey={routeReloadKey} onConnected={setConnected} />}
+        {viewMode === 'audit' && <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />}
         {viewMode === 'admissions' && <AdmissionsWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} onOpenBusinesses={() => switchView('onboarding')} onOpenCouriers={() => switchView('couriers')} />}
         {viewMode === 'onboarding' && <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
-        {viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && <section className="queue-panel">
+        {viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && <section className="queue-panel">
           <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
           {viewMode === 'dispatch' ? <form className="filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجوی شناسهٔ مأموریت" /></label>
