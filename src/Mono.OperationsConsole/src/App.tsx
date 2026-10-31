@@ -7,6 +7,7 @@ import DashboardSummaryCards from './DashboardSummaryCards'
 import CourierPlanningEvidence from './CourierPlanningEvidence'
 import CourierControlWorkbench from './CourierControlWorkbench'
 import ZonesCapacityWorkbench from './ZonesCapacityWorkbench'
+import SlaExceptionsWorkbench from './SlaExceptionsWorkbench'
 import RoutePlanWorkbench from './RoutePlanWorkbench'
 import AuditWorkbench from './AuditWorkbench'
 import ApiKeyWorkbench from './ApiKeyWorkbench'
@@ -1008,8 +1009,8 @@ export default function App() {
     admissions: 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها',
   }
 
-  function shouldShowShellTopbar() { return viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' }
-  function shouldShowLegacyDataPanel() { return viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' }
+  function shouldShowShellTopbar() { return viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' }
+  function shouldShowLegacyDataPanel() { return viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' }
 
   return (
     <div className="app-shell" dir="rtl">
@@ -1176,6 +1177,7 @@ export default function App() {
         {viewMode === 'onboarding' && <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
         {viewMode === 'couriers' && <CourierControlWorkbench couriers={courierItems} selectedCourierId={selectedCourierId} detail={courierDetail} audit={courierAudit} loading={loading} detailLoading={timelineLoading && !timelineTitle && Boolean(selectedCourierId)} detailErrors={detailErrors} error={error} query={courierQuery} status={courierStatus} token={token} pageIndex={pageIndex} hasNext={Boolean(courierNextCursor)} onQueryChange={setCourierQuery} onStatusChange={setCourierStatus} onSearch={applyFilters} onSelect={(courierId) => void showCourierDetails(courierId, true)} onPrevious={goPrevious} onNext={goNext} onRefresh={() => void fetchCourierPage(cursorStack[pageIndex] || null)} onOpenAdmissions={() => switchView('admissions')} onOpenZones={() => switchView('zones')} />}
         {viewMode === 'zones' && <ZonesCapacityWorkbench token={token} onConnected={setConnected} />}
+        {viewMode === 'sla' && <SlaExceptionsWorkbench token={token} onConnected={setConnected} onOpenMission={(missionId) => void showMissionDetails(missionId)} />}
         {shouldShowLegacyDataPanel() && <div className={viewMode === 'dispatch' ? 'operations-overview-layout' : ''}>
           {viewMode === 'dispatch' && <aside className="operations-overview-aside">
             <section className="operations-overview-card action-overview-card">
