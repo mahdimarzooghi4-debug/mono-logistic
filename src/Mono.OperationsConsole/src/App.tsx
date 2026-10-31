@@ -876,7 +876,7 @@ export default function App() {
     else if (mode === 'missions') void fetchMissionPage(null, [null])
     else if (mode === 'couriers') { closeDetails(); setSelectedCourierId(''); setCourierDetail(null); setCourierAudit([]); void fetchCourierPage(null, [null]) }
     else if (mode === 'finance') void fetchFinancePage(null, [null])
-    else if (mode === 'sla') void fetchSlaPage(null, [null])
+    else if (mode === 'sla') { setSlaItems([]); setSlaNextCursor(null); setSlaEvaluatedAt(null) }
     else if (mode === 'presence') void fetchPresencePage(null, [null])
     else if (mode === 'issues') void fetchIssuePage(null, [null])
     else if (mode === 'workers') void fetchWorkerStatus()
@@ -1075,12 +1075,6 @@ export default function App() {
           <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>باز در این صفحه</small><strong>{fa.format(issueItems.filter((item) => item.status === 'OPEN').length)}</strong></div></article>
           <article className="kpi-card"><span className="kpi-icon blue">✓</span><div><small>رسیدگی‌شده در این صفحه</small><strong>{fa.format(issueItems.filter((item) => item.status === 'RESOLVED').length)}</strong></div></article>
           <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>گزارش نگرانی ایمنی</small><strong>{fa.format(issueItems.filter((item) => item.issue_code === 'SAFETY_CONCERN').length)}</strong></div></article>
-        </section>}
-        {viewMode === 'sla' && <section className="kpi-grid" aria-label="خلاصهٔ هشدارهای SLA این صفحه">
-          <article className="kpi-card"><span className="kpi-icon cyan">!</span><div><small>هشدارهای این صفحه</small><strong>{fa.format(slaItems.length)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon red">◷</span><div><small>عبورکرده از موعد</small><strong>{fa.format(slaItems.filter((item) => item.is_overdue).length)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon amber">⌁</span><div><small>بدون پیک پذیرفته‌شده</small><strong>{fa.format(slaItems.filter((item) => !item.courier_id).length)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon blue">✓</span><div><small>دارای پیک پذیرفته‌شده</small><strong>{fa.format(slaItems.filter((item) => Boolean(item.courier_id)).length)}</strong></div></article>
         </section>}
 
         {viewMode === 'workers' && <section className="worker-grid" aria-label="وضعیت پردازش‌های پس‌زمینه">
@@ -1337,7 +1331,6 @@ export default function App() {
         {viewMode === 'dispatch' && <p className="data-note">آمار بالا فقط از ردیف‌های صفحهٔ جاری محاسبه شده است؛ API فعلاً شمار کل صف را برنمی‌گرداند.</p>}
         {viewMode === 'issues' && <p className="data-note">این صندوق فقط فرادادهٔ ساختاریافتهٔ گزارش را نشان می‌دهد؛ متن آزاد یا موقعیت مکانی پیک در این API ارائه نمی‌شود. این نما گزارش را resolve یا وضعیت مأموریت را تغییر نمی‌دهد.</p>}
         {viewMode === 'presence' && <p className="data-note">آمار فقط از ردیف‌های صفحهٔ جاری محاسبه شده و وضعیت براساس snapshot API است؛ این نما polling خودکار یا موقعیت GPS ارائه نمی‌کند.</p>}
-        {viewMode === 'sla' && <p className="data-note">خلاصه فقط از ردیف‌های همین صفحه است. هشدارها در زمان «مبنای ارزیابی» محاسبه شده‌اند؛ برای تازه‌سازی، دکمهٔ ↻ را بزنید.</p>}
         {viewMode === 'workers' && <p className="data-note">این وضعیت درون‌فرایندی و مخصوص همین نمونهٔ API است؛ در استقرار چندنمونه‌ای، وضعیت سایر نمونه‌ها را پوشش نمی‌دهد و health کلی API محسوب نمی‌شود. دریافت خودکار انجام نمی‌شود.</p>}
         {viewMode === 'zones' && <p className="data-note">این داده‌ها پنجره‌های کاری ثبت‌شده‌اند؛ حضور زنده، ظرفیت لحظه‌ای یا اختیار تخصیص از آن‌ها نتیجه نمی‌شود.</p>}{viewMode === 'finance' && <p className="data-note">این نما فقط از snapshot قطعی تعرفه و مفروضات تجاری Phase 1 برآورد می‌سازد؛ پرداخت، موجودی، برداشت، تسویهٔ واقعی یا وصول از حنا را گزارش نمی‌کند.</p>}
       </main>
