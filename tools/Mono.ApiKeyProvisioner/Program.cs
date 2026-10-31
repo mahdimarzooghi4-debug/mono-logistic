@@ -22,6 +22,12 @@ internal static class ApiKeyProvisionerCommand
             return 2;
         }
 
+        if (Console.IsInputRedirected || Console.IsOutputRedirected || Console.IsErrorRedirected)
+        {
+            Console.Error.WriteLine("Provisioning requires an interactive terminal with stdin, stdout, and stderr connected directly to the terminal.");
+            return 2;
+        }
+
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Mono");
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -37,12 +43,6 @@ internal static class ApiKeyProvisionerCommand
         catch (ArgumentException exception)
         {
             Console.Error.WriteLine(exception.Message);
-            return 2;
-        }
-
-        if (Console.IsInputRedirected)
-        {
-            Console.Error.WriteLine("Provisioning requires an interactive terminal.");
             return 2;
         }
 

@@ -5,6 +5,12 @@ import OnboardingWorkbench from './OnboardingWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
 import DashboardSummaryCards from './DashboardSummaryCards'
 import CourierPlanningEvidence from './CourierPlanningEvidence'
+import CourierControlWorkbench from './CourierControlWorkbench'
+import ZonesCapacityWorkbench from './ZonesCapacityWorkbench'
+import SlaExceptionsWorkbench from './SlaExceptionsWorkbench'
+import RoutePlanWorkbench from './RoutePlanWorkbench'
+import AuditWorkbench from './AuditWorkbench'
+import ApiKeyWorkbench from './ApiKeyWorkbench'
 import type { DashboardSummaryMetrics } from './DashboardSummaryCards'
 
 type Offer = {
@@ -67,7 +73,6 @@ type WebhookAuditPage = { items: Array<{ audit_id: string; actor_id: string; act
 type MissionFare = { mission_id: string; customer_id: string; delivery_request_id: string; status: string; committed_delivery_at: string; created_at: string; quote_id: string; quote_version: number; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number; mono_commission_estimate_toman: number; commission_vat_estimate_toman: number; courier_net_estimate_toman: number }
 type MissionFarePage = { items: MissionFare[]; next_cursor: string | null }
 type MissionTimeline = { events?: Array<{ eventId: string; eventType: string; sequence: number; occurredAt: string }> }
-type MissionReadAudit = { items?: Array<{ auditId: string; actorId: string; action: string; missionId: string | null; resultCount: number; occurredAt: string }> }
 type CourierSummary = { courier_id: string; mode: string; status: string; preferred_zone_ids: string[]; approved_zone_ids: string[]; primary_zone_id: string | null; created_at: string; updated_at: string }
 type CourierPage = { items: CourierSummary[]; next_cursor: string | null }
 type CourierDetail = CourierSummary & { created_by: string; trust_transitions: Array<{ transition_id: string; from_status: string; to_status: string; actor_id: string; reason_code: string; evidence_reference: string; occurred_at: string }> }
@@ -99,6 +104,29 @@ function statusLabel(state: string) {
   return 'در بازه'
 }
 
+function NavIcon({ type }: { type: string }) {
+  const common = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const }
+  switch (type) {
+    case 'dashboard': return <svg {...common}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    case 'mission': return <svg {...common}><path d="M5 19 19 5M7 5h12v12"/></svg>
+    case 'route': return <svg {...common}><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h3a3 3 0 0 0 3-3V9a3 3 0 0 1 3-3"/></svg>
+    case 'courier': return <svg {...common}><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="m6 17 4-8h4l4 8M10 9l-2-3H5m5 3 4 4h4M13 7h3"/></svg>
+    case 'vehicle': return <svg {...common}><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="18" cy="18" r="1.8"/></svg>
+    case 'zone': return <svg {...common}><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    case 'policy': return <svg {...common}><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>
+    case 'customers': return <svg {...common}><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5v1"/></svg>
+    case 'support': return <svg {...common}><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M12 8v4m0 3h.01"/></svg>
+    case 'finance': return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18m-5 5h2"/></svg>
+    case 'integration': return <svg {...common}><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="m8 7 3 8m5-8-3 8m-5-9h8"/></svg>
+    case 'tracking': return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="m15 9-2 5-5 2 2-5z"/></svg>
+    case 'audit': return <svg {...common}><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6m-6 4h6"/></svg>
+    case 'alert': return <svg {...common}><path d="M12 3 20 6v5c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M12 8v4m0 3h.01"/></svg>
+    case 'presence': return <svg {...common}><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1m2-12h4m-2-2v4"/></svg>
+    case 'admissions': return <svg {...common}><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5h6M9 11h6m-6 4h6"/></svg>
+    default: return <svg {...common}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1-1.6 2.8-.2-.1a1.7 1.7 0 0 0-1.8-.2 1.7 1.7 0 0 0-1 1.5v.2h-3.2v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.2l-.2.1-1.6-2.8.1-.1A1.7 1.7 0 0 0 8 15a1.7 1.7 0 0 0-1.5-1H6v-3h.5A1.7 1.7 0 0 0 8 10a1.7 1.7 0 0 0-.3-1.8l-.1-.1 1.6-2.8.2.1a1.7 1.7 0 0 0 1.8.2 1.7 1.7 0 0 0 1-1.5v-.2h3.2v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.2l.2-.1 1.6 2.8-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.5v3h-.5a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+  }
+}
+
 async function readError(response: Response) {
   try {
     const body = (await response.json()) as ApiError
@@ -109,10 +137,13 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('dispatch')
+  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('dispatch')
   const [policyReloadKey, setPolicyReloadKey] = useState(0)
+  const [routeReloadKey, setRouteReloadKey] = useState(0)
+  const [auditReloadKey, setAuditReloadKey] = useState(0)
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
+  const [connectionDialogOpen, setConnectionDialogOpen] = useState(false)
   const [items, setItems] = useState<Mission[]>([])
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummaryMetrics | null>(null)
   const [dashboardError, setDashboardError] = useState('')
@@ -141,7 +172,7 @@ export default function App() {
   const [webhookDetail, setWebhookDetail] = useState<WebhookDetail | null>(null)
   const [webhookDetailError, setWebhookDetailError] = useState('')
   const [webhookAudit, setWebhookAudit] = useState<WebhookAuditPage | null>(null)
-  const [webhookTab, setWebhookTab] = useState<'deliveries' | 'audit'>('deliveries')
+  const [webhookTab, setWebhookTab] = useState<'deliveries' | 'audit' | 'credentials'>('deliveries')
   const [webhookCustomerId, setWebhookCustomerId] = useState('')
   const [webhookEndpointId, setWebhookEndpointId] = useState('')
   const [webhookEventType, setWebhookEventType] = useState('')
@@ -153,6 +184,7 @@ export default function App() {
   const [webhookActionLoading, setWebhookActionLoading] = useState(false)
   const webhookActionKeys = useRef(new Map<string, string>())
   const [courierItems, setCourierItems] = useState<CourierSummary[]>([])
+  const [selectedCourierId, setSelectedCourierId] = useState('')
   const [courierQuery, setCourierQuery] = useState('')
   const [courierStatus, setCourierStatus] = useState('')
   const [financeItems, setFinanceItems] = useState<MissionFare[]>([])
@@ -193,7 +225,6 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
   const [missionDetail, setMissionDetail] = useState<MissionRecord | null>(null)
   const [missionTimeline, setMissionTimeline] = useState<NonNullable<MissionTimeline['events']>>([])
-  const [missionAudit, setMissionAudit] = useState<NonNullable<MissionReadAudit['items']>>([])
   const [courierDetail, setCourierDetail] = useState<CourierDetail | null>(null)
   const [courierAudit, setCourierAudit] = useState<NonNullable<CourierReadAudit['items']>>([])
   const [detailErrors, setDetailErrors] = useState<string[]>([])
@@ -701,8 +732,11 @@ export default function App() {
 
   function connect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setToken(tokenDraft.trim())
+    const value = tokenDraft.trim()
+    if (!value) return
+    setToken(value)
     setTokenDraft('')
+    setConnectionDialogOpen(false)
     setItems([])
     setMissionItems([])
     setCourierItems([])
@@ -858,29 +892,32 @@ export default function App() {
     void fetchSlaPage(null, [null], horizon)
   }
 
-  function switchView(mode: 'dispatch' | 'missions' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
+  function switchView(mode: 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
     setError('')
     if (mode === 'dispatch') { void fetchPage(null, [null]); void fetchDashboardSummary() }
     else if (mode === 'missions') void fetchMissionPage(null, [null])
-    else if (mode === 'couriers') void fetchCourierPage(null, [null])
+    else if (mode === 'couriers') { closeDetails(); setSelectedCourierId(''); setCourierDetail(null); setCourierAudit([]); void fetchCourierPage(null, [null]) }
     else if (mode === 'finance') void fetchFinancePage(null, [null])
-    else if (mode === 'sla') void fetchSlaPage(null, [null])
+    else if (mode === 'sla') { setSlaItems([]); setSlaNextCursor(null); setSlaEvaluatedAt(null) }
     else if (mode === 'presence') void fetchPresencePage(null, [null])
     else if (mode === 'issues') void fetchIssuePage(null, [null])
     else if (mode === 'workers') void fetchWorkerStatus()
     else if (mode === 'webhooks') { setWebhookTab('deliveries'); void fetchWebhookOps(null) }
+    else if (mode === 'routes') setRouteReloadKey((value) => value + 1)
+    else if (mode === 'audit') setAuditReloadKey((value) => value + 1)
     else if (mode === 'policies') setPolicyReloadKey((value) => value + 1)
     else if (mode === 'onboarding') setPolicyReloadKey((value) => value + 1)
     else if (mode === 'admissions') setPolicyReloadKey((value) => value + 1)
     else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
   }
 
-  async function showCourierDetails(courierId: string) {
+  async function showCourierDetails(courierId: string, inWorkspace = false) {
     const requestId = ++detailRequestId.current
-    setTimelineTitle(courierId); setCourierDetail(null); setCourierAudit([]); setDetailErrors([]); setTimelineLoading(true)
+    setSelectedCourierId(courierId)
+    setTimelineTitle(inWorkspace ? '' : courierId); setCourierDetail(null); setCourierAudit([]); setDetailErrors([]); setTimelineLoading(true)
     const requests = await Promise.allSettled([
       fetch(`/operations/v1/couriers/${encodeURIComponent(courierId)}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
       fetch('/operations/v1/courier-read-audit?page_size=100', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
@@ -905,16 +942,12 @@ export default function App() {
     setCourierDetail(null)
     setCourierAudit([])
     setMissionTimeline([])
-    setMissionAudit([])
     setDetailErrors([])
     setTimelineLoading(true)
     const missionPath = `/operations/v1/missions/${encodeURIComponent(missionId)}`
     const requests = await Promise.allSettled([
       fetch(missionPath, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
       fetch(`${missionPath}/timeline`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
-      fetch(`/operations/v1/mission-read-audit?page_size=25&mission_id=${encodeURIComponent(missionId)}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store',
-      }),
     ])
     const errors: string[] = []
     const readResponse = async <T,>(result: PromiseSettledResult<Response>, label: string): Promise<T | null> => {
@@ -929,15 +962,13 @@ export default function App() {
       try { return await result.value.json() as T }
       catch { errors.push(`${label}: قالب پاسخ معتبر نیست.`); return null }
     }
-    const [detail, timelineResult, auditResult] = await Promise.all([
+    const [detail, timelineResult] = await Promise.all([
       readResponse<MissionRecord>(requests[0], 'جزئیات مأموریت'),
       readResponse<MissionTimeline>(requests[1], 'timeline'),
-      readResponse<MissionReadAudit>(requests[2], 'گزارش دسترسی'),
     ])
     if (requestId !== detailRequestId.current) return
     setMissionDetail(detail)
     setMissionTimeline(Array.isArray(timelineResult?.events) ? timelineResult.events : [])
-    setMissionAudit(Array.isArray(auditResult?.items) ? auditResult.items : [])
     setDetailErrors(errors)
     setTimelineLoading(false)
   }
@@ -974,53 +1005,68 @@ export default function App() {
     setCourierDetail(null)
     setCourierAudit([])
     setMissionTimeline([])
-    setMissionAudit([])
     closeDetails()
     setError('')
   }
 
+  const panelTitles: Record<typeof viewMode, string> = {
+    dispatch: 'داشبورد عملیات', missions: 'مأموریت‌ها', couriers: 'کنترل پیک‌ها', zones: 'مناطق و ظرفیت',
+    finance: 'مالی و بررسی کرایه', sla: 'استثناهای SLA', presence: 'وضعیت حضور پیک‌ها',
+    issues: 'پشتیبانی و گزارش مشکلات', workers: 'سلامت پردازش‌ها', webhooks: 'یکپارچه‌سازی‌ها',
+    policies: 'استانداردها و پیکربندی', onboarding: 'مشتریان و شعب', admissions: 'پذیرش و راه‌اندازی', routes: 'مسیرها', audit: 'ممیزی عملیات',
+  }
+  const panelDescriptions: Record<typeof viewMode, string> = {
+    dispatch: 'صف مأموریت‌های در انتظار تخصیص پیک', missions: 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده', routes: 'برنامهٔ مسیر و ترتیب توقف‌های ذخیره‌شده؛ بدون نقشه و موقعیت زنده', audit: 'بررسی سابقهٔ قابل‌دسترسی هر دامنه از APIهای مستقل',
+    couriers: 'وضعیت اعتماد، تخصیص، محدوده و آمادگی عملیاتی پیک‌ها', zones: 'ظرفیت برنامه‌ریزی‌شده و پنجره‌های کاری زون',
+    finance: 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت', sla: 'مأموریت‌های نزدیک موعد یا عبورکرده از SLA',
+    presence: 'وضعیت آنلاین یا آفلاین و آخرین زمان ثبت حضور',
+    issues: 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها',
+    workers: 'وضعیت پردازش‌های پس‌زمینه از API', webhooks: 'صف تحویل و تلاش‌های ارسال webhook',
+    policies: 'نسخه‌ها و چرخهٔ عمر سیاست‌های عملیاتی',
+    onboarding: 'ثبت و بررسی مشتری‌ها و شعب با سابقهٔ ممیزی API',
+    admissions: 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها',
+  }
+
+  function shouldShowShellTopbar() { return viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' }
+  function shouldShowLegacyDataPanel() { return viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' }
+
   return (
     <div className="app-shell" dir="rtl">
       <aside className="sidebar">
-        <div className="brand-lockup"><span className="brand-mark">م</span><span><strong>مونو</strong><small>LOGISTICS</small></span></div>
+        <div className="sidebar-brand-card"><div className="brand-lockup"><span><strong>مونو</strong><small>لجستیک هوشمند</small></span><svg className="brand-symbol" viewBox="0 0 48 48" aria-hidden="true"><path d="M5 24h38M24 4v40M8 21l-3 3 3 3M40 21l3 3-3 3"/><circle cx="24" cy="24" r="3"/><circle cx="13" cy="12" r="1.5"/></svg></div></div>
         <div className="side-caption">فضای عملیات</div>
         <nav className="navigation" aria-label="ناوبری اصلی">
-          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon">▦</span>صف dispatch</button>
-          <button className={`nav-item ${viewMode === 'sla' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon">!</span>هشدارهای SLA</button>
-          <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon">↗</span>همهٔ مأموریت‌ها</button>
-          <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon">⌁</span>پیک‌ها</button>
-          <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon">●</span>وضعیت حضور پیک‌ها</button>
-          <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon">!</span>صندوق مشکلات پیک‌ها</button>
-          <button className={`nav-item ${viewMode === 'workers' ? 'active' : ''}`} onClick={() => switchView('workers')}><span className="nav-icon">⚙</span>سلامت پردازش‌ها</button>
-          <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon">↻</span>وب‌هوک‌های خروجی</button>
-          <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon">⚖</span>سیاست‌ها و پیکربندی</button>
-          <button className={`nav-item ${viewMode === 'admissions' ? 'active' : ''}`} onClick={() => switchView('admissions')}><span className="nav-icon">▤</span>پذیرش مونو</button>
-          <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon">＋</span>راه‌اندازی مشتری و شعب</button>
-          <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>زون‌ها و ظرفیت</button>
-          <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon">▤</span>بررسی کرایه</button>
+          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon"><NavIcon type="dashboard" /></span>داشبورد</button>
+          <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon"><NavIcon type="mission" /></span>مأموریت‌ها</button>
+          <button className={`nav-item ${viewMode === 'routes' ? 'active' : ''}`} onClick={() => switchView('routes')}><span className="nav-icon"><NavIcon type="route" /></span>مسیرها</button>
+          <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon"><NavIcon type="courier" /></span>پیک‌ها</button>
+          <button className="nav-item" disabled title="فهرست و API مستقل وسایل نقلیه هنوز در دسترس نیست"><span className="nav-icon"><NavIcon type="vehicle" /></span>وسایل نقلیه</button>
+          <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon"><NavIcon type="zone" /></span>مناطق و ظرفیت</button>
+          <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon"><NavIcon type="policy" /></span>سیاست‌ها و پیکربندی</button>
+          <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon"><NavIcon type="customers" /></span>مشتریان</button>
+          <button className={`nav-item ${viewMode === 'sla' || viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon"><NavIcon type="support" /></span>SLA و استثناها</button>
+          <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon"><NavIcon type="finance" /></span>مالی</button>
+          <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon"><NavIcon type="integration" /></span>یکپارچه‌سازی</button>
+          <button className={`nav-item ${viewMode === 'audit' ? 'active' : ''}`} onClick={() => switchView('audit')}><span className="nav-icon"><NavIcon type="audit" /></span>ممیزی</button>
         </nav>
-        <div className="sidebar-footer"><span className="online-dot" />نسخهٔ عملیاتی داخلی</div>
+        <div className="sidebar-footer"><div className="sidebar-operator"><span className="operator-avatar">م</span><span>اپراتور مونو<small>تیم عملیات</small></span><i className={`operator-status ${token ? 'connected' : ''}`} /></div><button className="sidebar-access" onClick={() => token ? disconnect() : setConnectionDialogOpen(true)}>{token ? 'خروج' : 'اتصال API'}</button></div>
       </aside>
 
       <main className="workspace">
-        <header className="topbar">
+        {shouldShowShellTopbar() && <header className="topbar">
           <div className="topbar-actions">
-            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
-            <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'routes' ? setRouteReloadKey((value) => value + 1) : viewMode === 'audit' ? setAuditReloadKey((value) => value + 1) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            {viewMode === 'dispatch' && <span className="overview-updated-at">آخرین به‌روزرسانی: {updatedAt ? new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(updatedAt)) : '—'}</span>}
+            <button type="button" className={`system-pill ${connected ? 'is-online' : ''}`} onClick={() => !token && setConnectionDialogOpen(true)}><i />{connected ? 'سیستم آنلاین' : 'اتصال API'}</button>
+            {viewMode === 'dispatch' && <button className="primary-button create-mission-action" type="button" disabled title="مأموریت از تأیید ارسال ایجاد می‌شود؛ API ایجاد دستی مأموریت در دسترس نیست.">ایجاد مأموریت ＋</button>}
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
-          <div className="page-heading"><h1>{viewMode === 'policies' ? 'سیاست‌ها و پیکربندی' : viewMode === 'onboarding' ? 'راه‌اندازی مشتری و شعب' : viewMode === 'admissions' ? 'پذیرش مونو' : 'مرکز کنترل عملیات'}</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'presence' ? 'وضعیت آنلاین/آفلاین و آخرین زمان ثبت حضور' : viewMode === 'issues' ? 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت'  : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA'  : viewMode === 'workers' ? 'وضعیت workerهای پردازش در همین نمونهٔ API' : viewMode === 'webhooks' ? 'پایش صف تحویل و بررسی تلاش‌های ارسال webhook' : viewMode === 'policies' ? 'ثبت و بررسی نسخه‌های سیاست با دسترسی مدیر Mono' : viewMode === 'onboarding' ? 'ثبت و بررسی مشتری‌ها و شعب با مجوز مدیر و سابقهٔ ممیزی API' : viewMode === 'admissions' ? 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
-        </header>
+          <div className="page-heading"><h1>{viewMode === 'dispatch' ? 'مرکز کنترل عملیات' : panelTitles[viewMode]}</h1><p>{viewMode === 'dispatch' ? 'نمای زندهٔ مأموریت‌ها، پیک‌ها، مسیرها و وضعیت استاندارد' : panelDescriptions[viewMode]}</p></div>
+        </header>}
 
-        {!token && <section className="connect-card">
-          <div><span className="eyebrow">دسترسی امن</span><h2>اتصال به API عملیات</h2><p>توکن معتبر مدیر عملیات را وارد کنید. توکن فقط در حافظهٔ همین صفحه نگهداری می‌شود.</p></div>
-          <form className="connect-form" onSubmit={connect}>
-            <label>توکن Bearer <input type="password" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} placeholder="توکن دسترسی عملیات" dir="ltr" autoComplete="off" /></label>
-            <button className="primary-button" disabled={loading}>اتصال و دریافت داده</button>
-          </form>
-        </section>}
+        {connectionDialogOpen && <div className="api-access-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setConnectionDialogOpen(false)}><section className="api-access-dialog" role="dialog" aria-modal="true" aria-labelledby="api-access-title"><header><div><span className="eyebrow">دسترسی امن</span><h2 id="api-access-title">اتصال به API عملیات</h2></div><button type="button" className="icon-button" onClick={() => setConnectionDialogOpen(false)} aria-label="بستن">×</button></header><p>توکن فقط در حافظهٔ همین صفحه نگهداری می‌شود.</p><form className="api-access-form" onSubmit={connect}><label>توکن Bearer<input type="password" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} placeholder="توکن دسترسی عملیات" dir="ltr" autoComplete="off" autoFocus /></label><div><button className="primary-button" disabled={loading || !tokenDraft.trim()}>اتصال و دریافت داده</button><button className="secondary-button" type="button" onClick={() => setConnectionDialogOpen(false)}>انصراف</button></div></form></section></div>}
 
-        {error && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
+        {error && token && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
         {viewMode === 'dispatch' && dashboardError && <div className="error-banner" role="alert"><span>!</span><div><strong>خلاصهٔ سراسری داشبورد دریافت نشد</strong><p>{dashboardError}</p></div><button onClick={() => setDashboardError('')} aria-label="بستن">×</button></div>}
 
         {viewMode === 'dispatch' && <DashboardSummaryCards summary={dashboardSummary} actionsDisabled={!token} onOpenPresence={openDashboardPresence} onOpenDispatch={openDashboardDispatch} onOpenSla={openDashboardSla} onOpenMissions={openDashboardMissions} />}
@@ -1035,12 +1081,6 @@ export default function App() {
           <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>باز در این صفحه</small><strong>{fa.format(issueItems.filter((item) => item.status === 'OPEN').length)}</strong></div></article>
           <article className="kpi-card"><span className="kpi-icon blue">✓</span><div><small>رسیدگی‌شده در این صفحه</small><strong>{fa.format(issueItems.filter((item) => item.status === 'RESOLVED').length)}</strong></div></article>
           <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>گزارش نگرانی ایمنی</small><strong>{fa.format(issueItems.filter((item) => item.issue_code === 'SAFETY_CONCERN').length)}</strong></div></article>
-        </section>}
-        {viewMode === 'sla' && <section className="kpi-grid" aria-label="خلاصهٔ هشدارهای SLA این صفحه">
-          <article className="kpi-card"><span className="kpi-icon cyan">!</span><div><small>هشدارهای این صفحه</small><strong>{fa.format(slaItems.length)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon red">◷</span><div><small>عبورکرده از موعد</small><strong>{fa.format(slaItems.filter((item) => item.is_overdue).length)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon amber">⌁</span><div><small>بدون پیک پذیرفته‌شده</small><strong>{fa.format(slaItems.filter((item) => !item.courier_id).length)}</strong></div></article>
-          <article className="kpi-card"><span className="kpi-icon blue">✓</span><div><small>دارای پیک پذیرفته‌شده</small><strong>{fa.format(slaItems.filter((item) => Boolean(item.courier_id)).length)}</strong></div></article>
         </section>}
 
         {viewMode === 'workers' && <section className="worker-grid" aria-label="وضعیت پردازش‌های پس‌زمینه">
@@ -1082,6 +1122,7 @@ export default function App() {
             <div className="panel-heading"><div><span className="eyebrow">پایش وب‌هوک خروجی</span><h2>تحویل‌ها و تاریخچهٔ عملیات</h2></div><span className="panel-meta">محتوای payload، URL مقصد و secret نمایش داده نمی‌شود</span></div>
             <div className="webhook-tabs" role="tablist" aria-label="نمای وب‌هوک">
               <button type="button" className={webhookTab === 'deliveries' ? 'active' : ''} onClick={() => setWebhookTab('deliveries')}>تحویل‌ها</button>
+              <button type="button" className={webhookTab === 'credentials' ? 'active' : ''} onClick={() => setWebhookTab('credentials')}>کلیدهای API</button>
               <button type="button" className={webhookTab === 'audit' ? 'active' : ''} onClick={() => setWebhookTab('audit')}>سوابق عملیات</button>
             </div>
             {webhookTab === 'deliveries' ? <>
@@ -1108,7 +1149,7 @@ export default function App() {
                 {!loading && !webhookErrors.list && webhookItems.length === 0 && <tr><td className="state-cell" colSpan={8}><span className="empty-icon">⌕</span><strong>تحویلی پیدا نشد</strong><small>فیلترها را بررسی کنید یا صف را تازه‌سازی کنید.</small></td></tr>}
               </tbody></table></div>
               <footer className="table-footer"><span>{fa.format(webhookItems.length)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !webhookNextCursor}>بعدی</button></div></footer>
-            </> : <div className="table-wrap"><table className="webhook-table"><thead><tr><th>زمان</th><th>کاربر عملیات</th><th>عمل</th><th>شناسهٔ منبع</th><th>نتیجه</th></tr></thead><tbody>
+            </> : webhookTab === 'credentials' ? <ApiKeyWorkbench token={token} /> : <div className="table-wrap"><table className="webhook-table"><thead><tr><th>زمان</th><th>کاربر عملیات</th><th>عمل</th><th>شناسهٔ منبع</th><th>نتیجه</th></tr></thead><tbody>
               {webhookAudit?.items.map((item) => <tr key={item.audit_id}><td>{formatDate(item.occurred_at)}</td><td dir="ltr">{item.actor_id}</td><td dir="ltr">{item.action}</td><td dir="ltr">{item.resource_id || '—'}</td><td dir="ltr">{item.outcome_code || fa.format(item.result_count)}</td></tr>)}
               {(!webhookAudit || webhookAudit.items.length === 0) && <tr><td className="state-cell" colSpan={5}><strong>رکورد audit برای این صفحه دریافت نشد</strong></td></tr>}
             </tbody></table><p className="data-note webhook-audit-note">نمای audit شامل ۵۰ رکورد نخست است.</p></div>}
@@ -1130,16 +1171,49 @@ export default function App() {
           {webhookDetailError && !webhookDetail && <div className="webhook-inline-error" role="alert">{webhookDetailError}</div>}
         </div>}
         {viewMode === 'policies' && <PolicyWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
+        {viewMode === 'routes' && <RoutePlanWorkbench token={token} reloadKey={routeReloadKey} onConnected={setConnected} />}
+        {viewMode === 'audit' && <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />}
         {viewMode === 'admissions' && <AdmissionsWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} onOpenBusinesses={() => switchView('onboarding')} onOpenCouriers={() => switchView('couriers')} />}
         {viewMode === 'onboarding' && <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
-        {viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && <section className="queue-panel">
-          <div className="panel-heading"><div><span className="eyebrow">{viewMode === 'dispatch' ? 'مدیریت تخصیص' : 'پایش عملیات'}</span><h2>{viewMode === 'dispatch' ? 'صف انتظار dispatch' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div><div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div></div>
-          {viewMode === 'dispatch' ? <form className="filters" onSubmit={applyFilters}>
-            <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجوی شناسهٔ مأموریت" /></label>
-            <label><span className="sr-only">وضعیت موعد</span><select value={deliveryWindow} onChange={(event) => setDeliveryWindow(event.target.value)}><option value="">همهٔ موعدها</option><option value="upcoming">در پیش</option><option value="due_now">موعد همین حالا</option><option value="overdue">از موعد گذشته</option></select></label>
-            <label><span className="sr-only">پیشنهاد فعال</span><select value={hasOffer} onChange={(event) => setHasOffer(event.target.value)}><option value="">همهٔ پیشنهادها</option><option value="true">دارای پیشنهاد فعال</option><option value="false">بدون پیشنهاد فعال</option></select></label>
-            <label><span className="sr-only">ترتیب</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="delivery_due">نزدیک‌ترین موعد</option><option value="created_at">جدیدترین مأموریت</option></select></label>
-            <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال فیلتر</button>
+        {viewMode === 'couriers' && <CourierControlWorkbench couriers={courierItems} selectedCourierId={selectedCourierId} detail={courierDetail} audit={courierAudit} loading={loading} detailLoading={timelineLoading && !timelineTitle && Boolean(selectedCourierId)} detailErrors={detailErrors} error={error} query={courierQuery} status={courierStatus} token={token} pageIndex={pageIndex} hasNext={Boolean(courierNextCursor)} onQueryChange={setCourierQuery} onStatusChange={setCourierStatus} onSearch={applyFilters} onSelect={(courierId) => void showCourierDetails(courierId, true)} onPrevious={goPrevious} onNext={goNext} onRefresh={() => void fetchCourierPage(cursorStack[pageIndex] || null)} onOpenAdmissions={() => switchView('admissions')} onOpenZones={() => switchView('zones')} />}
+        {viewMode === 'zones' && <ZonesCapacityWorkbench token={token} onConnected={setConnected} />}
+        {viewMode === 'sla' && <SlaExceptionsWorkbench token={token} onConnected={setConnected} onOpenMission={(missionId) => void showMissionDetails(missionId)} />}
+        {shouldShowLegacyDataPanel() && <div className={viewMode === 'dispatch' ? 'operations-overview-layout' : ''}>
+          {viewMode === 'dispatch' && <aside className="operations-overview-aside">
+            <section className="operations-overview-card action-overview-card">
+              <header><strong>نیازمند اقدام</strong><span>{dashboardSummary ? fa.format([dashboardSummary.unassigned_mission_count, dashboardSummary.sla_at_risk_count, dashboardSummary.sla_overdue_count].filter((count) => count > 0).length) : '—'}</span></header>
+              <div className="overview-action-list">
+                <button onClick={openDashboardSla} disabled={!token}><span><strong>در معرض نقض SLA</strong><small>هشدارهای نیازمند پایش</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.sla_at_risk_count) : '—'}</b></button>
+                <button onClick={openDashboardSla} disabled={!token}><span><strong>از موعد گذشته</strong><small>در بازهٔ جاری API</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.sla_overdue_count) : '—'}</b></button>
+                <button onClick={openDashboardDispatch} disabled={!token}><span><strong>بدون تخصیص پیک</strong><small>در انتظار پیشنهاد پذیرفته‌شده</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.unassigned_mission_count) : '—'}</b></button>
+              </div>
+            </section>
+            <section className="operations-overview-card capacity-overview-card">
+              <header><strong>ظرفیت مناطق</strong><button onClick={() => switchView('zones')}>برنامه‌ریزی</button></header>
+              <div className="capacity-overview-empty"><span>◷</span><strong>ظرفیت منطقه‌ای این نما موجود نیست</strong><p>API ظرفیت را فقط برای زون و بازهٔ انتخاب‌شده برمی‌گرداند؛ اینجا مقدار منطقه‌ای حدس زده نمی‌شود.</p><button onClick={() => switchView('zones')}>مشاهدهٔ ظرفیت برنامه‌ریزی‌شده ←</button></div>
+            </section>
+          </aside>}
+          <section className={`queue-panel ${viewMode === 'dispatch' ? 'operations-primary-card' : ''}`}>
+          <div className={`panel-heading ${viewMode === 'dispatch' ? 'dashboard-panel-heading' : ''}`}>
+            {viewMode === 'dispatch' && <div className="dashboard-panel-actions">
+              <button type="button" className="dashboard-toolbar-button" onClick={() => { void fetchPage(cursorStack[pageIndex] || null); void fetchDashboardSummary() }} disabled={!token || loading}>تازه‌سازی <span aria-hidden="true">↻</span></button>
+              <details className="dashboard-filter-details"><summary>فیلترها <span aria-hidden="true">☷</span></summary>
+                <form className="dashboard-filter-form" onSubmit={applyFilters}>
+                  <label>وضعیت موعد<select value={deliveryWindow} onChange={(event) => setDeliveryWindow(event.target.value)}><option value="">همهٔ موعدها</option><option value="upcoming">در پیش</option><option value="due_now">موعد همین حالا</option><option value="overdue">از موعد گذشته</option></select></label>
+                  <label>پیشنهاد فعال<select value={hasOffer} onChange={(event) => setHasOffer(event.target.value)}><option value="">همهٔ پیشنهادها</option><option value="true">دارای پیشنهاد فعال</option><option value="false">بدون پیشنهاد فعال</option></select></label>
+                  <label>ترتیب<select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="delivery_due">نزدیک‌ترین موعد</option><option value="created_at">جدیدترین مأموریت</option></select></label>
+                  <label>شناسهٔ مشتری<input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="cus_…" dir="ltr" /></label>
+                  <label>ایجادشده تا تاریخ<input type="datetime-local" value={createdBefore} onChange={(event) => setCreatedBefore(event.target.value)} /></label>
+                  <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال فیلتر</button>
+                </form>
+              </details>
+            </div>}
+            <div>{viewMode !== 'dispatch' && <span className="eyebrow">پایش عملیات</span>}<h2>{viewMode === 'dispatch' ? 'مأموریت‌های فعال' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div>
+            {viewMode !== 'dispatch' && <div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div>}
+          </div>
+          {viewMode === 'dispatch' ? <form className="filters dashboard-search-row" onSubmit={applyFilters}>
+            <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جست‌وجو با شناسهٔ مأموریت، سفارش یا پیک…" /></label>
+            <button className="sr-only" type="submit" disabled={!token || loading}>جست‌وجو</button>
           </form> : viewMode === 'missions' ? <form className="filters mission-filters" onSubmit={applyFilters}>
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="شناسه مأموریت، درخواست یا مرجع سفارش" /></label>
             <label>از تاریخ<input type="datetime-local" value={createdAfter} onChange={(event) => setCreatedAfter(event.target.value)} /></label>
@@ -1178,11 +1252,6 @@ export default function App() {
           </form>}
           {viewMode === 'zones' && <p className="courier-list-note">زمان‌های ورودی بر اساس منطقهٔ زمانی مرورگر به UTC تبدیل می‌شوند؛ زون باید شناسهٔ زون عملیاتی فعال باشد. ثبت پنجره تا ۳۰ روز آینده و حداکثر ۱۶ ساعت مجاز است.</p>}
           {viewMode === 'zones' && (availabilityWriteError || availabilityWriteMessage) && <div className={availabilityWriteError ? 'detail-errors capacity-errors' : 'availability-write-success'} role={availabilityWriteError ? 'alert' : 'status'}>{availabilityWriteError || availabilityWriteMessage}</div>}
-          {viewMode === 'dispatch' && <details className="advanced-filters"><summary>فیلترهای بیشتر</summary><div className="advanced-grid">
-            <label>شناسهٔ مشتری<input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="cus_…" dir="ltr" /></label>
-            <label>ایجادشده تا تاریخ<input type="datetime-local" value={createdBefore} onChange={(event) => setCreatedBefore(event.target.value)} /></label>
-          </div></details>}
-
           {viewMode === 'zones' && <>
             {(capacityError || availabilityError) && <div className="detail-errors capacity-errors">{capacityError && <p>ظرفیت برنامه‌ریزی‌شده: {capacityError}</p>}{availabilityError && <p>پنجره‌های برنامه‌ریزی: {availabilityError}</p>}</div>}
             {capacityProjection && <section className="capacity-result" aria-label="ظرفیت برنامه‌ریزی‌شده">
@@ -1196,19 +1265,21 @@ export default function App() {
           </>}
 
           <div className="table-wrap">
-            <table className={viewMode === 'finance' ? 'finance-table' : undefined}>
-              <thead>{viewMode === 'dispatch' ? <tr><th>شناسه مأموریت</th><th>مشتری / شعبه</th><th>زمان ایجاد</th><th>موعد تحویل</th><th>تلاش / آخرین اقدام</th><th>پیشنهاد فعال</th><th>سوابق</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : viewMode === 'presence' ? <tr><th>شناسهٔ پیک</th><th>وضعیت حضور</th><th>زون</th><th>آخرین تغییر حضور</th><th>مشخصات</th></tr> : viewMode === 'couriers' ? <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr> : viewMode === 'finance' ? <tr><th>مأموریت</th><th>وضعیت</th><th>نرخ ثبت‌شده</th><th>مسافت</th><th>کرایه</th><th>سهم خریدار</th><th>سهم فروشنده</th><th>کمیسیون مونو (برآورد)</th><th>مالیات کمیسیون</th><th>خالص پیک (برآورد)</th></tr> : viewMode === 'issues' ? <tr><th>شناسهٔ گزارش</th><th>مأموریت</th><th>پیک</th><th>نوع مشکل</th><th>وضعیت</th><th>گزارش‌شده</th><th>آخرین تغییر</th><th>سوابق مأموریت</th></tr> : viewMode === 'sla' ? <tr><th>شناسهٔ مأموریت</th><th>مشتری</th><th>وضعیت مأموریت</th><th>موعد تحویل</th><th>پیک پذیرفته‌شده</th><th>وضعیت SLA</th><th>سوابق</th></tr> : <tr><th>شناسه پنجره</th><th>شناسه پیک</th><th>زون</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>ثبت‌کننده</th><th>زمان ثبت</th><th>عملیات</th></tr>}</thead>
+            <table className={viewMode === 'finance' ? 'finance-table' : viewMode === 'dispatch' ? 'dashboard-missions-table' : undefined}>
+              <thead>{viewMode === 'dispatch' ? <tr><th aria-label="اقدامات"/><th>آخرین رویداد</th><th>منطقه</th><th>استاندارد خدمت</th><th>زمان تخمینی</th><th>پیک</th><th>وضعیت</th><th>مشتری</th><th>شناسهٔ مأموریت</th></tr> : viewMode === 'missions' ? <tr><th>شناسه مأموریت</th><th>مشتری</th><th>درخواست</th><th>وضعیت</th><th>موعد تحویل</th><th>زمان ایجاد</th><th>سوابق</th></tr> : viewMode === 'presence' ? <tr><th>شناسهٔ پیک</th><th>وضعیت حضور</th><th>زون</th><th>آخرین تغییر حضور</th><th>مشخصات</th></tr> : viewMode === 'couriers' ? <tr><th>شناسه پیک</th><th>نوع عملیات</th><th>وضعیت اعتماد</th><th>زون‌های ترجیحی</th><th>زون‌های تأییدشده</th><th>زون اصلی</th><th>آخرین تغییر</th><th>جزئیات</th></tr> : viewMode === 'finance' ? <tr><th>مأموریت</th><th>وضعیت</th><th>نرخ ثبت‌شده</th><th>مسافت</th><th>کرایه</th><th>سهم خریدار</th><th>سهم فروشنده</th><th>کمیسیون مونو (برآورد)</th><th>مالیات کمیسیون</th><th>خالص پیک (برآورد)</th></tr> : viewMode === 'issues' ? <tr><th>شناسهٔ گزارش</th><th>مأموریت</th><th>پیک</th><th>نوع مشکل</th><th>وضعیت</th><th>گزارش‌شده</th><th>آخرین تغییر</th><th>سوابق مأموریت</th></tr> : viewMode === 'sla' ? <tr><th>شناسهٔ مأموریت</th><th>مشتری</th><th>وضعیت مأموریت</th><th>موعد تحویل</th><th>پیک پذیرفته‌شده</th><th>وضعیت SLA</th><th>سوابق</th></tr> : <tr><th>شناسه پنجره</th><th>شناسه پیک</th><th>زون</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>ثبت‌کننده</th><th>زمان ثبت</th><th>عملیات</th></tr>}</thead>
               <tbody>
-                {loading && <tr><td colSpan={viewMode === 'finance' ? 10 : viewMode === 'zones' ? 9 : viewMode === 'sla' ? 7 : viewMode === 'presence' ? 5 : viewMode === 'issues' ? 8 : 8} className="state-cell"><span className="spinner" />در حال دریافت اطلاعات…</td></tr>}
-                {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'issues' ? issueItems.length === 0 : viewMode === 'presence' ? presenceItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : viewMode === 'finance' ? financeItems.length === 0 : viewMode === 'sla' ? slaItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={viewMode === 'finance' ? 10 : viewMode === 'sla' ? 7 : viewMode === 'presence' ? 5 : 8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
+                {loading && <tr><td colSpan={viewMode === 'finance' ? 10 : viewMode === 'dispatch' || viewMode === 'zones' ? 9 : viewMode === 'sla' ? 7 : viewMode === 'presence' ? 5 : viewMode === 'issues' ? 8 : 8} className="state-cell"><span className="spinner" />در حال دریافت اطلاعات…</td></tr>}
+                {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'issues' ? issueItems.length === 0 : viewMode === 'presence' ? presenceItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : viewMode === 'finance' ? financeItems.length === 0 : viewMode === 'sla' ? slaItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={viewMode === 'finance' ? 10 : viewMode === 'dispatch' || viewMode === 'zones' ? 9 : viewMode === 'sla' ? 7 : viewMode === 'presence' ? 5 : 8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
                 {!loading && viewMode === 'dispatch' && items.map((mission) => <tr key={mission.missionId}>
-                  <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong>{mission.deliveryOverdue && <span className="badge danger">موعد گذشته</span>}</td>
+                  <td><button className="dashboard-row-action" onClick={() => void showMissionDetails(mission.missionId)} aria-label={`جزئیات مأموریت ${mission.missionId}`}>•••</button></td>
+                  <td><span className="cell-primary">{mission.latestAttempt?.action || mission.latestAttempt?.outcome || 'رویدادی ثبت نشده'}</span><span className="cell-secondary">{mission.latestAttempt ? formatDate(mission.latestAttempt.createdAt) : '—'}</span></td>
+                  <td><span className="cell-secondary">—</span></td>
+                  <td><span className={`badge ${mission.deliveryOverdue ? 'danger' : mission.deliveryWindowState === 'due_now' ? 'warning' : 'neutral'}`}>{statusLabel(mission.deliveryWindowState)}</span></td>
+                  <td><span className="cell-secondary">—</span></td>
+                  <td>{mission.activeOffer?.courierId ? <span className="cell-primary" dir="ltr">{mission.activeOffer.courierId}</span> : <span className="cell-secondary">بدون پیک</span>}</td>
+                  <td><span className="badge neutral">در صف تخصیص</span></td>
                   <td><span className="cell-primary" dir="ltr">{mission.customerId}</span><span className="cell-secondary" dir="ltr">{mission.branchId}</span></td>
-                  <td>{formatDate(mission.createdAt)}</td>
-                  <td><span className="cell-primary">{formatDate(mission.committedDeliveryAt)}</span><span className={`badge ${mission.deliveryWindowState === 'overdue' ? 'danger' : mission.deliveryWindowState === 'due_now' ? 'warning' : 'neutral'}`}>{statusLabel(mission.deliveryWindowState)}</span></td>
-                  <td><span className="cell-primary">{fa.format(mission.attemptCount)} تلاش</span><span className="cell-secondary">{mission.latestAttempt?.action || mission.latestAttempt?.outcome || 'بدون تلاش ثبت‌شده'}</span></td>
-                  <td>{mission.activeOffer ? <><span className="cell-primary" dir="ltr">{mission.activeOffer.courierId || mission.activeOffer.offerId || 'پیشنهاد فعال'}</span><span className={`badge ${mission.activeOffer.deadlinePassed ? 'danger' : 'success'}`}>{mission.activeOffer.deadlinePassed ? 'مهلت پاسخ گذشته' : `مهلت ${formatDate(mission.activeOffer.expiresAt)}`}</span></> : <span className="cell-secondary">پیشنهادی فعال ندارد</span>}</td>
-                  <td><button className="history-button" onClick={() => void showMissionDetails(mission.missionId)}>جزئیات</button></td>
+                  <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong></td>
                 </tr>)}
                 {!loading && viewMode === 'missions' && missionItems.map((mission) => <tr key={mission.missionId}>
                   <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong></td>
@@ -1271,11 +1342,10 @@ export default function App() {
             </table>
           </div>
           <footer className="table-footer"><span>{fa.format(viewMode === 'dispatch' ? items.length : viewMode === 'missions' ? missionItems.length : viewMode === 'couriers' ? courierItems.length : viewMode === 'presence' ? presenceItems.length : viewMode === 'issues' ? issueItems.length : viewMode === 'finance' ? financeItems.length : viewMode === 'sla' ? slaItems.length : availabilityPage?.items.length || 0)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !(viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : viewMode === 'presence' ? presenceNextCursor : availabilityNextCursor)}>بعدی</button></div></footer>
-        </section>}
-        {viewMode === 'dispatch' && <p className="data-note">آمار بالا فقط از ردیف‌های صفحهٔ جاری محاسبه شده است؛ API فعلاً شمار کل صف را برنمی‌گرداند.</p>}
+          </section>
+        </div>}
         {viewMode === 'issues' && <p className="data-note">این صندوق فقط فرادادهٔ ساختاریافتهٔ گزارش را نشان می‌دهد؛ متن آزاد یا موقعیت مکانی پیک در این API ارائه نمی‌شود. این نما گزارش را resolve یا وضعیت مأموریت را تغییر نمی‌دهد.</p>}
         {viewMode === 'presence' && <p className="data-note">آمار فقط از ردیف‌های صفحهٔ جاری محاسبه شده و وضعیت براساس snapshot API است؛ این نما polling خودکار یا موقعیت GPS ارائه نمی‌کند.</p>}
-        {viewMode === 'sla' && <p className="data-note">خلاصه فقط از ردیف‌های همین صفحه است. هشدارها در زمان «مبنای ارزیابی» محاسبه شده‌اند؛ برای تازه‌سازی، دکمهٔ ↻ را بزنید.</p>}
         {viewMode === 'workers' && <p className="data-note">این وضعیت درون‌فرایندی و مخصوص همین نمونهٔ API است؛ در استقرار چندنمونه‌ای، وضعیت سایر نمونه‌ها را پوشش نمی‌دهد و health کلی API محسوب نمی‌شود. دریافت خودکار انجام نمی‌شود.</p>}
         {viewMode === 'zones' && <p className="data-note">این داده‌ها پنجره‌های کاری ثبت‌شده‌اند؛ حضور زنده، ظرفیت لحظه‌ای یا اختیار تخصیص از آن‌ها نتیجه نمی‌شود.</p>}{viewMode === 'finance' && <p className="data-note">این نما فقط از snapshot قطعی تعرفه و مفروضات تجاری Phase 1 برآورد می‌سازد؛ پرداخت، موجودی، برداشت، تسویهٔ واقعی یا وصول از حنا را گزارش نمی‌کند.</p>}
       </main>
@@ -1287,7 +1357,11 @@ export default function App() {
         {webhookActionError && <div className="webhook-inline-error" role="alert">{webhookActionError}<small>در صورت نامشخص‌بودن نتیجه، دکمهٔ تلاش مجدد همان کلید idempotency را حفظ می‌کند.</small></div>}
         <div className="capacity-actions"><button className="primary-button" onClick={() => void performWebhookAction()} disabled={webhookActionLoading}>{webhookActionLoading ? 'در حال ارسال…' : webhookActionError ? 'تلاش مجدد' : 'تأیید عملیات'}</button><button className="secondary-button" onClick={() => setWebhookAction(null)} disabled={webhookActionLoading}>انصراف</button></div>
       </section></div>}
-      {timelineTitle && <div className="modal-backdrop" role="presentation" onClick={closeDetails}><section className="timeline-modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}><header><div><span className="eyebrow">جزئیات و سوابق عملیاتی</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></header>{timelineLoading ? <p className="modal-state">در حال دریافت اطلاعات…</p> : viewMode === 'couriers' || viewMode === 'presence' ? <>
+      {timelineTitle && <div className={`modal-backdrop${viewMode !== 'couriers' && viewMode !== 'presence' ? ' mission-drawer-backdrop' : ''}`} role="presentation" onClick={closeDetails}><section className={`timeline-modal detail-modal${viewMode !== 'couriers' && viewMode !== 'presence' ? ' mission-detail-drawer' : ''}`} role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}>{viewMode !== 'couriers' && viewMode !== 'presence' ? <header className="mission-drawer-header">
+        <div className="mission-drawer-heading"><h2 id="timeline-title">جزئیات مأموریت</h2><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></div>
+        <div className="mission-drawer-id-row"><span className="badge neutral">{missionDetail?.status || '—'}</span><strong className="mission-id" dir="ltr">{timelineTitle}</strong></div>
+        <p className="mission-drawer-customer">مشتری: <bdi dir="ltr">{missionDetail?.customerId || '—'}</bdi></p>
+      </header> : <header><div><span className="eyebrow">جزئیات و سوابق عملیاتی</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></header>}{timelineLoading ? <p className="modal-state">در حال دریافت اطلاعات…</p> : viewMode === 'couriers' || viewMode === 'presence' ? <>
         {detailErrors.length > 0 && <div className="detail-errors">{detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
         <section className="detail-section"><h3>مشخصات پیک</h3>{courierDetail ? <dl className="detail-grid">
           <div><dt>شناسه پیک</dt><dd dir="ltr">{courierDetail.courier_id}</dd></div><div><dt>نوع عملیات</dt><dd dir="ltr">{courierDetail.mode}</dd></div><div><dt>وضعیت اعتماد</dt><dd>{courierDetail.status}</dd></div>
@@ -1298,15 +1372,22 @@ export default function App() {
         <section className="detail-section"><h3>سوابق خواندن پیک</h3>{courierAudit.length ? <div className="audit-list">{courierAudit.map((record) => <article key={record.audit_id}><div><strong>{record.action}</strong><small>{record.actor_id}</small></div><span>{formatDate(record.occurred_at)}</span><em>{fa.format(record.result_count)} نتیجه</em></article>)}</div> : <p className="modal-state">در ۱۰۰ رویداد اخیر، سابقه‌ای برای این پیک پیدا نشد.</p>}</section>
       </> : <>
         {detailErrors.length > 0 && <div className="detail-errors">{detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
-        <section className="detail-section"><h3>مشخصات مأموریت</h3>{missionDetail ? <dl className="detail-grid">
-          <div><dt>وضعیت</dt><dd><span className="badge neutral">{missionDetail.status}</span></dd></div>
-          <div><dt>مشتری</dt><dd dir="ltr">{missionDetail.customerId}</dd></div>
-          <div><dt>درخواست تحویل</dt><dd dir="ltr">{missionDetail.deliveryRequestId}</dd></div>
-          <div><dt>ایجاد</dt><dd>{formatDate(missionDetail.createdAt)}</dd></div>
-          <div><dt>موعد تحویل متعهدشده</dt><dd>{formatDate(missionDetail.committedDeliveryAt)}</dd></div>
-        </dl> : <p className="modal-state">جزئیات مأموریت در دسترس نیست.</p>}</section>
-        <section className="detail-section"><h3>رویدادهای مأموریت</h3>{missionTimeline.length ? <ol className="event-list">{missionTimeline.map((event) => <li key={event.eventId}><span className="event-dot"/><div><strong>{event.eventType}</strong><small>{formatDate(event.occurredAt)} · {fa.format(event.sequence)}</small></div></li>)}</ol> : <p className="modal-state">رویدادی در timeline ثبت نشده است.</p>}</section>
-        <section className="detail-section"><h3>سوابق دسترسی عملیات</h3>{missionAudit.length ? <div className="audit-list">{missionAudit.map((record) => <article key={record.auditId}><div><strong>{record.action}</strong><small>{record.actorId}</small></div><span>{formatDate(record.occurredAt)}</span><em>{fa.format(record.resultCount)} نتیجه</em></article>)}</div> : <p className="modal-state">سابقه‌ای برای نمایش برنگشت.</p>}</section>
+        <section className="detail-section"><h3>وضعیت و تعهد</h3>{missionDetail ? <div className="drawer-info-list">
+          <div><strong>{formatDate(missionDetail.committedDeliveryAt)}</strong><span>زمان تعهدشده</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>زمان تخمینی فعلی</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>وضعیت استاندارد</span></div>
+          <div><strong className="unavailable-value">قابل محاسبه نیست</strong><span>زمان باقیمانده</span></div>
+        </div> : <p className="modal-state">جزئیات مأموریت در دسترس نیست.</p>}</section>
+        <section className="detail-section"><h3>اجرا و مسیر</h3>{missionDetail ? <div className="drawer-info-list">
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>پیک تخصیص‌یافته</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>شیوهٔ حمل</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مبدأ</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مقصد</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مسیر فعال</span></div>
+        </div> : <p className="modal-state">اطلاعات اجرا در دسترس نیست.</p>}</section>
+        <section className="detail-section decision-evidence"><h3>دلیل تصمیم سیستم</h3><p>دادهٔ دلیل تخصیص در API فعلی موجود نیست.</p></section>
+        <section className="detail-section"><h3>تاریخچه مأموریت</h3>{missionTimeline.length ? <ol className="drawer-timeline">{[...missionTimeline].sort((a,b) => a.sequence-b.sequence).map((event) => <li key={event.eventId}><time>{formatDate(event.occurredAt)}</time><span className="event-dot"/><div><strong>{event.eventType}</strong><small>رویداد {fa.format(event.sequence)}</small></div></li>)}</ol> : <p className="modal-state">رویدادی در timeline ثبت نشده است.</p>}</section>
+        <footer className="drawer-actions"><div className="drawer-action-row"><button disabled title="API فعلی مسیر فعال مأموریت را ارائه نمی‌کند">مشاهده مسیر</button><button disabled title="اطلاعات تماس پیک در API مأموریت موجود نیست">تماس با پیک</button></div><div className="drawer-action-row"><button disabled title="API عملیات ثبت استثنا را ارائه نمی‌کند">ثبت استثنا</button><button disabled title="API عملیات تخصیص مجدد را ارائه نمی‌کند">تخصیص مجدد</button></div><button className="drawer-cancel" disabled title="لغو مأموریت از این پنل در API پشتیبانی نمی‌شود">لغو مأموریت</button><small>اقدام‌های عملیاتی تا زمان پشتیبانی API غیرفعال هستند.</small></footer>
       </>}</section></div>}
     </div>
   )

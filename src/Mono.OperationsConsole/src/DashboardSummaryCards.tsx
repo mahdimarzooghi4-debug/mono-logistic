@@ -31,19 +31,19 @@ export default function DashboardSummaryCards({
 }) {
   const updatedAt = summary ? new Intl.DateTimeFormat('fa-IR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(summary.as_of)) : null
   return (
-    <section className="kpi-grid" aria-label="خلاصهٔ صفحهٔ جاری">
-      <article className="kpi-card"><span className="kpi-icon cyan">%</span><div><small>تحویل به‌موقع امروز</small><strong>{summary?.on_time_delivery_rate_percent == null ? '—' : `${fa.format(summary.on_time_delivery_rate_percent)}٪`}</strong><small>{summary ? `${fa.format(summary.on_time_delivered_today_count)} از ${fa.format(summary.delivered_today_count)} · ${summary.business_date}` : 'در انتظار دادهٔ API'}</small></div></article>
+    <section className="kpi-grid dashboard-summary-strip" aria-label="خلاصهٔ صفحهٔ جاری">
+      <article className="kpi-card"><div><small>تحویل به‌موقع امروز</small><strong>{summary?.on_time_delivery_rate_percent == null ? '—' : `${fa.format(summary.on_time_delivery_rate_percent)}٪`}</strong><span className="sr-only">{summary ? `${fa.format(summary.on_time_delivered_today_count)} از ${fa.format(summary.delivered_today_count)} · ${summary.business_date}` : 'در انتظار دادهٔ API'}</span></div></article>
       <button type="button" className="kpi-card kpi-card-action" onClick={onOpenPresence} disabled={actionsDisabled} aria-label="مشاهدهٔ فهرست وضعیت پیک‌ها">
-        <span className="kpi-icon blue">●</span><span className="kpi-card-copy"><small>پیک‌های آنلاین</small><strong>{summary ? fa.format(summary.online_courier_count) : '—'}</strong><small>حضور زندهٔ پیک فعال</small><small className="kpi-action-hint">مشاهدهٔ وضعیت پیک‌ها ←</small></span>
+        <span className="kpi-card-copy"><small>پیک‌های آنلاین</small><strong>{summary ? fa.format(summary.online_courier_count) : '—'}</strong><span className="sr-only">حضور زندهٔ پیک فعال</span></span>
       </button>
       <button type="button" className="kpi-card kpi-card-action" onClick={onOpenDispatch} disabled={actionsDisabled} aria-label="رفتن به صف مأموریت‌های بدون تخصیص">
-        <span className="kpi-icon amber">◷</span><span className="kpi-card-copy"><small>بدون تخصیص پیک</small><strong>{summary ? fa.format(summary.unassigned_mission_count) : '—'}</strong><small>بدون پیشنهاد پذیرفته‌شده</small><small className="kpi-action-hint">رفتن به صف مأموریت ←</small></span>
+        <span className="kpi-card-copy"><small>بدون تخصیص</small><strong>{summary ? fa.format(summary.unassigned_mission_count) : '—'}</strong><span className="sr-only">بدون پیشنهاد پذیرفته‌شده</span></span>
       </button>
       <button type="button" className="kpi-card kpi-card-action" onClick={onOpenSla} disabled={actionsDisabled} aria-label="مشاهدهٔ مأموریت‌های دارای هشدار SLA">
-        <span className="kpi-icon red">!</span><span className="kpi-card-copy"><small>در معرض نقض SLA</small><strong>{summary ? fa.format(summary.sla_at_risk_count) : '—'}</strong><small>{summary ? `افق ${fa.format(summary.sla_horizon_minutes)} دقیقه · گذشته از موعد ${fa.format(summary.sla_overdue_count)}` : 'در انتظار دادهٔ API'}</small><small className="kpi-action-hint">مشاهدهٔ هشدارهای SLA ←</small></span>
+        <span className="kpi-card-copy"><small>در معرض نقض استاندارد</small><strong>{summary ? fa.format(summary.sla_at_risk_count) : '—'}</strong><span className="sr-only">{summary ? `افق ${fa.format(summary.sla_horizon_minutes)} دقیقه · گذشته از موعد ${fa.format(summary.sla_overdue_count)}` : 'در انتظار دادهٔ API'}</span></span>
       </button>
       <button type="button" className="kpi-card kpi-card-action" onClick={onOpenMissions} disabled={actionsDisabled} aria-label="مشاهدهٔ فهرست مأموریت‌ها">
-        <span className="kpi-icon cyan">▦</span><span className="kpi-card-copy"><small>مأموریت‌های فعال</small><strong>{summary ? fa.format(summary.active_mission_count) : '—'}</strong><small>{updatedAt ? `به‌روزرسانی ${updatedAt}` : 'در انتظار دادهٔ API'}</small><small className="kpi-action-hint">رفتن به فهرست مأموریت‌ها ←</small></span>
+        <span className="kpi-card-copy"><small>مأموریت‌های فعال</small><strong>{summary ? fa.format(summary.active_mission_count) : '—'}</strong><span className="sr-only">{updatedAt ? `به‌روزرسانی ${updatedAt}` : 'در انتظار دادهٔ API'}</span></span>
       </button>
     </section>
   )

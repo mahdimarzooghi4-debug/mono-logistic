@@ -9,6 +9,26 @@ afterEach(() => {
 })
 
 describe('merchant portal delivery flow', () => {
+  it('shows a clearly labeled local preview and keeps its sample delivery out of the API', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'مشاهدهٔ نسخهٔ نمایشی' }))
+    expect(screen.getByText('محیط نمایشی · داده‌های ساختگی')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'داشبورد کسب‌وکار' })).toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: 'ارسال جدید' })[0])
+    await user.clear(screen.getByLabelText('شمارهٔ سفارش'))
+    await user.type(screen.getByLabelText('شمارهٔ سفارش'), 'ORD-TEST')
+    await user.click(screen.getByRole('button', { name: 'ثبت نمونهٔ ارسال' }))
+
+    expect(await screen.findByText('ORD-TEST')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('فقط در همین پیش‌نمایش')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('renders the business dashboard tools from real account data and supports quick tracking', async () => {
     const branchId = `br_${'c'.repeat(32)}`
     const requestId = `drq_${'d'.repeat(32)}`

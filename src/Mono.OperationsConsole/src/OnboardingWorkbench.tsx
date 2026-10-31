@@ -7,6 +7,7 @@ type CustomerPage = { customers: Customer[]; nextCursor: string | null }
 type Branch = { branchId: string; customerId: string; name: string; address: string | null; latitude: number | null; longitude: number | null; zoneId: string | null; status: string; operatingHours?: unknown }
 type Audit = { action: string; actorId: string; reason: string; occurredAt: string; auditId?: string }
 type AuditPage = { entries: Audit[]; nextCursor: string | null }
+type ApiKey = { keyId: string; customerId: string; scopes: string[]; createdAt: string; expiresAt: string; revokedAt: string | null }
 type Props = { token: string; reloadKey: number; onConnected: (connected: boolean) => void }
 
 const fa = new Intl.NumberFormat('fa-IR')
@@ -26,6 +27,7 @@ export default function OnboardingWorkbench({ token, reloadKey, onConnected }: P
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchAudit, setBranchAudit] = useState<Audit[]>([])
   const [branchAuditNextCursor, setBranchAuditNextCursor] = useState<string | null>(null)
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
   const [branchDetail, setBranchDetail] = useState<Branch | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -77,14 +79,15 @@ export default function OnboardingWorkbench({ token, reloadKey, onConnected }: P
 
   const loadDetail = useCallback(async (customer: Customer) => {
     const id = ++detailRequestId.current
-    setSelected(customer); setCustomerAudit([]); setBranches([]); setBranchAudit([]); setBranchDetail(null); setError('')
+    setSelected(customer); setCustomerAudit([]); setBranches([]); setApiKeys([]); setBranchAudit([]); setBranchDetail(null); setError('')
     try {
-      const [audit, branchPage] = await Promise.all([
+      const [audit, branchPage, keyPage] = await Promise.all([
         api<{ entries: Audit[] }>(`/operations/v1/customers/${encodeURIComponent(customer.customerId)}/audit`),
         api<{ branches: Branch[] }>(`/operations/v1/customers/${encodeURIComponent(customer.customerId)}/branches`),
+        api<{ apiKeys: ApiKey[] }>(`/operations/v1/customers/${encodeURIComponent(customer.customerId)}/api-keys`),
       ])
       if (id !== detailRequestId.current) return
-      setCustomerAudit(audit.entries); setBranches(branchPage.branches)
+      setCustomerAudit(audit.entries); setBranches(branchPage.branches); setApiKeys(keyPage.apiKeys ?? [])
     } catch (cause) { if (id === detailRequestId.current) setError(cause instanceof Error ? cause.message : 'دریافت جزئیات مشتری ناموفق بود.') }
   }, [api])
 
@@ -180,6 +183,7 @@ export default function OnboardingWorkbench({ token, reloadKey, onConnected }: P
             {branches.length === 0 ? <p className="onboarding-empty compact">شعبه‌ای برای این مشتری ثبت نشده است.</p> : <div className="onboarding-branch-list">{branches.map((branch) => <article key={branch.branchId} className="onboarding-branch"><div><strong>{branch.name}</strong><small>{branch.address || 'نشانی ثبت نشده'} · زون {branch.zoneId || '—'}</small><code dir="ltr">{branch.branchId}</code></div><div><button className="text-button" onClick={() => void inspectBranch(branch.branchId)}>جزئیات و audit</button><button className="text-button" onClick={() => void inspectBranch(branch.branchId).then((detail) => { if (detail) editBranch(detail) })} disabled={branch.status !== 'ACTIVE'}>ویرایش</button></div></article>)}</div>}
           </section>
           {branchDetail && <section className="onboarding-subsection"><header><h3>جزئیات شعبه · <span dir="ltr">{branchDetail.branchId}</span></h3></header><dl className="onboarding-facts"><div><dt>نشانی</dt><dd>{branchDetail.address || '—'}</dd></div><div><dt>مختصات</dt><dd dir="ltr">{branchDetail.latitude ?? '—'}, {branchDetail.longitude ?? '—'}</dd></div><div><dt>زون</dt><dd dir="ltr">{branchDetail.zoneId || '—'}</dd></div></dl><pre className="onboarding-json" dir="ltr">{JSON.stringify(branchDetail.operatingHours ?? {}, null, 2)}</pre><h4>سابقهٔ شعبه</h4><AuditList entries={branchAudit} />{branchAuditNextCursor && <button className="secondary-button" onClick={() => void loadBranchAudit(branchDetail.branchId, branchAuditNextCursor, true)}>دریافت رویدادهای بعدی</button>}</section>}
+          <section className="onboarding-subsection"><header><h3>دسترسی‌های API</h3></header><p className="onboarding-hint">فقط فرادادهٔ credentialها نمایش داده می‌شود؛ مقدار کلید محرمانه در این API قابل بازیابی نیست.</p>{apiKeys.length ? <div className="onboarding-branches">{apiKeys.map((key) => <article className="onboarding-branch" key={key.keyId}><div><strong dir="ltr">{key.keyId}</strong><span>{key.revokedAt ? 'لغوشده' : new Date(key.expiresAt) <= new Date() ? 'منقضی‌شده' : 'فعال'}</span></div><small>Scopes: <bdi dir="ltr">{key.scopes.length ? key.scopes.join(', ') : '—'}</bdi></small><small>ایجاد: {fmtDate(key.createdAt)} · انقضا: {fmtDate(key.expiresAt)}{key.revokedAt ? ` · لغو: ${fmtDate(key.revokedAt)}` : ''}</small></article>)}</div> : <p className="onboarding-empty compact">برای این مشتری credentialی از API برنگشت.</p>}</section>
           <section className="onboarding-subsection"><header><h3>سابقهٔ مشتری</h3></header><AuditList entries={customerAudit} /></section>
         </>}
       </section>
