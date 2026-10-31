@@ -17,6 +17,7 @@ export default function SlaExceptionsWorkbench({ token, onConnected, onOpenMissi
   const [cursor, setCursor] = useState<string | null>(null)
   const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
   const [horizon, setHorizon] = useState('0')
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [selectedId, setSelectedId] = useState('')
   const [search, setSearch] = useState('')
   const [timeline, setTimeline] = useState<Timeline['events']>(undefined)
@@ -74,7 +75,7 @@ export default function SlaExceptionsWorkbench({ token, onConnected, onOpenMissi
   const unassignedCount = items.filter((item) => !item.courier_id).length
 
   return <div className="sla-workbench">
-    <header className="sla-page-heading"><div><h1>استاندارد خدمت و استثناها</h1><p>رسیدگی به مأموریت‌های عبورکرده یا نزدیک موعد براساس ارزیابی ثبت‌شدهٔ API</p></div><div className="sla-heading-actions"><label>افق پایش<select aria-label="افق پایش" value={horizon} onChange={(event) => setHorizon(event.target.value)}><option value="0">موعد رسیده یا گذشته</option><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60">۱ ساعت</option><option value="240">۴ ساعت</option></select></label><button className="secondary-button" onClick={() => void load() } disabled={!token || loading}>تازه‌سازی</button><button className="primary-button" disabled title="ثبت استثنا به‌عنوان اقدام عملیاتی در API فعلی پشتیبانی نمی‌شود.">ثبت استثنا</button></div></header>
+    <header className="sla-page-heading"><div><h1>استاندارد خدمت و استثناها</h1><p>رسیدگی به مأموریت‌های عبورکرده یا نزدیک موعد براساس ارزیابی ثبت‌شدهٔ API</p></div><div className="sla-heading-actions"><div className="sla-settings-wrap"><button className="secondary-button" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>تنظیم هشدارها</button>{settingsOpen && <label>افق پایش<select aria-label="افق پایش" value={horizon} onChange={(event) => setHorizon(event.target.value)}><option value="0">موعد رسیده یا گذشته</option><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60">۱ ساعت</option><option value="240">۴ ساعت</option></select></label>}</div><button className="primary-button" disabled title="ثبت استثنا به‌عنوان اقدام عملیاتی در API فعلی پشتیبانی نمی‌شود.">ثبت استثنا</button></div></header>
     <section className="sla-kpis" aria-label="خلاصهٔ هشدارهای همین صفحه"><article><small>هشدارهای این صفحه</small><strong>{token ? fa.format(items.length) : '—'}</strong><span>حداکثر ۵۰ ردیف از API</span></article><article><small>از موعد گذشته</small><strong className="sla-red">{token ? fa.format(overdueCount) : '—'}</strong><span>در snapshot همین صفحه</span></article><article><small>در افق پایش</small><strong>{token ? fa.format(dueSoon) : '—'}</strong><span>{horizon === '0' ? 'موعد فعلی' : `${fa.format(Number(horizon))} دقیقهٔ آینده`}</span></article><article><small>بدون پیک پذیرفته‌شده</small><strong>{token ? fa.format(unassignedCount) : '—'}</strong><span>نیازمند بررسی وضعیت</span></article><article><small>مبنای ارزیابی</small><strong className="sla-time">{evaluatedAt ? fmt(evaluatedAt) : '—'}</strong><span>زمان محاسبهٔ هشدار در API</span></article></section>
     {error && <div className="sla-error" role="alert">{error}</div>}
     <div className="sla-layout">
