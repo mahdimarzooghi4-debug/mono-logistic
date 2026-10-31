@@ -38,11 +38,12 @@ describe('Operations route plan workbench', () => {
     fireEvent.change(screen.getByLabelText('شناسهٔ مسیر'), { target: { value: routeId } })
     fireEvent.click(screen.getByRole('button', { name: 'جست‌وجوی مسیر' }))
 
-    expect(await screen.findByRole('heading', { name: 'نسخهٔ ۲' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: routeId })).toBeInTheDocument()
+    expect(screen.getAllByText('نسخهٔ ۲')).toHaveLength(2)
     expect(screen.getByText('loc_pickup_1')).toBeInTheDocument()
     expect(screen.getByText('loc_dropoff_1')).toBeInTheDocument()
     expect(screen.getByText('ops-admin')).toBeInTheDocument()
-    expect(screen.getByText(/فهرست همهٔ مسیرها/)).toBeInTheDocument()
+    expect(screen.getByText(/API فعلی فهرست مسیرها را ارائه نمی‌کند/)).toBeInTheDocument()
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     for (const [, init] of fetchMock.mock.calls) {
       expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer verified-admin')
