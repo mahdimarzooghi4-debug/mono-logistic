@@ -322,8 +322,9 @@ tbody tr:hover { background: #fbfdfd; }
 .quick-create { display: flex; flex-direction: column; gap: 8px; }
 .quick-create > h2 { font-size: 17px; }
 .quick-create > p { margin: 0; color: #59646b; font-size: 10px; line-height: 1.7; }
-.quick-create-fields { display: flex; gap: 8px; }
+.quick-create-fields { display: flex; gap: 8px; direction: ltr; }
 .quick-create-fields button { display: grid; flex: 1; gap: 3px; min-width: 0; min-height: 58px; border: 1px solid #dde6e9; border-radius: 9px; padding: 7px 10px; color: #4f5a61; background: #f7fafb; text-align: right; }
+.quick-create-fields button { direction: rtl; }
 .quick-create-fields small { color: #8a949a; font-size: 9px; }
 .quick-create-fields span { font-size: 10px; }
 .quick-create .full-width { width: 100%; min-height: 40px; }
@@ -335,7 +336,7 @@ tbody tr:hover { background: #fbfdfd; }
 .quick-track-form .secondary-button { min-height: 27px; border: 0; border-radius: 999px; padding: 0 9px; background: #eaf8fa; }
 .branch-widget h2,.service-widget h2 { font-size: 14px; }
 .branch-status-list { gap: 0; padding: 0; }
-.branch-status-list li { min-height: 22px; border: 0; color: #0b0b0e; font-size: 10px; }
+.branch-status-list li { min-height: 22px; border: 0; color: #0b0b0e; font-size: 10px; direction: ltr; }
 .branch-active { width: 54px; color: #168a52; font-size: 9px; font-weight: 600; }
 .service-widget { display: grid; align-content: start; gap: 7px; }
 .service-widget dl { gap: 0; padding: 0; }
