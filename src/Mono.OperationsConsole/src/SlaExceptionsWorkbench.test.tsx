@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import SlaExceptionsWorkbench from './SlaExceptionsWorkbench'
 
@@ -10,6 +10,13 @@ describe('SlaExceptionsWorkbench', () => {
     expect(screen.getByText('برای شروع به API عملیات متصل شوید.')).toBeInTheDocument()
     expect(screen.getByText('از موعد گذشته').parentElement).toHaveTextContent('—')
     expect(screen.getByRole('button', { name: 'ثبت استثنا' })).toBeDisabled()
+  })
+
+  it('keeps alert horizon controls behind the Figma settings action', () => {
+    render(<SlaExceptionsWorkbench token="" onConnected={vi.fn()} onOpenMission={vi.fn()} />)
+    expect(screen.queryByLabelText('افق پایش')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'تنظیم هشدارها' }))
+    expect(screen.getByLabelText('افق پایش')).toBeInTheDocument()
   })
 
   it('loads actual alert, mission and timeline data without inventing ETA values', async () => {
