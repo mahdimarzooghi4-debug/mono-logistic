@@ -425,9 +425,16 @@ tbody tr:hover { background: #fbfdfd; }
   .operations-primary-card { min-height: 420px; }
   .create-mission-action { display: none; }
 }
-.mission-drawer-backdrop { place-items: stretch start; padding: 0; }
+.mission-drawer-backdrop { inset: 0 248px 0 0; place-items: stretch start; padding: 0; }
 .mission-detail-drawer { display: flex; flex-direction: column; width: min(420px,100vw); height: 100dvh; max-height: 100dvh; overflow: auto; padding: 0; border-radius: 0; box-shadow: 14px 0 48px rgba(0,0,0,.18); }
-.mission-detail-drawer>header { position: sticky; top: 0; z-index: 1; flex: 0 0 auto; align-items: center; padding: 20px 24px 14px; border-bottom: 1px solid #e9eff1; background: rgba(255,255,255,.98); }
+.mission-detail-drawer>header { position: sticky; top: 0; z-index: 1; flex: 0 0 138px; height: 138px; padding: 20px 24px 14px; border-bottom: 1px solid #e9eff1; background: rgba(255,255,255,.98); }
+.mission-drawer-heading { display: flex; align-items: center; justify-content: space-between; height: 32px; }
+.mission-drawer-heading h2 { margin: 0; color: #263940; font-size: 15px; font-weight: 700; }
+.mission-drawer-heading .icon-button { width: 32px; min-width: 32px; height: 32px; border: 0; background: #f5f8f9; }
+.mission-drawer-id-row { display: flex; align-items: center; justify-content: space-between; height: 32px; margin-top: 8px; direction: rtl; }
+.mission-drawer-id-row .badge { min-height: 28px; }
+.mission-drawer-id-row .mission-id { margin-right: auto; color: #263940; font-size: 14px; }
+.mission-drawer-customer { margin: 8px 0 0; color: #77868c; font-size: 9px; }
 .mission-detail-drawer>header>div { min-width: 0; }
 .mission-detail-drawer .eyebrow { font-size: 10px; }
 .mission-detail-drawer h2 { margin: 4px 0 0; font-size: 14px; }
@@ -457,4 +464,4 @@ tbody tr:hover { background: #fbfdfd; }
 .drawer-actions button:disabled { cursor: not-allowed; opacity: .72; }
 .drawer-actions .drawer-cancel { width: 100%; min-height: 34px; color: #a25851; background: #fff8f7; border-color: #f0dedb; }
 .drawer-actions small { display: block; margin-top: 7px; color: #89969b; font-size: 8px; text-align: center; }
-@media (max-width: 600px) { .mission-drawer-backdrop { place-items: end stretch; } .mission-detail-drawer { width: 100%; height: min(92dvh,900px); max-height: 92dvh; border-radius: 14px 14px 0 0; } }
+@media (max-width: 600px) { .mission-drawer-backdrop { inset: 0; place-items: end stretch; } .mission-detail-drawer { width: 100%; height: min(92dvh,900px); max-height: 92dvh; border-radius: 14px 14px 0 0; } }
