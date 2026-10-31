@@ -65,3 +65,64 @@
 .route-detail-empty p { max-width: 320px; margin: 0; color: #829096; font-size: 9px; line-height: 1.9; }
 @media(max-width:1000px){.route-control-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.route-control-layout{grid-template-columns:235px minmax(0,1fr)}.route-detail-overview{grid-template-columns:1fr}.route-map-placeholder{min-height:230px}}
 @media(max-width:720px){.route-control-header{flex-direction:column}.route-control-actions{width:100%}.route-control-actions button{flex:1}.route-control-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.route-control-kpis article{min-height:60px}.route-control-layout{grid-template-columns:1fr}.route-list-panel{min-height:auto}.route-detail-panel{min-height:400px}.route-detail-empty{min-height:350px}}
+
+/* Figma route-control frame (84:2): 300px route rail + 818px detail workspace. */
+.route-control-workbench{gap:20px}
+.route-control-header{min-height:60px;align-items:flex-start}
+.route-control-title h2{font-size:21px}
+.route-control-title p{font-size:10px}
+.route-control-actions button{min-height:36px;font-size:10px}
+.route-control-kpis{min-height:56px;border-radius:9px}
+.route-control-kpis article{min-height:56px;padding:6px 16px;gap:0}
+.route-control-kpis span{font-size:9px}
+.route-control-kpis strong{font-size:18px}
+.route-control-kpis small{display:none}
+.route-control-layout{grid-template-columns:300px minmax(0,818px);gap:18px;align-items:start}
+.route-list-panel,.route-detail-panel{min-height:816px;border:1px solid #dce5e8;border-radius:11px;background:#fff;box-shadow:none}
+.route-list-panel{padding:16px}
+.route-list-heading{margin-bottom:12px}
+.route-list-heading h3{font-size:13px}
+.route-count-pill{min-height:28px;font-size:9px}
+.route-list-search input{min-height:42px;direction:rtl;text-align:right;font-size:10px}
+.route-list-search button{display:none}
+.route-list-empty{padding:12px;font-size:10px}
+.route-detail-panel{display:grid;grid-template-rows:138px 260px auto;gap:14px;min-width:0;padding:0;overflow:hidden}
+.route-detail-panel>.route-summary-card{min-width:0;height:138px;padding:16px;border-bottom:1px solid #e4ebed}
+.route-summary-card .route-detail-heading{min-height:28px}
+.route-summary-card .route-detail-heading h3{font-size:16px}
+.route-summary-card .route-detail-heading p{font-size:10px}
+.route-summary-card .route-status-pill{min-height:28px}
+.route-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:16px}
+.route-metrics>div{display:grid;gap:4px;min-width:0}
+.route-metrics span{color:#748188;font-size:9px}
+.route-metrics strong{font-size:13px;color:#27343a}
+.route-detail-overview{grid-template-columns:minmax(0,520px) minmax(0,284px);gap:14px;height:260px;padding-inline:0 0}
+.route-map-placeholder{position:relative;min-height:260px;height:260px;overflow:hidden;border:1px solid #dce5e8;border-radius:11px;background:repeating-linear-gradient(0deg,transparent 0 72px,#fff 73px 80px,transparent 81px 87px),repeating-linear-gradient(90deg,#eef3f4 0 82px,#fff 83px 90px,#eef3f4 91px 166px)}
+.route-map-placeholder .route-map-icon{margin:0 0 4px}
+.route-map-placeholder strong{font-size:11px}
+.route-map-placeholder p{font-size:9px}
+.route-map-placeholder small{font-size:8px}
+.route-optimization-card{height:260px;gap:9px;padding:15px;border:1px solid #dce5e8;border-radius:11px}
+.route-optimization-card h3{font-size:13px}
+.route-optimization-card>p{font-size:9px}
+.route-optimization-card dl>div{padding:6px 0}
+.route-optimization-card dt,.route-optimization-card dd{font-size:9px}
+.route-optimization-card button{min-height:34px;font-size:9px}
+.route-stop-section{min-width:0;margin:0 0 0;padding:0 16px 14px;border:0;border-radius:0}
+.route-stop-section>header{min-height:45px;padding:8px 0}
+.route-stop-section h3{font-size:12px}
+.route-stop-section header p{font-size:8px}
+.route-stop-section table{min-width:0;width:100%;table-layout:fixed}
+.route-stop-section th,.route-stop-section td{padding:10px 6px;overflow-wrap:anywhere;font-size:8px}
+.route-stop-section th{white-space:normal}
+.route-stop-section th:nth-child(1),.route-stop-section td:nth-child(1){width:7%}
+.route-stop-section th:nth-child(2),.route-stop-section td:nth-child(2){width:11%}
+.route-stop-section th:nth-child(3),.route-stop-section td:nth-child(3){width:16%}
+.route-stop-section th:nth-child(4),.route-stop-section td:nth-child(4){width:24%}
+.route-stop-section th:nth-child(5),.route-stop-section td:nth-child(5){width:10%}
+.route-stop-section th:nth-child(6),.route-stop-section td:nth-child(6){width:15%}
+.route-stop-section th:nth-child(7),.route-stop-section td:nth-child(7){width:17%}
+.route-audit-disclosure{margin:0 16px 16px;padding-top:10px}
+.route-detail-empty{min-height:650px}
+@media(max-width:1000px){.route-control-layout{grid-template-columns:260px minmax(0,1fr)}.route-detail-panel{grid-template-rows:auto auto auto;min-height:0;padding-bottom:12px}.route-summary-card .route-detail-heading p{max-width:60vw}.route-detail-overview{height:auto;grid-template-columns:minmax(0,1.6fr) minmax(220px,1fr)}.route-map-placeholder,.route-optimization-card{height:240px;min-height:240px}}
+@media(max-width:720px){.route-control-layout{grid-template-columns:minmax(0,1fr)}.route-list-panel,.route-detail-panel{min-height:0}.route-detail-panel{grid-template-rows:auto auto auto}.route-summary-card .route-detail-heading p{max-width:none}.route-metrics{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:12px}.route-detail-overview{grid-template-columns:minmax(0,1fr)}.route-map-placeholder,.route-optimization-card{height:auto;min-height:220px}.route-stop-section .table-wrap{overflow-x:auto}.route-stop-section table{min-width:680px}}
