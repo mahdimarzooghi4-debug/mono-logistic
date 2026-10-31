@@ -979,25 +979,48 @@ export default function App() {
     setError('')
   }
 
+  const panelTitles: Record<typeof viewMode, string> = {
+    dispatch: 'داشبورد عملیات', missions: 'مأموریت‌ها', couriers: 'پیک‌ها', zones: 'مناطق و ظرفیت',
+    finance: 'مالی و بررسی کرایه', sla: 'استثناهای SLA', presence: 'وضعیت حضور پیک‌ها',
+    issues: 'پشتیبانی و گزارش مشکلات', workers: 'سلامت پردازش‌ها', webhooks: 'یکپارچه‌سازی‌ها',
+    policies: 'استانداردها و پیکربندی', onboarding: 'مشتریان و شعب', admissions: 'پذیرش و راه‌اندازی',
+  }
+  const panelDescriptions: Record<typeof viewMode, string> = {
+    dispatch: 'صف مأموریت‌های در انتظار تخصیص پیک', missions: 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده',
+    couriers: 'فهرست پیک‌ها و سوابق اعتماد', zones: 'ظرفیت برنامه‌ریزی‌شده و پنجره‌های کاری زون',
+    finance: 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت', sla: 'مأموریت‌های نزدیک موعد یا عبورکرده از SLA',
+    presence: 'وضعیت آنلاین یا آفلاین و آخرین زمان ثبت حضور',
+    issues: 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها',
+    workers: 'وضعیت پردازش‌های پس‌زمینه از API', webhooks: 'صف تحویل و تلاش‌های ارسال webhook',
+    policies: 'نسخه‌ها و چرخهٔ عمر سیاست‌های عملیاتی',
+    onboarding: 'ثبت و بررسی مشتری‌ها و شعب با سابقهٔ ممیزی API',
+    admissions: 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها',
+  }
+
   return (
     <div className="app-shell" dir="rtl">
       <aside className="sidebar">
         <div className="brand-lockup"><span className="brand-mark">م</span><span><strong>مونو</strong><small>LOGISTICS</small></span></div>
         <div className="side-caption">فضای عملیات</div>
         <nav className="navigation" aria-label="ناوبری اصلی">
-          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon">▦</span>صف dispatch</button>
-          <button className={`nav-item ${viewMode === 'sla' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon">!</span>هشدارهای SLA</button>
-          <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon">↗</span>همهٔ مأموریت‌ها</button>
+          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon">▦</span>داشبورد</button>
+          <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon">↗</span>مأموریت‌ها</button>
+          <button className="nav-item" disabled title="پنل مسیرها هنوز به API برنامه‌ریزی مسیر متصل نشده است"><span className="nav-icon">⌁</span>مسیرها</button>
           <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon">⌁</span>پیک‌ها</button>
-          <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon">●</span>وضعیت حضور پیک‌ها</button>
-          <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon">!</span>صندوق مشکلات پیک‌ها</button>
+          <button className="nav-item" disabled title="فهرست و API مستقل وسایل نقلیه هنوز در دسترس نیست"><span className="nav-icon">▰</span>وسایل نقلیه</button>
+          <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>مناطق و ظرفیت</button>
+          <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon">⚖</span>استانداردها</button>
+          <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon">＋</span>مشتریان و شعب</button>
+          <button className={`nav-item ${viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('issues')}><span className="nav-icon">!</span>پشتیبانی</button>
+          <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon">▤</span>مالی</button>
+          <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon">↻</span>یکپارچه‌سازی</button>
+          <button className="nav-item" disabled title="نمای ردیابی زنده به رویدادهای مکان معتبر و به‌روزرسانی GPS نیاز دارد"><span className="nav-icon">⌖</span>ردیابی</button>
+          <button className="nav-item" disabled title="جست‌وجوی ممیزی یکپارچه هنوز API ندارد؛ تاریخچه‌ها داخل پنل هر دامنه هستند"><span className="nav-icon">▤</span>گزارش ممیزی</button>
+          <div className="nav-divider">ابزارهای داخلی عملیات</div>
+          <button className={`nav-item ${viewMode === 'sla' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon">!</span>استثناهای SLA</button>
+          <button className={`nav-item ${viewMode === 'presence' ? 'active' : ''}`} onClick={() => switchView('presence')}><span className="nav-icon">●</span>حضور پیک‌ها</button>
+          <button className={`nav-item ${viewMode === 'admissions' ? 'active' : ''}`} onClick={() => switchView('admissions')}><span className="nav-icon">▤</span>پذیرش</button>
           <button className={`nav-item ${viewMode === 'workers' ? 'active' : ''}`} onClick={() => switchView('workers')}><span className="nav-icon">⚙</span>سلامت پردازش‌ها</button>
-          <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon">↻</span>وب‌هوک‌های خروجی</button>
-          <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon">⚖</span>سیاست‌ها و پیکربندی</button>
-          <button className={`nav-item ${viewMode === 'admissions' ? 'active' : ''}`} onClick={() => switchView('admissions')}><span className="nav-icon">▤</span>پذیرش مونو</button>
-          <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon">＋</span>راه‌اندازی مشتری و شعب</button>
-          <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon">◉</span>زون‌ها و ظرفیت</button>
-          <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon">▤</span>بررسی کرایه</button>
         </nav>
         <div className="sidebar-footer"><span className="online-dot" />نسخهٔ عملیاتی داخلی</div>
       </aside>
@@ -1009,7 +1032,7 @@ export default function App() {
             <span className={`system-pill ${connected ? 'is-online' : ''}`}><i />{connected ? 'اتصال به API برقرار است' : 'اتصال برقرار نیست'}</span>
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
-          <div className="page-heading"><h1>{viewMode === 'policies' ? 'سیاست‌ها و پیکربندی' : viewMode === 'onboarding' ? 'راه‌اندازی مشتری و شعب' : viewMode === 'admissions' ? 'پذیرش مونو' : 'مرکز کنترل عملیات'}</h1><p>{viewMode === 'dispatch' ? 'صف مأموریت‌های در انتظار تخصیص پیک' : viewMode === 'missions' ? 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده' : viewMode === 'couriers' ? 'فهرست و سوابق اعتماد پیک‌ها' : viewMode === 'presence' ? 'وضعیت آنلاین/آفلاین و آخرین زمان ثبت حضور' : viewMode === 'issues' ? 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها' : viewMode === 'finance' ? 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت'  : viewMode === 'sla' ? 'مأموریت‌های فعال نزدیک موعد یا عبورکرده از SLA'  : viewMode === 'workers' ? 'وضعیت workerهای پردازش در همین نمونهٔ API' : viewMode === 'webhooks' ? 'پایش صف تحویل و بررسی تلاش‌های ارسال webhook' : viewMode === 'policies' ? 'ثبت و بررسی نسخه‌های سیاست با دسترسی مدیر Mono' : viewMode === 'onboarding' ? 'ثبت و بررسی مشتری‌ها و شعب با مجوز مدیر و سابقهٔ ممیزی API' : viewMode === 'admissions' ? 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها' : 'برنامهٔ ظرفیت زون‌ها و تحلیل پیک‌ها'}</p></div>
+          <div className="page-heading"><h1>{panelTitles[viewMode]}</h1><p>{panelDescriptions[viewMode]}</p></div>
         </header>
 
         {!token && <section className="connect-card">

@@ -19,11 +19,11 @@ An endpoint alone does not complete a panel. Figma sample data is not production
 
 | Panel | Unique designed screens | Current repository coverage |
 |---|---:|---|
-| Operations Console | 18 | Several partial operational workbenches; 5 additional product-aligned screens/states were added to Figma during this review. |
-| Onboarding Console | 6 | **UI partial:** API-backed customer and branch onboarding workbench now covers customer queue, registration, activation, branch registration/editing and audit. Courier review and document verification remain absent. |
-| Courier App | 16 | No courier mobile app UI; several mission, presence, issue, and finance APIs exist. |
-| Merchant Dashboard | 15 | Core delivery and branch-read flows exist; settings, access, billing and configuration are absent or partial. |
-| Merchant Mobile | 15 | No mobile app UI; 6 system-state variants are separately designed. |
+| Operations Console | 18 | API-backed workbenches cover dispatch, missions, couriers, capacity, SLA, fare review, issues, workers, webhook deliveries, policies and customer/branch onboarding. Several designed screens remain partial or have no matching API. Navigation and shell were aligned to Figma in the current panel-parity branch. |
+| Onboarding Console | 6 | **UI partial:** API-backed customer and branch onboarding workbench covers customer queue, registration, activation, branch registration/editing and audit. Courier review, secure document verification and onboarding tracking remain absent. |
+| Courier App | 16 | A hosted static interaction demo covers the designed mission states; it is not the authenticated courier product app and does not call the production API. Mission, presence, issue, and finance APIs exist in parts. |
+| Merchant Dashboard | 15 | Delivery and branch-read flows exist. PR #258 adds navigation and setup screens for settings, access, billing and integrations, but unsupported operations remain unconnected until their APIs exist. |
+| Merchant Mobile | 15 | A basic mobile-oriented web shell exists for home, deliveries, create, notifications and branch/account entry. The remaining designed profile, finance, support, preferences and security flows are not complete. Six system-state variants are separately designed. |
 | **Total** | **70** | Plus 6 system-state variants and prototype duplicates. |
 
 Merchant Mobile prototype copies are duplicates, not additional unique screens. The former incoming-call reference frame has been converted into the Mono Operations Console caller-context flow; it is counted as a screen, with telephony integration explicitly marked as an external dependency. The caller flow now covers recognized, unmatched, and multiple-active-order states.
@@ -153,6 +153,16 @@ A screen is complete only when designed states/actions are accounted for; its AP
 ## Review boundary
 
 This is a Figma/repository inventory, not pixel-level visual QA or release approval. It does not certify every Figma interaction/variant, and it does not approve external provider, financial, identity or document-verification choices. No Stage or Production claim is made.
+
+## Panel synchronization update — 2026-10-31
+
+- The Operations Console shell now uses the Figma teal navigation rail, matching desktop width/background, the Figma panel names and a page-specific heading/description for every implemented view. Existing useful operational workbenches remain reachable under the corresponding product areas: dispatch, missions, courier presence, SLA, support, capacity, standards, onboarding, finance and integrations.
+- These labels do not imply that every Figma screen is complete. Route control, live GPS tracking, vehicle inventory, a unified cross-domain audit search, and telephony caller context still require their own authoritative APIs/providers or additional UI. Customer and policy audit views remain scoped to their current domain workbenches.
+- The Onboarding Console remains a set of API-backed admissions and customer/branch workbenches inside Operations. Its Figma concepts for courier document review and onboarding tracking cannot be completed safely with the current API contracts.
+- Merchant Dashboard settings navigation is available for review in [PR #258](https://github.com/mahdimarzooghi4-debug/mono-logistic/pull/258). It is a UI scaffold, not a claim that billing, workspace persistence, members, notification preferences, webhook endpoint setup, or branch creation are backed by APIs.
+- The mobile shell and courier demo are separate review artifacts. The merchant mobile shell has only its currently implemented views; the courier demo uses sample data and local interactions. Neither completes the corresponding authenticated mobile product.
+
+The Operations Console TypeScript/Vite production build and its 15 tests passed after the shell update. This is a code/build check, not a pixel-level verification of every Figma frame.
 
 ## Implementation update — 2026-10-21
 
