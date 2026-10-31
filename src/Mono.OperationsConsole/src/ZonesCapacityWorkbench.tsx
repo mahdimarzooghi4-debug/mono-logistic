@@ -127,18 +127,18 @@ export default function ZonesCapacityWorkbench({ token, onConnected }: Props) {
   const maxScale = Math.max(1, ...((projection?.buckets || []).map((item) => item.planned_courier_count)))
 
   return <div className="zones-capacity-workbench">
-    <header className="zones-page-heading"><div><h1>مناطق و ظرفیت</h1><p>کنترل محدوده‌های عملیاتی، ظرفیت برنامه‌ریزی‌شده و ریسک کمبود پیک</p></div><div className="zones-heading-actions"><button className="secondary-button" disabled title="تعریف زون از این پنل پشتیبانی نمی‌شود؛ ابتدا snapshot هندسه باید ثبت و تأیید شود.">تعریف محدوده</button><button className="primary-button" onClick={() => document.getElementById('zone-capacity-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>برنامه‌ریزی ظرفیت</button></div></header>
+    <header className="zones-page-heading"><div><h1>مناطق و ظرفیت</h1><p>کنترل Micro-zoneها، تقاضا، ظرفیت مؤثر شبکه و ریسک کمبود پیک</p></div><div className="zones-heading-actions"><button className="secondary-button" disabled title="تعریف زون از این پنل پشتیبانی نمی‌شود؛ ابتدا snapshot هندسه باید ثبت و تأیید شود.">تعریف محدوده</button><button className="primary-button" onClick={() => document.getElementById('zone-capacity-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>برنامه ظرفیت</button></div></header>
     <section className="zones-kpis" aria-label="خلاصهٔ مناطق و ظرفیت">
-      <article><small>زون‌های ثبت‌شده</small><strong>{token ? fa.format(catalog.length) : '—'}</strong><span>از کاتالوگ هندسهٔ API</span></article>
-      <article><small>محدوده‌های فعال</small><strong>{token ? fa.format(catalog.filter((zone) => zone.isActive).length) : '—'}</strong><span>هندسهٔ فعال و تأییدشده</span></article>
-      <article><small>ظرفیت برنامه‌ریزی‌شده</small><strong>{projection ? fa.format(plannedPeak) : '—'}</strong><span>بیشینهٔ پیک در گام انتخابی</span></article>
-      <article><small>پنجره‌های کاری ثبت‌شده</small><strong>{projection ? fa.format(totalWindows) : '—'}</strong><span>در زون و بازهٔ انتخاب‌شده</span></article>
-      <article><small>پیک آنلاین</small><strong>—</strong><span>این صفحه آمار زندهٔ حضور را ندارد</span></article>
+      <article><small>مناطق فعال</small><strong>{token ? fa.format(catalog.filter((zone) => zone.isActive).length) : '—'}</strong><span>هندسهٔ فعال در کاتالوگ API</span></article>
+      <article><small>پیک آنلاین</small><strong>—</strong><span>آمار حضور شبکه در API این نما نیست</span></article>
+      <article><small>ظرفیت مؤثر</small><strong>—</strong><span>نیازمند تجمیع ظرفیت همهٔ زون‌ها</span></article>
+      <article><small>مناطق کم‌ظرفیت</small><strong>—</strong><span>شاخص ریسک شبکه موجود نیست</span></article>
+      <article><small>مأموریت بدون پوشش</small><strong>—</strong><span>در این API برگردانده نمی‌شود</span></article>
     </section>
     <div className="zones-workspace">
       <aside className="zones-directory panel-card">
         <header><h2>مناطق عملیاتی</h2><span>{token ? fa.format(visibleZones.length) : '—'} زون</span></header>
-        <input aria-label="جست‌وجوی منطقه یا شناسه" placeholder="جست‌وجوی منطقه یا شناسه" value={query} onChange={(event) => setQuery(event.target.value)} />
+        <input aria-label="جست‌وجوی شناسهٔ زون" placeholder="جست‌وجوی شناسهٔ زون" value={query} onChange={(event) => setQuery(event.target.value)} />
         {catalogError && <p className="zones-inline-error" role="alert">دریافت کاتالوگ زون ناموفق بود. برای فهرست واقعی زون‌ها توکن مدیر عملیات را وارد کنید.</p>}
         <div className="zones-list">{visibleZones.map((zone) => <button key={`${zone.zoneId}-${zone.geometryVersion}`} className={`zone-list-item ${zone.zoneId === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(zone.zoneId); setProjection(null); setWindows([]) }}>
           <span className={`zone-state ${zone.isActive ? 'active' : 'inactive'}`}>{zone.isActive ? 'فعال' : 'پیش‌نویس'}</span><strong dir="ltr">{zoneLabel(zone)}</strong><small>{zone.kind} · نسخهٔ {zone.geometryVersion}</small>
