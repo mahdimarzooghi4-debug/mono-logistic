@@ -16,7 +16,7 @@ describe('merchant portal delivery flow', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: 'مشاهدهٔ نسخهٔ نمایشی' }))
-    expect(screen.getByText('تمام داده‌ها ساختگی‌اند؛ هیچ درخواستی به API ارسال نمی‌شود.')).toBeInTheDocument()
+    expect(screen.getByText('محیط نمایشی · داده‌های ساختگی')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'داشبورد کسب‌وکار' })).toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: 'ارسال جدید' })[0])
