@@ -130,39 +130,40 @@ export default function RoutePlanWorkbench({ token, reloadKey, onConnected }: Pr
   }
 
   const stops = plan?.snapshot.orderedStops || []
-  const missionDeadlines = new Map((plan?.snapshot.missions || []).map((mission) => [mission.missionId, mission.committedDeliveryAt]))
 
   return <main className="route-control-workbench" dir="rtl">
-    <header className="route-control-header"><div className="route-control-title"><h2>کنترل مسیرها</h2><p>نمای مسیرهای ثبت‌شده، ترتیب توقف‌ها و وضعیت اطلاعات در دسترس</p></div><div className="route-control-actions"><button className="secondary-button" onClick={() => routeId && void load(routeId)} disabled={!token || !routeId || loading}>{loading ? 'در حال دریافت…' : 'تازه‌سازی'}</button><button className="primary-button" disabled title="API فعلی ایجاد مسیر را ارائه نمی‌کند">ایجاد مسیر</button><button className="secondary-button" disabled title="API فعلی بهینه‌سازی مسیر را ارائه نمی‌کند">بهینه‌سازی مسیر</button></div></header>
+    <header className="route-control-header"><div className="route-control-title"><h2>کنترل مسیرها</h2><p>نمای زندهٔ مسیرهای فعال، ترتیب توقف‌ها، ظرفیت و ریسک استاندارد</p></div><div className="route-control-actions"><button className="secondary-button" disabled title="API فهرست مسیرهای فعال را ارائه نمی‌کند">بهینه‌سازی مسیر</button><button className="primary-button" disabled title="API فعلی ایجاد مسیر را ارائه نمی‌کند">ایجاد مسیر</button></div></header>
     <section className="route-control-kpis" aria-label="خلاصهٔ مسیرها">
-      <article><span>مسیرهای فعال</span><strong>—</strong><small>فهرست مسیرها در API موجود نیست</small></article>
-      <article><span>مأموریت‌های این مسیر</span><strong>{plan ? fa.format(plan.snapshot.missions.length) : '—'}</strong><small>{plan ? 'از برنامهٔ ثبت‌شده' : 'پس از جست‌وجوی مسیر'}</small></article>
-      <article><span>مسیرهای در معرض خطر</span><strong>—</strong><small>شاخص شبکه در API موجود نیست</small></article>
-      <article><span>توقف‌های ثبت‌شده</span><strong>{plan ? fa.format(stops.length) : '—'}</strong><small>{plan ? 'در نسخهٔ جاری' : 'پس از جست‌وجوی مسیر'}</small></article>
-      <article><span>ظرفیت آزاد شبکه</span><strong>—</strong><small>ظرفیت شبکه در API موجود نیست</small></article>
+      <article><span>مسیرهای فعال</span><strong>—</strong></article>
+      <article><span>مأموریت‌های Batched</span><strong>—</strong></article>
+      <article><span>مسیرهای در معرض خطر</span><strong>—</strong></article>
+      <article><span>میانگین مأموریت در مسیر</span><strong>—</strong></article>
+      <article><span>ظرفیت آزاد شبکه</span><strong>—</strong></article>
     </section>
     <div className="route-control-layout">
       <aside className="route-list-panel queue-panel">
-        <div className="route-list-heading"><span className="route-count-pill">فهرست API ندارد</span><h3>مسیرهای فعال</h3></div>
+        <div className="route-list-heading"><span className="route-count-pill">— فعال</span><h3>مسیرهای فعال</h3></div>
         <form className="route-list-search" onSubmit={submit}>
-          <label htmlFor="route-plan-id" className="sr-only">شناسهٔ مسیر</label>
-          <input id="route-plan-id" value={routeIdDraft} onChange={(event) => setRouteIdDraft(event.target.value)} dir="ltr" maxLength={128} placeholder="شناسهٔ مسیر، مثل route_…" autoComplete="off" />
-          <button className="primary-button" disabled={!token || loading || !routeIdDraft.trim()}>{loading ? 'در حال دریافت…' : 'جست‌وجوی مسیر'}</button>
+          <label htmlFor="route-plan-id" className="sr-only">جست‌وجوی مسیر یا پیک</label>
+          <input id="route-plan-id" value={routeIdDraft} onChange={(event) => setRouteIdDraft(event.target.value)} dir="auto" maxLength={128} placeholder="جست‌وجوی مسیر یا پیک" autoComplete="off" />
+          <button className="primary-button" disabled={!token || loading || !routeIdDraft.trim()}>{loading ? 'در حال دریافت…' : 'جست‌وجو'}</button>
         </form>
         {error && <div className="onboarding-error route-inline-error" role="alert">{error}</div>}
-        {!token ? <p className="route-list-empty">برای خواندن مسیرها، ابتدا به API عملیات متصل شوید.</p> : <p className="route-list-empty">API فعلی فهرست مسیرها را ارائه نمی‌کند. شناسهٔ مسیر را وارد کنید تا برنامهٔ همان مسیر خوانده شود.</p>}
+        {!token ? <p className="route-list-empty">برای خواندن مسیرها، ابتدا به API عملیات متصل شوید.</p> : <p className="route-list-empty">فهرست مسیرهای فعال هنوز از API در دسترس نیست. می‌توانید شناسهٔ یک مسیر ثبت‌شده را جست‌وجو کنید.</p>}
         {plan && <button className="route-selected-card" aria-current="true" onClick={() => void load(plan.snapshot.routeId)} disabled={loading}><span className="route-status-pill">نسخهٔ {fa.format(plan.version)}</span><strong dir="ltr">{plan.snapshot.routeId}</strong><small>{fa.format(plan.snapshot.missions.length)} مأموریت · نقطهٔ شروع {plan.snapshot.startLocationId}</small></button>}
       </aside>
       <section className="route-detail-panel queue-panel">
         {plan ? <>
-          <header className="route-detail-heading"><div><h3 dir="ltr">{plan.snapshot.routeId}</h3><p>پیک: از API برنامه دریافت نمی‌شود · {fa.format(plan.snapshot.missions.length)} مأموریت · نقطهٔ شروع {plan.snapshot.startLocationId}</p></div><span className="route-status-pill">نسخهٔ {fa.format(plan.version)}</span></header>
+          <section className="route-summary-card"><header className="route-detail-heading"><div><h3 dir="ltr">{plan.snapshot.routeId}</h3><p>پیک: اطلاعات در API نیست · {fa.format(plan.snapshot.missions.length)} مأموریت · {fa.format(stops.length)} توقف</p></div><span className="route-status-pill">وضعیت مسیر: نامشخص</span></header><div className="route-metrics">
+            <div><span>پایان تخمینی</span><strong>—</strong></div><div><span>انحراف فعلی</span><strong>—</strong></div><div><span>ظرفیت استفاده‌شده</span><strong>—</strong></div><div><span>ریسک استاندارد</span><strong>—</strong></div>
+          </div></section>
           <div className="route-detail-overview">
-            <section className="route-map-placeholder" aria-label="نقشهٔ مسیر"><span className="route-map-icon">⌖</span><strong>نقشهٔ مسیر در دسترس نیست</strong><p>API فعلی مختصات توقف‌ها یا هندسهٔ مسیر را برنمی‌گرداند.</p><small>زمان شروع برنامه: {formatDate(plan.snapshot.startedAt)}</small></section>
-            <section className="route-optimization-card"><h3>فرصت بهینه‌سازی</h3><span className="route-status-pill muted">نیازمند API</span><p>برای پیشنهاد مسیر جایگزین، دادهٔ مختصات، ETA و عملیات بهینه‌سازی لازم است.</p><dl><div><dt>مأموریت‌های مسیر</dt><dd>{fa.format(plan.snapshot.missions.length)}</dd></div><div><dt>توقف‌های ثبت‌شده</dt><dd>{fa.format(stops.length)}</dd></div><div><dt>زمان کل مسیر</dt><dd>—</dd></div></dl><button disabled title="عملیات بهینه‌سازی در API فعلی پیاده‌سازی نشده است">بهینه‌سازی مسیر</button></section>
+            <section className="route-map-placeholder" aria-label="نقشهٔ مسیر"><span className="route-map-icon">⌖</span><strong>نقشهٔ مسیر</strong><p>مختصات توقف‌ها و موقعیت لحظه‌ای پیک در API موجود نیست.</p><small>شروع برنامه: {formatDate(plan.snapshot.startedAt)}</small></section>
+            <section className="route-optimization-card"><h3>فرصت بهینه‌سازی</h3><span className="route-status-pill muted">در دسترس نیست</span><p>پیشنهاد افزودن مأموریت پس از ارائهٔ دادهٔ مکان و API ارزیابی استاندارد فعال می‌شود.</p><dl><div><dt>مأموریت‌های مسیر</dt><dd>{fa.format(plan.snapshot.missions.length)}</dd></div><div><dt>توقف‌های ثبت‌شده</dt><dd>{fa.format(stops.length)}</dd></div><div><dt>اثر بر زمان مسیر</dt><dd>—</dd></div></dl><button disabled title="API ارزیابی و افزودن مأموریت به مسیر موجود نیست">افزودن به مسیر</button></section>
           </div>
-          <section className="route-stop-section"><header><div><h3>ترتیب توقف‌ها</h3><p>نسخهٔ ثبت‌شدهٔ برنامهٔ مسیر</p></div><span className="route-status-pill muted">{fa.format(stops.length)} توقف</span></header><div className="table-wrap"><table><thead><tr><th>وضعیت اجرا</th><th>موعد تحویل</th><th>زمان آماده‌بودن دریافت</th><th>شناسهٔ مکان</th><th>مأموریت</th><th>نوع توقف</th><th>ترتیب</th></tr></thead><tbody>
+          <section className="route-stop-section"><header><div><h3>ترتیب توقف‌ها</h3><p>نسخهٔ ثبت‌شدهٔ برنامهٔ مسیر</p></div><span className="route-status-pill muted">{fa.format(stops.length)} توقف</span></header><div className="table-wrap"><table><thead><tr><th>ترتیب</th><th>نوع</th><th>مأموریت</th><th>مکان</th><th>ETA</th><th>استاندارد خدمت</th><th>وضعیت</th></tr></thead><tbody>
             {stops.map((stop, index) => <tr key={`${index}-${stop.missionId}-${stop.locationId}`}>
-              <td>از API دریافت نمی‌شود</td><td>{formatDate(missionDeadlines.get(stop.missionId))}</td><td>{formatDate(stop.pickupReadyAt)}</td><td dir="ltr">{stop.locationId}</td><td dir="ltr">{stop.missionId}</td><td>{stop.kind === 0 || stop.kind === 'Pickup' ? 'دریافت' : 'تحویل'}</td><td>{fa.format(index + 1)}</td>
+              <td>{fa.format(index + 1)}</td><td>{stop.kind === 0 || stop.kind === 'Pickup' ? 'دریافت' : 'تحویل'}</td><td dir="ltr">{stop.missionId}</td><td dir="ltr">{stop.locationId}</td><td>—</td><td>—</td><td>از API دریافت نمی‌شود</td>
             </tr>)}
             {stops.length === 0 && <tr><td colSpan={7} className="state-cell">برای این نسخه توقفی ثبت نشده است.</td></tr>}
           </tbody></table></div></section>
