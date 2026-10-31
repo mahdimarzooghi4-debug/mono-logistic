@@ -300,3 +300,76 @@ tbody tr:hover { background: #fbfdfd; }
   .dashboard-summary-strip .kpi-card:nth-child(odd)::after { display: none; }
   .dashboard-summary-strip .kpi-card:nth-child(even)::after { top: 10px; height: 42px; }
 }
+
+/* Operations overview — two-column composition from Figma node 72:4. */
+.operations-overview-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  direction: ltr;
+}
+.operations-overview-aside { display: grid; gap: 16px; direction: rtl; }
+.operations-overview-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.operations-overview-card > header {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid #edf1f2;
+}
+.operations-overview-card > header strong { color: #34474e; font-size: 12px; }
+.action-overview-card > header > span { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; background: #fff0ee; color: #c34b42; font-size: 10px; }
+.overview-action-list { display: grid; padding: 4px 12px 8px; }
+.overview-action-list button {
+  display: flex;
+  min-height: 45px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 4px;
+  border: 0;
+  border-bottom: 1px solid #f0f3f4;
+  background: transparent;
+  color: inherit;
+  text-align: right;
+}
+.overview-action-list button:last-child { border-bottom: 0; }
+.overview-action-list button:disabled { cursor: not-allowed; opacity: .62; }
+.overview-action-list button > span { display: grid; min-width: 0; gap: 3px; }
+.overview-action-list button strong { font-size: 10px; }
+.overview-action-list button small { color: #839096; font-size: 8px; }
+.overview-action-list button > b { min-width: 28px; color: #a43c37; font-size: 12px; text-align: left; }
+.capacity-overview-card { min-height: 222px; }
+.capacity-overview-card > header { min-height: 48px; border-bottom: 0; }
+.capacity-overview-card > header button,.capacity-overview-empty button { border: 0; background: transparent; color: #087e95; font-size: 9px; font-weight: 700; }
+.capacity-overview-empty { display: grid; justify-items: center; padding: 15px 16px; text-align: center; }
+.capacity-overview-empty > span { display: grid; width: 32px; height: 32px; place-items: center; margin-bottom: 7px; border-radius: 50%; background: #eef8fa; color: #087e95; font-size: 16px; }
+.capacity-overview-empty strong { color: #465960; font-size: 9px; }
+.capacity-overview-empty p { margin: 6px 0; color: #829096; font-size: 8px; line-height: 1.8; }
+.operations-primary-card { min-height: 749px; direction: rtl; }
+.overview-updated-at { color: #75848a; font-size: 9px; white-space: nowrap; }
+.create-mission-action { height: 35px; padding: 0 12px; font-size: 9px; }
+.create-mission-action:disabled { cursor: not-allowed; opacity: .55; }
+@media (max-width: 1050px) {
+  .operations-overview-layout { grid-template-columns: 245px minmax(0, 1fr); gap: 14px; }
+  .overview-updated-at { display: none; }
+}
+@media (max-width: 850px) {
+  .operations-overview-layout { grid-template-columns: 1fr; }
+  .operations-overview-aside { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .operations-primary-card { min-height: 560px; }
+}
+@media (max-width: 560px) {
+  .operations-overview-aside { grid-template-columns: 1fr; }
+  .operations-primary-card { min-height: 420px; }
+  .create-mission-action { display: none; }
+}
