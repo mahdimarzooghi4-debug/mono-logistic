@@ -998,9 +998,6 @@ export default function App() {
   const panelDescriptions: Record<typeof viewMode, string> = {
     dispatch: 'صف مأموریت‌های در انتظار تخصیص پیک', missions: 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده', routes: 'برنامهٔ مسیر و ترتیب توقف‌های ذخیره‌شده؛ بدون نقشه و موقعیت زنده', audit: 'بررسی سابقهٔ قابل‌دسترسی هر دامنه از APIهای مستقل',
     couriers: 'وضعیت اعتماد، تخصیص، محدوده و آمادگی عملیاتی پیک‌ها', zones: 'ظرفیت برنامه‌ریزی‌شده و پنجره‌های کاری زون',
-Warning: truncated output (original token count: 7848)
-Total output lines: 200
-
     finance: 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت', sla: 'مأموریت‌های نزدیک موعد یا عبورکرده از SLA',
     presence: 'وضعیت آنلاین یا آفلاین و آخرین زمان ثبت حضور',
     issues: 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها',
@@ -1100,7 +1097,30 @@ Total output lines: 200
                 <dl className="worker-details">
                   <div><dt>تنظیم فعال</dt><dd>{worker.enabled ? 'بله' : 'خیر'}</dd></div>
                   <div><dt>آخرین تلاش</dt><dd>{formatDate(worker.last_attempt_at)}</dd></div>
-                  <div><dt>آخرین موفقیت</dt><dd>{formatDate(worker.la…848 tokens truncated…tton>
+                  <div><dt>آخرین موفقیت</dt><dd>{formatDate(worker.last_success_at)}</dd></div>
+                  <div><dt>آخرین batch</dt><dd>{fa.format(worker.last_batch_claimed ?? worker.last_batch_candidates ?? 0)}</dd></div>
+                </dl>
+                <div className="worker-counts"><span>کل batchها <strong>{fa.format(worker.total_batches)}</strong></span><span>موفق <strong>{fa.format(worker.successful_batches)}</strong></span><span>ناموفق <strong>{fa.format(worker.failed_batches)}</strong></span></div>
+              </> : <p className="modal-state">برای دریافت وضعیت، صفحه را تازه‌سازی کنید.</p>}
+              <code dir="ltr">{endpoint}</code>
+            </article>
+          })}
+        </section>}
+        {viewMode === 'webhooks' && <div className="webhook-dashboard">
+          {webhookSummary && <section className="kpi-grid" aria-label="خلاصهٔ سراسری صف webhook">
+            <article className="kpi-card"><span className="kpi-icon cyan">↻</span><div><small>کل تحویل‌ها</small><strong>{fa.format(webhookSummary.total_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>موعد ارسال</small><strong>{fa.format(webhookSummary.due_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>قفل منقضی</small><strong>{fa.format(webhookSummary.stale_lease_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon blue">▤</span><div><small>Dead-letter در ۲۴ ساعت</small><strong>{fa.format(webhookSummary.dead_lettered_last_24_hours)}</strong></div></article>
+          </section>}
+          {webhookSummary && <p className="data-note">خلاصهٔ کل صف، مبنای مشاهده: {formatDate(webhookSummary.observed_at)} · باز: {fa.format(webhookSummary.pending_count + webhookSummary.in_progress_count + webhookSummary.retrying_count)} · موفق: {fa.format(webhookSummary.succeeded_count)} · لغوشده: {fa.format(webhookSummary.cancelled_count)} · قدیمی‌ترین کار باز: {formatDate(webhookSummary.oldest_open_delivery_at)}</p>}
+          {Object.entries(webhookErrors).filter(([, message]) => message).map(([key, message]) => <div className="webhook-inline-error" role="alert" key={key}>{key === 'summary' ? 'خلاصهٔ صف' : key === 'list' ? 'فهرست تحویل‌ها' : 'audit'}: {message}</div>)}
+          {webhookActionMessage && <div className="availability-write-success" role="status">{webhookActionMessage}</div>}
+          <section className="queue-panel webhook-panel">
+            <div className="panel-heading"><div><span className="eyebrow">پایش وب‌هوک خروجی</span><h2>تحویل‌ها و تاریخچهٔ عملیات</h2></div><span className="panel-meta">محتوای payload، URL مقصد و secret نمایش داده نمی‌شود</span></div>
+            <div className="webhook-tabs" role="tablist" aria-label="نمای وب‌هوک">
+              <button type="button" className={webhookTab === 'deliveries' ? 'active' : ''} onClick={() => setWebhookTab('deliveries')}>تحویل‌ها</button>
+              <button type="button" className={webhookTab === 'credentials' ? 'active' : ''} onClick={() => setWebhookTab('credentials')}>کلیدهای API</button>
               <button type="button" className={webhookTab === 'audit' ? 'active' : ''} onClick={() => setWebhookTab('audit')}>سوابق عملیات</button>
             </div>
             {webhookTab === 'deliveries' ? <>
@@ -1178,9 +1198,6 @@ Total output lines: 200
             <label><span className="sr-only">ترتیب</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="delivery_due">نزدیک‌ترین موعد</option><option value="created_at">جدیدترین مأموریت</option></select></label>
             <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال فیلتر</button>
           </form> : viewMode === 'missions' ? <form className="filters mission-filters" onSubmit={applyFilters}>
-Warning: truncated output (original token count: 8654)
-Total output lines: 179
-
             <label className="search-field"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="شناسه مأموریت، درخواست یا مرجع سفارش" /></label>
             <label>از تاریخ<input type="datetime-local" value={createdAfter} onChange={(event) => setCreatedAfter(event.target.value)} /></label>
             <label>تا تاریخ<input type="datetime-local" value={createdBefore} onChange={(event) => setCreatedBefore(event.target.value)} /></label>
@@ -1243,7 +1260,62 @@ Total output lines: 179
                 {!loading && (viewMode === 'dispatch' ? items.length === 0 : viewMode === 'missions' ? missionItems.length === 0 : viewMode === 'issues' ? issueItems.length === 0 : viewMode === 'presence' ? presenceItems.length === 0 : viewMode === 'couriers' ? courierItems.length === 0 : viewMode === 'finance' ? financeItems.length === 0 : viewMode === 'sla' ? slaItems.length === 0 : !availabilityPage?.items.length) && <tr><td colSpan={viewMode === 'finance' ? 10 : viewMode === 'sla' ? 7 : viewMode === 'presence' ? 5 : 8} className="state-cell"><span className="empty-icon">⌕</span><strong>{token ? viewMode === 'zones' && !availabilityPage ? 'زون و بازه را وارد و محاسبه کنید' : 'رکوردی در این صفحه پیدا نشد' : 'برای شروع، به API متصل شوید'}</strong><small>{token ? 'صفحه را تازه کنید یا به صفحهٔ قبل برگردید.' : 'هیچ دادهٔ نمونه‌ای در این صفحه نمایش داده نمی‌شود.'}</small></td></tr>}
                 {!loading && viewMode === 'dispatch' && items.map((mission) => <tr key={mission.missionId}>
                   <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong>{mission.deliveryOverdue && <span className="badge danger">موعد گذشته</span>}</td>
-                  <td><span className="cell-primary" dir="ltr">{mission.customerId}…1654 tokens truncated…yPage?.items.map((window) => <tr key={window.window_id}>
+                  <td><span className="cell-primary" dir="ltr">{mission.customerId}</span><span className="cell-secondary" dir="ltr">{mission.branchId}</span></td>
+                  <td>{formatDate(mission.createdAt)}</td>
+                  <td><span className="cell-primary">{formatDate(mission.committedDeliveryAt)}</span><span className={`badge ${mission.deliveryWindowState === 'overdue' ? 'danger' : mission.deliveryWindowState === 'due_now' ? 'warning' : 'neutral'}`}>{statusLabel(mission.deliveryWindowState)}</span></td>
+                  <td><span className="cell-primary">{fa.format(mission.attemptCount)} تلاش</span><span className="cell-secondary">{mission.latestAttempt?.action || mission.latestAttempt?.outcome || 'بدون تلاش ثبت‌شده'}</span></td>
+                  <td>{mission.activeOffer ? <><span className="cell-primary" dir="ltr">{mission.activeOffer.courierId || mission.activeOffer.offerId || 'پیشنهاد فعال'}</span><span className={`badge ${mission.activeOffer.deadlinePassed ? 'danger' : 'success'}`}>{mission.activeOffer.deadlinePassed ? 'مهلت پاسخ گذشته' : `مهلت ${formatDate(mission.activeOffer.expiresAt)}`}</span></> : <span className="cell-secondary">پیشنهادی فعال ندارد</span>}</td>
+                  <td><button className="history-button" onClick={() => void showMissionDetails(mission.missionId)}>جزئیات</button></td>
+                </tr>)}
+                {!loading && viewMode === 'missions' && missionItems.map((mission) => <tr key={mission.missionId}>
+                  <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong></td>
+                  <td><span className="cell-primary" dir="ltr">{mission.customerId}</span></td>
+                  <td><span className="cell-primary" dir="ltr">{mission.deliveryRequestId}</span></td>
+                  <td><span className="badge neutral">{mission.status}</span></td>
+                  <td>{formatDate(mission.committedDeliveryAt)}</td>
+                  <td>{formatDate(mission.createdAt)}</td>
+                  <td><button className="history-button" onClick={() => void showMissionDetails(mission.missionId)}>جزئیات</button></td>
+                </tr>)}
+                {!loading && viewMode === 'sla' && slaItems.map((alert) => <tr key={alert.mission_id}>
+                  <td><strong className="mission-id" dir="ltr">{alert.mission_id}</strong></td>
+                  <td dir="ltr">{alert.customer_id}</td>
+                  <td><span className="badge neutral">{alert.status}</span></td>
+                  <td>{formatDate(alert.committed_delivery_at)}</td>
+                  <td dir="ltr">{alert.courier_id || <span className="cell-secondary">تخصیص پذیرفته‌شده ندارد</span>}</td>
+                  <td><span className={`badge ${alert.is_overdue ? 'danger' : 'warning'}`}>{alert.is_overdue ? 'از موعد گذشته' : new Date(alert.committed_delivery_at) <= new Date(slaEvaluatedAt || '') ? 'موعد رسیده' : 'نزدیک موعد'}</span></td>
+                  <td><button className="history-button" onClick={() => void showMissionDetails(alert.mission_id)}>جزئیات</button></td>
+                </tr>)}
+                {!loading && viewMode === 'issues' && issueItems.map((issue) => <tr key={issue.report_id}>
+                  <td><strong className="mission-id" dir="ltr">{issue.report_id}</strong></td>
+                  <td><span className="cell-primary mission-id" dir="ltr">{issue.mission_id}</span></td>
+                  <td dir="ltr">{issue.courier_id}</td><td>{issueCodeLabel(issue.issue_code)}</td>
+                  <td><span className={`badge ${issue.status === 'OPEN' ? 'warning' : 'success'}`}>{issue.status === 'OPEN' ? 'باز' : 'رسیدگی‌شده'}</span></td>
+                  <td>{formatDate(issue.reported_at)}</td><td>{formatDate(issue.updated_at)}</td>
+                  <td><button className="history-button" onClick={() => void showMissionDetails(issue.mission_id)}>جزئیات مأموریت</button></td>
+                </tr>)}
+                {!loading && viewMode === 'presence' && presenceItems.map((courier) => <tr key={courier.courier_id}>
+                  <td><strong className="mission-id" dir="ltr">{courier.courier_id}</strong></td>
+                  <td><span className={`badge ${courier.status === 'ONLINE' ? 'success' : 'neutral'}`}>{courier.status === 'ONLINE' ? 'آنلاین' : 'آفلاین'}</span></td>
+                  <td dir="ltr">{courier.zone_id || '—'}</td><td>{formatDate(courier.updated_at)}</td>
+                  <td><button className="history-button" onClick={() => void showCourierDetails(courier.courier_id)}>جزئیات پیک</button></td>
+                </tr>)}
+                {!loading && viewMode === 'couriers' && courierItems.map((courier) => <tr key={courier.courier_id}>
+                  <td><strong className="mission-id" dir="ltr">{courier.courier_id}</strong></td>
+                  <td><span className="cell-primary" dir="ltr">{courier.mode}</span></td>
+                  <td><span className={`badge ${courier.status === 'ACTIVE' ? 'success' : 'neutral'}`}>{courier.status}</span></td>
+                  <td dir="ltr">{courier.preferred_zone_ids.join('، ') || '—'}</td><td dir="ltr">{courier.approved_zone_ids.join('، ') || '—'}</td>
+                  <td dir="ltr">{courier.primary_zone_id || '—'}</td><td>{formatDate(courier.updated_at)}</td>
+                  <td><button className="history-button" onClick={() => void showCourierDetails(courier.courier_id)}>جزئیات</button></td>
+                </tr>)}
+                {!loading && viewMode === 'finance' && financeItems.map((row) => <tr key={row.mission_id}>
+                  <td><strong className="mission-id" dir="ltr">{row.mission_id}</strong><span className="cell-secondary" dir="ltr">{row.delivery_request_id}</span></td>
+                  <td><span className="badge neutral">{row.status}</span></td>
+                  <td><span className="cell-primary" dir="ltr">{row.quote_id}</span><span className="cell-secondary">نسخهٔ {fa.format(row.quote_version)}</span></td>
+                  <td>{fa.format(row.distance_meters)} متر</td><td>{fa.format(row.fare_toman)} تومان</td>
+                  <td>{fa.format(row.buyer_share_toman)} تومان</td><td>{fa.format(row.seller_share_toman)} تومان</td>
+                  <td>{fa.format(row.mono_commission_estimate_toman)} تومان</td><td>{fa.format(row.commission_vat_estimate_toman)} تومان</td><td>{fa.format(row.courier_net_estimate_toman)} تومان</td>
+                </tr>)}
+                {!loading && viewMode === 'zones' && availabilityPage?.items.map((window) => <tr key={window.window_id}>
                   <td><strong className="mission-id" dir="ltr">{window.window_id}</strong></td><td dir="ltr">{window.courier_id}</td><td dir="ltr">{window.zone_id}</td>
                   <td>{formatDate(window.starts_at)}</td><td>{formatDate(window.ends_at)}</td><td><span className={`badge ${window.status === 'SCHEDULED' ? 'success' : 'neutral'}`}>{window.status}</span></td><td dir="ltr">{window.created_by}</td><td>{formatDate(window.created_at)}</td>
                   <td>{window.status === 'SCHEDULED' ? <button className="history-button" onClick={() => { setCancelWindowId(window.window_id); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('') }}>لغو</button> : <span className="cell-secondary">—</span>}</td>
