@@ -38,4 +38,34 @@ describe('API key inventory workbench', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('دسترسی مدیر عملیات تأیید نشد')
     expect(screen.queryByText(/برای این مشتری کلیدی ثبت نشده/)).not.toBeInTheDocument()
   })
+
+  it('requires a reason and confirmation before revoking a key, then reloads authoritative status', async () => {
+    let revokedAt: string | null = null
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer admin-token')
+      if (url.endsWith('/revoke') && init?.method === 'POST') {
+        expect(JSON.parse(String(init.body))).toEqual({ reason: 'اعتبار امنیتی پایان یافت' })
+        revokedAt = '2026-10-31T11:00:00Z'
+        return new Response(JSON.stringify({ keyId: 'key_1', customerId: 'cus_example', revokedAt }), { status: 200 })
+      }
+      if (url.endsWith('/api-keys')) return new Response(JSON.stringify({ apiKeys: [{ keyId: 'key_1', customerId: 'cus_example', scopes: ['deliveries:write'], createdAt: '2026-10-20T10:00:00Z', expiresAt: '2027-10-20T10:00:00Z', revokedAt }] }), { status: 200 })
+      throw new Error(`Unexpected request ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<ApiKeyWorkbench token="admin-token" />)
+    await user.type(screen.getByLabelText('شناسهٔ مشتری'), 'cus_example')
+    await user.click(screen.getByRole('button', { name: 'نمایش کلیدها' }))
+    await user.click(await screen.findByRole('button', { name: 'لغو کلید' }))
+    const confirm = screen.getByRole('button', { name: 'تأیید لغو کلید' })
+    expect(confirm).toBeDisabled()
+    await user.type(screen.getByLabelText('دلیل ممیزی‌شده'), 'اعتبار امنیتی پایان یافت')
+    expect(confirm).toBeEnabled()
+    await user.click(confirm)
+    expect(await screen.findByRole('status')).toHaveTextContent('لغو شد و رویداد ممیزی ثبت شد')
+    expect(await screen.findByText('لغوشده')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'لغو کلید' })).not.toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith('/api-keys/key_1/revoke') && init?.method === 'POST')).toBe(true)
+  })
 })
