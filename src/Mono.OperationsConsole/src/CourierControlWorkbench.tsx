@@ -21,30 +21,29 @@ type Props = {
 }
 
 export default function CourierControlWorkbench(props: Props) {
-  const active = props.couriers.filter((courier) => courier.status === 'ACTIVE').length
   const selected = props.couriers.find((courier) => courier.courier_id === props.selectedCourierId)
   return <section className="courier-control-workbench" dir="rtl">
     <header className="courier-control-header">
-      <div><h2>کنترل پیک‌ها</h2><p>وضعیت اعتماد، تخصیص، محدوده و آمادگی عملیاتی پیک‌ها</p></div>
-      <div className="courier-control-actions"><button className="secondary-button" onClick={props.onRefresh} disabled={!props.token || props.loading}>تازه‌سازی</button><button className="secondary-button" onClick={props.onOpenZones}>مدیریت مناطق</button><button className="primary-button" onClick={props.onOpenAdmissions}>افزودن پیک</button></div>
+      <div><h2>کنترل پیک‌ها</h2><p>وضعیت زندهٔ شبکهٔ پیک‌ها، تخصیص، موقعیت، محدوده و آمادگی عملیاتی</p></div>
+      <div className="courier-control-actions"><button className="secondary-button" onClick={props.onOpenZones}>مدیریت مناطق</button><button className="primary-button" onClick={props.onOpenAdmissions}>افزودن پیک</button></div>
     </header>
 
-    <section className="courier-control-kpis" aria-label="خلاصهٔ پیک‌های همین صفحه">
-      <article><span>فعال در این صفحه</span><strong>{props.token ? fa.format(active) : '—'}</strong><small>بر اساس وضعیت اعتماد API</small></article>
-      <article><span>در مسیر فعال</span><strong>—</strong><small>مأموریت جاری از API پیک موجود نیست</small></article>
-      <article><span>در محل دریافت</span><strong>—</strong><small>رویداد دریافت از API پیک موجود نیست</small></article>
-      <article><span>مدارک نزدیک انقضا</span><strong>—</strong><small>تاریخ انقضای مدرک برگردانده نمی‌شود</small></article>
-      <article><span>غیرفعال / خارج از دسترس</span><strong>—</strong><small>وضعیت حضور از API فهرست پیک‌ها نمی‌آید</small></article>
+    <section className="courier-control-kpis" aria-label="خلاصهٔ شبکهٔ پیک‌ها">
+      <article><span>پیک‌های آنلاین</span><strong>—</strong></article>
+      <article><span>در مسیر فعال</span><strong>—</strong></article>
+      <article><span>در محل دریافت</span><strong>—</strong></article>
+      <article><span>مدارک نزدیک انقضا</span><strong>—</strong></article>
+      <article><span>غیرفعال / خارج از دسترس</span><strong>—</strong></article>
     </section>
 
     <div className="courier-control-layout">
       <aside className="courier-directory queue-panel">
-        <header><div><h3>پیک‌ها</h3><span className="courier-count-pill">{props.token ? `${fa.format(props.couriers.length)} در این صفحه` : 'دادهٔ API'}</span></div></header>
+        <header><div><span className="courier-count-pill">— آنلاین</span><h3>پیک‌ها</h3><button className="courier-list-refresh" onClick={props.onRefresh} disabled={!props.token || props.loading} aria-label="تازه‌سازی فهرست پیک‌ها">↻</button></div></header>
         <form className="courier-directory-search" onSubmit={props.onSearch}>
           <label className="sr-only" htmlFor="courier-search">جست‌وجوی پیک</label>
           <input id="courier-search" value={props.query} onChange={(event) => props.onQueryChange(event.target.value)} placeholder="جست‌وجو با پیشوند شناسهٔ پیک" dir="ltr" autoComplete="off" />
           <label className="sr-only" htmlFor="courier-trust-filter">وضعیت اعتماد</label>
-          <select id="courier-trust-filter" value={props.status} onChange={(event) => props.onStatusChange(event.target.value)}><option value="">همهٔ وضعیت‌ها</option><option value="REGISTERED">ثبت‌شده</option><option value="IDENTITY_VERIFIED">هویت تأییدشده</option><option value="DOCUMENTS_SUBMITTED">مدارک ارسال‌شده</option><option value="TRUST_REQUIREMENTS_VERIFIED">شرایط اعتماد تأییدشده</option><option value="MONO_APPROVED">تأییدشده توسط مونو</option><option value="ACTIVE">فعال</option></select>
+          <div className="courier-directory-filter-row"><select id="courier-trust-filter" value={props.status} onChange={(event) => props.onStatusChange(event.target.value)}><option value="">همهٔ وضعیت‌های اعتماد</option><option value="REGISTERED">ثبت‌شده</option><option value="IDENTITY_VERIFIED">هویت تأییدشده</option><option value="DOCUMENTS_SUBMITTED">مدارک ارسال‌شده</option><option value="TRUST_REQUIREMENTS_VERIFIED">شرایط اعتماد تأییدشده</option><option value="MONO_APPROVED">تأییدشده توسط مونو</option><option value="ACTIVE">فعال</option></select></div>
           <button className="secondary-button" type="submit" disabled={!props.token || props.loading}>جست‌وجو</button>
         </form>
         {props.error && <p className="courier-directory-error" role="alert">{props.error}</p>}
@@ -62,7 +61,7 @@ export default function CourierControlWorkbench(props: Props) {
 
       <section className="courier-profile queue-panel">
         {selected ? <>
-          <header className="courier-profile-header"><div><h3>{props.detail?.courier_id || selected.courier_id}</h3><p>{modeLabel(selected.mode)} · وضعیت اعتماد: {trustLabel(selected.status)} · آخرین تغییر {formatDate(selected.updated_at)}</p></div><span className={`courier-trust-pill ${selected.status === 'ACTIVE' ? 'active' : 'pending'}`}>{trustLabel(selected.status)}</span></header>
+          <section className="courier-summary-card"><header className="courier-profile-header"><div><h3>{props.detail?.courier_id || selected.courier_id}</h3><p>{modeLabel(selected.mode)} · وضعیت اعتماد: {trustLabel(selected.status)} · آخرین تغییر {formatDate(selected.updated_at)}</p></div><span className={`courier-trust-pill ${selected.status === 'ACTIVE' ? 'active' : 'pending'}`}>{trustLabel(selected.status)}</span></header><div className="courier-summary-metrics"><div><span>باتری دستگاه</span><strong>—</strong></div><div><span>مأموریت فعال</span><strong>—</strong></div><div><span>شیفت فعال</span><strong>—</strong></div><div><span>مسیر فعال</span><strong>—</strong></div></div></section>
           {props.detailErrors.length > 0 && <div className="courier-detail-errors" role="alert">{props.detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
           {props.detailLoading ? <p className="courier-detail-loading"><span className="spinner"/>در حال دریافت جزئیات و سوابق…</p> : <>
             <div className="courier-profile-overview">
@@ -81,7 +80,11 @@ export default function CourierControlWorkbench(props: Props) {
             </div>
             <details className="courier-audit-disclosure"><summary>سوابق اعتماد و دسترسی</summary><div className="courier-history-columns"><section><h4>تغییرات وضعیت اعتماد</h4>{props.detail?.trust_transitions.length ? <ol className="courier-transition-list">{props.detail.trust_transitions.map((event) => <li key={event.transition_id}><strong>{event.from_status} ← {event.to_status}</strong><small>{formatDate(event.occurred_at)} · {event.actor_id} · {event.reason_code}</small></li>)}</ol> : <p>تغییری در وضعیت اعتماد ثبت نشده است.</p>}</section><section><h4>سوابق خواندن پیک</h4>{props.audit.length ? <ul>{props.audit.map((event) => <li key={event.audit_id}>{event.action} · {event.actor_id} · {formatDate(event.occurred_at)}</li>)}</ul> : <p>سابقه‌ای برای نمایش برنگشت.</p>}</section></div></details>
           </>}
-        </> : <div className="courier-profile-empty"><span>⌖</span><h3>یک پیک را از فهرست انتخاب کنید</h3><p>اطلاعات واقعی پیک، محدوده‌های ثبت‌شده و سوابق اعتماد پس از انتخاب نمایش داده می‌شود.</p></div>}
+        </> : <>
+          <section className="courier-summary-card"><header className="courier-profile-header"><div><h3>پیک انتخاب‌شده</h3><p>برای مشاهدهٔ مشخصات، یک پیک از فهرست انتخاب کنید.</p></div><span className="courier-trust-pill">نامشخص</span></header><div className="courier-summary-metrics"><div><span>باتری دستگاه</span><strong>—</strong></div><div><span>مأموریت فعال</span><strong>—</strong></div><div><span>شیفت فعال</span><strong>—</strong></div><div><span>مسیر فعال</span><strong>—</strong></div></div></section>
+          <div className="courier-profile-overview"><section className="courier-map-empty"><span>⌖</span><strong>موقعیت زندهٔ پیک</strong><p>برای نمایش نقشه، مختصات GPS پیک لازم است.</p></section><section className="courier-current-job"><h4>کار جاری</h4><dl><div><dt>مسیر فعال</dt><dd>—</dd></div><div><dt>شعبهٔ بعدی</dt><dd>—</dd></div><div><dt>ETA</dt><dd>—</dd></div><div><dt>توقف‌ها</dt><dd>—</dd></div></dl><button disabled>باز کردن مسیر</button></section></div>
+          <div className="courier-profile-lower"><section className="courier-trust-card"><header><h4>صلاحیت، اعتماد و محدوده</h4><span className="courier-trust-pill">نامشخص</span></header><p className="courier-policy-note">اطلاعات صلاحیت و محدوده پس از انتخاب پیک نمایش داده می‌شود.</p></section><section className="courier-operations-card"><h4>عملکرد و کنترل عملیاتی</h4><div className="courier-metrics">{['پذیرش','تحویل به‌موقع','لغو پیک','میانگین دریافت'].map((label) => <article key={label}><small>{label}</small><strong>—</strong></article>)}</div><div className="courier-operational-state"><strong>وضعیت عملیاتی</strong><p>اطلاعات زنده پس از اتصال API در دسترس خواهد بود.</p></div><div className="courier-action-grid"><button disabled>تماس با پیک</button><button disabled>ارسال پیام</button><button disabled>مشاهده مدارک</button><button className="restrict-action" disabled>محدودسازی موقت</button></div></section></div>
+        </>}
       </section>
     </div>
   </section>
