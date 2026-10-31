@@ -169,3 +169,7 @@ The Operations Console TypeScript/Vite production build and its 19 tests passed 
 ## Implementation update — 2026-10-21
 
 The Operations Console now includes an API-backed customer/branch onboarding workbench. It covers the customer queue, Pending customer registration, reasoned customer activation, active-customer branch registration/editing, and customer/branch audit inspection. Customer creation does not issue API credentials. Document verification, courier onboarding review, and cross-entity onboarding analytics remain gaps.
+
+## Customer panel sync — 2026-10-31
+
+The Operations customer detail view now also reads the administrator-scoped API-key inventory and shows only key ID, scopes, creation/expiry and revocation timestamps. It never displays secret key material. The API does not expose customer order/SLA KPIs, delivery configuration, webhook health, or customer-associated missions in this panel, so those Figma details remain explicitly unimplemented. Credential issuance and revocation controls are also absent from this customer view; do not infer that activation creates credentials.
