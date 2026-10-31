@@ -41,7 +41,7 @@ type DeliveryDetail = DeliveryRequest & {
   promise: PromiseRecord | null
 }
 type ApiError = { error?: { code?: string; message?: string } }
-type View = 'dashboard' | 'deliveries' | 'create' | 'tracking' | 'branches'
+type View = 'dashboard' | 'deliveries' | 'create' | 'tracking' | 'branches' | 'billing' | 'settings' | 'branchAdd' | 'invite' | 'webhook'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dateTime = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' })
@@ -103,6 +103,7 @@ function App() {
   const [tokenDraft, setTokenDraft] = useState('')
   const [connected, setConnected] = useState(false)
   const [view, setView] = useState<View>('dashboard')
+  const [settingsTab, setSettingsTab] = useState<'integrations' | 'notifications' | 'members' | 'workspace' | 'branding'>('integrations')
   const [branches, setBranches] = useState<Branch[]>([])
   const [items, setItems] = useState<DeliveryRequest[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
@@ -300,6 +301,8 @@ function App() {
     { id: 'deliveries', label: 'ارسال‌ها', icon: '▤' },
     { id: 'tracking', label: 'رهگیری', icon: '⌖' },
     { id: 'branches', label: 'شعب', icon: '⌘' },
+    { id: 'billing', label: 'صورتحساب', icon: '◷' },
+    { id: 'settings', label: 'تنظیمات', icon: '⚙' },
   ]
 
   const titles: Record<View, { title: string; subtitle: string }> = {
@@ -308,6 +311,11 @@ function App() {
     create: { title: 'ثبت ارسال جدید', subtitle: 'ثبت درخواست شهری با اطلاعات مرسوله و مقصد' },
     tracking: { title: 'رهگیری ارسال', subtitle: 'مشاهدهٔ وضعیت و زمان تحویل ثبت‌شده برای یک شناسه' },
     branches: { title: 'شعب کسب‌وکار', subtitle: 'شعب فعال متصل به کلید API فعلی' },
+    billing: { title: 'صورتحساب', subtitle: 'هزینهٔ ارسال‌ها و تطبیق مالی کسب‌وکار' },
+    settings: { title: 'تنظیمات Workspace', subtitle: 'مدیریت هویت بصری، اعضا، اعلان‌ها و یکپارچه‌سازی' },
+    branchAdd: { title: 'افزودن شعبه', subtitle: 'ثبت مبدا جدید پس از آماده‌شدن API شعب' },
+    invite: { title: 'دعوت عضو جدید', subtitle: 'مدیریت دسترسی اعضای Workspace' },
+    webhook: { title: 'افزودن Webhook', subtitle: 'اتصال رویدادهای Mono به سیستم کسب‌وکار' },
   }
 
   return (
@@ -325,9 +333,7 @@ function App() {
               <span className="nav-icon" aria-hidden="true">{item.icon}</span>{item.label}
             </button>
           ))}
-          <p className="nav-caption secondary-caption">در برنامهٔ توسعه</p>
-          <button className="nav-item unavailable" disabled title="برای صورتحساب واقعی، سرویس مالی باید مشخص و متصل شود"><span className="nav-icon" aria-hidden="true">◷</span>صورتحساب <small>بعداً</small></button>
-          <button className="nav-item unavailable" disabled title="مدیریت تنظیمات حساب هنوز به API متصل نشده است"><span className="nav-icon" aria-hidden="true">⚙</span>تنظیمات <small>بعداً</small></button>
+          <p className="nav-caption secondary-caption">حساب کسب‌وکار</p>
         </nav>
         <div className="sidebar-footer"><span className={`status-dot ${connected ? 'on' : ''}`} />{connected ? 'متصل به API مونو' : 'هنوز متصل نشده'}</div>
       </aside>
@@ -447,10 +453,50 @@ function App() {
         )}
 
         {connected && view === 'branches' && (
-          <section className="panel"><div className="panel-heading"><div><span className="eyebrow">حساب مشتری</span><h2>شعب فعال</h2></div><span className="panel-meta">{fa.format(branches.length)} شعبه</span></div>
+          <section className="panel"><div className="panel-heading"><div><span className="eyebrow">حساب مشتری</span><h2>شعب فعال</h2></div><div className="panel-heading-actions"><span className="panel-meta">{fa.format(branches.length)} شعبه</span><button className="primary-button" onClick={() => setView('branchAdd')}>＋ افزودن شعبه</button></div></div>
             {branches.length ? <div className="branch-grid">{branches.map((branch) => <article className="branch-card" key={branch.branchId}><span className="branch-symbol">⌂</span><div><strong>{branch.name}</strong><p>{branch.address || 'نشانی ثبت نشده'}</p><small>{branch.zoneId ? `زون ${branch.zoneId}` : 'زون ثبت نشده'}</small></div><span className="badge success">فعال</span></article>)}</div> : <div className="empty-state"><span>⌂</span><strong>شعبهٔ فعالی ثبت نشده است</strong><small>فهرست فقط شامل شعب فعال برگشتی از API است.</small></div>}
           </section>
         )}
+
+        {connected && view === 'billing' && (
+          <section className="panel">
+            <div className="panel-heading"><div><span className="eyebrow">صورتحساب</span><h2>تطبیق مالی ارسال‌ها</h2></div><span className="panel-meta">سرویس مالی متصل نیست</span></div>
+            <div className="settings-summary-grid">
+              <article><small>صورتحساب باز</small><strong>—</strong></article><article><small>مبلغ قابل پرداخت</small><strong>—</strong></article><article><small>ارسال‌های دوره</small><strong>—</strong></article><article><small>پرداخت‌شده این ماه</small><strong>—</strong></article>
+            </div>
+            <div className="empty-state"><span>◷</span><strong>اطلاعات مالی از API صورتحساب در دسترس نیست</strong><small>مقادیر نمایشی فیگما عمداً به‌عنوان اطلاعات واقعی نمایش داده نمی‌شوند. برای تکمیل این صفحه، سرویس صورتحساب و خروجی CSV باید به API متصل شود.</small></div>
+          </section>
+        )}
+
+        {connected && view === 'settings' && (
+          <section className="panel settings-panel">
+            <div className="panel-heading"><div><span className="eyebrow">Workspace برند سپهر</span><h2>تنظیمات Workspace</h2></div><span className="panel-meta">دسترسی API محدود</span></div>
+            <p className="settings-intro">مدیریت هویت بصری، اعضا، اعلان‌ها و اتصال‌ها بر اساس امکاناتی که واقعاً برای حساب فعال شده‌اند.</p>
+            <div className="settings-tabs" role="tablist" aria-label="بخش‌های تنظیمات">
+              {([
+                ['integrations', 'یکپارچه‌سازی'], ['notifications', 'اعلان‌ها'], ['members', 'اعضا و دسترسی'], ['workspace', 'Workspace'], ['branding', 'هویت بصری'],
+              ] as const).map(([id, label]) => <button key={id} role="tab" aria-selected={settingsTab === id} className={settingsTab === id ? 'selected' : ''} onClick={() => setSettingsTab(id)}>{label}</button>)}
+            </div>
+            {settingsTab === 'integrations' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">API و Webhook</span><h3>اتصال سیستم‌های کسب‌وکار به مونو</h3></div><span className="badge success">API مشتری متصل</span></div><div className="settings-summary-grid"><article><small>API</small><strong>فعال</strong></article><article><small>Webhook</small><strong>اطلاعات در دسترس نیست</strong></article><article><small>موفقیت ۲۴ ساعت</small><strong>—</strong></article></div><p className="data-note">اتصال فعلی فقط API ارسال و شعب را پوشش می‌دهد؛ سلامت Webhook از API عملیاتی دریافت نشده است.</p><div className="form-actions"><button className="secondary-button" disabled title="ثبت Endpoint هنوز در API مشتری پیاده‌سازی نشده است">＋ افزودن Endpoint</button><a className="secondary-button" href="/docs" aria-label="مستندات API">مستندات API</a></div></div>}
+            {settingsTab === 'notifications' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">کانال‌ها و رویدادها</span><h3>تنظیمات اعلان‌ها</h3></div></div><div className="empty-state"><span>♧</span><strong>تنظیمات اعلان حساب در API موجود نیست</strong><small>کانال داخل پنل، پیامک و ایمیل پس از افزودن تنظیمات پایدار حساب قابل‌مدیریت می‌شوند.</small></div></div>}
+            {settingsTab === 'members' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">نقش‌ها و محدوده دسترسی</span><h3>اعضای Workspace</h3></div><button className="secondary-button" disabled title="دعوت عضو هنوز endpoint ندارد">دعوت عضو جدید</button></div><div className="empty-state"><span>♙</span><strong>فهرست اعضا از API حساب دریافت نمی‌شود</strong><small>تا اضافه‌شدن API اعضا و نقش‌ها، نام و تعداد نمونهٔ فیگما نمایش داده نمی‌شود.</small></div></div>}
+            {settingsTab === 'workspace' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">مشخصات Workspace</span><h3>پیکربندی فضای کاری</h3></div></div><div className="settings-summary-grid"><article><small>نام Workspace</small><strong>از API مشتری</strong></article><article><small>شناسه Workspace</small><strong>از API مشتری</strong></article><article><small>کشور</small><strong>ایران</strong></article></div><p className="data-note">نام و شناسه در نسخهٔ جاری پاسخ API مشتری ارائه نمی‌شود؛ برای جلوگیری از نمایش دادهٔ ساختگی، فیلدها قابل تغییر نیستند.</p></div>}
+            {settingsTab === 'branding' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">هویت برند</span><h3>تنظیمات هویت بصری</h3></div></div><div className="empty-state"><span>▧</span><strong>هویت بصری Workspace هنوز در سرویس حساب ذخیره نمی‌شود</strong><small>لوگو، نام تجاری و رنگ برند پس از آماده‌شدن API تنظیمات قابل بارگذاری و ذخیره خواهند بود.</small></div></div>}
+          </section>
+        )}
+
+        {connected && view === 'branchAdd' && (
+          <section className="panel settings-content"><div className="panel-heading"><div><span className="eyebrow">شعب</span><h2>افزودن شعبه</h2></div></div><div className="empty-state"><span>⌂</span><strong>ثبت شعبه هنوز از پنل مشتری پشتیبانی نمی‌شود</strong><small>برای فعال‌کردن این فرم باید API ایجاد و ویرایش شعبه در دسترس باشد.</small></div><div className="settings-form-grid"><label>نام شعبه<input disabled placeholder="مثلاً شعبه ونک" /></label><label>منطقه<input disabled placeholder="منطقهٔ خدمت" /></label><label className="wide">نشانی<input disabled placeholder="نشانی کامل مبدا" /></label></div><div className="form-actions"><button className="secondary-button" onClick={() => setView('branches')}>بازگشت به شعب</button><button className="primary-button" disabled>ثبت شعبه</button></div></section>
+        )}
+
+        {connected && view === 'invite' && (
+          <section className="panel settings-content"><div className="panel-heading"><div><span className="eyebrow">اعضا و دسترسی</span><h2>دعوت عضو جدید</h2></div></div><div className="empty-state"><span>♙</span><strong>دعوت اعضا هنوز به API نقش‌ها متصل نیست</strong><small>هیچ دعوتی ثبت نمی‌شود تا endpoint دعوت و ممیزی دسترسی آماده شود.</small></div><div className="settings-form-grid"><label>نام عضو<input disabled placeholder="نام و نام خانوادگی" /></label><label>ایمیل یا شماره همراه<input disabled placeholder="راه تماس عضو" /></label><label>نقش Workspace<select disabled><option>انتخاب نقش</option></select></label><label>محدوده شعب<select disabled><option>انتخاب شعب</option></select></label></div><div className="form-actions"><button className="secondary-button" onClick={() => { setView('settings'); setSettingsTab('members') }}>بازگشت</button><button className="primary-button" disabled>ارسال دعوت</button></div></section>
+        )}
+
+        {connected && view === 'webhook' && (
+          <section className="panel settings-content"><div className="panel-heading"><div><span className="eyebrow">یکپارچه‌سازی</span><h2>افزودن Webhook Endpoint</h2></div></div><div className="empty-state"><span>⌁</span><strong>مدیریت Webhook مشتری در API موجود نیست</strong><small>Endpoint، رویدادهای مشترک و secret تا آماده‌شدن API وب‌هوک قابل ثبت نیستند.</small></div><div className="settings-form-grid"><label className="wide">نشانی Endpoint<input disabled placeholder="https://" /></label><label>رویدادهای ارسالی<select disabled><option>انتخاب رویداد</option></select></label><label>Secret<input disabled placeholder="پس از ایجاد تولید می‌شود" /></label></div><div className="form-actions"><button className="secondary-button" onClick={() => { setView('settings'); setSettingsTab('integrations') }}>بازگشت</button><button className="primary-button" disabled>ثبت Endpoint</button></div></section>
+        )}
+
       </main>
 
       {detail && view !== 'tracking' && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetail(null) }}><section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title"><header><div><span className="eyebrow">جزئیات ارسال</span><h2 id="detail-title" dir="ltr">{detail.delivery_request_id}</h2></div><button className="icon-button" onClick={() => setDetail(null)} aria-label="بستن">×</button></header><DetailCard detail={detail} /></section></div>}
