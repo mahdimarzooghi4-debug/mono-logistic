@@ -35,15 +35,15 @@ describe('Operations route plan workbench', () => {
     vi.stubGlobal('fetch', fetchMock)
     render(<RoutePlanWorkbench token="verified-admin" reloadKey={0} onConnected={vi.fn()} />)
 
-    fireEvent.change(screen.getByLabelText('شناسهٔ مسیر'), { target: { value: routeId } })
-    fireEvent.click(screen.getByRole('button', { name: 'جست‌وجوی مسیر' }))
+    fireEvent.change(screen.getByLabelText('جست‌وجوی مسیر یا پیک'), { target: { value: routeId } })
+    fireEvent.submit(screen.getByLabelText('جست‌وجوی مسیر یا پیک').closest('form')!)
 
     expect(await screen.findByRole('heading', { name: routeId })).toBeInTheDocument()
-    expect(screen.getAllByText('نسخهٔ ۲')).toHaveLength(2)
+    expect(screen.getAllByText('نسخهٔ ۲')).toHaveLength(1)
     expect(screen.getByText('loc_pickup_1')).toBeInTheDocument()
     expect(screen.getByText('loc_dropoff_1')).toBeInTheDocument()
     expect(screen.getByText('ops-admin')).toBeInTheDocument()
-    expect(screen.getByText(/API فعلی فهرست مسیرها را ارائه نمی‌کند/)).toBeInTheDocument()
+    expect(screen.getByText(/فهرست مسیرهای فعال هنوز از API در دسترس نیست/)).toBeInTheDocument()
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
     for (const [, init] of fetchMock.mock.calls) {
       expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer verified-admin')
@@ -53,8 +53,8 @@ describe('Operations route plan workbench', () => {
   it('shows the API not-found response instead of substituting sample route data', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { code: 'ROUTE_NOT_FOUND', message: 'The Route plan was not found.' } }), { status: 404 })))
     render(<RoutePlanWorkbench token="verified-admin" reloadKey={0} onConnected={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText('شناسهٔ مسیر'), { target: { value: 'route_missing' } })
-    fireEvent.click(screen.getByRole('button', { name: 'جست‌وجوی مسیر' }))
+    fireEvent.change(screen.getByLabelText('جست‌وجوی مسیر یا پیک'), { target: { value: 'route_missing' } })
+    fireEvent.submit(screen.getByLabelText('جست‌وجوی مسیر یا پیک').closest('form')!)
     expect(await screen.findByRole('alert')).toHaveTextContent('The Route plan was not found.')
     expect(screen.queryByText(/RTE-۰۷۱/)).not.toBeInTheDocument()
   })
