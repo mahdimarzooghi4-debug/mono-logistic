@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import PickupRoute from './PickupRoute'
 
 type Offer = { id: string; shop: string; recipient: string; amount: string; pickup: string; total: string; distance: string }
 const offers: Offer[] = [
@@ -29,6 +30,7 @@ export default function App() {
   const [active, setActive] = useState('home')
   const [index, setIndex] = useState(0)
   const [accepted, setAccepted] = useState<string | null>(null)
+  const [screen, setScreen] = useState<'home' | 'pickup'>('home')
   const [notice, setNotice] = useState('')
   const touchStart = useRef<number | null>(null)
   const offer = offers[index]
@@ -39,12 +41,15 @@ export default function App() {
 
   function acceptOffer() {
     setAccepted(offer.id)
-    setNotice(`ماموریت ${offer.id} پذیرفته شد`)
-    window.setTimeout(() => setNotice(''), 2600)
+    setScreen('pickup')
+    setActive('missions')
   }
 
   return <main className="courier-app" dir="rtl">
-    <section className="content-scroll">
+    {screen === 'pickup' ? <PickupRoute onNotice={message => {
+      setNotice(message)
+      window.setTimeout(() => setNotice(''), 2600)
+    }} /> : <section className="content-scroll">
       <header className="profile-header">
         <img className="avatar" src="/figma/avatar.svg" alt="" />
         <div className="profile-copy"><strong>سلام، رضا</strong><small>پیک مونو • CR-۲۸۴</small></div>
@@ -81,11 +86,15 @@ export default function App() {
       <p className="swipe-hint">برای دیدن دو پیشنهاد دیگر، کارت را به راست یا چپ بکش.</p>
 
       <section className="wallet-card"><span className="withdrawable">قابل برداشت</span><div><strong>کیف پول</strong><b>۴۸۶٬۵۰۰ تومان</b></div></section>
-    </section>
+    </section>}
     {notice && <div className="toast" role="status">{notice}</div>}
-    <nav className="bottom-nav" aria-label="ناوبری اصلی">
-      {navItems.map(item => <button key={item.id} className={active === item.id ? 'active' : ''} onClick={() => setActive(item.id)} aria-current={active === item.id ? 'page' : undefined}>
-        <span className="nav-icon"><img src={`/figma/${item.icon}`} alt="" /></span><small>{item.label}</small>
+    <nav className={`bottom-nav ${screen === 'pickup' ? 'missions-active' : ''}`} aria-label="ناوبری اصلی">
+      {navItems.map(item => <button key={item.id} className={active === item.id ? 'active' : ''} onClick={() => {
+        setActive(item.id)
+        if (item.id === 'home') setScreen('home')
+        if (item.id === 'missions') setScreen('pickup')
+      }} aria-current={active === item.id ? 'page' : undefined}>
+        <span className="nav-icon"><img src={screen === 'pickup' ? `/figma/route-nav-${item.id === 'account' ? 'account' : item.id === 'wallet' ? 'income' : item.id === 'missions' ? 'missions' : 'home'}.svg` : `/figma/${item.icon}`} alt="" /></span><small>{item.label}</small>
       </button>)}
     </nav>
   </main>

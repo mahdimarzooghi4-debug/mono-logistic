@@ -10,12 +10,16 @@ describe('courier home', () => {
     expect(screen.getByText('MIS-۱۰۵۰۹')).toBeInTheDocument()
   })
 
-  it('toggles availability and accepts an offer in demo mode', () => {
+  it('toggles availability and opens the pickup route after accepting a mission', () => {
     render(<App />)
     const online = screen.getByRole('button', { name: 'آنلاین' })
     fireEvent.click(online)
     expect(screen.getByText('فعلا آفلاین هستید')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'پذیرش این ماموریت' }))
-    expect(screen.getByRole('status')).toHaveTextContent('MIS-۱۰۵۱۲')
+    expect(screen.getByText('MIS-۱۰۴۹۸ • حرکت به مبدا')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'گزارش مشکل' }))
+    expect(screen.getByRole('status')).toHaveTextContent('گزارش مشکل برای این مأموریت ثبت شد')
+    fireEvent.click(screen.getByRole('button', { name: 'رسیدم به مبدا' }))
+    expect(screen.getByRole('status')).toHaveTextContent('رسیدن به مبدأ ثبت شد')
   })
 })
