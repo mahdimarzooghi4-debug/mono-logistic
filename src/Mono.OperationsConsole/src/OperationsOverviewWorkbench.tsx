@@ -40,10 +40,9 @@ export default function OperationsOverviewWorkbench({ demoMode, summary, onOpenM
   const metric = (value: number | undefined) => value == null ? '—' : fa.format(value)
   return <div className="operations-overview-workbench" data-demo={demoMode}>
     <header className="overview-v2-heading">
-      <div><h1>نمای کلی عملیات</h1><p>وضعیت لحظه‌ای شبکهٔ مونو، مأموریت‌ها، پیک‌ها، استاندارد خدمت و ظرفیت عملیاتی</p></div>
-      <div className="overview-v2-actions"><button className="secondary-button" onClick={onRefresh} disabled={!demoMode && !summary}>نوسازی</button><button className="primary-button" disabled title="مأموریت پس از تأیید ارسال ایجاد می‌شود.">ایجاد مأموریت</button></div>
+      <div><h1>نمای کلی عملیات</h1><p>وضعیت لحظه‌ای شبکهٔ مونو، مأموریت‌ها، پیک‌ها، استاندارد خدمت و ظرفیت عملیاتی {demoMode && <span className="overview-demo-badge" title="داده‌های این صفحه نمایشی‌اند و فقط برای مقایسه با فیگما استفاده می‌شوند.">دادهٔ نمایشی</span>}</p></div>
+      <div className="overview-v2-actions"><button className="primary-button" disabled title="مأموریت پس از تأیید ارسال ایجاد می‌شود.">ایجاد مأموریت</button><button className="secondary-button" onClick={onRefresh} disabled={!demoMode && !summary}>نوسازی</button></div>
     </header>
-    {demoMode && <div className="overview-demo-banner">داده‌های این صفحه نمایشی‌اند و فقط برای مقایسه با فیگما استفاده می‌شوند.</div>}
     <section className="overview-v2-kpis" aria-label="شاخص‌های عملیات">
       <button onClick={onOpenMissions}><small>تحویل به‌موقع امروز</small><strong className="good">{values?.on_time_delivery_rate_percent == null ? '—' : `${fa.format(values.on_time_delivery_rate_percent)}٪`}</strong><span>{demoMode ? 'امروز' : 'نرخ ثبت‌شده در API'}</span></button>
       <button onClick={onOpenDispatch}><small>مسیر فعال</small><strong>{demoMode ? '۲۸' : '—'}</strong><span>{demoMode ? 'میانگین ۲٫۶ مأموریت' : 'در API موجود نیست'}</span></button>
