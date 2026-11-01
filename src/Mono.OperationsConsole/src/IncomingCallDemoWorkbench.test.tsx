@@ -17,9 +17,9 @@ describe('IncomingCallDemoWorkbench', () => {
 
   it('supports selecting one of multiple matched missions', () => {
     render(<IncomingCallDemoWorkbench scenario="multiple" onClose={vi.fn()} onOpenMission={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: /MIS-10501 شعبه ونک/ }))
+    fireEvent.click(screen.getByRole('button', { name: /MIS-10474 شعبه غرب/ }))
     expect(screen.getByText('۳ سفارش فعال')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /MIS-10501 شعبه ونک/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /MIS-10474 شعبه غرب/ })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('offers manual search for an unmatched caller without inventing matches', () => {
