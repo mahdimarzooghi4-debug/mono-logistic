@@ -33,14 +33,13 @@ type Props = {
   onSearch: (status?: string) => void
   onPrevious: () => void
   onNext: () => void
-  onRefresh: () => void
 }
 
 const fa = new Intl.NumberFormat('fa-IR')
 const money = (value?: number | null) => typeof value === 'number' && Number.isFinite(value) ? `${fa.format(value)} تومان` : '—'
 const statusLabel: Record<string, string> = { DELIVERED: 'تحویل‌شده', FAILED: 'ناموفق', CANCELLED: 'لغوشده', CREATED: 'ثبت‌شده', ACCEPTED: 'پذیرفته‌شده' }
 
-export default function FinanceWorkbench({ items, loading, error, token, query, status, pageIndex, hasNext, onQueryChange, onStatusChange, onSearch, onPrevious, onNext, onRefresh }: Props) {
+export default function FinanceWorkbench({ items, loading, error, token, query, status, pageIndex, hasNext, onQueryChange, onStatusChange, onSearch, onPrevious, onNext }: Props) {
   const [selectedId, setSelectedId] = useState('')
   const selected = items.find((item) => item.mission_id === selectedId) || items[0] || null
   const totals = items.reduce((sum, item) => ({
@@ -83,7 +82,7 @@ export default function FinanceWorkbench({ items, loading, error, token, query, 
       <main className="finance-detail">
         {error && token && <div className="finance-error" role="alert">{error}</div>}
         <section className="finance-selected panel-card">
-          <header><div><span className={`finance-status-chip ${selected?.status === 'DELIVERED' ? 'success' : selected?.status === 'FAILED' ? 'danger' : 'warning'}`}>{selected ? statusLabel[selected.status] || selected.status : 'بدون انتخاب'}</span><h2>{selected ? `تسویهٔ مالی — ${selected.mission_id}` : 'مأموریت مالی را انتخاب کنید'}</h2><p>{selected ? 'مقادیر زیر از snapshot قطعی کرایه خوانده شده‌اند؛ پرداخت و تسویهٔ واقعی در API گزارش نمی‌شوند.' : 'پس از اتصال به API، مأموریت و برآوردهای ثبت‌شده نمایش داده می‌شود.'}</p></div><button className="icon-button" onClick={onRefresh} disabled={!token || loading} aria-label="تازه‌سازی">↻</button></header>
+          <header><div className="finance-selected-copy"><div className="finance-selected-title"><span className={`finance-status-chip ${selected?.status === 'DELIVERED' ? 'success' : selected?.status === 'FAILED' ? 'danger' : 'warning'}`}>{selected ? statusLabel[selected.status] || selected.status : 'بدون انتخاب'}</span><h2>{selected ? `تسویهٔ مالی — ${selected.mission_id}` : 'مأموریت مالی را انتخاب کنید'}</h2></div><p>{selected ? 'مقادیر زیر از snapshot قطعی کرایه خوانده شده‌اند؛ پرداخت و تسویهٔ واقعی در API گزارش نمی‌شوند.' : 'پس از اتصال به API، مأموریت و برآوردهای ثبت‌شده نمایش داده می‌شود.'}</p></div></header>
           <div className="finance-facts"><div><small>کمیسیون مونو</small><strong>{selected ? money(selected.mono_commission_estimate_toman) : '—'}</strong></div><div><small>مالیات کمیسیون</small><strong>{selected ? money(selected.commission_vat_estimate_toman) : '—'}</strong></div><div><small>سهم فروشنده</small><strong>{selected ? money(selected.seller_share_toman) : '—'}</strong></div><div><small>سهم خریدار</small><strong>{selected ? money(selected.buyer_share_toman) : '—'}</strong></div><div><small>خالص برآوردی پیک</small><strong>{selected ? money(selected.courier_net_estimate_toman) : '—'}</strong></div></div>
         </section>
         <div className="finance-card-grid">
