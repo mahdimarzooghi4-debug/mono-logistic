@@ -24,8 +24,8 @@
 .sla-facts strong{font-size:9px}
 .sla-detail-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .sla-detail-grid>.panel-card{min-height:300px;padding:16px}
-.sla-detail-grid>.sla-context,.sla-detail-grid>.sla-timeline{grid-column:2}
-.sla-detail-grid>.sla-cause,.sla-detail-grid>.sla-actions{grid-column:1}
+.sla-detail-grid>.sla-context,.sla-detail-grid>.sla-actions{grid-column:2}
+.sla-detail-grid>.sla-cause,.sla-detail-grid>.sla-timeline{grid-column:1}
 .sla-detail-grid>.sla-context,.sla-detail-grid>.sla-cause{grid-row:1}
 .sla-detail-grid>.sla-timeline,.sla-detail-grid>.sla-actions{grid-row:2}
 .sla-detail-grid section>header{margin-bottom:14px}
