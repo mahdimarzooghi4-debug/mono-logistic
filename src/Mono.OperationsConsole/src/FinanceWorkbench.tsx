@@ -59,7 +59,7 @@ export default function FinanceWorkbench({ items, loading, error, token, query, 
     courier: sum.courier + item.courier_net_estimate_toman,
   }), { fare: 0, commission: 0, vat: 0, courier: 0 })
 
-  return <div className="finance-workbench">
+  return <div className="finance-workbench" data-demo={demoMode}>
     <header className="finance-heading"><div><h1>مالی و تسویه</h1><p>کنترل درآمد، مالیات، سهم پیک‌ها، کیف پول و برداشت‌ها {demoMode && <span className="finance-demo-badge">دادهٔ نمایشی</span>}</p></div><div className="finance-actions"><button className="primary-button" disabled title="ثبت تعدیل مالی در API فعلی پشتیبانی نمی‌شود.">ثبت تعدیل</button><button className="secondary-button" disabled title="گزارش تجمیعی پرداخت‌ها در API فعلی موجود نیست.">گزارش مالی</button></div></header>
     <section className="finance-kpis" aria-label="خلاصهٔ مالی همین صفحه">
       <article><small>برداشت در انتظار</small><strong className="finance-pending-value">{demoMode ? '۳ مورد' : '—'}</strong></article>
@@ -81,7 +81,7 @@ export default function FinanceWorkbench({ items, loading, error, token, query, 
         <div className="finance-mission-items">
           {visibleItems.map((item) => <button key={item.mission_id} type="button" className={`finance-mission-row ${selected?.mission_id === item.mission_id ? 'selected' : ''}`} onClick={() => setSelectedId(item.mission_id)}>
             <strong dir="ltr">{item.mission_id}</strong>
-            <span className={`finance-status-chip ${item.status === 'DELIVERED' ? 'success' : item.status === 'FAILED' ? 'danger' : 'warning'}`}>{statusLabel[item.status] || item.status}</span>
+            <span className={`finance-status-chip ${item.status === 'DELIVERED' ? 'success' : item.status === 'FAILED' ? 'danger' : 'warning'}`}>{demoMode && item.status === 'DELIVERED' ? 'تسویه‌شده' : statusLabel[item.status] || item.status}</span>
             <small>{fa.format(item.distance_meters)} متر · {money(item.fare_toman)}</small>
             <small dir="ltr">{item.quote_id} · نسخهٔ {fa.format(item.quote_version)}</small>
           </button>)}
@@ -124,7 +124,7 @@ export default function FinanceWorkbench({ items, loading, error, token, query, 
               <div><dt>کرایهٔ سفارش</dt><dd>{selected ? money(selected.fare_toman) : '—'}</dd></div>
               <div><dt>وضعیت صورتحساب</dt><dd>در API موجود نیست</dd></div>
             </>}
-          </dl>{demoMode ? <button className="secondary-button finance-invoice-action" disabled>مشاهدهٔ صورتحساب</button> : <p>دادهٔ وصول از حنا یا وضعیت صورتحساب در این API نیست.</p>}</section>
+            </dl>{demoMode ? <button className="secondary-button finance-invoice-action" disabled>مشاهدهٔ صورتحساب</button> : <p>دادهٔ وصول از حنا یا وضعیت صورتحساب در این API نیست.</p>}</section>
           <section className="panel-card finance-wallet"><header><h3>کیف پول پیک</h3><span className="finance-status-chip neutral">{demoMode ? selected?.quote_id : 'بدون دادهٔ کیف پول'}</span></header><dl>
             {demoMode ? <>
               <div><dt>موجودی قابل برداشت</dt><dd className="finance-positive">۸۷۲,۴۰۰ تومان</dd></div>
