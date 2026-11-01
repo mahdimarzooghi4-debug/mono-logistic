@@ -9,17 +9,21 @@ type Projection = { zone_id: string; bucket_minutes: number; buckets: Bucket[] }
 type Window = { window_id: string; courier_id: string; zone_id: string; starts_at: string; ends_at: string; status: string; created_by: string; created_at: string }
 type WindowPage = { items: Window[]; next_cursor: string | null }
 type Feature = { type: string; geometry: { type: string; coordinates: unknown }; properties: { zoneId: string; geometryVersion: string } }
-type Props = { token: string; onConnected: (connected: boolean) => void }
+type Props = { token: string; demoMode?: boolean; onConnected: (connected: boolean) => void }
 
 const fa = new Intl.NumberFormat('fa-IR')
 const faDate = (value: string) => new Intl.DateTimeFormat('fa-IR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
 const zoneLabel = (zone: Zone) => zone.zoneId
+const demoZones: Zone[] = [
+  ['ZN-C-01','مرکزی',82,24,21],['ZN-N-01','شمال',64,18,14],['ZN-W-01','غرب',41,13,7],['ZN-E-01','شرق',76,17,15],['ZN-S-01','جنوب',70,11,10],['ZN-C-02','مرکزی-۲',52,14,9],
+].map(([id,label]) => ({ zoneId: String(id), kind: 'MICRO_ZONE', geometryVersion: '۳', sourceId: String(label), sourceRevision: 'demo', isActive: true, integrityVerified: true }))
+const demoIndicators = [['پیک ثبت‌شده','۸۰','۸۰','کافی'],['پیک آنلاین','۲۴','—','زنده'],['ظرفیت مؤثر','۲۱','۲۰','مناسب'],['مأموریت فعال','۱۷','—','۸۲٪ مصرف'],['بدون تخصیص','۲','۰','نیازمند اقدام'],['استاندارد خدمت در معرض خطر','۱','۰','پایش']]
 
-export default function ZonesCapacityWorkbench({ token, onConnected }: Props) {
+export default function ZonesCapacityWorkbench({ token, demoMode = false, onConnected }: Props) {
   const [catalog, setCatalog] = useState<Zone[]>([])
   const [catalogError, setCatalogError] = useState('')
   const [query, setQuery] = useState('')
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedId, setSelectedId] = useState(demoMode ? 'ZN-C-01' : '')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [bucketMinutes, setBucketMinutes] = useState('30')
@@ -34,12 +38,14 @@ export default function ZonesCapacityWorkbench({ token, onConnected }: Props) {
   const [cancelId, setCancelId] = useState('')
   const [cancelReason, setCancelReason] = useState('')
 
-  const selected = catalog.find((item) => item.zoneId === selectedId) || null
-  const visibleZones = useMemo(() => catalog.filter((item) => item.zoneId.toLocaleLowerCase().includes(query.toLocaleLowerCase())), [catalog, query])
-  const plannedPeak = Math.max(0, ...(projection?.buckets.map((item) => item.planned_courier_count) || []))
-  const totalWindows = windows.filter((item) => item.status === 'SCHEDULED').length
+  const zones = demoMode ? demoZones : catalog
+  const selected = zones.find((item) => item.zoneId === selectedId) || null
+  const visibleZones = useMemo(() => zones.filter((item) => item.zoneId.toLocaleLowerCase().includes(query.toLocaleLowerCase())), [zones, query])
+  const plannedPeak = demoMode ? 21 : Math.max(0, ...(projection?.buckets.map((item) => item.planned_courier_count) || []))
+  const totalWindows = demoMode ? 24 : windows.filter((item) => item.status === 'SCHEDULED').length
 
   const loadCatalog = useCallback(async () => {
+    if (demoMode) { setCatalog([]); return }
     if (!token) { setCatalog([]); return }
     setCatalogError('')
     try {
@@ -52,7 +58,7 @@ export default function ZonesCapacityWorkbench({ token, onConnected }: Props) {
       setSelectedId((current) => zones.some((zone) => zone.zoneId === current) ? current : zones.find((zone) => zone.isActive)?.zoneId || zones[0]?.zoneId || '')
       onConnected(true)
     } catch (cause) { setCatalogError(cause instanceof Error ? cause.message : 'فهرست زون‌ها دریافت نشد.'); onConnected(false) }
-  }, [token, onConnected])
+  }, [token, demoMode, onConnected])
 
   useEffect(() => { void loadCatalog() }, [loadCatalog])
   useEffect(() => {
@@ -124,42 +130,43 @@ export default function ZonesCapacityWorkbench({ token, onConnected }: Props) {
     return pairs.map(([x, y], index) => `${index ? 'L' : 'M'}${12 + ((x - minX) / w) * 276},${172 - ((y - minY) / h) * 152}`).join(' ') + ' Z'
   }, [feature])
 
-  const maxScale = Math.max(1, ...((projection?.buckets || []).map((item) => item.planned_courier_count)))
+  const maxScale = Math.max(1, ...((projection?.buckets || []).map((item) => item.planned_courier_count)), ...(demoMode ? [21] : []))
+  const displayBuckets = demoMode ? [12,15,18,21,19,16,14,10].map((planned_courier_count,index)=>({from:new Date(Date.now() + index*30*60000).toISOString(),planned_courier_count})) : projection?.buckets || []
 
   return <div className="zones-capacity-workbench">
     <header className="zones-page-heading"><div><h1>مناطق و ظرفیت</h1><p>کنترل Micro-zoneها، تقاضا، ظرفیت مؤثر شبکه و ریسک کمبود پیک</p></div><div className="zones-heading-actions"><button className="secondary-button" disabled title="تعریف زون از این پنل پشتیبانی نمی‌شود؛ ابتدا snapshot هندسه باید ثبت و تأیید شود.">تعریف محدوده</button><button className="primary-button" onClick={() => document.getElementById('zone-capacity-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>برنامه ظرفیت</button></div></header>
     <section className="zones-kpis" aria-label="خلاصهٔ مناطق و ظرفیت">
-      <article><small>مناطق فعال</small><strong>{token ? fa.format(catalog.filter((zone) => zone.isActive).length) : '—'}</strong><span>هندسهٔ فعال در کاتالوگ API</span></article>
-      <article><small>پیک آنلاین</small><strong>—</strong><span>آمار حضور شبکه در API این نما نیست</span></article>
-      <article><small>ظرفیت مؤثر</small><strong>—</strong><span>نیازمند تجمیع ظرفیت همهٔ زون‌ها</span></article>
-      <article><small>مناطق کم‌ظرفیت</small><strong>—</strong><span>شاخص ریسک شبکه موجود نیست</span></article>
-      <article><small>مأموریت بدون پوشش</small><strong>—</strong><span>در این API برگردانده نمی‌شود</span></article>
+      <article><small>مناطق فعال</small><strong>{demoMode ? '۱۲' : token ? fa.format(catalog.filter((zone) => zone.isActive).length) : '—'}</strong><span>{demoMode ? 'Micro-zoneهای فعال' : 'هندسهٔ فعال در کاتالوگ API'}</span></article>
+      <article><small>پیک آنلاین</small><strong>{demoMode ? '۸۳' : '—'}</strong><span>{demoMode ? 'حضور فعال شبکه' : 'آمار حضور شبکه در API این نما نیست'}</span></article>
+      <article><small>ظرفیت مؤثر</small><strong>{demoMode ? '۷۱' : '—'}</strong><span>{demoMode ? 'ظرفیت عملیاتی نمونه' : 'نیازمند تجمیع ظرفیت همهٔ زون‌ها'}</span></article>
+      <article><small>مناطق کم‌ظرفیت</small><strong>{demoMode ? '۲' : '—'}</strong><span>{demoMode ? 'نیازمند پایش' : 'شاخص ریسک شبکه موجود نیست'}</span></article>
+      <article><small>مأموریت بدون پوشش</small><strong>{demoMode ? '۶' : '—'}</strong><span>{demoMode ? 'نیازمند اقدام' : 'در این API برگردانده نمی‌شود'}</span></article>
     </section>
     <div className="zones-workspace">
       <aside className="zones-directory panel-card">
-        <header><h2>مناطق عملیاتی</h2><span>{token ? fa.format(visibleZones.length) : '—'} زون</span></header>
+        <header><h2>مناطق عملیاتی</h2><span>{demoMode ? '۱۲' : token ? fa.format(visibleZones.length) : '—'} زون</span></header>
         <input aria-label="جست‌وجوی شناسهٔ زون" placeholder="جست‌وجوی شناسهٔ زون" value={query} onChange={(event) => setQuery(event.target.value)} />
         {catalogError && <p className="zones-inline-error" role="alert">دریافت کاتالوگ زون ناموفق بود. برای فهرست واقعی زون‌ها توکن مدیر عملیات را وارد کنید.</p>}
         <div className="zones-list">{visibleZones.map((zone) => <button key={`${zone.zoneId}-${zone.geometryVersion}`} className={`zone-list-item ${zone.zoneId === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(zone.zoneId); setProjection(null); setWindows([]) }}>
-          <span className={`zone-state ${zone.isActive ? 'active' : 'inactive'}`}>{zone.isActive ? 'فعال' : 'پیش‌نویس'}</span><strong dir="ltr">{zoneLabel(zone)}</strong><small>{zone.kind} · نسخهٔ {zone.geometryVersion}</small>
+          <span className={`zone-state ${zone.isActive ? 'active' : 'inactive'}`}>{zone.isActive ? 'فعال' : 'پیش‌نویس'}</span><strong dir="ltr">{demoMode ? zone.sourceId : zoneLabel(zone)}</strong><small>{demoMode ? `ظرفیت ${zone.sourceId === 'مرکزی' ? '۸۲' : zone.sourceId === 'شمال' ? '۶۴' : zone.sourceId === 'غرب' ? '۴۱' : '۷۶'}٪ • زون ${zone.zoneId}` : `${zone.kind} · نسخهٔ ${zone.geometryVersion}`}</small>
         </button>)}{!visibleZones.length && <p className="zones-empty-list">{token ? 'زون هندسی در کاتالوگ ثبت نشده است.' : 'برای نمایش فهرست واقعی، به API عملیات متصل شوید.'}</p>}</div>
       </aside>
       <main className="zones-main">
         <section className="zone-selected panel-card">
-          <header><div><h2>{selected ? `زون ${selected.zoneId}` : 'یک زون را انتخاب کنید'}</h2><p>{selected ? `${selected.kind} · نسخهٔ هندسه ${selected.geometryVersion} · منبع ${selected.sourceId}` : 'اطلاعات محدوده و ظرفیت پس از دریافت کاتالوگ API نمایش داده می‌شود.'}</p></div><span className={`zone-state ${selected?.isActive ? 'active' : 'inactive'}`}>{selected ? selected.isActive ? 'فعال' : 'غیرفعال' : '—'}</span></header>
-          <div className="zone-metrics"><div><small>وضعیت هندسه</small><strong>{selected?.integrityVerified ? 'یکپارچگی تأییدشده' : selected ? 'تأیید نشده' : '—'}</strong></div><div><small>ریسک ظرفیت</small><strong className={projection && plannedPeak === 0 ? 'risk-high' : 'risk-unknown'}>{projection ? plannedPeak === 0 ? 'نیازمند اقدام' : 'بر اساس برنامه' : 'نامشخص'}</strong></div><div><small>توقف‌های برنامه‌ریزی‌شده</small><strong>{projection ? fa.format(totalWindows) : '—'}</strong></div><div><small>مبنای محاسبه</small><strong>{projection ? `${fa.format(projection.bucket_minutes)} دقیقه` : 'بازه انتخاب نشده'}</strong></div></div>
+          <header><div><h2>{demoMode ? 'منطقه مرکزی' : selected ? `زون ${selected.zoneId}` : 'یک زون را انتخاب کنید'}</h2><p>{demoMode ? 'ZN-C-۰۱ · ۶ شعبه فعال • پوشش Bike / Car / Walk • ۲۴ پیک آنلاین' : selected ? `${selected.kind} · نسخهٔ هندسه ${selected.geometryVersion} · منبع ${selected.sourceId}` : 'اطلاعات محدوده و ظرفیت پس از دریافت کاتالوگ API نمایش داده می‌شود.'}</p></div><span className={`zone-state ${selected?.isActive ? 'active' : 'inactive'}`}>{selected ? selected.isActive ? 'فعال' : 'غیرفعال' : '—'}</span></header>
+          <div className="zone-metrics"><div><small>تقاضای فعال</small><strong>{demoMode ? '۱۷' : selected?.integrityVerified ? 'یکپارچگی تأییدشده' : selected ? 'تأیید نشده' : '—'}</strong></div><div><small>ظرفیت مؤثر</small><strong className={demoMode ? '' : projection && plannedPeak === 0 ? 'risk-high' : 'risk-unknown'}>{demoMode ? '۲۱' : projection ? plannedPeak === 0 ? 'نیازمند اقدام' : 'بر اساس برنامه' : 'نامشخص'}</strong></div><div><small>Utilization</small><strong>{demoMode ? '۸۲٪' : projection ? fa.format(totalWindows) : '—'}</strong></div><div><small>ریسک استاندارد</small><strong>{demoMode ? '۱ مأموریت' : projection ? `${fa.format(projection.bucket_minutes)} دقیقه` : 'بازه انتخاب نشده'}</strong></div></div>
         </section>
         <div className="zones-visual-row">
-          <section className="zone-map-card panel-card"><header><h3>نقشهٔ محدوده</h3><small>{feature ? 'هندسهٔ فعال از API' : 'هندسهٔ محدوده در دسترس نیست'}</small></header><div className="zone-map-canvas" dir="ltr">
-            <div className="map-grid-lines" />{path ? <svg viewBox="0 0 300 190" role="img" aria-label={`هندسهٔ زون ${selected?.zoneId}`}><path className="zone-boundary" d={path} /><circle className="zone-center" cx="150" cy="95" r="4" /></svg> : <div className="zone-map-empty"><span>⌖</span><strong>{token ? 'محدودهٔ واقعی برای نمایش موجود نیست' : 'برای دریافت نقشه به API متصل شوید'}</strong><small>نقشهٔ شهری یا مرز زون از دادهٔ ساختگی ساخته نمی‌شود.</small></div>}
+          <section className="zone-map-card panel-card"><header><h3>نقشهٔ محدوده</h3><small>{demoMode ? 'نقشه عملیاتی نمونه' : feature ? 'هندسهٔ فعال از API' : 'هندسهٔ محدوده در دسترس نیست'}</small></header><div className="zone-map-canvas" dir="ltr">
+            <div className="map-grid-lines" />{demoMode ? <div className="zone-demo-map"><svg viewBox="0 0 300 190" role="img" aria-label="نقشهٔ عملیاتی نمونهٔ تهران"><path className="zone-boundary" d="M34 98 L66 38 L135 27 L190 52 L261 41 L278 100 L238 158 L163 166 L99 143 L47 157 Z"/><circle className="zone-center" cx="150" cy="96" r="4"/></svg><span className="zone-demo-pin central">مرکزی · ۸۲٪</span><span className="zone-demo-pin north">شمال · ۶۴٪</span><span className="zone-demo-pin west">غرب · ۴۱٪</span><small>نقشهٔ عملیاتی نمونه · دادهٔ نمایشی</small></div> : path ? <svg viewBox="0 0 300 190" role="img" aria-label={`هندسهٔ زون ${selected?.zoneId}`}><path className="zone-boundary" d={path} /><circle className="zone-center" cx="150" cy="95" r="4" /></svg> : <div className="zone-map-empty"><span>⌖</span><strong>{token ? 'محدودهٔ واقعی برای نمایش موجود نیست' : 'برای دریافت نقشه به API متصل شوید'}</strong><small>نقشهٔ شهری یا مرز زون از دادهٔ ساختگی ساخته نمی‌شود.</small></div>}
           </div><footer><span>منبع: {selected?.sourceId || '—'}</span><span>بازبینی هندسه فقط پس از ثبت دادهٔ معتبر ممکن است.</span></footer></section>
-          <section className="zone-capacity-card panel-card"><header><h3>ظرفیت برنامه‌ریزی‌شده</h3><span>{projection ? `${fa.format(projection.buckets.length)} بازه` : 'بدون محاسبه'}</span></header>{projection ? <><div className="capacity-summary"><strong>{fa.format(plannedPeak)}</strong><small>بیشینهٔ پیک برنامه‌ریزی‌شده در هر بازه</small></div><div className="capacity-chart" aria-label="نمودار ظرفیت">{projection.buckets.map((item) => <div key={item.from} title={`${faDate(item.from)} · ${fa.format(item.planned_courier_count)} پیک`}><i style={{ height: `${Math.max(3, item.planned_courier_count / maxScale * 76)}%` }} /><small>{new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(item.from))}</small></div>)}</div></> : <div className="capacity-no-data"><span>◷</span><strong>ظرفیت زون مشخص نشده</strong><p>زون و بازهٔ زمانی را انتخاب کنید تا API ظرفیت را از پنجره‌های کاری ثبت‌شده محاسبه کند.</p></div>}
+          <section className="zone-capacity-card panel-card"><header><h3>ظرفیت برنامه‌ریزی‌شده</h3><span>{demoMode ? 'نمونهٔ امروز' : projection ? `${fa.format(projection.buckets.length)} بازه` : 'بدون محاسبه'}</span></header>{projection || demoMode ? <><div className="capacity-summary"><strong>{fa.format(plannedPeak)}</strong><small>بیشینهٔ پیک برنامه‌ریزی‌شده در هر بازه</small></div><div className="capacity-chart" aria-label="نمودار ظرفیت">{displayBuckets.map((item) => <div key={item.from} title={`${demoMode ? 'نمونهٔ امروز' : faDate(item.from)} · ${fa.format(item.planned_courier_count)} پیک`}><i style={{ height: `${Math.max(3, item.planned_courier_count / maxScale * 76)}%` }} /><small>{demoMode ? fa.format(displayBuckets.indexOf(item) * 30) : new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(item.from))}</small></div>)}</div></> : <div className="capacity-no-data"><span>◷</span><strong>ظرفیت زون مشخص نشده</strong><p>زون و بازهٔ زمانی را انتخاب کنید تا API ظرفیت را از پنجره‌های کاری ثبت‌شده محاسبه کند.</p></div>}
             <form id="zone-capacity-form" className="zone-capacity-form" onSubmit={calculate}><label>از زمان<input type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label>تا زمان<input type="datetime-local" value={to} onChange={(event) => setTo(event.target.value)} /></label><label>گام زمانی<select value={bucketMinutes} onChange={(event) => setBucketMinutes(event.target.value)}><option value="15">۱۵ دقیقه</option><option value="30">۳۰ دقیقه</option><option value="60">۶۰ دقیقه</option></select></label><button className="primary-button" type="submit" disabled={!token || loading || !selected?.isActive}>{loading ? 'در حال محاسبه…' : 'محاسبهٔ ظرفیت'}</button></form>
             {capacityError && <p className="zones-inline-error" role="alert">{capacityError}</p>}</section>
         </div>
         <div className="zones-bottom-row">
-          <section className="zone-table-card panel-card"><header><h3>تقاضا و ظرفیت منطقه</h3><small>{projection ? `زون ${projection.zone_id}` : 'پس از محاسبهٔ ظرفیت'}</small></header><div className="zone-table-wrap"><table><thead><tr><th>وضعیت</th><th>هدف</th><th>اکنون</th><th>شاخص</th></tr></thead><tbody>{projection?.buckets.map((item) => <tr key={item.from}><td>{item.planned_courier_count > 0 ? 'برنامه‌ریزی‌شده' : 'بدون پیک برنامه‌ریزی‌شده'}</td><td>{fa.format(item.planned_courier_count)}</td><td>—</td><td>{faDate(item.from)}</td></tr>)}{!projection && <tr><td colSpan={4} className="zone-table-empty">دادهٔ تقاضا در API موجود نیست؛ فقط پنجره‌های برنامه‌ریزی پیک قابل محاسبه‌اند.</td></tr>}</tbody></table></div><p>عدد برنامه‌ریزی‌شده بیانگر حضور زنده یا مجوز تخصیص نیست.</p></section>
-          <section className="zone-actions-card panel-card"><header><h3>اقدام پیشنهادی</h3><span className="zone-state inactive">{projection && plannedPeak === 0 ? 'نیازمند اقدام' : 'بر پایهٔ دادهٔ API'}</span></header><p>برای برنامه‌ریزی شیفت پیک، شناسهٔ معتبر پیک و بازهٔ زمانی را ثبت کنید. ثبت برنامه ظرفیت لحظه‌ای را تغییر نمی‌دهد.</p><label>شناسهٔ پیک<input value={courierId} onChange={(event) => setCourierId(event.target.value)} placeholder="crr_…" dir="ltr" autoComplete="off" /></label><button className="primary-button" onClick={() => void createWindow()} disabled={!token || !selected?.isActive}>ثبت پنجرهٔ کاری</button><button className="secondary-button" disabled title="افزایش ظرفیت خودکار از API پشتیبانی نمی‌شود.">درخواست پیک بیشتر</button>{(writeError || writeMessage) && <p className={writeError ? 'zones-inline-error' : 'zones-success'} role={writeError ? 'alert' : 'status'}>{writeError || writeMessage}</p>}</section>
+          <section className="zone-table-card panel-card"><header><h3>تقاضا و ظرفیت منطقه</h3><small>{demoMode ? 'منطقه مرکزی' : projection ? `زون ${projection.zone_id}` : 'پس از محاسبهٔ ظرفیت'}</small></header><div className="zone-table-wrap"><table><thead><tr><th>وضعیت</th><th>هدف</th><th>اکنون</th><th>شاخص</th></tr></thead><tbody>{demoMode ? demoIndicators.map((row) => <tr key={row[0]}><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td></tr>) : projection?.buckets.map((item) => <tr key={item.from}><td>{item.planned_courier_count > 0 ? 'برنامه‌ریزی‌شده' : 'بدون پیک برنامه‌ریزی‌شده'}</td><td>{fa.format(item.planned_courier_count)}</td><td>—</td><td>{faDate(item.from)}</td></tr>)}{!projection && !demoMode && <tr><td colSpan={4} className="zone-table-empty">دادهٔ تقاضا در API موجود نیست؛ فقط پنجره‌های برنامه‌ریزی پیک قابل محاسبه‌اند.</td></tr>}</tbody></table></div><p>{demoMode ? 'قاعدهٔ برنامه‌ریزی حنا: به‌ازای هر فروشگاه فعال، ۱۰ پیک تأییدشده در Pool مشترک منطقه.' : 'عدد برنامه‌ریزی‌شده بیانگر حضور زنده یا مجوز تخصیص نیست.'}</p></section>
+          <section className="zone-actions-card panel-card"><header><h3>اقدام پیشنهادی</h3><span className="zone-state inactive">{demoMode ? 'کمبود ظرفیت' : projection && plannedPeak === 0 ? 'نیازمند اقدام' : 'بر پایهٔ دادهٔ API'}</span></header>{demoMode ? <><p>منطقه غرب با ۴۱٪ ظرفیت و ۶ مأموریت بدون پوشش نیاز به مداخله دارد.</p><div className="zone-demo-action-metrics"><strong>۱۳ <small>پیک آنلاین</small></strong><strong>۷ <small>ظرفیت مؤثر</small></strong><strong>۱۱ <small>تقاضای فعال</small></strong></div></> : <p>برای برنامه‌ریزی شیفت پیک، شناسهٔ معتبر پیک و بازهٔ زمانی را ثبت کنید. ثبت برنامه ظرفیت لحظه‌ای را تغییر نمی‌دهد.</p>}<label>شناسهٔ پیک<input value={courierId} onChange={(event) => setCourierId(event.target.value)} placeholder="crr_…" dir="ltr" autoComplete="off" /></label><button className="primary-button" onClick={() => void createWindow()} disabled={!token || !selected?.isActive}>ثبت پنجرهٔ کاری</button><button className="secondary-button" disabled title="افزایش ظرفیت خودکار از API پشتیبانی نمی‌شود.">درخواست پیک بیشتر</button>{(writeError || writeMessage) && <p className={writeError ? 'zones-inline-error' : 'zones-success'} role={writeError ? 'alert' : 'status'}>{writeError || writeMessage}</p>}</section>
         </div>
         <section className="zone-windows panel-card"><header><h3>پنجره‌های کاری این بازه</h3><small>{projection ? fa.format(windows.length) : 'بازه را محاسبه کنید'}</small></header><div className="zone-table-wrap"><table><thead><tr><th>پیک</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>{windows.map((item) => <tr key={item.window_id}><td dir="ltr">{item.courier_id}</td><td>{faDate(item.starts_at)}</td><td>{faDate(item.ends_at)}</td><td>{item.status === 'SCHEDULED' ? 'برنامه‌ریزی‌شده' : item.status}</td><td>{item.status === 'SCHEDULED' ? <button className="zone-cancel-link" onClick={() => { setCancelId(item.window_id); setWriteError('') }}>لغو پنجره</button> : '—'}</td></tr>)}{!windows.length && <tr><td colSpan={5} className="zone-table-empty">{projection ? 'پنجرهٔ کاری در این زون و بازه ثبت نشده است.' : 'برای مشاهدهٔ دادهٔ واقعی، ظرفیت یک زون و بازه را محاسبه کنید.'}</td></tr>}</tbody></table></div>
           {cancelId && <div className="zone-cancel-form"><strong>دلیل لغو پنجرهٔ {cancelId}</strong><input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} maxLength={128} placeholder="دلیل الزامی لغو" /><button className="primary-button" onClick={() => void cancelWindow()}>تأیید لغو</button><button className="secondary-button" onClick={() => setCancelId('')}>انصراف</button></div>}
