@@ -36,3 +36,4 @@
 .sla-actions>button{min-height:32px;font-size:9px}
 @media(max-width:1050px){.sla-layout{grid-template-columns:255px minmax(0,1fr)}.sla-list{min-height:650px}.sla-detail-grid>.panel-card{min-height:250px}}
 @media(max-width:760px){.sla-workbench{gap:12px}.sla-page-heading{min-height:0}.sla-layout{grid-template-columns:1fr;gap:10px}.sla-list{min-height:0}.sla-list-items{max-height:260px}.sla-detail-grid{grid-template-columns:1fr}.sla-detail-grid>.sla-context,.sla-detail-grid>.sla-timeline,.sla-detail-grid>.sla-cause,.sla-detail-grid>.sla-actions{grid-column:1}.sla-detail-grid>.panel-card{min-height:0}.sla-settings-wrap>label{left:auto;right:0}}
+.sla-demo-banner{padding:8px 12px;border:1px solid #f0d9b6;border-radius:8px;background:#fff8ec;color:#9a6717;font-size:9px}
