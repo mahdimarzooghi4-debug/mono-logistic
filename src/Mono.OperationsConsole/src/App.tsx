@@ -41,9 +41,36 @@ type Mission = {
   latestAttempt: Attempt | null
   deliveryOverdue: boolean
   deliveryWindowState: 'upcoming' | 'due_now' | 'overdue' | string
+  demoZone?: string
+  demoStatus?: string
+  demoEta?: string
 }
 
 type QueuePage = { items: Mission[]; nextCursor: string | null }
+const DEMO_DISPATCH_SUMMARY: DashboardSummaryMetrics = {
+  as_of: new Date().toISOString(), business_date: new Date().toISOString().slice(0, 10), sla_horizon_minutes: 15,
+  active_mission_count: 126, unassigned_mission_count: 14, online_courier_count: 83, sla_at_risk_count: 9,
+  sla_overdue_count: 3, delivered_today_count: 148, on_time_delivered_today_count: 140, on_time_delivery_rate_percent: 94.6,
+}
+const DEMO_DISPATCH_MISSIONS: Mission[] = [
+  ['MIS-10482','CR-204','مرکزی','در مسیر','۱۲ دقیقه','حرکت به مقصد','upcoming'],
+  ['MIS-10479','CR-118','شمال','در محل دریافت','۲۱ دقیقه','توقف ۷ دقیقه','due_now'],
+  ['MIS-10474',null,'غرب','جست‌وجوی پیک','۳۴ دقیقه','بدون تخصیص','overdue'],
+  ['MIS-10461','CR-311','مرکزی','پیک جایگزین','۲۹ دقیقه','جایگزینی پیک فعال شد','overdue'],
+  ['MIS-10455','CR-302','جنوب','تحویل‌گرفته‌شده','۸ دقیقه','دریافت کامل شد','upcoming'],
+  ['MIS-10450','CR-225','شرق','تحویل‌شده','—','مأموریت با موفقیت پایان یافت','upcoming'],
+  ['MIS-10448','CR-204','مرکزی','در مسیر','۱۲ دقیقه','پیک به نزدیکی مقصد رسید','upcoming'],
+  ['MIS-10445','CR-118','شمال','در محل دریافت','۲۱ دقیقه','توقف دریافت بیش از ۳ دقیقه','due_now'],
+  ['MIS-10441',null,'غرب','جست‌وجوی پیک','۳۴ دقیقه','عدم تخصیص پس از ۱۰ دقیقه','overdue'],
+  ['MIS-10438','CR-302','جنوب','تحویل‌گرفته‌شده','۸ دقیقه','تحویل فیزیکی محموله به پیک','upcoming'],
+  ['MIS-10435','CR-225','شرق','تحویل‌شده','—','مأموریت با موفقیت پایان یافت','upcoming'],
+  ['MIS-10430',null,'مرکزی','تخصیص مجدد','۳۹ دقیقه','آغاز بازتخصیص توسط سیستم','overdue'],
+].map(([missionId,courierId,zone,status,eta,event,state],index) => ({
+  missionId: String(missionId), customerId: 'حنا', branchId: String(zone), createdAt: new Date(Date.now() - (index + 4) * 60_000).toISOString(),
+  committedDeliveryAt: new Date(Date.now() + (index + 5) * 60_000).toISOString(), activeOffer: courierId ? { courierId: String(courierId) } : null,
+  attemptCount: 1, latestAttempt: { action: String(event), createdAt: new Date(Date.now() - (index + 1) * 60_000).toISOString() },
+  deliveryOverdue: state === 'overdue', deliveryWindowState: String(state), demoZone: String(zone), demoStatus: String(status), demoEta: String(eta),
+}))
 type MissionRecord = {
   missionId: string
   customerId: string
@@ -167,6 +194,7 @@ export default function App() {
   const [routeReloadKey, setRouteReloadKey] = useState(0)
   const [auditReloadKey, setAuditReloadKey] = useState(0)
   const [token, setToken] = useState('')
+  const demoMode = !token && new URLSearchParams(window.location.search).get('demo') === '1'
   const [tokenDraft, setTokenDraft] = useState('')
   const [connectionDialogOpen, setConnectionDialogOpen] = useState(false)
   const [items, setItems] = useState<Mission[]>([])
@@ -262,7 +290,7 @@ export default function App() {
   const capacityPeak = useMemo(() => Math.max(1, ...(capacityProjection?.buckets.map((bucket) => bucket.planned_courier_count) || [])), [capacityProjection])
 
   const fetchDashboardSummary = useCallback(async (submittedToken = token) => {
-    if (!submittedToken) { setDashboardSummary(null); setDashboardError(''); return }
+    if (!submittedToken) { setDashboardSummary(demoMode ? DEMO_DISPATCH_SUMMARY : null); setDashboardError(''); return }
     setDashboardError('')
     try {
       const response = await fetch('/operations/v1/dashboard/summary?sla_horizon_minutes=15', {
@@ -279,10 +307,19 @@ export default function App() {
       setDashboardSummary(null)
       setDashboardError(cause instanceof Error ? cause.message : 'دریافت خلاصهٔ داشبورد ناموفق بود.')
     }
-  }, [token])
+  }, [token, demoMode])
 
   const fetchPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, resetFilters = false) => {
     if (!token) {
+      if (demoMode) {
+        setItems(DEMO_DISPATCH_MISSIONS)
+        setNextCursor(null)
+        setCursorStack([null])
+        setPageIndex(0)
+        setUpdatedAt(new Date().toISOString())
+        setError('')
+        return
+      }
       setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
       return
     }
@@ -316,7 +353,7 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [token, sortBy, query, customerId, hasOffer, deliveryWindow, createdBefore])
+  }, [token, sortBy, query, customerId, hasOffer, deliveryWindow, createdBefore, demoMode])
 
   const fetchMissionPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, resetFilters = false) => {
     if (!token) {
@@ -1084,7 +1121,7 @@ export default function App() {
           <div className="topbar-actions">
             <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'routes' ? setRouteReloadKey((value) => value + 1) : viewMode === 'audit' ? setAuditReloadKey((value) => value + 1) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             {viewMode === 'dispatch' && <span className="overview-updated-at">آخرین به‌روزرسانی: {updatedAt ? new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(updatedAt)) : '—'}</span>}
-            <button type="button" className={`system-pill ${connected ? 'is-online' : ''}`} onClick={() => !token && setConnectionDialogOpen(true)}><i />{connected ? 'سیستم آنلاین' : 'اتصال API'}</button>
+            <button type="button" className={`system-pill ${connected || demoMode ? 'is-online' : ''}`} onClick={() => !token && setConnectionDialogOpen(true)}><i />{demoMode ? 'دادهٔ نمایشی' : connected ? 'سیستم آنلاین' : 'اتصال API'}</button>
             {viewMode === 'dispatch' && <button className="primary-button create-mission-action" type="button" disabled title="مأموریت از تأیید ارسال ایجاد می‌شود؛ API ایجاد دستی مأموریت در دسترس نیست.">ایجاد مأموریت ＋</button>}
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
@@ -1219,7 +1256,7 @@ export default function App() {
             </section>
             <section className="operations-overview-card capacity-overview-card">
               <header><strong>ظرفیت مناطق</strong><button onClick={() => switchView('zones')}>برنامه‌ریزی</button></header>
-              <div className="capacity-overview-empty"><span>◷</span><strong>ظرفیت منطقه‌ای این نما موجود نیست</strong><p>API ظرفیت را فقط برای زون و بازهٔ انتخاب‌شده برمی‌گرداند؛ اینجا مقدار منطقه‌ای حدس زده نمی‌شود.</p><button onClick={() => switchView('zones')}>مشاهدهٔ ظرفیت برنامه‌ریزی‌شده ←</button></div>
+              {demoMode ? <div className="dispatch-capacity-list">{[['مرکزی',82,'مناسب'],['شمال',64,'پایش'],['غرب',41,'کم']].map(([zone,value,label]) => <div className="dispatch-capacity-row" key={String(zone)}><span>{label}</span><b>{fa.format(Number(value))}٪</b><strong>{zone}</strong><i><em style={{width:`${value}%`}} /></i></div>)}</div> : <div className="capacity-overview-empty"><span>◷</span><strong>ظرفیت منطقه‌ای این نما موجود نیست</strong><p>API ظرفیت را فقط برای زون و بازهٔ انتخاب‌شده برمی‌گرداند؛ اینجا مقدار منطقه‌ای حدس زده نمی‌شود.</p><button onClick={() => switchView('zones')}>مشاهدهٔ ظرفیت برنامه‌ریزی‌شده ←</button></div>}
             </section>
           </aside>}
           <section className={`queue-panel ${viewMode === 'dispatch' ? 'operations-primary-card' : ''}`}>
@@ -1302,11 +1339,11 @@ export default function App() {
                 {!loading && viewMode === 'dispatch' && items.map((mission) => <tr key={mission.missionId}>
                   <td><button className="dashboard-row-action" onClick={() => void showMissionDetails(mission.missionId)} aria-label={`جزئیات مأموریت ${mission.missionId}`}>•••</button></td>
                   <td><span className="cell-primary">{mission.latestAttempt?.action || mission.latestAttempt?.outcome || 'رویدادی ثبت نشده'}</span><span className="cell-secondary">{mission.latestAttempt ? formatDate(mission.latestAttempt.createdAt) : '—'}</span></td>
-                  <td><span className="cell-secondary">—</span></td>
+                  <td><span className="cell-secondary">{mission.demoZone || '—'}</span></td>
                   <td><span className={`badge ${mission.deliveryOverdue ? 'danger' : mission.deliveryWindowState === 'due_now' ? 'warning' : 'neutral'}`}>{statusLabel(mission.deliveryWindowState)}</span></td>
-                  <td><span className="cell-secondary">—</span></td>
+                  <td><span className="cell-secondary">{mission.demoEta || '—'}</span></td>
                   <td>{mission.activeOffer?.courierId ? <span className="cell-primary" dir="ltr">{mission.activeOffer.courierId}</span> : <span className="cell-secondary">بدون پیک</span>}</td>
-                  <td><span className="badge neutral">در صف تخصیص</span></td>
+                  <td><span className={`badge ${mission.demoStatus === 'در مسیر' ? 'info' : mission.demoStatus === 'تحویل‌شده' ? 'success' : mission.demoStatus === 'پیک جایگزین' ? 'warning' : 'neutral'}`}>{mission.demoStatus || 'در صف تخصیص'}</span></td>
                   <td><span className="cell-primary" dir="ltr">{mission.customerId}</span><span className="cell-secondary" dir="ltr">{mission.branchId}</span></td>
                   <td><strong className="mission-id" dir="ltr">{mission.missionId}</strong></td>
                 </tr>)}
