@@ -18,6 +18,8 @@ import RoutePlanWorkbench from './RoutePlanWorkbench'
 import AuditWorkbench from './AuditWorkbench'
 import ApiKeyWorkbench from './ApiKeyWorkbench'
 import FinanceWorkbench from './FinanceWorkbench'
+import IncomingCallDemoWorkbench from './IncomingCallDemoWorkbench'
+import type { IncomingCallScenario } from './IncomingCallDemoWorkbench'
 import type { MissionFare } from './FinanceWorkbench'
 import type { DashboardSummaryMetrics } from './DashboardSummaryCards'
 
@@ -208,6 +210,8 @@ export default function App() {
   const [auditReloadKey, setAuditReloadKey] = useState(0)
   const [token, setToken] = useState('')
   const demoMode = !token && new URLSearchParams(window.location.search).get('demo') === '1'
+  const [incomingCallOpen, setIncomingCallOpen] = useState(false)
+  const [incomingCallScenario, setIncomingCallScenario] = useState<IncomingCallScenario>('matched')
   const [tokenDraft, setTokenDraft] = useState('')
   const [connectionDialogOpen, setConnectionDialogOpen] = useState(false)
   const [items, setItems] = useState<Mission[]>([])
@@ -1151,6 +1155,7 @@ export default function App() {
             <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'routes' ? setRouteReloadKey((value) => value + 1) : viewMode === 'audit' ? setAuditReloadKey((value) => value + 1) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
             {viewMode === 'dispatch' && <span className="overview-updated-at">آخرین به‌روزرسانی: {updatedAt ? new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(updatedAt)) : '—'}</span>}
             <button type="button" className={`system-pill ${connected || demoMode ? 'is-online' : ''}`} onClick={() => !token && setConnectionDialogOpen(true)}><i />{demoMode ? 'دادهٔ نمایشی' : connected ? 'سیستم آنلاین' : 'اتصال API'}</button>
+            {demoMode && viewMode === 'dispatch' && <div className="incoming-call-demo-launch"><select aria-label="حالت تماس نمایشی" value={incomingCallScenario} onChange={(event) => setIncomingCallScenario(event.target.value as IncomingCallScenario)}><option value="matched">شمارهٔ شناخته‌شده</option><option value="unmatched">شمارهٔ ناشناس</option><option value="multiple">چند مأموریت</option></select><button type="button" className="secondary-button" onClick={() => setIncomingCallOpen(true)}>تماس ورودی</button></div>}
             {viewMode === 'dispatch' && <button className="primary-button create-mission-action" type="button" disabled title="مأموریت از تأیید ارسال ایجاد می‌شود؛ API ایجاد دستی مأموریت در دسترس نیست.">ایجاد مأموریت ＋</button>}
             {token && <button className="text-button" onClick={disconnect}>خروج</button>}
           </div>
@@ -1158,6 +1163,8 @@ export default function App() {
         </header>}
 
         {connectionDialogOpen && <div className="api-access-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setConnectionDialogOpen(false)}><section className="api-access-dialog" role="dialog" aria-modal="true" aria-labelledby="api-access-title"><header><div><span className="eyebrow">دسترسی امن</span><h2 id="api-access-title">اتصال به API عملیات</h2></div><button type="button" className="icon-button" onClick={() => setConnectionDialogOpen(false)} aria-label="بستن">×</button></header><p>توکن فقط در حافظهٔ همین صفحه نگهداری می‌شود.</p><form className="api-access-form" onSubmit={connect}><label>توکن Bearer<input type="password" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} placeholder="توکن دسترسی عملیات" dir="ltr" autoComplete="off" autoFocus /></label><div><button className="primary-button" disabled={loading || !tokenDraft.trim()}>اتصال و دریافت داده</button><button className="secondary-button" type="button" onClick={() => setConnectionDialogOpen(false)}>انصراف</button></div></form></section></div>}
+
+        {demoMode && incomingCallOpen && <IncomingCallDemoWorkbench scenario={incomingCallScenario} onClose={() => setIncomingCallOpen(false)} onOpenMission={(missionId) => { setIncomingCallOpen(false); void showMissionDetails(missionId) }} />}
 
         {error && token && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
         {viewMode === 'dispatch' && dashboardError && <div className="error-banner" role="alert"><span>!</span><div><strong>خلاصهٔ سراسری داشبورد دریافت نشد</strong><p>{dashboardError}</p></div><button onClick={() => setDashboardError('')} aria-label="بستن">×</button></div>}
