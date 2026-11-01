@@ -27,4 +27,18 @@ describe('ZonesCapacityWorkbench', () => {
     await waitFor(() => expect(screen.getByText('زون هندسی در کاتالوگ ثبت نشده است.')).toBeInTheDocument())
     expect(screen.queryByText('مرکزی')).not.toBeInTheDocument()
   })
+
+  it('renders the Figma network and capacity view with labeled demo values and no API requests', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { container } = render(<ZonesCapacityWorkbench token="" demoMode onConnected={vi.fn()} />)
+    expect(screen.getByRole('heading', { name: 'منطقه مرکزی' })).toBeInTheDocument()
+    expect(container.querySelector('.zones-kpis article:first-child')).toHaveTextContent('۱۲')
+    expect(container.querySelector('.zones-kpis article:nth-child(3)')).toHaveTextContent('۷۱')
+    expect(screen.getAllByText('غرب').length).toBeGreaterThan(0)
+    expect(screen.getByRole('img', { name: 'نقشهٔ عملیاتی نمونهٔ تهران' })).toBeInTheDocument()
+    expect(screen.getByText('منطقه غرب با ۴۱٪ ظرفیت و ۶ مأموریت بدون پوشش نیاز به مداخله دارد.')).toBeInTheDocument()
+    expect(container.querySelector('.zone-capacity-form button')).toBeDisabled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
