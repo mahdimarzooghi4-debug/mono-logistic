@@ -44,6 +44,7 @@ export default function AdmissionsDashboardDemo({ onNavigate }: Props) {
   if (section === 'پیک‌ها') return <CourierAdmissionPage onNavigate={onNavigate} onSectionChange={setSection} />
   if (section === 'کسب‌وکارها') return <BusinessAdmissionPage onNavigate={onNavigate} onSectionChange={setSection} />
   if (section === 'مدارک') return <VerificationDocumentsPage onNavigate={onNavigate} onSectionChange={setSection} />
+  if (section === 'فعال‌سازی') return <ActivationPage onNavigate={onNavigate} onSectionChange={setSection} />
 
   return <main className="admissions-demo" dir="rtl">
     <aside className="admissions-demo-sidebar">
@@ -232,5 +233,47 @@ function VerificationDocumentsPage({ onNavigate, onSectionChange }: Props) {
       </div>
     </div>
     {toast&&<div role="status" className="admissions-demo-toast">{toast}</div>}
+  </main>
+}
+
+const activationCases = [
+  { id: 'ACT-۰۱۴۲', applicantId: 'CR-REG-۰۱۲۲', type: 'پیک', name: 'علی موسوی', status: 'آماده', issue: 'بدون مانع', mode: 'موتورسیکلت', area: 'مرکزی' },
+  { id: 'ACT-۰۱۳۹', applicantId: 'BIZ-REG-۰۰۲۱', type: 'کسب‌وکار', name: 'فروشگاه اطلس', status: 'آماده', issue: 'بدون مانع', mode: 'ارسال شهری', area: 'مرکزی' },
+  { id: 'ACT-۰۱۳۷', applicantId: 'CR-REG-۰۱۴۸', type: 'پیک', name: 'رضا احمدی', status: 'مانع', issue: 'بیمه', mode: 'موتورسیکلت', area: 'شمال' },
+  { id: 'ACT-۰۱۳۳', applicantId: 'CR-REG-۰۱۳۹', type: 'پیک', name: 'مجتبی کریمی', status: 'آماده', issue: 'بدون مانع', mode: 'موتورسیکلت', area: 'مرکزی' },
+  { id: 'ACT-۰۱۲۹', applicantId: 'BIZ-REG-۰۰۳۴', type: 'کسب‌وکار', name: 'فروشگاه سپهر', status: 'مانع', issue: 'قرارداد', mode: 'ارسال شهری', area: 'تهران' },
+  { id: 'ACT-۰۱۲۴', applicantId: 'CR-REG-۰۱۳۴', type: 'پیک', name: 'امیر رضایی', status: 'آماده', issue: 'بدون مانع', mode: 'موتورسیکلت', area: 'مرکزی، شمال' },
+]
+
+function ActivationPage({ onNavigate, onSectionChange }: Props) {
+  const [selectedId, setSelectedId] = useState(activationCases[0].id)
+  const [filter, setFilter] = useState('همه')
+  const [search, setSearch] = useState('')
+  const [dialog, setDialog] = useState('')
+  const [toast, setToast] = useState('')
+  const selected = activationCases.find(item => item.id === selectedId) || activationCases[0]
+  const list = activationCases.filter(item => (filter === 'همه' || filter === 'دارای مانع' && item.status === 'مانع' || filter === item.type) && `${item.id} ${item.applicantId} ${item.name}`.includes(search.trim()))
+  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800) }
+  const activationChecks = [['احراز هویت','تکمیل','بدون مانع','ok'],['مدارک لازم','تکمیل','همه معتبر','ok'],['حساب بانکی','تکمیل','مالکیت تأیید','ok'],['اعتماد و تضمین','تکمیل','ثبت شده','ok'],['مناطق و وسیله','تکمیل','تنظیم شده','ok']]
+  return <main className="admissions-demo activation-demo" dir="rtl">
+    <aside className="admissions-demo-sidebar"><div className="admissions-demo-brand"><span className="admissions-demo-mark"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
+      <nav aria-label="منوی پذیرش">{(['داشبورد','پیک‌ها','کسب‌وکارها','احراز و مدارک','فعال‌سازی','ردشده‌ها'] as const).map((item,index)=><button key={item} className={item==='فعال‌سازی'?'active':''} onClick={()=>item==='داشبورد'?onNavigate('overview'):item==='پیک‌ها'?onSectionChange?.('پیک‌ها'):item==='کسب‌وکارها'?onSectionChange?.('کسب‌وکارها'):item==='احراز و مدارک'?onSectionChange?.('مدارک'):item==='ردشده‌ها'?onSectionChange?.('ردشده‌ها'):undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index}/></span>{item}</button>)}</nav>
+      <div className="admissions-demo-profile"><span className="admissions-demo-avatar">م</span><span><strong>کارشناس پذیرش مونو</strong><small>تیم پذیرش و احراز</small></span></div><button className="admissions-demo-logout" onClick={()=>notify('برای خروج از اتصال API استفاده کن.')}>خروج</button>
+    </aside>
+    <div className="admissions-demo-workspace activation-workspace">
+      <header className="admissions-demo-header"><div className="admissions-demo-header-actions"><button className="admissions-demo-secondary" onClick={()=>notify('گزارش فعال‌سازی در این نسخهٔ نمایشی تولید نشد.')}>گزارش فعال‌سازی</button><button className="admissions-demo-secondary" onClick={()=>notify('قواعد فعال‌سازی در نسخهٔ نمایشی قابل تغییر نیست.')}>تنظیم قواعد</button></div><div><h1>فعال‌سازی</h1><p>گیت نهایی پیش از ورود پیک یا کسب‌وکار به محیط عملیاتی مونو</p></div></header>
+      <section className="admissions-demo-kpis activation-kpis">{[['آماده فعال‌سازی','۷'],['دارای مانع','۳'],['پیک آماده','۵'],['کسب‌وکار آماده','۲'],['فعال‌شده امروز','۹']].map(([label,value],i)=><article key={label}><small>{label}</small><strong className={`metric-tone-${i}`}>{value}</strong></article>)}</section>
+      <div className="verification-tabs" role="tablist" aria-label="فیلتر فعال‌سازی">{['همه','پیک','کسب‌وکار','دارای مانع'].map(item=><button key={item} role="tab" aria-selected={filter===item} className={filter===item?'active':''} onClick={()=>setFilter(item)}>{item==='پیک'?'پیک‌ها':item==='کسب‌وکار'?'کسب‌وکارها':item}</button>)}</div>
+      <div className="activation-layout">
+        <section className="admissions-demo-card activation-list"><header><h2>صف فعال‌سازی</h2><span>۷ آماده</span></header><input aria-label="جست‌وجوی نام یا شناسه" placeholder="جست‌وجوی نام یا شناسه" value={search} onChange={e=>setSearch(e.target.value)}/><div className="verification-items">{list.map(item=><button key={item.id} className={`verification-case ${selected.id===item.id?'selected':''}`} onClick={()=>setSelectedId(item.id)}><span className={`priority ${item.status==='مانع'?'priority-action':'priority-ready'}`}>{item.status}</span><bdi>{item.id}</bdi><strong>{item.type} • {item.applicantId}</strong><small>{item.name} • {item.status==='مانع'?`مانع: ${item.issue}`:'آماده'}</small></button>)}{list.length===0&&<p className="admission-empty-row">موردی برای این فیلتر پیدا نشد.</p>}</div><footer>{list.length} مورد از ۷ مورد نمونه</footer></section>
+        <div className="activation-detail">
+          <section className="admissions-demo-card activation-summary"><span className={`priority ${selected.status==='مانع'?'priority-action':'priority-ready'}`}>{selected.status}</span><div><h2>{selected.id} — {selected.name}</h2><p>{selected.type} • {selected.applicantId} • {selected.mode} • منطقه {selected.area} • بررسی نهایی: امروز ۱۱:۰۶</p></div><div className="activation-gates">{[['احراز','تکمیل'],['مدارک','تکمیل'],['دسترسی',selected.status==='مانع'?'مسدود':'آماده'],['مانع',selected.issue]].map(([a,b])=><span key={a}><small>{a}</small><b className={b==='تکمیل'||b==='آماده'||b==='بدون مانع'?'ok':'pending'}>{b}</b></span>)}</div></section>
+          <div className="activation-columns"><section className="admissions-demo-card activation-card"><h2>حساب و دسترسی</h2>{[['حساب پیک','ایجاد شده'],['شماره موبایل','۰۹۱۲ ۵۵۵ ۱۸۴۲'],['نقش','پیک'],['ورود اولیه','رمز یک‌بارمصرف موبایل'],['کیف پول','ایجاد شده'],['شناسه عملیاتی','CR-۲۸۴']].map(([a,b])=><div key={a}><span>{a}</span><b className={b==='ایجاد شده'?'ok':''}>{b}</b></div>)}</section><section className="admissions-demo-card activation-card"><h2>تنظیمات عملیاتی</h2>{[['شیوه حمل',selected.mode],['مناطق مجاز',selected.area+', شمال'],['حد مأموریت همزمان','۳'],['شروع فعالیت','امروز'],['آموزش اولیه','تکمیل'],['وضعیت اولیه',selected.status==='مانع'?'غیرفعال تا تأیید':'آماده فعال‌سازی']].map(([a,b])=><div key={a}><span>{a}</span><b>{b}</b></div>)}</section></div>
+          <div className="activation-lower"><section className="admissions-demo-card activation-checks"><h2>چک‌لیست آمادگی</h2>{activationChecks.map(([a,b,c,d])=><div key={a}><span>{a}</span><small>{c}</small><b className={selected.status==='مانع'&&a==='مدارک لازم'?'pending':d}>{selected.status==='مانع'&&a==='مدارک لازم'?'مانع':b}</b></div>)}<div><span>حساب عملیاتی</span><small>CR-۲۸۴</small><b className="ok">آماده</b></div></section><section className="admissions-demo-card activation-decision"><h2>تصمیم فعال‌سازی</h2><div className={`decision-summary ${selected.status==='مانع'?'activation-blocked':''}`}><b>{selected.status==='مانع'?'دارای مانع':'آماده فعال‌سازی'}</b><p>{selected.status==='مانع'?`مانع «${selected.issue}» باید رفع شود؛ فعال‌سازی ممکن نیست.`:'تمام کنترل‌های الزامی تکمیل شده‌اند و مانع باز وجود ندارد.'}</p></div><ol><li><small>۱۰:۴۲</small><span>تأیید احراز</span></li><li><small>۱۰:۵۸</small><span>آماده‌سازی حساب</span></li><li><small>۱۱:۰۶</small><span>بررسی نهایی</span></li></ol><button onClick={()=>setDialog('تعلیق فعال‌سازی')}>تعلیق فعال‌سازی</button><button className="admissions-demo-primary" disabled={selected.status==='مانع'} onClick={()=>setDialog('فعال‌سازی نهایی')}>فعال‌سازی نهایی</button></section></div>
+        </div>
+      </div>
+    </div>
+    {toast&&<div role="status" className="admissions-demo-toast">{toast}</div>}
+    {dialog&&<div className="admissions-demo-backdrop" onClick={()=>setDialog('')}><section role="dialog" aria-modal="true" aria-labelledby="activation-dialog-title" onClick={e=>e.stopPropagation()}><button className="admissions-demo-close" onClick={()=>setDialog('')} aria-label="بستن">×</button><h2 id="activation-dialog-title">{dialog}</h2><p>این نما روی دادهٔ نمایشی کار می‌کند؛ وضعیت واقعی ایجاد یا تغییر نمی‌کند. اجرای عملیاتی به اتصال API و مجوز فعال‌سازی نیاز دارد.</p><button className="admissions-demo-primary" onClick={()=>{setDialog('');notify('تغییری در نسخهٔ نمایشی ثبت نشد.')}}>متوجه شدم</button></section></div>}
   </main>
 }
