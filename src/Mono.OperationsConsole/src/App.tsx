@@ -1258,7 +1258,7 @@ export default function App() {
           {webhookDetailError && !webhookDetail && <div className="webhook-inline-error" role="alert">{webhookDetailError}</div>}
         </div>}
         {viewMode === 'policies' && <PolicyWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
-        {viewMode === 'routes' && <RoutePlanWorkbench token={token} reloadKey={routeReloadKey} onConnected={setConnected} />}
+        {viewMode === 'routes' && <RoutePlanWorkbench token={token} reloadKey={routeReloadKey} demoMode={demoMode} onConnected={setConnected} />}
         {viewMode === 'audit' && <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />}
         {viewMode === 'admissions' && <AdmissionsWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} onOpenBusinesses={() => switchView('onboarding')} onOpenCouriers={() => switchView('couriers')} />}
         {viewMode === 'onboarding' && <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
