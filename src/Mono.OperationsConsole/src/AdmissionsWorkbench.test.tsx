@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
 
 describe('AdmissionsWorkbench', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
   it('combines real courier and business responses and filters by record type', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
@@ -35,5 +35,15 @@ describe('AdmissionsWorkbench', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'جست‌وجوی شناسه، نام، موبایل یا کسب‌وکار' }), { target: { value: 'فروشگاه سپهر' } })
     expect(screen.getByText('فروشگاه سپهر')).toBeInTheDocument()
     expect(screen.queryByText('رضا احمدی')).not.toBeInTheDocument()
+  })
+
+  it('opens the Figma courier admission review from its internal navigation', async () => {
+    render(<AdmissionsWorkbench token="" reloadKey={0} onConnected={vi.fn()} onOpenBusinesses={vi.fn()} onOpenCouriers={vi.fn()} demoMode />)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'منوی پذیرش' })).getByRole('button', { name: /پیک‌ها/ }))
+    expect(await screen.findByRole('heading', { name: 'ثبت‌نام و پذیرش پیک‌ها' })).toBeInTheDocument()
+    expect(screen.getByText('چک‌لیست پذیرش')).toBeInTheDocument()
+    expect(screen.getByText('نتیجهٔ بررسی')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /CR-REG-۰۱۴۲/ }))
+    expect(screen.getByRole('heading', { name: /CR-REG-۰۱۴۲ — سعید مرادی/ })).toBeInTheDocument()
   })
 })

@@ -41,6 +41,8 @@ export default function AdmissionsDashboardDemo({ onNavigate }: Props) {
   }), [tab, search, section])
   function notify(message: string) { setToast(message); window.setTimeout(() => setToast(''), 2600) }
 
+  if (section === 'پیک‌ها') return <CourierAdmissionPage onNavigate={onNavigate} />
+
   return <main className="admissions-demo" dir="rtl">
     <aside className="admissions-demo-sidebar">
       <div className="admissions-demo-brand"><span className="admissions-demo-mark" aria-hidden="true"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
@@ -48,7 +50,7 @@ export default function AdmissionsDashboardDemo({ onNavigate }: Props) {
         {(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردشده‌ها'] as const).map((item, index) => <button key={item} className={section === item || (item === 'احراز و مدارک' && section === 'مدارک') ? 'active' : ''} onClick={() => {
           setSection(item)
           if (item === 'داشبورد') onNavigate('overview')
-          if (item === 'پیک‌ها') { setTab('پیک‌ها'); onNavigate('couriers') }
+          if (item === 'پیک‌ها') setTab('پیک‌ها')
           if (item === 'کسب‌وکارها') { setTab('کسب‌وکارها'); onNavigate('onboarding') }
           if (item === 'احراز و مدارک') { setTab('همه'); setSection('مدارک') }
         }}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}
@@ -103,4 +105,46 @@ function AdmissionNavIcon({ index }: { index: number }) {
   if (index === 3) return <svg {...common}><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 13h6m-6 4h6"/></svg>
   if (index === 4) return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="m8 12 2.5 2.5L16 9"/></svg>
   return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="m9 9 6 6m0-6-6 6"/></svg>
+}
+
+const courierCases = [
+  { id: 'CR-REG-۰۱۴۸', name: 'رضا احمدی', detail: 'بررسی مدارک', age: '۸ دقیقه پیش', flag: 'بررسی', tone: 'review' },
+  { id: 'CR-REG-۰۱۴۲', name: 'سعید مرادی', detail: 'احراز هویت', age: '۱۵ دقیقه پیش', flag: 'اقدام', tone: 'action' },
+  { id: 'CR-REG-۰۱۳۹', name: 'مجتبی کریمی', detail: 'اعتماد و تضمین', age: '۲۱ دقیقه پیش', flag: 'بررسی', tone: 'review' },
+  { id: 'CR-REG-۰۱۳۴', name: 'امیر رضایی', detail: 'مناطق و وسیله', age: '۳۳ دقیقه پیش', flag: 'بررسی', tone: 'review' },
+  { id: 'CR-REG-۰۱۲۸', name: 'حسین کریمی', detail: 'اطلاعات بانکی', age: '۴۷ دقیقه پیش', flag: 'اقدام', tone: 'action' },
+  { id: 'CR-REG-۰۱۲۲', name: 'علی موسوی', detail: 'تأیید نهایی', age: '۵۸ دقیقه پیش', flag: 'آماده', tone: 'ready' },
+]
+const courierChecks = [['احراز هویت', 'تأیید', 'امروز ۰۹:۴۸', 'done'], ['اطلاعات بانکی', 'تأیید', 'امروز ۰۹:۵۱', 'done'], ['کارت وسیله', 'تأیید', 'امروز ۱۰:۰۲', 'done'], ['بیمه وسیله', 'در بررسی', 'انقضا ۱۴۰۶/۰۹', 'pending'], ['تصویر وسیله', 'تأیید', 'امروز ۱۰:۰۴', 'done'], ['سفته الکترونیک', 'تأیید', 'ثبت‌شده', 'done'], ['اعتماد / تضمین', 'پذیرفته', 'نسخه ۱.۰', 'done'], ['قوانین مونو', 'تأیید', 'نسخه ۱.۰', 'done']]
+
+function CourierAdmissionPage({ onNavigate }: Props) {
+  const [selectedId, setSelectedId] = useState(courierCases[0].id)
+  const [filter, setFilter] = useState('همه')
+  const [search, setSearch] = useState('')
+  const [decision, setDecision] = useState('')
+  const [toast, setToast] = useState('')
+  const selected = courierCases.find(item => item.id === selectedId) || courierCases[0]
+  const list = courierCases.filter(item => (filter === 'همه' || item.flag === filter) && `${item.id} ${item.name} ${item.detail}`.includes(search.trim()))
+  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800) }
+  return <main className="admissions-demo" dir="rtl">
+    <aside className="admissions-demo-sidebar">
+      <div className="admissions-demo-brand"><span className="admissions-demo-mark"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
+      <nav aria-label="منوی پذیرش">{(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردشده‌ها'] as const).map((item, index) => <button key={item} className={item === 'پیک‌ها' ? 'active' : ''} onClick={() => item === 'داشبورد' ? onNavigate('overview') : item === 'کسب‌وکارها' ? onNavigate('onboarding') : undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}</nav>
+      <div className="admissions-demo-profile"><span className="admissions-demo-avatar">م</span><span><strong>کارشناس پذیرش مونو</strong><small>تیم پذیرش و احراز</small></span></div><button className="admissions-demo-logout" onClick={() => notify('برای خروج از اتصال API استفاده کن.')}>خروج</button>
+    </aside>
+    <div className="admissions-demo-workspace courier-admission-workspace">
+      <header className="admissions-demo-header"><div className="admissions-demo-header-actions"><button className="admissions-demo-secondary" onClick={() => notify('پرونده از صف بررسی خارج شد؛ تغییری در دادهٔ نمایشی ذخیره نشد.')}>خروج از بررسی</button><button className="admissions-demo-primary" onClick={() => notify('ثبت پیک واقعی به اتصال API نیاز دارد.')}>ثبت پیک جدید</button></div><div><h1>ثبت‌نام و پذیرش پیک‌ها</h1><p>بررسی هویت، مدارک، اطلاعات بانکی، وسیله، مناطق و الزامات اعتماد پیش از فعال‌سازی</p></div></header>
+      <section className="admissions-demo-kpis courier-admission-kpis">{[['درخواست باز','۲۸'],['نیازمند اقدام','۷'],['مدارک ناقص','۹'],['آماده تأیید','۶'],['فعال‌شده امروز','۱۲']].map(([label,value],i)=><article key={label}><small>{label}</small><strong className={`metric-tone-${i}`}>{value}</strong></article>)}</section>
+      <div className="courier-admission-layout">
+        <aside className="admissions-demo-card courier-case-list"><header><h2>درخواست‌های پیک</h2><span>۲۸ باز</span></header><input aria-label="جست‌وجوی پیک" placeholder="جست‌وجوی نام، موبایل یا شناسه" value={search} onChange={e=>setSearch(e.target.value)} /><div className="courier-case-filters">{['همه','اقدام','بررسی','آماده'].map(item=><button key={item} className={filter===item?'active':''} onClick={()=>setFilter(item)}>{item}</button>)}</div><div className="courier-case-items">{list.map(item=><button key={item.id} className={`courier-case ${selectedId===item.id?'selected':''}`} onClick={()=>setSelectedId(item.id)}><span className={`priority priority-${item.tone}`}>{item.flag}</span><bdi>{item.id}</bdi><strong>{item.name} · {item.detail}</strong><small>{item.age}</small></button>)}{list.length===0&&<p className="admission-empty-row">پرونده‌ای پیدا نشد.</p>}</div></aside>
+        <div className="courier-admission-detail">
+          <section className="admissions-demo-card courier-selected"><header><span className="priority priority-بالا">در بررسی</span><div><h2>{selected.id} — {selected.name}</h2><p>موبایل: ۰۹۱۲ ۳۴۵ ۶۷۸۹ · نوع فعالیت: موتورسیکلت · منطقهٔ ترجیحی: مرکزی · ثبت‌نام: امروز ۰۹:۴۲</p></div></header><div className="courier-review-status">{[['اعتماد','تأیید'],['مدارک وسیله','در بررسی'],['بانک','تأیید'],['هویت','تأیید']].map(([a,b])=><span key={a}><small>{a}</small><b className={b==='تأیید'?'ok':'pending'}>{b}</b></span>)}</div></section>
+          <div className="courier-info-grid"><section className="admissions-demo-card courier-info-card"><h2>هویت و اطلاعات پایه</h2>{[['نام و نام خانوادگی',selected.name],['کد ملی','۰۰۱۲۳۴۵۶۷۸'],['موبایل','۰۹۱۲ ۳۴۵ ۶۷۸۹'],['احراز هویت','تأییدشده'],['شبا','IR ۸۲۰۱...۴۵۶۷'],['تطبیق مالک حساب','تأیید']].map(([a,b])=><div key={a}><span>{a}</span><b className={b==='تأییدشده'||b==='تأیید'?'ok':''}>{b}</b></div>)}</section><section className="admissions-demo-card courier-info-card"><h2>شیوهٔ فعالیت و محدوده</h2>{[['شیوه حمل','موتورسیکلت'],['وسیله','VEH-REG-۰۷۸'],['پلاک','۱۲الف۳۴۵'],['منطقهٔ اصلی','مرکزی'],['مناطق انتخابی','مرکزی، شمال'],['ظرفیت پیشنهادی','۳ مأموریت']].map(([a,b])=><div key={a}><span>{a}</span><b>{b}</b></div>)}</section></div>
+          <div className="courier-check-decision"><section className="admissions-demo-card courier-checklist"><h2>چک‌لیست پذیرش</h2>{courierChecks.map(([label,status,time,state])=><div key={label}><span>{label}</span><small>{time}</small><b className={state==='done'?'ok':'pending'}>{status}</b></div>)}</section><section className="admissions-demo-card courier-decision"><h2>تصمیم پذیرش</h2><div className="decision-summary"><b>نتیجهٔ بررسی</b><p>هویت، حساب بانکی و اعتماد تأیید شده‌اند. فقط بررسی بیمهٔ وسیله باقی مانده است.</p></div><ol>{[['۰۹:۴۲','ثبت‌نام تکمیل شد'],['۰۹:۴۸','هویت تأیید شد'],['۰۹:۵۱','شبا تطبیق شد'],['۱۰:۰۴','مدارک وسیله ارسال شد']].map(([time,event])=><li key={time}><small>{time}</small><span>{event}</span></li>)}</ol><button onClick={()=>setDecision('درخواست مدرک')}>درخواست مدرک</button><button className="danger" onClick={()=>setDecision('رد درخواست')}>رد درخواست</button><button className="admissions-demo-primary" onClick={()=>setDecision('تأیید و فعال‌سازی')}>تأیید و فعال‌سازی</button></section></div>
+        </div>
+      </div>
+    </div>
+    {toast&&<div role="status" className="admissions-demo-toast">{toast}</div>}
+    {decision&&<div className="admissions-demo-backdrop" onClick={()=>setDecision('')}><section role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}><button className="admissions-demo-close" onClick={()=>setDecision('')} aria-label="بستن">×</button><h2>{decision}</h2><p>این پنل روی دادهٔ نمایشی کار می‌کند. برای اعمال تصمیم واقعی، اتصال API و مجوز پذیرش لازم است.</p><button className="admissions-demo-primary" onClick={()=>{setDecision('');notify('تصمیم در نسخهٔ نمایشی ثبت نشد.')}}>متوجه شدم</button></section></div>}
+  </main>
 }
