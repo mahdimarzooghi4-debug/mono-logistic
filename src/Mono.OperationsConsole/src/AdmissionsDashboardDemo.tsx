@@ -43,6 +43,7 @@ export default function AdmissionsDashboardDemo({ onNavigate }: Props) {
 
   if (section === 'پیک‌ها') return <CourierAdmissionPage onNavigate={onNavigate} onSectionChange={setSection} />
   if (section === 'کسب‌وکارها') return <BusinessAdmissionPage onNavigate={onNavigate} onSectionChange={setSection} />
+  if (section === 'مدارک') return <VerificationDocumentsPage onNavigate={onNavigate} onSectionChange={setSection} />
 
   return <main className="admissions-demo" dir="rtl">
     <aside className="admissions-demo-sidebar">
@@ -189,5 +190,47 @@ function BusinessAdmissionPage({ onNavigate, onSectionChange }: Props) {
     </div>
     {toast&&<div role="status" className="admissions-demo-toast">{toast}</div>}
     {decision&&<div className="admissions-demo-backdrop" onClick={()=>setDecision('')}><section role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}><button className="admissions-demo-close" onClick={()=>setDecision('')} aria-label="بستن">×</button><h2>{decision}</h2><p>این پنل روی دادهٔ نمایشی کار می‌کند. برای اعمال تصمیم واقعی، اتصال API و مجوز پذیرش لازم است.</p><button className="admissions-demo-primary" onClick={()=>{setDecision('');notify('تصمیم در نسخهٔ نمایشی ثبت نشد.')}}>متوجه شدم</button></section></div>}
+  </main>
+}
+
+const verificationCases = [
+  { id: 'VER-۰۲۸۴', applicantId: 'CR-REG-۰۱۴۲', name: 'سعید مرادی', kind: 'پیک', document: 'کارت ملی', issue: 'عدم تطابق تصویر', priority: 'بحرانی', tone: 'action', validity: 'معتبر', face: '۶۲٪' },
+  { id: 'VER-۰۲۸۱', applicantId: 'BIZ-REG-۰۰۳۱', name: 'سوپرمارکت آریا', kind: 'کسب‌وکار', document: 'روزنامه رسمی', issue: 'ناقص', priority: 'بالا', tone: 'action', validity: 'معتبر', face: '—' },
+  { id: 'VER-۰۲۷۹', applicantId: 'CR-REG-۰۱۴۸', name: 'رضا احمدی', kind: 'پیک', document: 'بیمه وسیله', issue: 'در بررسی', priority: 'متوسط', tone: 'review', validity: 'تا ۱۴۰۵/۰۸/۲۱', face: '—' },
+  { id: 'VER-۰۲۷۶', applicantId: 'BIZ-REG-۰۰۳۴', name: 'فروشگاه سپهر', kind: 'کسب‌وکار', document: 'حساب بانکی', issue: 'تأیید مالکیت', priority: 'عادی', tone: 'ready', validity: 'معتبر', face: '—' },
+  { id: 'VER-۰۲۷۳', applicantId: 'CR-REG-۰۱۳۴', name: 'امیر رضایی', kind: 'پیک', document: 'سفته الکترونیک', issue: 'در بررسی', priority: 'متوسط', tone: 'review', validity: 'معتبر', face: '—' },
+  { id: 'VER-۰۲۶۸', applicantId: 'CR-REG-۰۱۲۸', name: 'مهدی نادری', kind: 'پیک', document: 'شبا', issue: 'عدم تطابق', priority: 'بالا', tone: 'action', validity: 'معتبر', face: '—' },
+  { id: 'VER-۰۲۶۲', applicantId: 'BIZ-REG-۰۰۲۷', name: 'فروشگاه باران', kind: 'کسب‌وکار', document: 'شناسه ملی', issue: 'تأیید', priority: 'عادی', tone: 'ready', validity: 'معتبر', face: '—' },
+]
+
+function VerificationDocumentsPage({ onNavigate, onSectionChange }: Props) {
+  const [selectedId, setSelectedId] = useState(verificationCases[0].id)
+  const [filter, setFilter] = useState('همه')
+  const [search, setSearch] = useState('')
+  const [toast, setToast] = useState('')
+  const selected = verificationCases.find(item => item.id === selectedId) || verificationCases[0]
+  const list = verificationCases.filter(item => (filter === 'همه' || item.kind === filter || item.document.includes(filter)) && `${item.id} ${item.applicantId} ${item.name} ${item.document} ${item.issue}`.includes(search.trim()))
+  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800) }
+  return <main className="admissions-demo verification-demo" dir="rtl">
+    <aside className="admissions-demo-sidebar">
+      <div className="admissions-demo-brand"><span className="admissions-demo-mark"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
+      <nav aria-label="منوی پذیرش">{(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردشده‌ها'] as const).map((item, index) => <button key={item} className={item === 'احراز و مدارک' ? 'active' : ''} onClick={() => item === 'داشبورد' ? onNavigate('overview') : item === 'پیک‌ها' ? onSectionChange?.('پیک‌ها') : item === 'کسب‌وکارها' ? onSectionChange?.('کسب‌وکارها') : item === 'فعال‌سازی' ? onSectionChange?.('فعال‌سازی') : item === 'ردشده‌ها' ? onSectionChange?.('ردشده‌ها') : undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}</nav>
+      <div className="admissions-demo-profile"><span className="admissions-demo-avatar">م</span><span><strong>کارشناس پذیرش مونو</strong><small>تیم پذیرش و احراز</small></span></div><button className="admissions-demo-logout" onClick={() => notify('برای خروج از اتصال API استفاده کن.')}>خروج</button>
+    </aside>
+    <div className="admissions-demo-workspace verification-workspace">
+      <header className="admissions-demo-header"><div className="admissions-demo-header-actions"><button className="admissions-demo-secondary" onClick={() => notify('گزارش انقضا در این نسخهٔ نمایشی تولید نشد.')}>گزارش انقضا</button><button className="admissions-demo-secondary" onClick={() => notify('قواعد احراز در نسخهٔ نمایشی قابل تغییر نیست.')}>قواعد احراز</button></div><div><h1>احراز و مدارک</h1><p>صف متمرکز بررسی هویت، اسناد حقوقی، حساب بانکی، مدارک وسیله و انقضاها</p></div></header>
+      <section className="admissions-demo-kpis verification-kpis">{[['در انتظار بررسی','۲۳'],['رد احراز','۳'],['مدرک ناقص','۸'],['انقضا تا ۳۰ روز','۵'],['آماده تأیید','۷']].map(([label,value],i)=><article key={label}><small>{label}</small><strong className={`metric-tone-${i}`}>{value}</strong></article>)}</section>
+      <div className="verification-tabs" role="tablist" aria-label="فیلتر پرونده‌ها">{['همه','پیک‌ها','کسب‌وکارها','هویت','بانک','وسیله'].map(item=><button key={item} role="tab" aria-selected={filter===item} className={filter===item?'active':''} onClick={()=>setFilter(item)}>{item}</button>)}</div>
+      <div className="verification-layout">
+        <section className="admissions-demo-card verification-list"><header><h2>صف بررسی</h2><span>۲۳ باز</span></header><input aria-label="جست‌وجوی مدرک" placeholder="جست‌وجوی شناسه، نام یا نوع مدرک" value={search} onChange={e=>setSearch(e.target.value)} /><div className="verification-items">{list.map(item=><button key={item.id} className={`verification-case ${selected.id===item.id?'selected':''}`} onClick={()=>setSelectedId(item.id)}><span className={`priority priority-${item.tone}`}>{item.priority}</span><bdi>{item.id}</bdi><strong>{item.kind} • {item.applicantId} • {item.document}</strong><small>{item.name} · {item.issue}</small></button>)}{list.length===0&&<p className="admission-empty-row">مدرکی با این مشخصات پیدا نشد.</p>}</div><footer>{list.length} مورد از ۲۳ مورد نمونه</footer></section>
+        <div className="verification-detail">
+          <section className="admissions-demo-card verification-summary"><span className={`priority priority-${selected.tone}`}>{selected.priority}</span><div><h2>{selected.id} — احراز هویت {selected.name}</h2><p>{selected.kind} • {selected.applicantId} • موبایل ۰۹۱۲ ۶۷۸ ۴۵۲۱ • ارسال مدرک: امروز ۱۰:۳۱</p></div><div className="verification-meta"><span><small>مدرک</small><b>{selected.document}</b></span><span><small>اعتبار</small><b className="ok">{selected.validity}</b></span><span><small>تطبیق چهره</small><b className="pending">{selected.face}</b></span><span><small>اقدام</small><b>بررسی دستی</b></span></div></section>
+          <section className="admissions-demo-card verification-preview"><header><h2>پیش‌نمایش مدرک</h2><span>{selected.document}</span></header><div className="document-mock"><div className="document-seal">مونو</div><div><b>نمونه مدرک هویتی</b><span>نام: {selected.name}</span><span>کد ملی: ۰۰۴۵۶۷۸۹۱۲</span><span>تاریخ تولد: ۱۳۷۴/۰۵/۱۷</span></div><p>تصویر برای بررسی اپراتور نمایش داده می‌شود؛ اصل فایل در مخزن فایل نگهداری می‌شود.</p></div></section>
+          <div className="verification-lower"><section className="admissions-demo-card verification-evidence"><h2>شواهد و مغایرت</h2><div className="evidence-values"><span><b>۰۰۴۵۶۷۸۹۱۲</b><small>کد ملی فرم</small></span><i>↔</i><span><b>۰۰۴۵۶۷۸۹۱۲</b><small>کد ملی مدرک</small></span><span><b>{selected.name}</b><small>نام</small></span><span><b>{selected.face}</b><small>تطبیق چهره</small></span><span><b>۸۵٪</b><small>حد پذیرش</small></span></div><div className="evidence-alert"><b>نیازمند بررسی دستی</b><span>شناسه‌ها منطبق‌اند، اما تطبیق چهره پایین‌تر از حد پذیرش است.</span></div><h3>چک‌لیست بررسی</h3>{[['خوانایی مدرک','کیفیت مناسب','تأیید'],['اعتبار مدرک','منقضی نشده','تأیید'],['تطبیق کد ملی','مطابق فرم','تأیید'],['تطبیق نام','مطابق فرم','تأیید'],['تطبیق چهره',selected.face,'رد']].map(([a,b,c])=><div className="verification-check" key={a}><span>{a}</span><small>{b}</small><b className={c==='رد'?'error':'ok'}>{c}</b></div>)}</section>
+            <section className="admissions-demo-card verification-decision"><h2>تصمیم بررسی</h2><div className="decision-summary"><b>پیشنهاد سیستم</b><p>به‌دلیل تطبیق چهره ۶۲٪، مدرک را خودکار تأیید نکنید.</p></div><div className="verification-audit"><span>۱۰:۳۶ • سیستم</span><span>آخرین تغییر</span><b>کارشناس احراز</b><small>بررسی‌کننده</small></div><button onClick={()=>notify('درخواست تصویر جدید در نسخهٔ نمایشی ثبت نشد.')}>درخواست تصویر جدید</button><button className="danger" onClick={()=>notify('رد مدرک در نسخهٔ نمایشی ثبت نشد.')}>رد مدرک</button><button className="admissions-demo-primary" onClick={()=>notify('تأیید دستی در نسخهٔ نمایشی ثبت نشد.')}>تأیید دستی</button></section></div>
+        </div>
+      </div>
+    </div>
+    {toast&&<div role="status" className="admissions-demo-toast">{toast}</div>}
   </main>
 }
