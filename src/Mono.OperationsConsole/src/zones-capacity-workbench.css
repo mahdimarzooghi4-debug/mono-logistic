@@ -59,3 +59,12 @@
 .zone-windows{margin-top:14px}
 @media(max-width:1100px){.zones-workspace{grid-template-columns:260px minmax(0,1fr)}.zones-main{grid-template-rows:auto auto auto auto;min-height:0}.zones-visual-row,.zones-bottom-row{height:auto}.zone-map-card,.zone-capacity-card,.zone-table-card,.zone-actions-card{height:auto;min-height:270px}.zone-map-canvas{min-height:220px;height:220px}}
 @media(max-width:760px){.zones-workspace{grid-template-columns:minmax(0,1fr);min-height:0}.zones-directory{min-height:0}.zones-main{grid-template-rows:auto}.zones-visual-row,.zones-bottom-row{grid-template-columns:minmax(0,1fr)}.zones-kpis article{min-height:54px}.zone-selected{height:auto}.zone-map-card,.zone-capacity-card,.zone-table-card,.zone-actions-card{height:auto;min-height:0}.zone-map-canvas{height:220px}.zone-windows{margin-top:0}}
+.zone-demo-map{position:relative;width:100%;height:100%;min-height:170px;overflow:hidden;background:repeating-linear-gradient(28deg,transparent 0 42px,#ffffffa8 43px 47px,transparent 48px 72px),repeating-linear-gradient(112deg,transparent 0 55px,#ffffffc9 56px 61px,transparent 62px 94px),#eaf1ed}
+.zone-demo-map svg{position:absolute;inset:0;width:100%;height:100%}
+.zone-demo-map .zone-boundary{fill:#0c9aaa24;stroke:#0b91a2;stroke-width:3;stroke-dasharray:7 4}
+.zone-demo-map .zone-center{fill:#0b91a2;stroke:white;stroke-width:2}
+.zone-demo-map>small{position:absolute;bottom:8px;left:8px;padding:4px 7px;border-radius:5px;background:#ffffffdf;color:#087e95;font-size:8px}
+.zone-demo-pin{position:absolute;padding:5px 8px;border:1px solid #fff;border-radius:999px;background:#fff;color:#52646b;font-size:8px;box-shadow:0 2px 5px #153c331a}
+.zone-demo-pin.central{top:44%;left:42%;background:#0b94a4;color:white}.zone-demo-pin.north{top:15%;left:54%}.zone-demo-pin.west{top:53%;left:14%;background:#fff2e5;color:#a96c12}
+.zone-demo-action-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:10px 0;padding:10px;border-radius:8px;background:#fff7eb}
+.zone-demo-action-metrics strong{display:grid;gap:4px;color:#a96c12;font-size:14px}.zone-demo-action-metrics small{color:#829096;font-size:7px;font-weight:400}
