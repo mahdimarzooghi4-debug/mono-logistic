@@ -5,11 +5,24 @@ import SlaExceptionsWorkbench from './SlaExceptionsWorkbench'
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('SlaExceptionsWorkbench', () => {
+  it('renders the selected Figma exception, evidence, timeline and recommendation in demo mode without API calls', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    render(<SlaExceptionsWorkbench token="" demoMode onConnected={vi.fn()} onOpenMission={vi.fn()} />)
+    expect(screen.getByRole('heading', { name: /MIS-10461/ })).toBeInTheDocument()
+    expect(screen.getByText('RTE-071')).toBeInTheDocument()
+    expect(screen.getByText('۱۴:۵۴')).toBeInTheDocument()
+    expect(await screen.findByText('پذیرش مأموریت')).toBeInTheDocument()
+    expect(screen.getByText(/CR-311 نزدیک‌ترین گزینه/)).toBeInTheDocument()
+    expect(screen.getByText(/دادهٔ نمایشی SLA/)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('keeps counts blank until the operations API is authenticated', () => {
     render(<SlaExceptionsWorkbench token="" onConnected={vi.fn()} onOpenMission={vi.fn()} />)
     expect(screen.getByText('برای شروع به API عملیات متصل شوید.')).toBeInTheDocument()
     expect(screen.getByText('بحرانی').parentElement).toHaveTextContent('—')
-    expect(screen.getByText('میانگین ریسک').parentElement).toHaveTextContent('—')
+    expect(screen.getByText('میانگین رسیدگی').parentElement).toHaveTextContent('—')
     expect(screen.getByRole('button', { name: 'ثبت استثنا' })).toBeDisabled()
   })
 
@@ -32,7 +45,7 @@ describe('SlaExceptionsWorkbench', () => {
     render(<SlaExceptionsWorkbench token="ops-token" onConnected={vi.fn()} onOpenMission={vi.fn()} />)
     expect((await screen.findAllByText(alert.mission_id)).length).toBeGreaterThan(0)
     expect(await screen.findByText('پذیرش مأموریت')).toBeInTheDocument()
-    expect(screen.getAllByText('زمان واقعی تحویل')).toHaveLength(2)
+    expect(screen.getAllByText('زمان واقعی تحویل')).toHaveLength(1)
     expect(screen.getByText('داده‌ای ارائه نشده')).toBeInTheDocument()
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
     expect(screen.getByRole('button', { name: 'تأیید تخصیص مجدد' })).toBeDisabled()
