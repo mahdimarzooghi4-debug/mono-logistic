@@ -60,4 +60,14 @@ describe('courier home', () => {
     expect(screen.getByRole('status')).toHaveTextContent('به بک‌اند بانکی متصل نیست')
     expect(screen.getAllByText('−۲۰۰٬۰۰۰ تومان')).toHaveLength(2)
   })
+
+  it('opens the courier account and makes support actions respond', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'حساب' }))
+    expect(screen.getByText('رضا احمدی')).toBeInTheDocument()
+    expect(screen.getByText('مشخصات عملیاتی')).toBeInTheDocument()
+    expect(screen.getByText('ماموریت همزمان')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /پشتیبانی/ }))
+    expect(screen.getByRole('status')).toHaveTextContent('مرکز عملیات')
+  })
 })

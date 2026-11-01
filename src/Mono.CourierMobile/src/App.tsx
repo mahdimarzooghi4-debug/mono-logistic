@@ -6,6 +6,7 @@ import FinalDelivery from './FinalDelivery'
 import MissionComplete from './MissionComplete'
 import MissionHistory from './MissionHistory'
 import MissionWallet from './MissionWallet'
+import CourierAccount from './CourierAccount'
 
 type Offer = { id: string; shop: string; recipient: string; amount: string; pickup: string; total: string; distance: string }
 const offers: Offer[] = [
@@ -36,7 +37,7 @@ export default function App() {
   const [active, setActive] = useState('home')
   const [index, setIndex] = useState(0)
   const [accepted, setAccepted] = useState<string | null>(null)
-  const [screen, setScreen] = useState<'home' | 'enroute' | 'received' | 'dropoff' | 'finaldelivery' | 'complete' | 'history' | 'wallet'>('home')
+  const [screen, setScreen] = useState<'home' | 'enroute' | 'received' | 'dropoff' | 'finaldelivery' | 'complete' | 'history' | 'wallet' | 'account'>('home')
   const [notice, setNotice] = useState('')
   const touchStart = useRef<number | null>(null)
   const offer = offers[index]
@@ -72,6 +73,9 @@ export default function App() {
       setNotice(message)
       window.setTimeout(() => setNotice(''), 2600)
     }} /> : screen === 'history' ? <MissionHistory /> : screen === 'wallet' ? <MissionWallet onNotice={message => {
+      setNotice(message)
+      window.setTimeout(() => setNotice(''), 2600)
+    }} /> : screen === 'account' ? <CourierAccount onNotice={message => {
       setNotice(message)
       window.setTimeout(() => setNotice(''), 2600)
     }} /> : <section className="content-scroll">
@@ -116,11 +120,12 @@ export default function App() {
     <nav className={`bottom-nav ${screen !== 'home' ? 'missions-active' : ''}`} aria-label="ناوبری اصلی">
       {navItems.map(item => <button key={item.id} className={active === item.id ? 'active' : ''} onClick={() => {
         setActive(item.id)
+        if (item.id === 'account') setScreen('account')
         if (item.id === 'home') setScreen('home')
         if (item.id === 'missions') setScreen('history')
         if (item.id === 'wallet') setScreen('wallet')
       }} aria-current={active === item.id ? 'page' : undefined}>
-          <span className="nav-icon"><img src={screen === 'home' ? `/figma/${item.icon}` : `/figma/${screen === 'received' ? 'arrived' : screen === 'dropoff' || screen === 'finaldelivery' || screen === 'complete' || screen === 'history' || screen === 'wallet' ? 'dropoff' : 'route'}-nav-${item.id === 'account' ? 'account' : item.id === 'wallet' ? 'income' : item.id === 'missions' ? 'missions' : 'home'}.svg`} alt="" /></span><small>{item.label}</small>
+          <span className="nav-icon"><img src={screen === 'home' || screen === 'account' ? `/figma/${item.icon}` : `/figma/${screen === 'received' ? 'arrived' : screen === 'dropoff' || screen === 'finaldelivery' || screen === 'complete' || screen === 'history' || screen === 'wallet' ? 'dropoff' : 'route'}-nav-${item.id === 'account' ? 'account' : item.id === 'wallet' ? 'income' : item.id === 'missions' ? 'missions' : 'home'}.svg`} alt="" /></span><small>{item.label}</small>
       </button>)}
     </nav>
   </main>
