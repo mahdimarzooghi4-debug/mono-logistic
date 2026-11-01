@@ -26,6 +26,7 @@ describe('courier home', () => {
     fireEvent.click(screen.getByLabelText('تعداد درست است'))
     fireEvent.click(screen.getByLabelText('بسته سالم است'))
     fireEvent.click(screen.getByRole('button', { name: 'سفارش را تحویل گرفتم' }))
-    expect(screen.getByRole('button', { name: 'تحویل ثبت شد' })).toBeDisabled()
+    expect(screen.getByText('MIS-۱۰۴۹۸ • حرکت به مقصد')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'رسیدم به مقصد' })).toBeInTheDocument()
   })
 })

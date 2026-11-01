@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-type PickupReceivedProps = { onNotice: (message: string) => void }
+type PickupReceivedProps = { onNotice: (message: string) => void; onHandedOff: () => void }
 
-export default function PickupReceived({ onNotice }: PickupReceivedProps) {
+export default function PickupReceived({ onNotice, onHandedOff }: PickupReceivedProps) {
   const [waitSeconds, setWaitSeconds] = useState(134)
   const [countChecked, setCountChecked] = useState(false)
   const [packageChecked, setPackageChecked] = useState(false)
@@ -21,6 +21,7 @@ export default function PickupReceived({ onNotice }: PickupReceivedProps) {
       return
     }
     setHandedOff(true)
+    onHandedOff()
     onNotice('تحویل سفارش از شعبه ثبت شد.')
   }
 
