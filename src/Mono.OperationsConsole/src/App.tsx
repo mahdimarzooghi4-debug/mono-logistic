@@ -1041,7 +1041,7 @@ export default function App() {
         <div className="side-caption">فضای عملیات</div>
         <nav className="navigation" aria-label="ناوبری اصلی">
           <button className={`nav-item ${viewMode === 'overview' ? 'active' : ''}`} onClick={() => switchView('overview')}><span className="nav-icon"><NavIcon type="dashboard" /></span>داشبورد</button>
-          <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon"><NavIcon type="mission" /></span>مأموریت‌ها</button>
+          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={openDashboardDispatch}><span className="nav-icon"><NavIcon type="mission" /></span>مأموریت‌ها</button>
           <button className={`nav-item ${viewMode === 'routes' ? 'active' : ''}`} onClick={() => switchView('routes')}><span className="nav-icon"><NavIcon type="route" /></span>مسیرها</button>
           <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon"><NavIcon type="courier" /></span>پیک‌ها</button>
           <button className="nav-item" disabled title="فهرست و API مستقل وسایل نقلیه هنوز در دسترس نیست"><span className="nav-icon"><NavIcon type="vehicle" /></span>وسایل نقلیه</button>
