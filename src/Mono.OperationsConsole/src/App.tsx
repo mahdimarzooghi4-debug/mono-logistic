@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import PolicyWorkbench from './PolicyWorkbench'
 import OnboardingWorkbench from './OnboardingWorkbench'
+import CustomersDemoWorkbench from './CustomersDemoWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
 import DashboardSummaryCards from './DashboardSummaryCards'
 import OperationsOverviewWorkbench from './OperationsOverviewWorkbench'
@@ -1261,7 +1262,7 @@ export default function App() {
         {viewMode === 'routes' && <RoutePlanWorkbench token={token} reloadKey={routeReloadKey} demoMode={demoMode} onConnected={setConnected} />}
         {viewMode === 'audit' && <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />}
         {viewMode === 'admissions' && <AdmissionsWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} onOpenBusinesses={() => switchView('onboarding')} onOpenCouriers={() => switchView('couriers')} />}
-        {viewMode === 'onboarding' && <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
+        {viewMode === 'onboarding' && (demoMode ? <CustomersDemoWorkbench /> : <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />)}
         {viewMode === 'couriers' && <CourierControlWorkbench couriers={courierItems} selectedCourierId={selectedCourierId} detail={courierDetail} audit={courierAudit} loading={loading} detailLoading={timelineLoading && !timelineTitle && Boolean(selectedCourierId)} detailErrors={detailErrors} error={error} query={courierQuery} status={courierStatus} token={token} demoMode={demoMode} pageIndex={pageIndex} hasNext={Boolean(courierNextCursor)} onQueryChange={setCourierQuery} onStatusChange={setCourierStatus} onSearch={applyFilters} onSelect={(courierId) => demoMode ? setSelectedCourierId(courierId) : void showCourierDetails(courierId, true)} onPrevious={goPrevious} onNext={goNext} onRefresh={() => void fetchCourierPage(cursorStack[pageIndex] || null)} onOpenAdmissions={() => switchView('admissions')} onOpenZones={() => switchView('zones')} />}
         {viewMode === 'zones' && <ZonesCapacityWorkbench token={token} demoMode={demoMode} onConnected={setConnected} />}
         {viewMode === 'sla' && <SlaExceptionsWorkbench token={token} demoMode={demoMode} onConnected={setConnected} onOpenMission={(missionId) => void showMissionDetails(missionId)} />}
