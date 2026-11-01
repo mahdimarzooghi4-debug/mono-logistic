@@ -376,6 +376,16 @@ tbody tr:hover { background: #fbfdfd; }
 .capacity-overview-empty > span { display: grid; width: 32px; height: 32px; place-items: center; margin-bottom: 7px; border-radius: 50%; background: #eef8fa; color: #087e95; font-size: 16px; }
 .capacity-overview-empty strong { color: #465960; font-size: 9px; }
 .capacity-overview-empty p { margin: 6px 0; color: #829096; font-size: 8px; line-height: 1.8; }
+.dispatch-capacity-list { padding: 0 16px 12px; }
+.dispatch-capacity-row { display: grid; grid-template-columns: 55px 42px 1fr; align-items: center; gap: 8px; padding-top: 12px; font-size: 9px; direction: ltr; }
+.dispatch-capacity-row>span,.dispatch-capacity-row>b,.dispatch-capacity-row>strong { direction: rtl; }
+.dispatch-capacity-row>span { color: #168b55; }
+.dispatch-capacity-row>b { color: #74838a; font-weight: 500; }
+.dispatch-capacity-row>strong { text-align: right; }
+.dispatch-capacity-row>i { grid-column: 1 / 4; height: 4px; margin-top: 2px; border-radius: 5px; background: #edf1f2; overflow: hidden; }
+.dispatch-capacity-row>i>em { display: block; height: 100%; border-radius: inherit; background: #1cab6a; }
+.dispatch-capacity-row:nth-child(2)>i>em { background: #d18a15; }
+.dispatch-capacity-row:nth-child(3)>i>em { background: #cf4942; }
 .operations-primary-card { min-height: 749px; direction: rtl; }
 .operations-primary-card .dashboard-panel-heading { position: relative; display: grid; grid-template-columns: 1fr 1fr; min-height: 49px; align-items: flex-start; padding: 20px 20px 0; }
 .operations-primary-card .dashboard-panel-heading h2 { margin: 0; font-size: 15px; line-height: 1.5; }
