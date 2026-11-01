@@ -4,6 +4,8 @@ import PolicyWorkbench from './PolicyWorkbench'
 import OnboardingWorkbench from './OnboardingWorkbench'
 import CustomersDemoWorkbench from './CustomersDemoWorkbench'
 import VehiclesDemoWorkbench from './VehiclesDemoWorkbench'
+import IntegrationDemoWorkbench from './IntegrationDemoWorkbench'
+import TrackingDemoWorkbench from './TrackingDemoWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
 import DashboardSummaryCards from './DashboardSummaryCards'
 import OperationsOverviewWorkbench from './OperationsOverviewWorkbench'
@@ -1115,7 +1117,7 @@ export default function App() {
     admissions: 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها',
   }
 
-  function shouldShowShellTopbar() { return viewMode !== 'overview' && viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' && !(demoMode && (viewMode === 'onboarding' || viewMode === 'vehicles')) }
+  function shouldShowShellTopbar() { return viewMode !== 'overview' && viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' && !(demoMode && (viewMode === 'onboarding' || viewMode === 'vehicles' || viewMode === 'webhooks' || viewMode === 'audit')) }
   function shouldShowLegacyDataPanel() { return viewMode !== 'overview' && viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'vehicles' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
   const activeDemoMission = demoMode ? DEMO_DISPATCH_MISSIONS.find((mission) => mission.missionId === timelineTitle) : undefined
 
@@ -1198,7 +1200,8 @@ export default function App() {
             </article>
           })}
         </section>}
-        {viewMode === 'webhooks' && <div className="webhook-dashboard">
+        {viewMode === 'webhooks' && demoMode && <IntegrationDemoWorkbench />}
+        {viewMode === 'webhooks' && !demoMode && <div className="webhook-dashboard">
           {webhookSummary && <section className="kpi-grid" aria-label="خلاصهٔ سراسری صف webhook">
             <article className="kpi-card"><span className="kpi-icon cyan">↻</span><div><small>کل تحویل‌ها</small><strong>{fa.format(webhookSummary.total_count)}</strong></div></article>
             <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>موعد ارسال</small><strong>{fa.format(webhookSummary.due_count)}</strong></div></article>
@@ -1263,7 +1266,7 @@ export default function App() {
         {viewMode === 'policies' && <PolicyWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
         {viewMode === 'routes' && <RoutePlanWorkbench token={token} reloadKey={routeReloadKey} demoMode={demoMode} onConnected={setConnected} />}
         {viewMode === 'vehicles' && demoMode && <VehiclesDemoWorkbench />}
-        {viewMode === 'audit' && <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />}
+        {viewMode === 'audit' && (demoMode ? <TrackingDemoWorkbench /> : <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />)}
         {viewMode === 'admissions' && <AdmissionsWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} onOpenBusinesses={() => switchView('onboarding')} onOpenCouriers={() => switchView('couriers')} />}
         {viewMode === 'onboarding' && (demoMode ? <CustomersDemoWorkbench /> : <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />)}
         {viewMode === 'couriers' && <CourierControlWorkbench couriers={courierItems} selectedCourierId={selectedCourierId} detail={courierDetail} audit={courierAudit} loading={loading} detailLoading={timelineLoading && !timelineTitle && Boolean(selectedCourierId)} detailErrors={detailErrors} error={error} query={courierQuery} status={courierStatus} token={token} demoMode={demoMode} pageIndex={pageIndex} hasNext={Boolean(courierNextCursor)} onQueryChange={setCourierQuery} onStatusChange={setCourierStatus} onSearch={applyFilters} onSelect={(courierId) => demoMode ? setSelectedCourierId(courierId) : void showCourierDetails(courierId, true)} onPrevious={goPrevious} onNext={goNext} onRefresh={() => void fetchCourierPage(cursorStack[pageIndex] || null)} onOpenAdmissions={() => switchView('admissions')} onOpenZones={() => switchView('zones')} />}
