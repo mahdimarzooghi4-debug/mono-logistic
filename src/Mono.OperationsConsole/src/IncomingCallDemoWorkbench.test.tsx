@@ -24,8 +24,9 @@ describe('IncomingCallDemoWorkbench', () => {
 
   it('offers manual search for an unmatched caller without inventing matches', () => {
     render(<IncomingCallDemoWorkbench scenario="unmatched" onClose={vi.fn()} onOpenMission={vi.fn()} />)
-    fireEvent.change(screen.getByRole('textbox', { name: /جست‌وجوی تلفن/ }), { target: { value: 'MIS-10479' } })
+    fireEvent.change(screen.getByRole('textbox', { name: /جست‌وجوی تلفن/ }), { target: { value: 'علی رضایی' } })
     expect(screen.getByRole('button', { name: /MIS-10479/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /MIS-/ })).toHaveLength(3)
     expect(screen.getByRole('button', { name: 'جست‌وجوی مأموریت' })).toBeDisabled()
   })
 })
