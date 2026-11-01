@@ -88,4 +88,17 @@ describe('courier home', () => {
     expect(screen.getByRole('status')).toHaveTextContent('عدم دسترسی گیرنده برای پشتیبانی ثبت شد')
     expect(screen.getByRole('button', { name: 'عدم دسترسی گیرنده ثبت شد' })).toBeDisabled()
   })
+
+  it('records a store preparation delay without blaming the courier', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'پذیرش این ماموریت' }))
+    fireEvent.click(screen.getByRole('button', { name: 'رسیدم به مبدا' }))
+    fireEvent.click(screen.getByRole('button', { name: 'سفارش آماده نیست' }))
+    expect(screen.getByText('تأخیر آماده‌سازی فروشگاه')).toBeInTheDocument()
+    expect(screen.getByText('HNA-۸۳۹۲۵۱')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('یادداشت تأخیر آماده‌سازی'), { target: { value: '۵ دقیقه دیگر آماده می‌شود' } })
+    fireEvent.click(screen.getByRole('button', { name: 'ثبت تأخیر شعبه' }))
+    expect(screen.getByRole('status')).toHaveTextContent('به عملکرد پیک منظور نمی‌شود')
+    expect(screen.getByRole('button', { name: 'تأخیر شعبه ثبت شد' })).toBeDisabled()
+  })
 })

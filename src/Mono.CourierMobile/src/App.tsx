@@ -8,6 +8,7 @@ import MissionHistory from './MissionHistory'
 import MissionWallet from './MissionWallet'
 import CourierAccount from './CourierAccount'
 import RecipientUnavailable from './RecipientUnavailable'
+import OrderNotReady from './OrderNotReady'
 
 type Offer = { id: string; shop: string; recipient: string; amount: string; pickup: string; total: string; distance: string }
 const offers: Offer[] = [
@@ -38,7 +39,7 @@ export default function App() {
   const [active, setActive] = useState('home')
   const [index, setIndex] = useState(0)
   const [accepted, setAccepted] = useState<string | null>(null)
-  const [screen, setScreen] = useState<'home' | 'enroute' | 'received' | 'dropoff' | 'finaldelivery' | 'recipientunavailable' | 'complete' | 'history' | 'wallet' | 'account'>('home')
+  const [screen, setScreen] = useState<'home' | 'enroute' | 'received' | 'dropoff' | 'finaldelivery' | 'recipientunavailable' | 'ordernotready' | 'complete' | 'history' | 'wallet' | 'account'>('home')
   const [notice, setNotice] = useState('')
   const touchStart = useRef<number | null>(null)
   const offer = offers[index]
@@ -57,10 +58,13 @@ export default function App() {
     {screen === 'enroute' ? <PickupRoute onArrive={() => setScreen('received')} onNotice={message => {
       setNotice(message)
       window.setTimeout(() => setNotice(''), 2600)
-    }} /> : screen === 'received' ? <PickupReceived onHandedOff={() => setScreen('dropoff')} onNotice={message => {
+    }} /> : screen === 'received' ? <PickupReceived onHandedOff={() => setScreen('dropoff')} onOrderNotReady={() => setScreen('ordernotready')} onNotice={message => {
       setNotice(message)
       window.setTimeout(() => setNotice(''), 2600)
     }} /> : screen === 'dropoff' ? <DropoffRoute onArrive={() => setScreen('finaldelivery')} onNotice={message => {
+      setNotice(message)
+      window.setTimeout(() => setNotice(''), 2600)
+    }} /> : screen === 'ordernotready' ? <OrderNotReady onNotice={message => {
       setNotice(message)
       window.setTimeout(() => setNotice(''), 2600)
     }} /> : screen === 'finaldelivery' ? <FinalDelivery onComplete={() => setScreen('complete')} onUnavailable={() => setScreen('recipientunavailable')} onNotice={message => {
@@ -129,7 +133,7 @@ export default function App() {
         if (item.id === 'missions') setScreen('history')
         if (item.id === 'wallet') setScreen('wallet')
       }} aria-current={active === item.id ? 'page' : undefined}>
-          <span className="nav-icon"><img src={screen === 'home' || screen === 'account' ? `/figma/${item.icon}` : `/figma/${screen === 'received' ? 'arrived' : screen === 'dropoff' || screen === 'finaldelivery' || screen === 'recipientunavailable' || screen === 'complete' || screen === 'history' || screen === 'wallet' ? 'dropoff' : 'route'}-nav-${item.id === 'account' ? 'account' : item.id === 'wallet' ? 'income' : item.id === 'missions' ? 'missions' : 'home'}.svg`} alt="" /></span><small>{item.label}</small>
+          <span className="nav-icon"><img src={screen === 'home' || screen === 'account' ? `/figma/${item.icon}` : `/figma/${screen === 'received' ? 'arrived' : screen === 'dropoff' || screen === 'finaldelivery' || screen === 'recipientunavailable' || screen === 'ordernotready' || screen === 'complete' || screen === 'history' || screen === 'wallet' ? 'dropoff' : 'route'}-nav-${item.id === 'account' ? 'account' : item.id === 'wallet' ? 'income' : item.id === 'missions' ? 'missions' : 'home'}.svg`} alt="" /></span><small>{item.label}</small>
       </button>)}
     </nav>
   </main>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 
-type PickupReceivedProps = { onNotice: (message: string) => void; onHandedOff: () => void }
+type PickupReceivedProps = { onNotice: (message: string) => void; onHandedOff: () => void; onOrderNotReady: () => void }
 
-export default function PickupReceived({ onNotice, onHandedOff }: PickupReceivedProps) {
+export default function PickupReceived({ onNotice, onHandedOff, onOrderNotReady }: PickupReceivedProps) {
   const [waitSeconds, setWaitSeconds] = useState(134)
   const [countChecked, setCountChecked] = useState(false)
   const [packageChecked, setPackageChecked] = useState(false)
@@ -59,7 +59,7 @@ export default function PickupReceived({ onNotice, onHandedOff }: PickupReceived
     </section>
 
     <div className="pickup-problem-actions">
-      <button onClick={() => onNotice('وضعیت «سفارش آماده نیست» برای این مأموریت ثبت شد.')}>سفارش آماده نیست</button>
+      <button onClick={onOrderNotReady}>سفارش آماده نیست</button>
       <button onClick={() => onNotice('فرم ثبت مشکل تحویل برای این مأموریت باز شد.')}>مشکل در تحویل</button>
     </div>
 
