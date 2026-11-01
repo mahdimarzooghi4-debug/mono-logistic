@@ -106,6 +106,29 @@ function statusLabel(state: string) {
   return 'در بازه'
 }
 
+function missionStatusText(status?: string | null) {
+  const labels: Record<string, string> = {
+    PROMISED: 'زمان تحویل تأییدشده', SEARCHING_COURIER: 'جست‌وجوی پیک',
+    COURIER_ASSIGNED: 'پیک تخصیص‌یافته', ARRIVED_PICKUP: 'در محل دریافت',
+    HANDED_TO_COURIER: 'تحویل به پیک', PICKED_UP: 'دریافت‌شده',
+    IN_TRANSIT: 'در مسیر', ARRIVED_DROPOFF: 'در محل تحویل',
+    DELIVERED: 'تحویل‌شده', FAILED: 'ناموفق', CANCELLED: 'لغوشده',
+  }
+  return status ? labels[status.toUpperCase()] || status : '—'
+}
+
+function missionEventText(eventType: string) {
+  const labels: Record<string, string> = {
+    'mission.created': 'مأموریت ایجاد شد', 'mission.searching_courier': 'جست‌وجوی پیک آغاز شد',
+    'mission.courier_assigned': 'پیک تخصیص داده شد', 'mission.arrived_pickup': 'پیک به مبدأ رسید',
+    'mission.handed_to_courier': 'مأموریت به پیک تحویل شد', 'mission.picked_up': 'مرسوله دریافت شد',
+    'mission.in_transit': 'حرکت به مقصد', 'mission.arrived_dropoff': 'پیک به مقصد رسید',
+    'mission.delivered': 'تحویل کامل شد', 'mission.failed': 'تحویل ناموفق بود',
+    'mission.cancelled': 'مأموریت لغو شد',
+  }
+  return labels[eventType] || eventType
+}
+
 function NavIcon({ type }: { type: string }) {
   const common = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const }
   switch (type) {
@@ -1365,7 +1388,7 @@ export default function App() {
       </section></div>}
       {timelineTitle && <div className={`modal-backdrop${viewMode !== 'couriers' && viewMode !== 'presence' ? ' mission-drawer-backdrop' : ''}`} role="presentation" onClick={closeDetails}><section className={`timeline-modal detail-modal${viewMode !== 'couriers' && viewMode !== 'presence' ? ' mission-detail-drawer' : ''}`} role="dialog" aria-modal="true" aria-labelledby="timeline-title" onClick={(event) => event.stopPropagation()}>{viewMode !== 'couriers' && viewMode !== 'presence' ? <header className="mission-drawer-header">
         <div className="mission-drawer-heading"><h2 id="timeline-title">جزئیات مأموریت</h2><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></div>
-        <div className="mission-drawer-id-row"><span className="badge neutral">{missionDetail?.status || '—'}</span><strong className="mission-id" dir="ltr">{timelineTitle}</strong></div>
+        <div className="mission-drawer-id-row"><span className={`badge ${missionDetail?.status === 'DELIVERED' ? 'success' : missionDetail?.status === 'FAILED' || missionDetail?.status === 'CANCELLED' ? 'danger' : missionDetail?.status ? 'info' : 'neutral'}`}>{missionStatusText(missionDetail?.status)}</span><strong className="mission-id" dir="ltr">{timelineTitle}</strong></div>
         <p className="mission-drawer-customer">مشتری: <bdi dir="ltr">{missionDetail?.customerId || '—'}</bdi></p>
       </header> : <header><div><span className="eyebrow">جزئیات و سوابق عملیاتی</span><h2 id="timeline-title" dir="ltr">{timelineTitle}</h2></div><button className="icon-button" onClick={closeDetails} aria-label="بستن">×</button></header>}{timelineLoading ? <p className="modal-state">در حال دریافت اطلاعات…</p> : viewMode === 'couriers' || viewMode === 'presence' ? <>
         {detailErrors.length > 0 && <div className="detail-errors">{detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
@@ -1389,10 +1412,11 @@ export default function App() {
           <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>شیوهٔ حمل</span></div>
           <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مبدأ</span></div>
           <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مقصد</span></div>
+          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>زون</span></div>
           <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مسیر فعال</span></div>
         </div> : <p className="modal-state">اطلاعات اجرا در دسترس نیست.</p>}</section>
         <section className="detail-section decision-evidence"><h3>دلیل تصمیم سیستم</h3><p>دادهٔ دلیل تخصیص در API فعلی موجود نیست.</p></section>
-        <section className="detail-section"><h3>تاریخچه مأموریت</h3>{missionTimeline.length ? <ol className="drawer-timeline">{[...missionTimeline].sort((a,b) => a.sequence-b.sequence).map((event) => <li key={event.eventId}><time>{formatDate(event.occurredAt)}</time><span className="event-dot"/><div><strong>{event.eventType}</strong><small>رویداد {fa.format(event.sequence)}</small></div></li>)}</ol> : <p className="modal-state">رویدادی در timeline ثبت نشده است.</p>}</section>
+        <section className="detail-section"><h3>تاریخچه مأموریت</h3>{missionTimeline.length ? <ol className="drawer-timeline">{[...missionTimeline].sort((a,b) => a.sequence-b.sequence).map((event) => <li key={event.eventId}><time>{formatDate(event.occurredAt)}</time><span className="event-dot"/><div><strong>{missionEventText(event.eventType)}</strong><small>رویداد {fa.format(event.sequence)}</small></div></li>)}</ol> : <p className="modal-state">رویدادی در timeline ثبت نشده است.</p>}</section>
         <footer className="drawer-actions"><div className="drawer-action-row"><button disabled title="API فعلی مسیر فعال مأموریت را ارائه نمی‌کند">مشاهده مسیر</button><button disabled title="اطلاعات تماس پیک در API مأموریت موجود نیست">تماس با پیک</button></div><div className="drawer-action-row"><button disabled title="API عملیات ثبت استثنا را ارائه نمی‌کند">ثبت استثنا</button><button disabled title="API عملیات تخصیص مجدد را ارائه نمی‌کند">تخصیص مجدد</button></div><button className="drawer-cancel" disabled title="لغو مأموریت از این پنل در API پشتیبانی نمی‌شود">لغو مأموریت</button><small>اقدام‌های عملیاتی تا زمان پشتیبانی API غیرفعال هستند.</small></footer>
       </>}</section></div>}
     </div>
