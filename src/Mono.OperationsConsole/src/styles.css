@@ -123,6 +123,7 @@ tbody tr:hover { background: #fbfdfd; }
 .badge.warning { background: #fff5e4; color: #ad7416; }
 .badge.neutral { background: #eef3f4; color: #69787e; }
 .badge.success { background: #e9f8ef; color: #198b55; }
+.badge.info { background: #e8f7fa; color: #007f96; }
 .history-button { border: 1px solid #d8e6e9; border-radius: 6px; background: #fff; color: #087e95; padding: 5px 9px; font-size: 9px; }
 .state-cell { height: 145px; text-align: center; color: #829096; }
 .state-cell strong,.state-cell small { display: block; }
