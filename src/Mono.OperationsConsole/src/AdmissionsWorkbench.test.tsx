@@ -25,4 +25,15 @@ describe('AdmissionsWorkbench', () => {
     await waitFor(() => expect(screen.queryByText('نمونه')).not.toBeInTheDocument())
     expect(screen.getAllByText('courier-1')).toHaveLength(2)
   })
+
+  it('renders the Figma admissions overview in demo mode with searchable sample records', async () => {
+    render(<AdmissionsWorkbench token="" reloadKey={0} onConnected={vi.fn()} onOpenBusinesses={vi.fn()} onOpenCouriers={vi.fn()} demoMode />)
+    expect(screen.getByRole('heading', { name: 'ثبت‌نام و پذیرش مونو' })).toBeInTheDocument()
+    expect(screen.getByText('وضعیت پایپ‌لاین')).toBeInTheDocument()
+    expect(screen.getByText('مسیر پذیرش پیک')).toBeInTheDocument()
+    expect(screen.getByText('CR-REG-۰۱۴۸')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'جست‌وجوی شناسه، نام، موبایل یا کسب‌وکار' }), { target: { value: 'فروشگاه سپهر' } })
+    expect(screen.getByText('فروشگاه سپهر')).toBeInTheDocument()
+    expect(screen.queryByText('رضا احمدی')).not.toBeInTheDocument()
+  })
 })
