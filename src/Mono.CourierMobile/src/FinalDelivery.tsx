@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
-type FinalDeliveryProps = { onNotice: (message: string) => void; onComplete: () => void }
+type FinalDeliveryProps = { onNotice: (message: string) => void; onComplete: () => void; onUnavailable: () => void }
 
-export default function FinalDelivery({ onNotice, onComplete }: FinalDeliveryProps) {
+export default function FinalDelivery({ onNotice, onComplete, onUnavailable }: FinalDeliveryProps) {
   const [recipientType, setRecipientType] = useState<'customer' | 'other'>('customer')
   const [recipient, setRecipient] = useState('علی رضایی')
   const [condition, setCondition] = useState<'intact' | 'issue'>('intact')
@@ -75,7 +75,7 @@ export default function FinalDelivery({ onNotice, onComplete }: FinalDeliveryPro
     </label>
 
     <div className="final-issue-actions">
-      <button className="unavailable" onClick={() => onNotice('گیرنده در دسترس نیست؛ وضعیت برای پیگیری ثبت شد.')}>گیرنده در دسترس نیست</button>
+      <button className="unavailable" onClick={onUnavailable}>گیرنده در دسترس نیست</button>
       <button onClick={() => onNotice('گزارش مشکل تحویل برای این مأموریت ثبت شد.')}>مشکل در تحویل</button>
     </div>
     <button className="final-complete-button" onClick={completeDelivery} disabled={delivered}>{delivered ? 'تحویل ثبت شد' : 'تحویل انجام شد'}</button>
