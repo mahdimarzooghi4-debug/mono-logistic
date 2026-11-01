@@ -26,4 +26,20 @@ describe('Courier control workspace', () => {
     expect(screen.getByRole('button', { name: 'تماس با پیک' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'محدودسازی موقت' })).toBeDisabled()
   })
+
+  it('renders a labeled Tehran courier and route in demo mode without an API record', () => {
+    render(<CourierControlWorkbench
+      couriers={[]} selectedCourierId="" detail={null} audit={[]}
+      loading={false} detailLoading={false} detailErrors={[]} error="" query="" status="" token="" demoMode
+      pageIndex={0} hasNext={false} onQueryChange={vi.fn()} onStatusChange={vi.fn()} onSearch={vi.fn()}
+      onSelect={vi.fn()} onPrevious={vi.fn()} onNext={vi.fn()} onOpenAdmissions={vi.fn()} onOpenZones={vi.fn()} onRefresh={vi.fn()}
+    />)
+
+    expect(screen.getByText(/دادهٔ نمایشی تهران/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'CR-204' })).toBeInTheDocument()
+    expect(screen.getAllByText('MIS-10482')).toHaveLength(2)
+    expect(screen.getByText('موقعیت زندهٔ پیک · تهران')).toBeInTheDocument()
+    expect(screen.getByText('موقعیت نمایشی است و از GPS واقعی نمی‌آید.')).toBeInTheDocument()
+    expect(screen.getByText('۸۳ آنلاین')).toBeInTheDocument()
+  })
 })
