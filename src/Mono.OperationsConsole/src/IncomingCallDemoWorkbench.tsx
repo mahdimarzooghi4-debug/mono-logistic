@@ -6,7 +6,7 @@ export type IncomingCallScenario = 'matched' | 'unmatched' | 'multiple'
 const matches = [
   { id: 'MIS-10479', order: 'HNA-839251', branch: 'شعبه مرکزی', status: 'در محل دریافت', committed: '۱۴:۳۰', eta: '۱۴:۵۱', courier: 'CR-118', route: 'مسیر فعال', destination: 'ونک، ملاصدرا', event: 'توقف دریافت بیش از ۳ دقیقه', risk: 'در معرض خطر' },
   { id: 'MIS-10482', order: 'HNA-839254', branch: 'شعبه شمال', status: 'در مسیر', committed: '۱۴:۴۵', eta: '۱۴:۵۰', courier: 'CR-204', route: 'مسیر مرکزی ۰۷', destination: 'میدان ونک', event: 'حرکت به مقصد', risk: 'عادی' },
-  { id: 'MIS-10501', order: 'HNA-839260', branch: 'شعبه ونک', status: 'تخصیص‌شده', committed: '۱۵:۱۰', eta: '۱۵:۱۸', courier: 'بدون پیک', route: 'بدون مسیر فعال', destination: 'ملاصدرا', event: 'در انتظار پذیرش پیک', risk: 'در معرض خطر' },
+  { id: 'MIS-10474', order: 'HNA-839247', branch: 'شعبه غرب', status: 'جست‌وجوی پیک', committed: '۱۴:۲۰', eta: '۳۴ دقیقه', courier: 'بدون پیک', route: 'بدون مسیر فعال', destination: 'میدان ونک', event: 'در انتظار پذیرش پیک', risk: 'در معرض خطر' },
 ]
 
 export default function IncomingCallDemoWorkbench({ scenario, onClose, onOpenMission }: { scenario: IncomingCallScenario; onClose: () => void; onOpenMission: (id: string) => void }) {
@@ -57,7 +57,7 @@ export default function IncomingCallDemoWorkbench({ scenario, onClose, onOpenMis
       </div>
       <footer className="incoming-call-actions">
         <div className="incoming-action-row"><button className="incoming-primary" onClick={() => onOpenMission(mission.id)} disabled={scenario === 'unmatched'}>{scenario === 'unmatched' ? 'جست‌وجوی مأموریت' : 'باز کردن مأموریت'}</button><button className="incoming-secondary" disabled title="پس از اتصال درگاه تلفنی فعال می‌شود">پاسخ به تماس · درگاه تلفنی</button></div>
-        <div className="incoming-action-row"><button className="incoming-secondary" onClick={() => setNotice('ثبت استثنا فقط پس از اتصال API پشتیبانی انجام می‌شود.')} disabled={scenario !== 'matched'}>ثبت استثنای عملیاتی</button><button className="incoming-secondary" onClick={() => scenario === 'multiple' ? setSelected((selected + 1) % matches.length) : setNotice('این گزینه در اتصال تلفنی واقعی فعال می‌شود.')}>{scenario === 'multiple' ? 'مأموریت بعدی' : 'انتخاب مأموریت دیگر'}</button></div>
+        <div className="incoming-action-row"><button className="incoming-secondary" onClick={() => setNotice('درخواست ثبت نمی‌شود؛ API پشتیبانی هنوز به این پنل متصل نیست.')}>ثبت استثنای عملیاتی</button><button className="incoming-secondary" onClick={() => scenario === 'multiple' ? setSelected((selected + 1) % matches.length) : setNotice('این گزینه در اتصال تلفنی واقعی فعال می‌شود.')}>{scenario === 'multiple' ? 'مأموریت بعدی' : 'انتخاب مأموریت دیگر'}</button></div>
         <p>این پیش‌نمایش فقط دادهٔ نمونه دارد؛ تماس واقعی به اتصال تلفنی و تطبیق سمت سرور نیاز دارد.</p>
       </footer>
     </aside>
