@@ -166,7 +166,7 @@ export default function RoutePlanWorkbench({ token, reloadKey, demoMode = false,
           </div>
           <section className="route-stop-section"><header><div><h3>ترتیب توقف‌ها</h3><p>نسخهٔ ثبت‌شدهٔ برنامهٔ مسیر</p></div><span className="route-status-pill muted">{fa.format(stops.length)} توقف</span></header><div className="table-wrap"><table><thead><tr><th>ترتیب</th><th>نوع</th><th>مأموریت</th><th>مکان</th><th>ETA</th><th>استاندارد خدمت</th><th>وضعیت</th></tr></thead><tbody>
             {stops.map((stop, index) => <tr key={`${index}-${stop.missionId}-${stop.locationId}`}>
-              <td>{fa.format(index + 1)}</td><td>{stop.kind === 0 || stop.kind === 'Pickup' ? 'دریافت' : 'تحویل'}</td><td dir="ltr">{stop.missionId}</td><td dir="ltr">{stop.locationId}</td><td>{demoMode ? `${14+index}: ${index%2?'۴۰':'۲۷'}` : '—'}</td><td>{demoMode ? index===4?'در معرض خطر':'عادی' : '—'}</td><td>{demoMode ? 'در برنامه' : 'از API دریافت نمی‌شود'}</td>
+              <td>{fa.format(index + 1)}</td><td>{stop.kind === 0 || stop.kind === 'Pickup' ? 'دریافت' : 'تحویل'}</td><td dir="ltr">{stop.missionId}</td><td dir="ltr">{stop.locationId}</td><td>{demoMode ? ['۱۴:۲۷','۱۴:۴۰','۱۴:۵۲','۱۵:۰۴','۱۵:۱۶','۱۵:۲۸'][index] : '—'}</td><td>{demoMode ? index===4?'در معرض خطر':'عادی' : '—'}</td><td>{demoMode ? 'در برنامه' : 'از API دریافت نمی‌شود'}</td>
             </tr>)}
             {stops.length === 0 && <tr><td colSpan={7} className="state-cell">برای این نسخه توقفی ثبت نشده است.</td></tr>}
           </tbody></table></div></section>
