@@ -1,6 +1,6 @@
-type DropoffRouteProps = { onNotice: (message: string) => void }
+type DropoffRouteProps = { onNotice: (message: string) => void; onArrive: () => void }
 
-export default function DropoffRoute({ onNotice }: DropoffRouteProps) {
+export default function DropoffRoute({ onNotice, onArrive }: DropoffRouteProps) {
   return <section className="content-scroll dropoff-content" dir="rtl">
     <header className="profile-header">
       <img className="avatar" src="/figma/dropoff-route-avatar.svg" alt="" />
@@ -37,7 +37,7 @@ export default function DropoffRoute({ onNotice }: DropoffRouteProps) {
       </div>
     </section>
 
-    <button className="reached-destination-button" onClick={() => onNotice('رسیدن به مقصد ثبت شد؛ تحویل نهایی را ادامه دهید.')}>رسیدم به مقصد</button>
+    <button className="reached-destination-button" onClick={onArrive}>رسیدم به مقصد</button>
     <p className="destination-hint">پس از رسیدن، تحویل نهایی و تأیید نام گیرنده ثبت می‌شود.</p>
   </section>
 }
