@@ -4,6 +4,7 @@ import PickupReceived from './PickupReceived'
 import DropoffRoute from './DropoffRoute'
 import FinalDelivery from './FinalDelivery'
 import MissionComplete from './MissionComplete'
+import MissionHistory from './MissionHistory'
 
 type Offer = { id: string; shop: string; recipient: string; amount: string; pickup: string; total: string; distance: string }
 const offers: Offer[] = [
@@ -34,7 +35,7 @@ export default function App() {
   const [active, setActive] = useState('home')
   const [index, setIndex] = useState(0)
   const [accepted, setAccepted] = useState<string | null>(null)
-  const [screen, setScreen] = useState<'home' | 'enroute' | 'received' | 'dropoff' | 'finaldelivery' | 'complete'>('home')
+  const [screen, setScreen] = useState<'home' | 'enroute' | 'received' | 'dropoff' | 'finaldelivery' | 'complete' | 'history'>('home')
   const [notice, setNotice] = useState('')
   const touchStart = useRef<number | null>(null)
   const offer = offers[index]
@@ -69,7 +70,7 @@ export default function App() {
     }} onNotice={message => {
       setNotice(message)
       window.setTimeout(() => setNotice(''), 2600)
-    }} /> : <section className="content-scroll">
+    }} /> : screen === 'history' ? <MissionHistory /> : <section className="content-scroll">
       <header className="profile-header">
         <img className="avatar" src="/figma/avatar.svg" alt="" />
         <div className="profile-copy"><strong>سلام، رضا</strong><small>پیک مونو • CR-۲۸۴</small></div>
@@ -112,9 +113,9 @@ export default function App() {
       {navItems.map(item => <button key={item.id} className={active === item.id ? 'active' : ''} onClick={() => {
         setActive(item.id)
         if (item.id === 'home') setScreen('home')
-        if (item.id === 'missions' && screen === 'home') setScreen('enroute')
+        if (item.id === 'missions') setScreen('history')
       }} aria-current={active === item.id ? 'page' : undefined}>
-          <span className="nav-icon"><img src={screen === 'home' ? `/figma/${item.icon}` : `/figma/${screen === 'received' ? 'arrived' : screen === 'dropoff' || screen === 'finaldelivery' || screen === 'complete' ? 'dropoff' : 'route'}-nav-${item.id === 'account' ? 'account' : item.id === 'wallet' ? 'income' : item.id === 'missions' ? 'missions' : 'home'}.svg`} alt="" /></span><small>{item.label}</small>
+          <span className="nav-icon"><img src={screen === 'home' ? `/figma/${item.icon}` : `/figma/${screen === 'received' ? 'arrived' : screen === 'dropoff' || screen === 'finaldelivery' || screen === 'complete' || screen === 'history' ? 'dropoff' : 'route'}-nav-${item.id === 'account' ? 'account' : item.id === 'wallet' ? 'income' : item.id === 'missions' ? 'missions' : 'home'}.svg`} alt="" /></span><small>{item.label}</small>
       </button>)}
     </nav>
   </main>
