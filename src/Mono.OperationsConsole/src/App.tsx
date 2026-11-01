@@ -6,6 +6,7 @@ import CustomersDemoWorkbench from './CustomersDemoWorkbench'
 import VehiclesDemoWorkbench from './VehiclesDemoWorkbench'
 import IntegrationDemoWorkbench from './IntegrationDemoWorkbench'
 import TrackingDemoWorkbench from './TrackingDemoWorkbench'
+import SupportCasesDemoWorkbench from './SupportCasesDemoWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
 import DashboardSummaryCards from './DashboardSummaryCards'
 import OperationsOverviewWorkbench from './OperationsOverviewWorkbench'
@@ -201,6 +202,7 @@ async function readError(response: Response) {
 
 export default function App() {
   const [viewMode, setViewMode] = useState<'overview' | 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'vehicles' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('overview')
+  const [supportDemoTab, setSupportDemoTab] = useState<'sla' | 'cases'>('sla')
   const [policyReloadKey, setPolicyReloadKey] = useState(0)
   const [routeReloadKey, setRouteReloadKey] = useState(0)
   const [auditReloadKey, setAuditReloadKey] = useState(0)
@@ -976,7 +978,7 @@ export default function App() {
     else if (mode === 'missions') void fetchMissionPage(null, [null])
     else if (mode === 'couriers') { closeDetails(); setSelectedCourierId(''); setCourierDetail(null); setCourierAudit([]); void fetchCourierPage(null, [null]) }
     else if (mode === 'finance') void fetchFinancePage(null, [null])
-    else if (mode === 'sla') { setSlaItems([]); setSlaNextCursor(null); setSlaEvaluatedAt(null) }
+    else if (mode === 'sla') { setSupportDemoTab('sla'); setSlaItems([]); setSlaNextCursor(null); setSlaEvaluatedAt(null) }
     else if (mode === 'presence') void fetchPresencePage(null, [null])
     else if (mode === 'issues') void fetchIssuePage(null, [null])
     else if (mode === 'workers') void fetchWorkerStatus()
@@ -1271,7 +1273,9 @@ export default function App() {
         {viewMode === 'onboarding' && (demoMode ? <CustomersDemoWorkbench /> : <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />)}
         {viewMode === 'couriers' && <CourierControlWorkbench couriers={courierItems} selectedCourierId={selectedCourierId} detail={courierDetail} audit={courierAudit} loading={loading} detailLoading={timelineLoading && !timelineTitle && Boolean(selectedCourierId)} detailErrors={detailErrors} error={error} query={courierQuery} status={courierStatus} token={token} demoMode={demoMode} pageIndex={pageIndex} hasNext={Boolean(courierNextCursor)} onQueryChange={setCourierQuery} onStatusChange={setCourierStatus} onSearch={applyFilters} onSelect={(courierId) => demoMode ? setSelectedCourierId(courierId) : void showCourierDetails(courierId, true)} onPrevious={goPrevious} onNext={goNext} onRefresh={() => void fetchCourierPage(cursorStack[pageIndex] || null)} onOpenAdmissions={() => switchView('admissions')} onOpenZones={() => switchView('zones')} />}
         {viewMode === 'zones' && <ZonesCapacityWorkbench token={token} demoMode={demoMode} onConnected={setConnected} />}
-        {viewMode === 'sla' && <SlaExceptionsWorkbench token={token} demoMode={demoMode} onConnected={setConnected} onOpenMission={(missionId) => void showMissionDetails(missionId)} />}
+        {viewMode === 'sla' && demoMode && <div className="support-demo-tabs" role="tablist" aria-label="نمای استاندارد خدمت و ارجاعات"><button role="tab" aria-selected={supportDemoTab === 'sla'} className={supportDemoTab === 'sla' ? 'active' : ''} onClick={() => setSupportDemoTab('sla')}>SLA و استثناها</button><button role="tab" aria-selected={supportDemoTab === 'cases'} className={supportDemoTab === 'cases' ? 'active' : ''} onClick={() => setSupportDemoTab('cases')}>ارجاع‌های حنا</button></div>}
+        {viewMode === 'sla' && demoMode && (supportDemoTab === 'sla' ? <SlaExceptionsWorkbench token={token} demoMode onConnected={setConnected} onOpenMission={(missionId) => void showMissionDetails(missionId)} /> : <SupportCasesDemoWorkbench />)}
+        {viewMode === 'sla' && !demoMode && <SlaExceptionsWorkbench token={token} onConnected={setConnected} onOpenMission={(missionId) => void showMissionDetails(missionId)} />}
         {viewMode === 'finance' && <FinanceWorkbench items={financeItems} loading={loading} error={error} token={token} query={financeQuery} status={financeStatus} pageIndex={pageIndex} hasNext={Boolean(financeNextCursor)} onQueryChange={setFinanceQuery} onStatusChange={setFinanceStatus} onSearch={(nextStatus) => void fetchFinancePage(null, [null], nextStatus)} onPrevious={goPrevious} onNext={goNext} />}
         {shouldShowLegacyDataPanel() && <div className={viewMode === 'dispatch' ? 'operations-overview-layout' : ''}>
           {viewMode === 'dispatch' && <aside className="operations-overview-aside">
