@@ -44,6 +44,11 @@ type Mission = {
   demoZone?: string
   demoStatus?: string
   demoEta?: string
+  demoVehicleMode?: string
+  demoOrigin?: string
+  demoDestination?: string
+  demoRoute?: string
+  demoAssignmentReason?: string
 }
 
 type QueuePage = { items: Mission[]; nextCursor: string | null }
@@ -70,6 +75,8 @@ const DEMO_DISPATCH_MISSIONS: Mission[] = [
   committedDeliveryAt: new Date(Date.now() + (index + 5) * 60_000).toISOString(), activeOffer: courierId ? { courierId: String(courierId) } : null,
   attemptCount: 1, latestAttempt: { action: String(event), createdAt: new Date(Date.now() - (index + 1) * 60_000).toISOString() },
   deliveryOverdue: state === 'overdue', deliveryWindowState: String(state), demoZone: String(zone), demoStatus: String(status), demoEta: String(eta),
+  demoVehicleMode: 'موتورسیکلت', demoOrigin: 'شعبهٔ جردن', demoDestination: 'ونک، ملاصدرا', demoRoute: 'مسیر مرکزی ۰۷',
+  demoAssignmentReason: courierId ? `پیک ${String(courierId)} با ظرفیت کافی و ETA مناسب برای این مأموریت انتخاب شد.` : 'در این مأموریت هنوز پیک پذیرفته‌شده‌ای وجود ندارد.',
 }))
 type MissionRecord = {
   missionId: string
@@ -1008,6 +1015,20 @@ export default function App() {
     setMissionTimeline([])
     setDetailErrors([])
     setTimelineLoading(true)
+    if (demoMode) {
+      const sample = DEMO_DISPATCH_MISSIONS.find((mission) => mission.missionId === missionId)
+      if (!sample) { setDetailErrors(['این مأموریت در دادهٔ نمایشی پیدا نشد.']); setTimelineLoading(false); return }
+      const status = sample.demoStatus === 'در مسیر' ? 'IN_TRANSIT' : sample.demoStatus === 'در محل دریافت' ? 'ARRIVED_PICKUP' : sample.demoStatus === 'تحویل‌گرفته‌شده' ? 'PICKED_UP' : sample.demoStatus === 'تحویل‌شده' ? 'DELIVERED' : sample.demoStatus === 'تخصیص مجدد' ? 'SEARCHING_COURIER' : 'COURIER_ASSIGNED'
+      const lastEvent = sample.demoStatus === 'در مسیر' ? 'mission.in_transit' : sample.demoStatus === 'در محل دریافت' ? 'mission.arrived_pickup' : sample.demoStatus === 'تحویل‌گرفته‌شده' ? 'mission.picked_up' : sample.demoStatus === 'تحویل‌شده' ? 'mission.delivered' : sample.demoStatus === 'تخصیص مجدد' ? 'mission.searching_courier' : 'mission.courier_assigned'
+      const now = new Date().toISOString()
+      setMissionDetail({ missionId: sample.missionId, customerId: sample.customerId, deliveryRequestId: `REQ-${sample.missionId.slice(-3)}`, status, createdAt: sample.createdAt, committedDeliveryAt: sample.committedDeliveryAt })
+      const events: NonNullable<MissionTimeline['events']> = [{ eventId: `${missionId}-1`, eventType: 'mission.created', sequence: 1, occurredAt: sample.createdAt }, { eventId: `${missionId}-2`, eventType: 'mission.searching_courier', sequence: 2, occurredAt: new Date(Date.now() - 3 * 60_000).toISOString() }]
+      if (sample.activeOffer?.courierId && lastEvent !== 'mission.courier_assigned') events.push({ eventId: `${missionId}-3`, eventType: 'mission.courier_assigned', sequence: 3, occurredAt: new Date(Date.now() - 2 * 60_000).toISOString() })
+      if (lastEvent !== 'mission.searching_courier') events.push({ eventId: `${missionId}-last`, eventType: lastEvent, sequence: events.length + 1, occurredAt: now })
+      setMissionTimeline(events)
+      setTimelineLoading(false)
+      return
+    }
     const missionPath = `/operations/v1/missions/${encodeURIComponent(missionId)}`
     const requests = await Promise.allSettled([
       fetch(missionPath, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
@@ -1093,6 +1114,7 @@ export default function App() {
 
   function shouldShowShellTopbar() { return viewMode !== 'overview' && viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
   function shouldShowLegacyDataPanel() { return viewMode !== 'overview' && viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
+  const activeDemoMission = demoMode ? DEMO_DISPATCH_MISSIONS.find((mission) => mission.missionId === timelineTitle) : undefined
 
   return (
     <div className="app-shell" dir="rtl">
@@ -1440,19 +1462,19 @@ export default function App() {
         {detailErrors.length > 0 && <div className="detail-errors">{detailErrors.map((message) => <p key={message}>{message}</p>)}</div>}
         <section className="detail-section"><h3>وضعیت و تعهد</h3>{missionDetail ? <div className="drawer-info-list">
           <div><strong>{formatDate(missionDetail.committedDeliveryAt)}</strong><span>زمان تعهدشده</span></div>
-          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>زمان تخمینی فعلی</span></div>
-          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>وضعیت استاندارد</span></div>
-          <div><strong className="unavailable-value">قابل محاسبه نیست</strong><span>زمان باقیمانده</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode ? activeDemoMission?.demoEta || '—' : 'از API دریافت نمی‌شود'}</strong><span>زمان تخمینی فعلی</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode && activeDemoMission ? statusLabel(activeDemoMission.deliveryWindowState) : 'از API دریافت نمی‌شود'}</strong><span>وضعیت استاندارد</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode ? activeDemoMission?.demoEta || '—' : 'قابل محاسبه نیست'}</strong><span>زمان باقیمانده</span></div>
         </div> : <p className="modal-state">جزئیات مأموریت در دسترس نیست.</p>}</section>
         <section className="detail-section"><h3>اجرا و مسیر</h3>{missionDetail ? <div className="drawer-info-list">
-          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>پیک تخصیص‌یافته</span></div>
-          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>شیوهٔ حمل</span></div>
-          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مبدأ</span></div>
-          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مقصد</span></div>
-          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>زون</span></div>
-          <div><strong className="unavailable-value">از API دریافت نمی‌شود</strong><span>مسیر فعال</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode ? activeDemoMission?.activeOffer?.courierId || 'بدون پیک' : 'از API دریافت نمی‌شود'}</strong><span>پیک تخصیص‌یافته</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode ? activeDemoMission?.demoVehicleMode : 'از API دریافت نمی‌شود'}</strong><span>شیوهٔ حمل</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode ? activeDemoMission?.demoOrigin : 'از API دریافت نمی‌شود'}</strong><span>مبدأ</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode ? activeDemoMission?.demoDestination : 'از API دریافت نمی‌شود'}</strong><span>مقصد</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode ? activeDemoMission?.demoZone : 'از API دریافت نمی‌شود'}</strong><span>زون</span></div>
+          <div><strong className={demoMode ? '' : 'unavailable-value'}>{demoMode ? activeDemoMission?.demoRoute : 'از API دریافت نمی‌شود'}</strong><span>مسیر فعال</span></div>
         </div> : <p className="modal-state">اطلاعات اجرا در دسترس نیست.</p>}</section>
-        <section className="detail-section decision-evidence"><h3>دلیل تصمیم سیستم</h3><p>دادهٔ دلیل تخصیص در API فعلی موجود نیست.</p></section>
+        <section className="detail-section decision-evidence"><h3>دلیل تصمیم سیستم</h3><p>{demoMode ? activeDemoMission?.demoAssignmentReason : 'دادهٔ دلیل تخصیص در API فعلی موجود نیست.'}</p></section>
         <section className="detail-section"><h3>تاریخچه مأموریت</h3>{missionTimeline.length ? <ol className="drawer-timeline">{[...missionTimeline].sort((a,b) => a.sequence-b.sequence).map((event) => <li key={event.eventId}><time>{formatDate(event.occurredAt)}</time><span className="event-dot"/><div><strong>{missionEventText(event.eventType)}</strong><small>رویداد {fa.format(event.sequence)}</small></div></li>)}</ol> : <p className="modal-state">رویدادی در timeline ثبت نشده است.</p>}</section>
         <footer className="drawer-actions"><div className="drawer-action-row"><button disabled title="API فعلی مسیر فعال مأموریت را ارائه نمی‌کند">مشاهده مسیر</button><button disabled title="اطلاعات تماس پیک در API مأموریت موجود نیست">تماس با پیک</button></div><div className="drawer-action-row"><button disabled title="API عملیات ثبت استثنا را ارائه نمی‌کند">ثبت استثنا</button><button disabled title="API عملیات تخصیص مجدد را ارائه نمی‌کند">تخصیص مجدد</button></div><button className="drawer-cancel" disabled title="لغو مأموریت از این پنل در API پشتیبانی نمی‌شود">لغو مأموریت</button><small>اقدام‌های عملیاتی تا زمان پشتیبانی API غیرفعال هستند.</small></footer>
       </>}</section></div>}
