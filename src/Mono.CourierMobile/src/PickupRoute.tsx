@@ -1,6 +1,6 @@
-type PickupRouteProps = { onNotice: (message: string) => void }
+type PickupRouteProps = { onNotice: (message: string) => void; onArrive: () => void }
 
-export default function PickupRoute({ onNotice }: PickupRouteProps) {
+export default function PickupRoute({ onNotice, onArrive }: PickupRouteProps) {
   return <section className="content-scroll route-content" dir="rtl">
     <header className="profile-header">
       <img className="avatar" src="/figma/route-avatar.svg" alt="" />
@@ -40,7 +40,7 @@ export default function PickupRoute({ onNotice }: PickupRouteProps) {
       </div>
     </section>
 
-    <button className="arrived-button" onClick={() => onNotice('رسیدن به مبدأ ثبت شد؛ مرحلهٔ بعد دریافت سفارش است.')}>رسیدم به مبدا</button>
+    <button className="arrived-button" onClick={onArrive}>رسیدم به مبدا</button>
     <p className="arrival-hint">پس از رسیدن، زمان انتظار دریافت سفارش ثبت می‌شود.</p>
   </section>
 }

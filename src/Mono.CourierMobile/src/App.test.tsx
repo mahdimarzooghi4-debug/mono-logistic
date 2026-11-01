@@ -10,7 +10,7 @@ describe('courier home', () => {
     expect(screen.getByText('MIS-۱۰۵۰۹')).toBeInTheDocument()
   })
 
-  it('toggles availability and opens the pickup route after accepting a mission', () => {
+  it('moves through pickup and requires package checks before handoff', () => {
     render(<App />)
     const online = screen.getByRole('button', { name: 'آنلاین' })
     fireEvent.click(online)
@@ -20,6 +20,12 @@ describe('courier home', () => {
     fireEvent.click(screen.getByRole('button', { name: 'گزارش مشکل' }))
     expect(screen.getByRole('status')).toHaveTextContent('گزارش مشکل برای این مأموریت ثبت شد')
     fireEvent.click(screen.getByRole('button', { name: 'رسیدم به مبدا' }))
-    expect(screen.getByRole('status')).toHaveTextContent('رسیدن به مبدأ ثبت شد')
+    expect(screen.getByText('MIS-۱۰۴۹۸ • رسیدن به مبدا')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'سفارش را تحویل گرفتم' }))
+    expect(screen.getByRole('status')).toHaveTextContent('تعداد و سلامت بسته‌ها را بررسی کنید')
+    fireEvent.click(screen.getByLabelText('تعداد درست است'))
+    fireEvent.click(screen.getByLabelText('بسته سالم است'))
+    fireEvent.click(screen.getByRole('button', { name: 'سفارش را تحویل گرفتم' }))
+    expect(screen.getByRole('button', { name: 'تحویل ثبت شد' })).toBeDisabled()
   })
 })
