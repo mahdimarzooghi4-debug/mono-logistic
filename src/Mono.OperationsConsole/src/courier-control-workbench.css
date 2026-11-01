@@ -4,6 +4,14 @@
 
 /* Figma courier-control frame (87:2). Keep every metric sourced from APIs. */
 .courier-control-workbench{gap:20px}
+.courier-demo-banner{padding:8px 12px;border:1px solid #c5e8ec;border-radius:8px;background:#edf9fa;color:#087e95;font-size:9px}
+.courier-map-empty.has-demo-route{position:relative;isolation:isolate;overflow:hidden;background-color:#eff5f2;background-image:linear-gradient(25deg,transparent 46%,#fff 47% 51%,transparent 52%),linear-gradient(115deg,transparent 42%,#fff 43% 47%,transparent 48%),linear-gradient(0deg,transparent 48%,#dce8e2 49% 51%,transparent 52%),linear-gradient(90deg,transparent 48%,#dce8e2 49% 51%,transparent 52%);background-size:180px 120px,220px 170px,145px 105px,170px 130px}
+.courier-map-empty.has-demo-route>span{position:absolute;z-index:3;top:20%;right:18%;display:grid;width:24px;height:24px;margin:0;background:#0797a8;color:#fff;font-size:15px;box-shadow:0 2px 8px #163b3340}
+.courier-map-empty.has-demo-route>strong,.courier-map-empty.has-demo-route>p,.courier-map-empty.has-demo-route>small{position:absolute;z-index:3;top:12px;right:14px;max-width:55%;padding:5px 8px;border-radius:6px;background:#ffffffdc;text-align:right}
+.courier-map-empty.has-demo-route>p{top:34px}.courier-map-empty.has-demo-route>small{top:auto;right:auto;bottom:12px;left:12px;color:#087e95}
+.demo-route-line{position:absolute;z-index:1;top:52%;left:19%;width:61%;height:3px;border-radius:4px;background:#0b9aaa;transform:rotate(-19deg);box-shadow:0 0 0 4px #0b9aaa24}
+.demo-route-origin,.demo-route-courier,.demo-route-destination{position:absolute;z-index:2;display:grid;place-items:center;width:28px;height:28px;border:3px solid #fff;border-radius:50%;background:#0b9aaa;color:#fff;font-size:7px;box-shadow:0 2px 6px #163b3340}
+.demo-route-origin{bottom:23%;left:18%;background:#ed9b35}.demo-route-courier{top:44%;left:48%}.demo-route-destination{top:29%;right:17%;background:#228c5b}
 .courier-control-header{min-height:60px;align-items:flex-start}
 .courier-control-header h2{font-size:21px}
 .courier-control-header p{font-size:10px}
