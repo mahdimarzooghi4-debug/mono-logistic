@@ -45,12 +45,13 @@ export default function AdmissionsDashboardDemo({ onNavigate }: Props) {
   if (section === 'کسب‌وکارها') return <BusinessAdmissionPage onNavigate={onNavigate} onSectionChange={setSection} />
   if (section === 'مدارک') return <VerificationDocumentsPage onNavigate={onNavigate} onSectionChange={setSection} />
   if (section === 'فعال‌سازی') return <ActivationPage onNavigate={onNavigate} onSectionChange={setSection} />
+  if (section === 'ردیابی') return <AdmissionsTrackingPage onNavigate={onNavigate} onSectionChange={setSection} />
 
   return <main className="admissions-demo" dir="rtl">
     <aside className="admissions-demo-sidebar">
       <div className="admissions-demo-brand"><span className="admissions-demo-mark" aria-hidden="true"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
       <nav aria-label="منوی پذیرش">
-        {(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردشده‌ها'] as const).map((item, index) => <button key={item} className={section === item || (item === 'احراز و مدارک' && section === 'مدارک') ? 'active' : ''} onClick={() => {
+        {(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردیابی'] as const).map((item, index) => <button key={item} className={section === item || (item === 'احراز و مدارک' && section === 'مدارک') ? 'active' : ''} onClick={() => {
           setSection(item)
           if (item === 'داشبورد') onNavigate('overview')
           if (item === 'پیک‌ها') setTab('پیک‌ها')
@@ -107,7 +108,7 @@ function AdmissionNavIcon({ index }: { index: number }) {
   if (index === 2) return <svg {...common}><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1m2-12a3 3 0 0 1 3 3m-1 3a5 5 0 0 1 3 5v1"/></svg>
   if (index === 3) return <svg {...common}><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 13h6m-6 4h6"/></svg>
   if (index === 4) return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="m8 12 2.5 2.5L16 9"/></svg>
-  return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="m9 9 6 6m0-6-6 6"/></svg>
+  return <svg {...common}><circle cx="5" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="13" cy="14" r="2"/><path d="m7 17 4.2-2m3.5-2.2 2.1-5"/></svg>
 }
 
 const courierCases = [
@@ -132,7 +133,7 @@ function CourierAdmissionPage({ onNavigate, onSectionChange }: Props) {
   return <main className="admissions-demo" dir="rtl">
     <aside className="admissions-demo-sidebar">
       <div className="admissions-demo-brand"><span className="admissions-demo-mark"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
-      <nav aria-label="منوی پذیرش">{(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردشده‌ها'] as const).map((item, index) => <button key={item} className={item === 'پیک‌ها' ? 'active' : ''} onClick={() => item === 'داشبورد' ? onNavigate('overview') : item === 'کسب‌وکارها' ? onSectionChange?.('کسب‌وکارها') : item === 'احراز و مدارک' ? onSectionChange?.('مدارک') : item === 'فعال‌سازی' ? onSectionChange?.('فعال‌سازی') : item === 'ردشده‌ها' ? onSectionChange?.('ردشده‌ها') : undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}</nav>
+      <nav aria-label="منوی پذیرش">{(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردیابی'] as const).map((item, index) => <button key={item} className={item === 'پیک‌ها' ? 'active' : ''} onClick={() => item === 'داشبورد' ? onNavigate('overview') : item === 'کسب‌وکارها' ? onSectionChange?.('کسب‌وکارها') : item === 'احراز و مدارک' ? onSectionChange?.('مدارک') : item === 'فعال‌سازی' ? onSectionChange?.('فعال‌سازی') : item === 'ردیابی' ? onSectionChange?.('ردیابی') : undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}</nav>
       <div className="admissions-demo-profile"><span className="admissions-demo-avatar">م</span><span><strong>کارشناس پذیرش مونو</strong><small>تیم پذیرش و احراز</small></span></div><button className="admissions-demo-logout" onClick={() => notify('برای خروج از اتصال API استفاده کن.')}>خروج</button>
     </aside>
     <div className="admissions-demo-workspace courier-admission-workspace">
@@ -174,7 +175,7 @@ function BusinessAdmissionPage({ onNavigate, onSectionChange }: Props) {
   return <main className="admissions-demo" dir="rtl">
     <aside className="admissions-demo-sidebar">
       <div className="admissions-demo-brand"><span className="admissions-demo-mark"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
-      <nav aria-label="منوی پذیرش">{(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردشده‌ها'] as const).map((item, index) => <button key={item} className={item === 'کسب‌وکارها' ? 'active' : ''} onClick={() => item === 'داشبورد' ? onNavigate('overview') : item === 'پیک‌ها' ? onSectionChange?.('پیک‌ها') : item === 'احراز و مدارک' ? onSectionChange?.('مدارک') : item === 'فعال‌سازی' ? onSectionChange?.('فعال‌سازی') : item === 'ردشده‌ها' ? onSectionChange?.('ردشده‌ها') : undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}</nav>
+      <nav aria-label="منوی پذیرش">{(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردیابی'] as const).map((item, index) => <button key={item} className={item === 'کسب‌وکارها' ? 'active' : ''} onClick={() => item === 'داشبورد' ? onNavigate('overview') : item === 'پیک‌ها' ? onSectionChange?.('پیک‌ها') : item === 'احراز و مدارک' ? onSectionChange?.('مدارک') : item === 'فعال‌سازی' ? onSectionChange?.('فعال‌سازی') : item === 'ردیابی' ? onSectionChange?.('ردیابی') : undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}</nav>
       <div className="admissions-demo-profile"><span className="admissions-demo-avatar">م</span><span><strong>کارشناس پذیرش مونو</strong><small>تیم پذیرش و احراز</small></span></div><button className="admissions-demo-logout" onClick={() => notify('برای خروج از اتصال API استفاده کن.')}>خروج</button>
     </aside>
     <div className="admissions-demo-workspace business-admission-workspace">
@@ -215,7 +216,7 @@ function VerificationDocumentsPage({ onNavigate, onSectionChange }: Props) {
   return <main className="admissions-demo verification-demo" dir="rtl">
     <aside className="admissions-demo-sidebar">
       <div className="admissions-demo-brand"><span className="admissions-demo-mark"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
-      <nav aria-label="منوی پذیرش">{(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردشده‌ها'] as const).map((item, index) => <button key={item} className={item === 'احراز و مدارک' ? 'active' : ''} onClick={() => item === 'داشبورد' ? onNavigate('overview') : item === 'پیک‌ها' ? onSectionChange?.('پیک‌ها') : item === 'کسب‌وکارها' ? onSectionChange?.('کسب‌وکارها') : item === 'فعال‌سازی' ? onSectionChange?.('فعال‌سازی') : item === 'ردشده‌ها' ? onSectionChange?.('ردشده‌ها') : undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}</nav>
+      <nav aria-label="منوی پذیرش">{(['داشبورد', 'پیک‌ها', 'کسب‌وکارها', 'احراز و مدارک', 'فعال‌سازی', 'ردیابی'] as const).map((item, index) => <button key={item} className={item === 'احراز و مدارک' ? 'active' : ''} onClick={() => item === 'داشبورد' ? onNavigate('overview') : item === 'پیک‌ها' ? onSectionChange?.('پیک‌ها') : item === 'کسب‌وکارها' ? onSectionChange?.('کسب‌وکارها') : item === 'فعال‌سازی' ? onSectionChange?.('فعال‌سازی') : item === 'ردیابی' ? onSectionChange?.('ردیابی') : undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index} /></span>{item}</button>)}</nav>
       <div className="admissions-demo-profile"><span className="admissions-demo-avatar">م</span><span><strong>کارشناس پذیرش مونو</strong><small>تیم پذیرش و احراز</small></span></div><button className="admissions-demo-logout" onClick={() => notify('برای خروج از اتصال API استفاده کن.')}>خروج</button>
     </aside>
     <div className="admissions-demo-workspace verification-workspace">
@@ -257,7 +258,7 @@ function ActivationPage({ onNavigate, onSectionChange }: Props) {
   const activationChecks = [['احراز هویت','تکمیل','بدون مانع','ok'],['مدارک لازم','تکمیل','همه معتبر','ok'],['حساب بانکی','تکمیل','مالکیت تأیید','ok'],['اعتماد و تضمین','تکمیل','ثبت شده','ok'],['مناطق و وسیله','تکمیل','تنظیم شده','ok']]
   return <main className="admissions-demo activation-demo" dir="rtl">
     <aside className="admissions-demo-sidebar"><div className="admissions-demo-brand"><span className="admissions-demo-mark"><i /><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
-      <nav aria-label="منوی پذیرش">{(['داشبورد','پیک‌ها','کسب‌وکارها','احراز و مدارک','فعال‌سازی','ردشده‌ها'] as const).map((item,index)=><button key={item} className={item==='فعال‌سازی'?'active':''} onClick={()=>item==='داشبورد'?onNavigate('overview'):item==='پیک‌ها'?onSectionChange?.('پیک‌ها'):item==='کسب‌وکارها'?onSectionChange?.('کسب‌وکارها'):item==='احراز و مدارک'?onSectionChange?.('مدارک'):item==='ردشده‌ها'?onSectionChange?.('ردشده‌ها'):undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index}/></span>{item}</button>)}</nav>
+      <nav aria-label="منوی پذیرش">{(['داشبورد','پیک‌ها','کسب‌وکارها','احراز و مدارک','فعال‌سازی','ردیابی'] as const).map((item,index)=><button key={item} className={item==='فعال‌سازی'?'active':''} onClick={()=>item==='داشبورد'?onNavigate('overview'):item==='پیک‌ها'?onSectionChange?.('پیک‌ها'):item==='کسب‌وکارها'?onSectionChange?.('کسب‌وکارها'):item==='احراز و مدارک'?onSectionChange?.('مدارک'):item==='ردیابی'?onSectionChange?.('ردیابی'):undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index}/></span>{item}</button>)}</nav>
       <div className="admissions-demo-profile"><span className="admissions-demo-avatar">م</span><span><strong>کارشناس پذیرش مونو</strong><small>تیم پذیرش و احراز</small></span></div><button className="admissions-demo-logout" onClick={()=>notify('برای خروج از اتصال API استفاده کن.')}>خروج</button>
     </aside>
     <div className="admissions-demo-workspace activation-workspace">
@@ -275,5 +276,54 @@ function ActivationPage({ onNavigate, onSectionChange }: Props) {
     </div>
     {toast&&<div role="status" className="admissions-demo-toast">{toast}</div>}
     {dialog&&<div className="admissions-demo-backdrop" onClick={()=>setDialog('')}><section role="dialog" aria-modal="true" aria-labelledby="activation-dialog-title" onClick={e=>e.stopPropagation()}><button className="admissions-demo-close" onClick={()=>setDialog('')} aria-label="بستن">×</button><h2 id="activation-dialog-title">{dialog}</h2><p>این نما روی دادهٔ نمایشی کار می‌کند؛ وضعیت واقعی ایجاد یا تغییر نمی‌کند. اجرای عملیاتی به اتصال API و مجوز فعال‌سازی نیاز دارد.</p><button className="admissions-demo-primary" onClick={()=>{setDialog('');notify('تغییری در نسخهٔ نمایشی ثبت نشد.')}}>متوجه شدم</button></section></div>}
+  </main>
+}
+
+const auditEvents = [
+  { time:'۱۱:۰۶', type:'پیک', id:'CR-REG-۰۱۲۲', action:'فعال‌سازی نهایی', actor:'کارشناس پذیرش', result:'موفق', origin:'دستی', activation:true },
+  { time:'۱۰:۵۸', type:'پیک', id:'CR-REG-۰۱۲۲', action:'ایجاد حساب عملیاتی', actor:'سیستم', result:'موفق', origin:'سیستمی', activation:true },
+  { time:'۱۰:۳۶', type:'پیک', id:'CR-REG-۰۱۴۲', action:'ارجاع به بررسی دستی', actor:'سیستم', result:'باز', origin:'سیستمی', activation:false },
+  { time:'۱۰:۳۴', type:'کسب‌وکار', id:'BIZ-REG-۰۰۳۴', action:'ثبت سه شعبه', actor:'کارشناس پذیرش', result:'موفق', origin:'دستی', activation:false },
+  { time:'۱۰:۲۸', type:'کسب‌وکار', id:'BIZ-REG-۰۰۳۴', action:'تطبیق حساب بانکی', actor:'سیستم', result:'موفق', origin:'سیستمی', activation:false },
+  { time:'۱۰:۲۵', type:'کسب‌وکار', id:'BIZ-REG-۰۰۳۱', action:'درخواست مدرک تکمیلی', actor:'کارشناس احراز', result:'منتظر', origin:'دستی', activation:false },
+  { time:'۱۰:۰۴', type:'پیک', id:'CR-REG-۰۱۴۸', action:'دریافت مدارک وسیله', actor:'سیستم', result:'موفق', origin:'سیستمی', activation:false },
+  { time:'۰۹:۵۱', type:'پیک', id:'CR-REG-۰۱۴۸', action:'تطبیق شبا', actor:'سیستم', result:'موفق', origin:'سیستمی', activation:false },
+  { time:'۰۹:۴۸', type:'پیک', id:'CR-REG-۰۱۴۸', action:'تأیید هویت', actor:'سیستم', result:'موفق', origin:'سیستمی', activation:false },
+  { time:'۰۹:۴۲', type:'پیک', id:'CR-REG-۰۱۴۸', action:'تکمیل ثبت‌نام', actor:'پیک', result:'موفق', origin:'دستی', activation:false },
+]
+
+function AdmissionsTrackingPage({ onNavigate, onSectionChange }: Props) {
+  const [filter, setFilter] = useState('همه')
+  const [search, setSearch] = useState('')
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [toast, setToast] = useState('')
+  const visibleEvents = auditEvents.filter(event => {
+    const matches = filter==='همه' || filter==='پیک‌ها' && event.type==='پیک' || filter==='کسب‌وکارها' && event.type==='کسب‌وکار' || filter==='دستی' && event.origin==='دستی' || filter==='سیستمی' && event.origin==='سیستمی' || filter==='فعال‌سازی' && event.activation
+    return matches && `${event.id} ${event.actor} ${event.type} ${event.action} ${event.result}`.includes(search.trim())
+  })
+  const selected = visibleEvents[selectedIndex] || visibleEvents[0] || auditEvents[0]
+  const notify = (message:string) => { setToast(message); window.setTimeout(()=>setToast(''),2800) }
+  return <main className="admissions-demo tracking-demo" dir="rtl">
+    <aside className="admissions-demo-sidebar"><div className="admissions-demo-brand"><span className="admissions-demo-mark"><i/><b>↔</b></span><span><strong>مونو</strong><small>لجستیک هوشمند</small></span></div>
+      <nav aria-label="منوی پذیرش">{(['داشبورد','پیک‌ها','کسب‌وکارها','احراز و مدارک','فعال‌سازی','ردیابی'] as const).map((item,index)=><button key={item} className={item==='ردیابی'?'active':''} onClick={()=>item==='داشبورد'?onNavigate('overview'):item==='پیک‌ها'?onSectionChange?.('پیک‌ها'):item==='کسب‌وکارها'?onSectionChange?.('کسب‌وکارها'):item==='احراز و مدارک'?onSectionChange?.('مدارک'):item==='فعال‌سازی'?onSectionChange?.('فعال‌سازی'):undefined}><span className="admissions-demo-navicon"><AdmissionNavIcon index={index}/></span>{item}</button>)}</nav>
+      <div className="admissions-demo-profile"><span className="admissions-demo-avatar">م</span><span><strong>کارشناس پذیرش مونو</strong><small>تیم پذیرش و احراز</small></span></div><button className="admissions-demo-logout" onClick={()=>notify('برای خروج از اتصال API استفاده کن.')}>خروج</button>
+    </aside>
+    <div className="admissions-demo-workspace tracking-workspace">
+      <header className="admissions-demo-header"><div className="admissions-demo-header-actions"><button className="admissions-demo-secondary" onClick={()=>notify('فیلتر تاریخچه در نسخهٔ نمایشی اعمال نشد.')}>فیلترها</button><button className="admissions-demo-secondary" onClick={()=>notify('خروجی تاریخچه در نسخهٔ نمایشی ساخته نشد.')}>خروجی تاریخچه</button></div><div><h1>ردیابی</h1><p>تاریخچه تغییر وضعیت، بررسی مدارک، تصمیم‌ها و فعال‌سازی پیک‌ها و کسب‌وکارها</p></div></header>
+      <section className="admissions-demo-kpis tracking-kpis">{[['رویداد امروز','۱۸۶'],['تغییر دستی','۲۱'],['رد احراز','۳'],['فعال‌سازی','۹'],['رویداد سیستمی','۱۵۳']].map(([label,value],i)=><article key={label}><small>{label}</small><strong className={`metric-tone-${i}`}>{value}</strong></article>)}</section>
+      <div className="tracking-tabs" role="tablist" aria-label="فیلتر تاریخچه">{['همه','پیک‌ها','کسب‌وکارها','دستی','سیستمی','فعال‌سازی'].map(item=><button key={item} role="tab" aria-selected={filter===item} className={filter===item?'active':''} onClick={()=>{setFilter(item);setSelectedIndex(0)}}>{item}</button>)}</div>
+      <div className="tracking-layout"><section className="admissions-demo-card tracking-table-card"><header><div><h2>تاریخچه رویدادها</h2><span>۱۸۶ امروز</span></div><label><input aria-label="جست‌وجوی رویداد" placeholder="جست‌وجوی شناسه، عامل، موجودیت یا اقدام" value={search} onChange={e=>{setSearch(e.target.value);setSelectedIndex(0)}}/><span>⌕</span></label></header>
+        <div className="tracking-table-wrap"><table><thead><tr>{['زمان','نوع','شناسه','اقدام','عامل','نتیجه'].map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{visibleEvents.map((event,index)=><tr key={`${event.time}-${event.id}-${event.action}`} className={selected===event?'selected':''} onClick={()=>setSelectedIndex(index)}><td>{event.time}</td><td>{event.type}</td><td><bdi>{event.id}</bdi></td><td>{event.action}</td><td>{event.actor}</td><td><span className={`tracking-result result-${event.result}`}>{event.result}</span></td></tr>)}{visibleEvents.length===0&&<tr><td colSpan={6} className="admission-empty-row">رویدادی با این مشخصات پیدا نشد.</td></tr>}</tbody></table></div>
+        <footer><span>{visibleEvents.length} رویداد از ۱۸۶ رویداد نمونه</span><button disabled>قبلی</button><b>۱</b><button disabled>بعدی</button></footer>
+      </section>
+      <aside className="admissions-demo-card tracking-detail"><header><span className="tracking-result result-موفق">{selected.result}</span><h2>{selected.action}</h2><p>رویداد مربوط به {selected.type} {selected.id} در ساعت {selected.time} ثبت شده است.</p></header>
+        <section className="tracking-facts"><div><small>عامل</small><b>{selected.actor}</b></div><div><small>نوع عامل</small><b>{selected.origin==='دستی'?'کاربر داخلی':'سیستم'}</b></div></section>
+        <h3>شناسه‌های مرتبط</h3><div className="tracking-links"><span><b>{selected.id}</b><small>ثبت‌نام</small></span><span><b>ACT-۰۱۴۲</b><small>فعال‌سازی</small></span><span><b>CR-۲۸۴</b><small>پیک عملیاتی</small></span><span><bdi>COR-۷۸۱۳</bdi><small>شناسه همبستگی</small></span></div>
+        <h3>تغییر وضعیت</h3><div className="tracking-change"><span><small>قبل</small><b>آماده فعال‌سازی</b></span><i>←</i><span><small>بعد</small><b>فعال</b></span></div>
+        <h3>شواهد تصمیم</h3><p className="tracking-evidence">تمام کنترل‌های الزامی تکمیل شده‌اند، هیچ مانع بازی وجود ندارد و حساب عملیاتی ایجاد شده است.</p>
+        <div className="tracking-immutable"><b>ثبت تغییرناپذیر</b><span>این سابقه حذف یا ویرایش مستقیم نمی‌شود؛ اصلاح فقط با رویداد جدید ثبت می‌شود.</span></div><button className="admissions-demo-secondary" onClick={()=>notify('پروندهٔ مرتبط در نسخهٔ نمایشی باز نشد.')}>باز کردن پرونده</button>
+      </aside></div>
+    </div>
+    {toast&&<div role="status" className="admissions-demo-toast">{toast}</div>}
   </main>
 }
