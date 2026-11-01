@@ -46,4 +46,14 @@ describe('AdmissionsWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: /CR-REG-۰۱۴۲/ }))
     expect(screen.getByRole('heading', { name: /CR-REG-۰۱۴۲ — سعید مرادی/ })).toBeInTheDocument()
   })
+
+  it('opens the Figma business admission review with branches and connection decision', async () => {
+    render(<AdmissionsWorkbench token="" reloadKey={0} onConnected={vi.fn()} onOpenBusinesses={vi.fn()} onOpenCouriers={vi.fn()} demoMode />)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'منوی پذیرش' })).getByRole('button', { name: /کسب‌وکارها/ }))
+    expect(await screen.findByRole('heading', { name: 'ثبت‌نام و پذیرش کسب‌وکارها' })).toBeInTheDocument()
+    expect(screen.getByText('سرویس، شعب و اتصال')).toBeInTheDocument()
+    expect(screen.getByText('روش اتصال پس از فعال‌سازی')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /BIZ-REG-۰۰۳۱/ }))
+    expect(screen.getByRole('heading', { name: /BIZ-REG-۰۰۳۱ — سوپرمارکت آریا/ })).toBeInTheDocument()
+  })
 })
