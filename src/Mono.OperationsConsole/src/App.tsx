@@ -4,6 +4,7 @@ import PolicyWorkbench from './PolicyWorkbench'
 import OnboardingWorkbench from './OnboardingWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
 import DashboardSummaryCards from './DashboardSummaryCards'
+import OperationsOverviewWorkbench from './OperationsOverviewWorkbench'
 import CourierPlanningEvidence from './CourierPlanningEvidence'
 import CourierControlWorkbench from './CourierControlWorkbench'
 import ZonesCapacityWorkbench from './ZonesCapacityWorkbench'
@@ -138,7 +139,7 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('dispatch')
+  const [viewMode, setViewMode] = useState<'overview' | 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions>('overview')
   const [policyReloadKey, setPolicyReloadKey] = useState(0)
   const [routeReloadKey, setRouteReloadKey] = useState(0)
   const [auditReloadKey, setAuditReloadKey] = useState(0)
@@ -894,12 +895,13 @@ export default function App() {
     void fetchSlaPage(null, [null], horizon)
   }
 
-  function switchView(mode: 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
+  function switchView(mode: 'overview' | 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
     setError('')
-    if (mode === 'dispatch') { void fetchPage(null, [null]); void fetchDashboardSummary() }
+    if (mode === 'overview') { void fetchDashboardSummary() }
+    else if (mode === 'dispatch') { void fetchPage(null, [null]); void fetchDashboardSummary() }
     else if (mode === 'missions') void fetchMissionPage(null, [null])
     else if (mode === 'couriers') { closeDetails(); setSelectedCourierId(''); setCourierDetail(null); setCourierAudit([]); void fetchCourierPage(null, [null]) }
     else if (mode === 'finance') void fetchFinancePage(null, [null])
@@ -1012,13 +1014,13 @@ export default function App() {
   }
 
   const panelTitles: Record<typeof viewMode, string> = {
-    dispatch: 'داشبورد عملیات', missions: 'مأموریت‌ها', couriers: 'کنترل پیک‌ها', zones: 'مناطق و ظرفیت',
+    overview: 'نمای کلی عملیات', dispatch: 'داشبورد عملیات', missions: 'مأموریت‌ها', couriers: 'کنترل پیک‌ها', zones: 'مناطق و ظرفیت',
     finance: 'مالی و بررسی کرایه', sla: 'استثناهای SLA', presence: 'وضعیت حضور پیک‌ها',
     issues: 'پشتیبانی و گزارش مشکلات', workers: 'سلامت پردازش‌ها', webhooks: 'یکپارچه‌سازی‌ها',
     policies: 'استانداردها و پیکربندی', onboarding: 'مشتریان و شعب', admissions: 'پذیرش و راه‌اندازی', routes: 'مسیرها', audit: 'ممیزی عملیات',
   }
   const panelDescriptions: Record<typeof viewMode, string> = {
-    dispatch: 'صف مأموریت‌های در انتظار تخصیص پیک', missions: 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده', routes: 'برنامهٔ مسیر و ترتیب توقف‌های ذخیره‌شده؛ بدون نقشه و موقعیت زنده', audit: 'بررسی سابقهٔ قابل‌دسترسی هر دامنه از APIهای مستقل',
+    overview: 'وضعیت شبکهٔ مونو، مأموریت‌ها، پیک‌ها، استاندارد خدمت و ظرفیت عملیاتی', dispatch: 'صف مأموریت‌های در انتظار تخصیص پیک', missions: 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده', routes: 'برنامهٔ مسیر و ترتیب توقف‌های ذخیره‌شده؛ بدون نقشه و موقعیت زنده', audit: 'بررسی سابقهٔ قابل‌دسترسی هر دامنه از APIهای مستقل',
     couriers: 'وضعیت اعتماد، تخصیص، محدوده و آمادگی عملیاتی پیک‌ها', zones: 'ظرفیت برنامه‌ریزی‌شده و پنجره‌های کاری زون',
     finance: 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت', sla: 'مأموریت‌های نزدیک موعد یا عبورکرده از SLA',
     presence: 'وضعیت آنلاین یا آفلاین و آخرین زمان ثبت حضور',
@@ -1029,8 +1031,8 @@ export default function App() {
     admissions: 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها',
   }
 
-  function shouldShowShellTopbar() { return viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
-  function shouldShowLegacyDataPanel() { return viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
+  function shouldShowShellTopbar() { return viewMode !== 'overview' && viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
+  function shouldShowLegacyDataPanel() { return viewMode !== 'overview' && viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
 
   return (
     <div className="app-shell" dir="rtl">
@@ -1038,7 +1040,7 @@ export default function App() {
         <div className="sidebar-brand-card"><div className="brand-lockup"><span><strong>مونو</strong><small>لجستیک هوشمند</small></span><svg className="brand-symbol" viewBox="0 0 48 48" aria-hidden="true"><path d="M5 24h38M24 4v40M8 21l-3 3 3 3M40 21l3 3-3 3"/><circle cx="24" cy="24" r="3"/><circle cx="13" cy="12" r="1.5"/></svg></div></div>
         <div className="side-caption">فضای عملیات</div>
         <nav className="navigation" aria-label="ناوبری اصلی">
-          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={() => switchView('dispatch')}><span className="nav-icon"><NavIcon type="dashboard" /></span>داشبورد</button>
+          <button className={`nav-item ${viewMode === 'overview' ? 'active' : ''}`} onClick={() => switchView('overview')}><span className="nav-icon"><NavIcon type="dashboard" /></span>داشبورد</button>
           <button className={`nav-item ${viewMode === 'missions' ? 'active' : ''}`} onClick={() => switchView('missions')}><span className="nav-icon"><NavIcon type="mission" /></span>مأموریت‌ها</button>
           <button className={`nav-item ${viewMode === 'routes' ? 'active' : ''}`} onClick={() => switchView('routes')}><span className="nav-icon"><NavIcon type="route" /></span>مسیرها</button>
           <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon"><NavIcon type="courier" /></span>پیک‌ها</button>
@@ -1071,6 +1073,7 @@ export default function App() {
         {error && token && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
         {viewMode === 'dispatch' && dashboardError && <div className="error-banner" role="alert"><span>!</span><div><strong>خلاصهٔ سراسری داشبورد دریافت نشد</strong><p>{dashboardError}</p></div><button onClick={() => setDashboardError('')} aria-label="بستن">×</button></div>}
 
+        {viewMode === 'overview' && <OperationsOverviewWorkbench demoMode={!token && new URLSearchParams(window.location.search).get('demo') === '1'} summary={dashboardSummary} onOpenMissions={openDashboardMissions} onOpenDispatch={openDashboardDispatch} onOpenSla={openDashboardSla} onOpenPresence={openDashboardPresence} onRefresh={() => void fetchDashboardSummary()} />}
         {viewMode === 'dispatch' && <DashboardSummaryCards summary={dashboardSummary} actionsDisabled={!token} onOpenPresence={openDashboardPresence} onOpenDispatch={openDashboardDispatch} onOpenSla={openDashboardSla} onOpenMissions={openDashboardMissions} />}
         {viewMode === 'presence' && <section className="kpi-grid" aria-label="خلاصهٔ حضور پیک‌های همین صفحه">
           <article className="kpi-card"><span className="kpi-icon cyan">●</span><div><small>آنلاین در این صفحه</small><strong>{fa.format(presenceItems.filter((item) => item.status === 'ONLINE').length)}</strong></div></article>
