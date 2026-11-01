@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 34480)
-Total output lines: 1483
-
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import PolicyWorkbench from './PolicyWorkbench'
@@ -567,7 +564,739 @@ export default function App() {
     if (!token) return
     setWebhookDetail(null); setWebhookDetailError('')
     try {
-      const response = await fetch(`/operations/v1/webhook-deliveries/${encodeURIComponent(deliveryId)}`, {…16480 tokens truncated…های تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div>
+      const response = await fetch(`/operations/v1/webhook-deliveries/${encodeURIComponent(deliveryId)}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+      if (!response.ok) throw new Error(await readError(response))
+      const detail = await response.json() as WebhookDetail
+      if (!detail.delivery || !Array.isArray(detail.attempts)) throw new Error('ساختار جزئیات webhook با قرارداد API سازگار نیست.')
+      setWebhookDetail(detail)
+    } catch (cause) { setWebhookDetailError(cause instanceof Error ? cause.message : 'دریافت جزئیات ناموفق بود.') }
+  }, [token])
+
+  async function performWebhookAction() {
+    if (!token || !webhookAction) return
+    const { deliveryId, kind } = webhookAction
+    const keyId = `${kind}:${deliveryId}`
+    let idempotencyKey = webhookActionKeys.current.get(keyId)
+    if (!idempotencyKey) {
+      idempotencyKey = `ops-${kind}-${crypto.randomUUID()}`
+      webhookActionKeys.current.set(keyId, idempotencyKey)
+    }
+    setWebhookActionLoading(true); setWebhookActionError(''); setWebhookActionMessage('')
+    try {
+      const response = await fetch(`/operations/v1/webhook-deliveries/${encodeURIComponent(deliveryId)}/${kind}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Idempotency-Key': idempotencyKey },
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      webhookActionKeys.current.delete(keyId)
+      setWebhookActionMessage(kind === 'replay' ? 'درخواست replay پذیرفته شد؛ نتیجهٔ ارسال در وضعیت بعدی و تاریخچه ثبت می‌شود.' : 'درخواست لغو ثبت شد.')
+      setWebhookAction(null)
+      await fetchWebhookOps(null)
+      await showWebhookDetail(deliveryId)
+    } catch (cause) {
+      setWebhookActionError(cause instanceof Error ? cause.message : 'عملیات ناموفق بود. در صورت ابهام، تلاش مجدد با همان کلید idempotency انجام می‌شود.')
+    } finally { setWebhookActionLoading(false) }
+  }
+
+  const fetchWorkerStatus = useCallback(async () => {
+    if (!token) {
+      setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.')
+      return
+    }
+    setLoading(true)
+    setWorkerErrors({ mission: '', webhook: '' })
+    const endpoints = {
+      mission: '/operations/v1/dispatch/offer-expiry-worker/status',
+      webhook: '/operations/v1/webhook-deliveries/worker-status',
+    }
+    const entries = await Promise.all(Object.entries(endpoints).map(async ([key, path]) => {
+      try {
+        const response = await fetch(path, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          cache: 'no-store',
+        })
+        if (!response.ok) throw new Error(await readError(response))
+        const snapshot = await response.json() as WorkerSnapshot
+        if (typeof snapshot.enabled !== 'boolean' || typeof snapshot.state !== 'string' ||
+          typeof snapshot.total_batches !== 'number' || typeof snapshot.successful_batches !== 'number' ||
+          typeof snapshot.failed_batches !== 'number')
+          throw new Error('ساختار پاسخ وضعیت worker با قرارداد API سازگار نیست.')
+        return [key, { snapshot, error: '' }] as const
+      } catch (cause) {
+        return [key, { snapshot: null, error: cause instanceof Error ? cause.message : 'ارتباط با API برقرار نشد.' }] as const
+      }
+    }))
+    const result = Object.fromEntries(entries)
+    const mission = result.mission as { snapshot: WorkerSnapshot | null; error: string }
+    const webhook = result.webhook as { snapshot: WorkerSnapshot | null; error: string }
+    setWorkerSnapshots({ mission: mission.snapshot, webhook: webhook.snapshot })
+    setWorkerErrors({ mission: mission.error, webhook: webhook.error })
+    setConnected(Boolean(mission.snapshot || webhook.snapshot))
+    setUpdatedAt(new Date().toISOString())
+    setLoading(false)
+  }, [token])
+
+  const fetchCourierPage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
+    if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
+    setLoading(true); setError(''); setCourierItems([])
+    const params = new URLSearchParams({ page_size: '25' })
+    if (courierQuery.trim()) params.set('query', courierQuery.trim())
+    if (courierStatus) params.set('status', courierStatus)
+    if (cursor) params.set('cursor', cursor)
+    try {
+      const response = await fetch(`/operations/v1/couriers?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+      if (!response.ok) throw new Error(await readError(response))
+      const page = await response.json() as CourierPage
+      if (!Array.isArray(page.items)) throw new Error('ساختار پاسخ فهرست پیک‌ها با قرارداد API سازگار نیست.')
+      setCourierItems(page.items); setCourierNextCursor(page.next_cursor || null)
+      setCursorStack(nextStack || [null]); setPageIndex((nextStack || [null]).length - 1)
+      setConnected(true); setUpdatedAt(new Date().toISOString())
+    } catch (cause) { setConnected(false); setError(cause instanceof Error ? cause.message : 'ارتباط با API برقرار نشد.') }
+    finally { setLoading(false) }
+  }, [token, courierQuery, courierStatus])
+
+  const fetchFinancePage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, statusOverride?: string) => {
+    if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
+    setLoading(true); setError(''); setFinanceItems([])
+    const params = new URLSearchParams({ page_size: '25' })
+    if (financeQuery.trim()) params.set('query', financeQuery.trim())
+    const requestedStatus = statusOverride === undefined ? financeStatus : statusOverride
+    if (requestedStatus) params.set('status', requestedStatus)
+    if (cursor) params.set('cursor', cursor)
+    try {
+      const response = await fetch(`/operations/v1/finance/mission-fares?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+      if (!response.ok) throw new Error(await readError(response))
+      const page = await response.json() as MissionFarePage
+      if (!Array.isArray(page.items)) throw new Error('ساختار پاسخ بررسی کرایه با قرارداد API سازگار نیست.')
+      setFinanceItems(page.items); setFinanceNextCursor(page.next_cursor || null)
+      setCursorStack(nextStack || [null]); setPageIndex((nextStack || [null]).length - 1)
+      setConnected(true); setUpdatedAt(new Date().toISOString())
+    } catch (cause) { setConnected(false); setError(cause instanceof Error ? cause.message : 'ارتباط با API برقرار نشد.') }
+    finally { setLoading(false) }
+  }, [token, financeQuery, financeStatus])
+
+  async function submitAvailabilityWindow() {
+    if (!token) { setAvailabilityWriteError('ابتدا با توکن مدیر عملیات متصل شوید.'); return }
+    const courier = availabilityCourierId.trim()
+    if (!/^crr_[0-9a-f]{32}$/.test(courier)) {
+      setAvailabilityWriteError('شناسهٔ پیک باید با قالب crr_ و ۳۲ رقم هگزادسیمال وارد شود.')
+      return
+    }
+    if (!zoneId.trim() || !capacityFrom || !capacityTo) {
+      setAvailabilityWriteError('زون و زمان شروع و پایان را کامل کنید.')
+      return
+    }
+    const from = new Date(capacityFrom)
+    const to = new Date(capacityTo)
+    const now = Date.now()
+    if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf()) ||
+        from.getTime() < now || from.getTime() > now + 30 * 24 * 60 * 60 * 1000 ||
+        to <= from || to.getTime() - from.getTime() > 16 * 60 * 60 * 1000) {
+      setAvailabilityWriteError('پنجره باید در ۳۰ روز آینده باشد و حداکثر ۱۶ ساعت طول بکشد.')
+      return
+    }
+    const createFingerprint = JSON.stringify({ courier, zone_id: zoneId.trim(), starts_at: from.toISOString(), ends_at: to.toISOString() })
+    if (availabilityCreateKey.current?.fingerprint !== createFingerprint) availabilityCreateKey.current = { fingerprint: createFingerprint, key: crypto.randomUUID() }
+    setAvailabilityWriteLoading(true); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
+    try {
+      const response = await fetch(`/operations/v1/couriers/${encodeURIComponent(courier)}/availability-windows`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': availabilityCreateKey.current.key },
+        body: JSON.stringify({ zone_id: zoneId.trim(), starts_at: from.toISOString(), ends_at: to.toISOString() }),
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const window = await response.json() as AvailabilityPage['items'][number]
+      if (!window?.window_id || window.status !== 'SCHEDULED') throw new Error('ساختار پاسخ ثبت پنجرهٔ کاری معتبر نیست.')
+      availabilityCreateKey.current = null
+      setAvailabilityWriteMessage('پنجرهٔ کاری با موفقیت ثبت شد. این برنامه‌ریزی به معنی حضور لحظه‌ای یا تخصیص پیک نیست.')
+      setAvailabilityPage((current) => {
+        if ((zoneId.trim() && window.zone_id !== zoneId.trim()) ||
+            new Date(window.starts_at) >= new Date(capacityTo) || new Date(window.ends_at) <= new Date(capacityFrom)) return current
+        if (!current) return { items: [window], next_cursor: null }
+        const rows = [...current.items.filter((item) => item.window_id !== window.window_id), window]
+          .sort((left, right) => left.starts_at.localeCompare(right.starts_at) || left.window_id.localeCompare(right.window_id))
+        return { ...current, items: rows.slice(0, 50) }
+      })
+      setAvailabilityCourierId('')
+    } catch (cause) {
+      setAvailabilityWriteError(cause instanceof Error ? cause.message : 'ثبت پنجرهٔ کاری انجام نشد.')
+    } finally { setAvailabilityWriteLoading(false) }
+  }
+
+  async function cancelAvailabilityWindow(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!token || !cancelWindowId) return
+    const reason = cancelReason.trim()
+    if (reason.length < 2 || reason.length > 128 || /[\u0000-\u001f\u007f]/.test(reason)) {
+      setAvailabilityWriteError('دلیل لغو باید ۲ تا ۱۲۸ نویسه و بدون نویسهٔ کنترلی باشد.')
+      return
+    }
+    const cancelFingerprint = JSON.stringify({ window_id: cancelWindowId, reason })
+    if (availabilityCancelKey.current?.fingerprint !== cancelFingerprint) availabilityCancelKey.current = { fingerprint: cancelFingerprint, key: crypto.randomUUID() }
+    setAvailabilityWriteLoading(true); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
+    try {
+      const response = await fetch(`/operations/v1/courier-availability-windows/${encodeURIComponent(cancelWindowId)}/cancel`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json', 'Idempotency-Key': availabilityCancelKey.current.key },
+        body: JSON.stringify({ reason }),
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const window = await response.json() as AvailabilityPage['items'][number]
+      if (window?.window_id !== cancelWindowId || window.status !== 'CANCELLED') throw new Error('ساختار پاسخ لغو پنجرهٔ کاری معتبر نیست.')
+      setAvailabilityPage((current) => current ? { ...current, items: current.items.map((item) => item.window_id === window.window_id ? window : item) } : current)
+      availabilityCancelKey.current = null
+      setAvailabilityWriteMessage('پنجرهٔ کاری لغو شد و دلیل در سابقهٔ آن ثبت شد.')
+      setCancelWindowId(null); setCancelReason('')
+    } catch (cause) {
+      setAvailabilityWriteError(cause instanceof Error ? cause.message : 'لغو پنجرهٔ کاری انجام نشد.')
+    } finally { setAvailabilityWriteLoading(false) }
+  }
+
+  const fetchZoneCapacity = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, refreshProjection = true) => {
+    if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
+    if (!zoneId.trim() || !capacityFrom || !capacityTo) { setError('شناسهٔ زون و بازهٔ زمانی را کامل کنید.'); return }
+    const from = new Date(capacityFrom)
+    const to = new Date(capacityTo)
+    if (Number.isNaN(from.valueOf()) || Number.isNaN(to.valueOf()) || to <= from || to.getTime() - from.getTime() > 24 * 60 * 60 * 1000) {
+      setError('بازهٔ زمانی باید معتبر، مثبت و حداکثر ۲۴ ساعت باشد.'); return
+    }
+    const bucket = Number(bucketMinutes)
+    const fromUtc = from.toISOString()
+    const toUtc = to.toISOString()
+    if (![15, 30, 60].includes(bucket) || new Date(fromUtc).getUTCMinutes() % bucket !== 0 || new Date(toUtc).getUTCMinutes() % bucket !== 0 || (to.getTime() - from.getTime()) / 60000 % bucket !== 0) {
+      setError('زمان شروع و پایان در UTC باید با گام انتخاب‌شده هم‌تراز باشند.'); return
+    }
+    setLoading(true); setError(''); setCapacityError(''); setAvailabilityError('')
+    setPlanningRefreshKey((value) => value + 1)
+    const params = new URLSearchParams({ zone_id: zoneId.trim(), from: fromUtc, to: toUtc, page_size: '50' })
+    if (cursor) params.set('cursor', cursor)
+    const availabilityRequest = fetch(`/operations/v1/courier-availability-windows?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+    const projectionParams = new URLSearchParams({ zone_id: zoneId.trim(), from: fromUtc, to: toUtc, bucket_minutes: String(bucket) })
+    const projectionRequest = refreshProjection
+      ? fetch(`/operations/v1/courier-capacity-projection?${projectionParams}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
+      : Promise.resolve(null)
+    const [availabilityResult, projectionResult] = await Promise.allSettled([availabilityRequest, projectionRequest])
+    if (availabilityResult.status === 'fulfilled') {
+      if (availabilityResult.value.ok) {
+        try {
+          const page = await availabilityResult.value.json() as AvailabilityPage
+          if (!Array.isArray(page.items)) throw new Error('ساختار پاسخ فهرست پنجره‌های برنامه‌ریزی نامعتبر است.')
+          setAvailabilityPage(page); setAvailabilityNextCursor(page.next_cursor || null)
+        } catch (cause) { setAvailabilityError(cause instanceof Error ? cause.message : 'پاسخ فهرست پنجره‌های برنامه‌ریزی نامعتبر است.'); setAvailabilityPage(null); setAvailabilityNextCursor(null) }
+      } else { setAvailabilityError(await readError(availabilityResult.value)); setAvailabilityPage(null); setAvailabilityNextCursor(null) }
+    } else { setAvailabilityError('ارتباط با API فهرست پنجره‌های برنامه‌ریزی برقرار نشد.'); setAvailabilityPage(null); setAvailabilityNextCursor(null) }
+    if (refreshProjection) {
+      if (projectionResult.status === 'fulfilled' && projectionResult.value) {
+        if (projectionResult.value.ok) {
+          try { const projection = await projectionResult.value.json() as CapacityProjection; if (!Array.isArray(projection.buckets)) throw new Error('ساختار پاسخ ظرفیت نامعتبر است.'); setCapacityProjection(projection) }
+          catch (cause) { setCapacityError(cause instanceof Error ? cause.message : 'پاسخ ظرفیت نامعتبر است.'); setCapacityProjection(null) }
+        } else { setCapacityError(await readError(projectionResult.value)); setCapacityProjection(null) }
+      } else { setCapacityError('ارتباط با API ظرفیت برقرار نشد.'); setCapacityProjection(null) }
+    }
+    setCursorStack(nextStack || [null]); setPageIndex((nextStack || [null]).length - 1)
+    setConnected(true); setUpdatedAt(new Date().toISOString()); setLoading(false)
+  }, [token, zoneId, capacityFrom, capacityTo, bucketMinutes])
+
+  function connect(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const value = tokenDraft.trim()
+    if (!value) return
+    setToken(value)
+    setTokenDraft('')
+    setConnectionDialogOpen(false)
+    setItems([])
+    setMissionItems([])
+    setCourierItems([])
+    setPresenceItems([])
+    setPresenceNextCursor(null)
+    setIssueItems([])
+    setIssueNextCursor(null)
+    setFinanceItems([])
+    setFinanceNextCursor(null)
+    setCourierNextCursor(null)
+    setAvailabilityNextCursor(null)
+    setCapacityProjection(null)
+    setAvailabilityPage(null)
+    availabilityCreateKey.current = null; availabilityCancelKey.current = null
+    setCancelWindowId(null); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
+    setCursorStack([null])
+    setPageIndex(0)
+    setConnected(false)
+    setError('')
+    if (!tokenDraft.trim()) {
+      setError('توکن معتبر عملیات را وارد کنید.')
+      return
+    }
+    // State updates are asynchronous; use the submitted values for the first request.
+    void requestWithCredentials(tokenDraft.trim(), null, [null])
+  }
+
+  async function requestWithCredentials(
+    submittedToken: string,
+    cursor: string | null,
+    stack: Array<string | null>,
+  ) {
+    setLoading(true)
+    const params = new URLSearchParams({ page_size: '25', sort_by: sortBy })
+    if (query.trim()) params.set('query', query.trim())
+    if (customerId.trim()) params.set('customer_id', customerId.trim())
+    if (hasOffer) params.set('has_offer', hasOffer)
+    if (deliveryWindow) params.set('delivery_window_state', deliveryWindow)
+    if (createdBefore) params.set('created_before', new Date(createdBefore).toISOString())
+    if (cursor) params.set('cursor', cursor)
+    try {
+      const response = await fetch(`/operations/v1/dispatch/queue?${params}`, {
+        headers: { Authorization: `Bearer ${submittedToken}`, Accept: 'application/json' },
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const page = (await response.json()) as QueuePage
+      if (!Array.isArray(page.items)) throw new Error('ساختار پاسخ صف مأموریت با قرارداد API سازگار نیست.')
+      setItems(page.items)
+      setNextCursor(page.nextCursor || null)
+      setCursorStack(stack)
+      setPageIndex(stack.length - 1)
+      setConnected(true)
+      setUpdatedAt(new Date().toISOString())
+      setError('')
+      void fetchDashboardSummary(submittedToken)
+    } catch (cause) {
+      setConnected(false)
+      setError(cause instanceof Error ? cause.message : 'ارتباط با API برقرار نشد.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (viewMode === 'dispatch') { void fetchPage(null, [null]); void fetchDashboardSummary() }
+    else if (viewMode === 'missions') void fetchMissionPage(null, [null])
+    else if (viewMode === 'couriers') void fetchCourierPage(null, [null])
+    else if (viewMode === 'finance') void fetchFinancePage(null, [null])
+    else if (viewMode === 'sla') void fetchSlaPage(null, [null])
+    else if (viewMode === 'presence') void fetchPresencePage(null, [null])
+    else if (viewMode === 'issues') void fetchIssuePage(null, [null])
+    else if (viewMode === 'workers') void fetchWorkerStatus()
+    else if (viewMode === 'webhooks') void fetchWebhookOps(null)
+    else void fetchZoneCapacity(null, [null], true)
+  }
+
+  function goNext() {
+    const cursor = viewMode === 'dispatch' ? nextCursor : viewMode === 'missions' ? missionNextCursor : viewMode === 'couriers' ? courierNextCursor : viewMode === 'finance' ? financeNextCursor : viewMode === 'sla' ? slaNextCursor : viewMode === 'presence' ? presenceNextCursor : viewMode === 'issues' ? issueNextCursor : viewMode === 'webhooks' ? webhookNextCursor : availabilityNextCursor
+    if (!cursor) return
+    const nextStack = [...cursorStack, cursor]
+    if (viewMode === 'dispatch') void fetchPage(cursor, nextStack)
+    else if (viewMode === 'missions') void fetchMissionPage(cursor, nextStack)
+    else if (viewMode === 'couriers') void fetchCourierPage(cursor, nextStack)
+    else if (viewMode === 'finance') void fetchFinancePage(cursor, nextStack)
+    else if (viewMode === 'sla') void fetchSlaPage(cursor, nextStack)
+    else if (viewMode === 'presence') void fetchPresencePage(cursor, nextStack)
+    else if (viewMode === 'issues') void fetchIssuePage(cursor, nextStack)
+    else if (viewMode === 'workers') return
+    else if (viewMode === 'webhooks') { const nextStack = [...cursorStack, webhookNextCursor!]; void fetchWebhookOps(webhookNextCursor, nextStack) }
+    else void fetchZoneCapacity(cursor, nextStack, false)
+  }
+
+  function goPrevious() {
+    if (pageIndex < 1) return
+    const previousStack = cursorStack.slice(0, -1)
+    const cursor = previousStack[previousStack.length - 1] || null
+    if (viewMode === 'dispatch') void fetchPage(cursor, previousStack)
+    else if (viewMode === 'missions') void fetchMissionPage(cursor, previousStack)
+    else if (viewMode === 'couriers') void fetchCourierPage(cursor, previousStack)
+    else if (viewMode === 'finance') void fetchFinancePage(cursor, previousStack)
+    else if (viewMode === 'sla') void fetchSlaPage(cursor, previousStack)
+    else if (viewMode === 'presence') void fetchPresencePage(cursor, previousStack)
+    else if (viewMode === 'issues') void fetchIssuePage(cursor, previousStack)
+    else if (viewMode === 'workers') return
+    else if (viewMode === 'webhooks') void fetchWebhookOps(cursor, previousStack)
+    else void fetchZoneCapacity(cursor, previousStack, false)
+  }
+
+  function openDashboardPresence() {
+    setViewMode('presence')
+    setPresenceStatus('ONLINE')
+    setPresenceZoneId('')
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    void fetchPresencePage(null, [null], 'ONLINE', '')
+  }
+
+  function openDashboardDispatch() {
+    setViewMode('dispatch')
+    setQuery('')
+    setCustomerId('')
+    setHasOffer('')
+    setDeliveryWindow('')
+    setCreatedBefore('')
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    void fetchPage(null, [null], true)
+    void fetchDashboardSummary()
+  }
+
+  function openDashboardMissions() {
+    setViewMode('missions')
+    setQuery('')
+    setCreatedAfter('')
+    setCreatedBefore('')
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    void fetchMissionPage(null, [null], true)
+  }
+
+  function openDashboardSla() {
+    const horizon = String(dashboardSummary?.sla_horizon_minutes ?? 15)
+    setViewMode('sla')
+    setSlaMinutesAhead(horizon)
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    void fetchSlaPage(null, [null], horizon)
+  }
+
+  function switchView(mode: 'overview' | 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
+    setViewMode(mode)
+    setCursorStack([null])
+    setPageIndex(0)
+    setError('')
+    if (mode === 'overview') { void fetchDashboardSummary() }
+    else if (mode === 'dispatch') { void fetchPage(null, [null]); void fetchDashboardSummary() }
+    else if (mode === 'missions') void fetchMissionPage(null, [null])
+    else if (mode === 'couriers') { closeDetails(); setSelectedCourierId(''); setCourierDetail(null); setCourierAudit([]); void fetchCourierPage(null, [null]) }
+    else if (mode === 'finance') void fetchFinancePage(null, [null])
+    else if (mode === 'sla') { setSlaItems([]); setSlaNextCursor(null); setSlaEvaluatedAt(null) }
+    else if (mode === 'presence') void fetchPresencePage(null, [null])
+    else if (mode === 'issues') void fetchIssuePage(null, [null])
+    else if (mode === 'workers') void fetchWorkerStatus()
+    else if (mode === 'webhooks') { setWebhookTab('deliveries'); void fetchWebhookOps(null) }
+    else if (mode === 'routes') setRouteReloadKey((value) => value + 1)
+    else if (mode === 'audit') setAuditReloadKey((value) => value + 1)
+    else if (mode === 'policies') setPolicyReloadKey((value) => value + 1)
+    else if (mode === 'onboarding') setPolicyReloadKey((value) => value + 1)
+    else if (mode === 'admissions') setPolicyReloadKey((value) => value + 1)
+    else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
+  }
+
+  async function showCourierDetails(courierId: string, inWorkspace = false) {
+    const requestId = ++detailRequestId.current
+    setSelectedCourierId(courierId)
+    setTimelineTitle(inWorkspace ? '' : courierId); setCourierDetail(null); setCourierAudit([]); setDetailErrors([]); setTimelineLoading(true)
+    const requests = await Promise.allSettled([
+      fetch(`/operations/v1/couriers/${encodeURIComponent(courierId)}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+      fetch('/operations/v1/courier-read-audit?page_size=100', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+    ])
+    const errors: string[] = []
+    const read = async <T,>(result: PromiseSettledResult<Response>, label: string): Promise<T | null> => {
+      if (result.status === 'rejected') { errors.push(`${label}: خطای ارتباط`); return null }
+      if (!result.value.ok) { errors.push(`${label}: ${await readError(result.value)}`); return null }
+      try { return await result.value.json() as T } catch { errors.push(`${label}: قالب پاسخ معتبر نیست.`); return null }
+    }
+    const [detail, audit] = await Promise.all([read<CourierDetail>(requests[0], 'جزئیات پیک'), read<CourierReadAudit>(requests[1], 'گزارش دسترسی')])
+    if (requestId !== detailRequestId.current) return
+    setCourierDetail(detail); setCourierAudit(Array.isArray(audit?.items) ? audit.items.filter((row) => row.courier_id === courierId) : []); setDetailErrors(errors); setTimelineLoading(false)
+  }
+
+  async function showMissionDetails(missionId: string) {
+    const requestId = ++detailRequestId.current
+    setTimelineTitle(missionId)
+    setMissionDetail(null)
+    setCourierDetail(null)
+    setCourierAudit([])
+    setCourierDetail(null)
+    setCourierAudit([])
+    setMissionTimeline([])
+    setDetailErrors([])
+    setTimelineLoading(true)
+    if (demoMode) {
+      const sample = DEMO_DISPATCH_MISSIONS.find((mission) => mission.missionId === missionId)
+      if (!sample) { setDetailErrors(['این مأموریت در دادهٔ نمایشی پیدا نشد.']); setTimelineLoading(false); return }
+      const status = sample.demoStatus === 'در مسیر' ? 'IN_TRANSIT' : sample.demoStatus === 'در محل دریافت' ? 'ARRIVED_PICKUP' : sample.demoStatus === 'تحویل‌گرفته‌شده' ? 'PICKED_UP' : sample.demoStatus === 'تحویل‌شده' ? 'DELIVERED' : sample.demoStatus === 'تخصیص مجدد' ? 'SEARCHING_COURIER' : 'COURIER_ASSIGNED'
+      const lastEvent = sample.demoStatus === 'در مسیر' ? 'mission.in_transit' : sample.demoStatus === 'در محل دریافت' ? 'mission.arrived_pickup' : sample.demoStatus === 'تحویل‌گرفته‌شده' ? 'mission.picked_up' : sample.demoStatus === 'تحویل‌شده' ? 'mission.delivered' : sample.demoStatus === 'تخصیص مجدد' ? 'mission.searching_courier' : 'mission.courier_assigned'
+      const now = new Date().toISOString()
+      setMissionDetail({ missionId: sample.missionId, customerId: sample.customerId, deliveryRequestId: `REQ-${sample.missionId.slice(-3)}`, status, createdAt: sample.createdAt, committedDeliveryAt: sample.committedDeliveryAt })
+      const events: NonNullable<MissionTimeline['events']> = [{ eventId: `${missionId}-1`, eventType: 'mission.created', sequence: 1, occurredAt: sample.createdAt }, { eventId: `${missionId}-2`, eventType: 'mission.searching_courier', sequence: 2, occurredAt: new Date(Date.now() - 3 * 60_000).toISOString() }]
+      if (sample.activeOffer?.courierId && lastEvent !== 'mission.courier_assigned') events.push({ eventId: `${missionId}-3`, eventType: 'mission.courier_assigned', sequence: 3, occurredAt: new Date(Date.now() - 2 * 60_000).toISOString() })
+      if (lastEvent !== 'mission.searching_courier') events.push({ eventId: `${missionId}-last`, eventType: lastEvent, sequence: events.length + 1, occurredAt: now })
+      setMissionTimeline(events)
+      setTimelineLoading(false)
+      return
+    }
+    const missionPath = `/operations/v1/missions/${encodeURIComponent(missionId)}`
+    const requests = await Promise.allSettled([
+      fetch(missionPath, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+      fetch(`${missionPath}/timeline`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' }),
+    ])
+    const errors: string[] = []
+    const readResponse = async <T,>(result: PromiseSettledResult<Response>, label: string): Promise<T | null> => {
+      if (result.status === 'rejected') {
+        errors.push(`${label}: ${result.reason instanceof Error ? result.reason.message : 'خطای ارتباط'}`)
+        return null
+      }
+      if (!result.value.ok) {
+        errors.push(`${label}: ${await readError(result.value)}`)
+        return null
+      }
+      try { return await result.value.json() as T }
+      catch { errors.push(`${label}: قالب پاسخ معتبر نیست.`); return null }
+    }
+    const [detail, timelineResult] = await Promise.all([
+      readResponse<MissionRecord>(requests[0], 'جزئیات مأموریت'),
+      readResponse<MissionTimeline>(requests[1], 'timeline'),
+    ])
+    if (requestId !== detailRequestId.current) return
+    setMissionDetail(detail)
+    setMissionTimeline(Array.isArray(timelineResult?.events) ? timelineResult.events : [])
+    setDetailErrors(errors)
+    setTimelineLoading(false)
+  }
+
+  function closeDetails() {
+    detailRequestId.current += 1
+    setTimelineTitle('')
+    setTimelineLoading(false)
+  }
+
+  function disconnect() {
+    availabilityCreateKey.current = null; availabilityCancelKey.current = null
+    setToken('')
+    setTokenDraft('')
+    setDashboardSummary(null)
+    setDashboardError('')
+    setItems([])
+    setMissionItems([])
+    setCourierItems([])
+    setPresenceItems([])
+    setPresenceNextCursor(null)
+    setFinanceItems([])
+    setFinanceNextCursor(null)
+    setCourierNextCursor(null)
+    setAvailabilityNextCursor(null)
+    setCapacityProjection(null)
+    setAvailabilityPage(null)
+    setCancelWindowId(null); setCancelReason(''); setAvailabilityWriteError(''); setAvailabilityWriteMessage('')
+    setNextCursor(null)
+    setCursorStack([null])
+    setPageIndex(0)
+    setConnected(false)
+    setMissionDetail(null)
+    setCourierDetail(null)
+    setCourierAudit([])
+    setMissionTimeline([])
+    closeDetails()
+    setError('')
+  }
+
+  const panelTitles: Record<typeof viewMode, string> = {
+    overview: 'نمای کلی عملیات', dispatch: 'داشبورد عملیات', missions: 'مأموریت‌ها', couriers: 'کنترل پیک‌ها', zones: 'مناطق و ظرفیت',
+    finance: 'مالی و بررسی کرایه', sla: 'استثناهای SLA', presence: 'وضعیت حضور پیک‌ها',
+    issues: 'پشتیبانی و گزارش مشکلات', workers: 'سلامت پردازش‌ها', webhooks: 'یکپارچه‌سازی‌ها',
+    policies: 'استانداردها و پیکربندی', onboarding: 'مشتریان و شعب', admissions: 'پذیرش و راه‌اندازی', routes: 'مسیرها', audit: 'ممیزی عملیات',
+  }
+  const panelDescriptions: Record<typeof viewMode, string> = {
+    overview: 'وضعیت شبکهٔ مونو، مأموریت‌ها، پیک‌ها، استاندارد خدمت و ظرفیت عملیاتی', dispatch: 'صف مأموریت‌های در انتظار تخصیص پیک', missions: 'جست‌وجو و پیگیری مأموریت‌های ثبت‌شده', routes: 'برنامهٔ مسیر و ترتیب توقف‌های ذخیره‌شده؛ بدون نقشه و موقعیت زنده', audit: 'بررسی سابقهٔ قابل‌دسترسی هر دامنه از APIهای مستقل',
+    couriers: 'وضعیت اعتماد، تخصیص، محدوده و آمادگی عملیاتی پیک‌ها', zones: 'ظرفیت برنامه‌ریزی‌شده و پنجره‌های کاری زون',
+    finance: 'برآورد سهم‌ها از snapshot نرخ ثبت‌شدهٔ مأموریت', sla: 'مأموریت‌های نزدیک موعد یا عبورکرده از SLA',
+    presence: 'وضعیت آنلاین یا آفلاین و آخرین زمان ثبت حضور',
+    issues: 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها',
+    workers: 'وضعیت پردازش‌های پس‌زمینه از API', webhooks: 'صف تحویل و تلاش‌های ارسال webhook',
+    policies: 'نسخه‌ها و چرخهٔ عمر سیاست‌های عملیاتی',
+    onboarding: 'ثبت و بررسی مشتری‌ها و شعب با سابقهٔ ممیزی API',
+    admissions: 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها',
+  }
+
+  function shouldShowShellTopbar() { return viewMode !== 'overview' && viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
+  function shouldShowLegacyDataPanel() { return viewMode !== 'overview' && viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
+  const activeDemoMission = demoMode ? DEMO_DISPATCH_MISSIONS.find((mission) => mission.missionId === timelineTitle) : undefined
+
+  return (
+    <div className="app-shell" dir="rtl">
+      <aside className="sidebar">
+        <div className="sidebar-brand-card"><div className="brand-lockup"><span><strong>مونو</strong><small>لجستیک هوشمند</small></span><svg className="brand-symbol" viewBox="0 0 48 48" aria-hidden="true"><path d="M5 24h38M24 4v40M8 21l-3 3 3 3M40 21l3 3-3 3"/><circle cx="24" cy="24" r="3"/><circle cx="13" cy="12" r="1.5"/></svg></div></div>
+        <div className="side-caption">فضای عملیات</div>
+        <nav className="navigation" aria-label="ناوبری اصلی">
+          <button className={`nav-item ${viewMode === 'overview' ? 'active' : ''}`} onClick={() => switchView('overview')}><span className="nav-icon"><NavIcon type="dashboard" /></span>داشبورد</button>
+          <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={openDashboardDispatch}><span className="nav-icon"><NavIcon type="mission" /></span>مأموریت‌ها</button>
+          <button className={`nav-item ${viewMode === 'routes' ? 'active' : ''}`} onClick={() => switchView('routes')}><span className="nav-icon"><NavIcon type="route" /></span>مسیرها</button>
+          <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon"><NavIcon type="courier" /></span>پیک‌ها</button>
+          <button className="nav-item" disabled title="فهرست و API مستقل وسایل نقلیه هنوز در دسترس نیست"><span className="nav-icon"><NavIcon type="vehicle" /></span>وسایل نقلیه</button>
+          <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon"><NavIcon type="zone" /></span>مناطق و ظرفیت</button>
+          <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon"><NavIcon type="policy" /></span>سیاست‌ها و پیکربندی</button>
+          <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon"><NavIcon type="customers" /></span>مشتریان</button>
+          <button className={`nav-item ${viewMode === 'sla' || viewMode === 'issues' ? 'active' : ''}`} onClick={() => switchView('sla')}><span className="nav-icon"><NavIcon type="support" /></span>SLA و استثناها</button>
+          <button className={`nav-item ${viewMode === 'finance' ? 'active' : ''}`} onClick={() => switchView('finance')}><span className="nav-icon"><NavIcon type="finance" /></span>مالی</button>
+          <button className={`nav-item ${viewMode === 'webhooks' ? 'active' : ''}`} onClick={() => switchView('webhooks')}><span className="nav-icon"><NavIcon type="integration" /></span>یکپارچه‌سازی</button>
+          <button className={`nav-item ${viewMode === 'audit' ? 'active' : ''}`} onClick={() => switchView('audit')}><span className="nav-icon"><NavIcon type="audit" /></span>ممیزی</button>
+        </nav>
+        <div className="sidebar-footer"><div className="sidebar-operator"><span className="operator-avatar">م</span><span>اپراتور مونو<small>تیم عملیات</small></span><i className={`operator-status ${token ? 'connected' : ''}`} /></div><button className="sidebar-access" onClick={() => token ? disconnect() : setConnectionDialogOpen(true)}>{token ? 'خروج' : 'اتصال API'}</button></div>
+      </aside>
+
+      <main className="workspace">
+        {shouldShowShellTopbar() && <header className="topbar">
+          <div className="topbar-actions">
+            <button className="icon-button" onClick={() => viewMode === 'dispatch' ? (void fetchPage(cursorStack[pageIndex] || null), void fetchDashboardSummary()) : viewMode === 'missions' ? void fetchMissionPage(cursorStack[pageIndex] || null) : viewMode === 'routes' ? setRouteReloadKey((value) => value + 1) : viewMode === 'audit' ? setAuditReloadKey((value) => value + 1) : viewMode === 'couriers' ? void fetchCourierPage(cursorStack[pageIndex] || null) : viewMode === 'presence' ? void fetchPresencePage(cursorStack[pageIndex] || null) : viewMode === 'issues' ? void fetchIssuePage(cursorStack[pageIndex] || null) : viewMode === 'finance' ? void fetchFinancePage(cursorStack[pageIndex] || null) : viewMode === 'sla' ? void fetchSlaPage(cursorStack[pageIndex] || null)  : viewMode === 'workers' ? void fetchWorkerStatus() : viewMode === 'webhooks' ? void fetchWebhookOps(cursorStack[pageIndex] || null) : viewMode === 'policies' || viewMode === 'onboarding' || viewMode === 'admissions' ? setPolicyReloadKey((value) => value + 1) : void fetchZoneCapacity(cursorStack[pageIndex] || null, undefined, true)} disabled={!token || loading} aria-label="تازه‌سازی">↻</button>
+            {viewMode === 'dispatch' && <span className="overview-updated-at">آخرین به‌روزرسانی: {updatedAt ? new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit' }).format(new Date(updatedAt)) : '—'}</span>}
+            <button type="button" className={`system-pill ${connected || demoMode ? 'is-online' : ''}`} onClick={() => !token && setConnectionDialogOpen(true)}><i />{demoMode ? 'دادهٔ نمایشی' : connected ? 'سیستم آنلاین' : 'اتصال API'}</button>
+            {viewMode === 'dispatch' && <button className="primary-button create-mission-action" type="button" disabled title="مأموریت از تأیید ارسال ایجاد می‌شود؛ API ایجاد دستی مأموریت در دسترس نیست.">ایجاد مأموریت ＋</button>}
+            {token && <button className="text-button" onClick={disconnect}>خروج</button>}
+          </div>
+          <div className="page-heading"><h1>{viewMode === 'dispatch' ? 'مرکز کنترل عملیات' : panelTitles[viewMode]}</h1><p>{viewMode === 'dispatch' ? 'نمای زندهٔ مأموریت‌ها، پیک‌ها، مسیرها و وضعیت استاندارد' : panelDescriptions[viewMode]}</p></div>
+        </header>}
+
+        {connectionDialogOpen && <div className="api-access-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setConnectionDialogOpen(false)}><section className="api-access-dialog" role="dialog" aria-modal="true" aria-labelledby="api-access-title"><header><div><span className="eyebrow">دسترسی امن</span><h2 id="api-access-title">اتصال به API عملیات</h2></div><button type="button" className="icon-button" onClick={() => setConnectionDialogOpen(false)} aria-label="بستن">×</button></header><p>توکن فقط در حافظهٔ همین صفحه نگهداری می‌شود.</p><form className="api-access-form" onSubmit={connect}><label>توکن Bearer<input type="password" value={tokenDraft} onChange={(event) => setTokenDraft(event.target.value)} placeholder="توکن دسترسی عملیات" dir="ltr" autoComplete="off" autoFocus /></label><div><button className="primary-button" disabled={loading || !tokenDraft.trim()}>اتصال و دریافت داده</button><button className="secondary-button" type="button" onClick={() => setConnectionDialogOpen(false)}>انصراف</button></div></form></section></div>}
+
+        {error && token && <div className="error-banner" role="alert"><span>!</span><div><strong>دریافت اطلاعات ناموفق بود</strong><p>{error}</p></div><button onClick={() => setError('')} aria-label="بستن">×</button></div>}
+        {viewMode === 'dispatch' && dashboardError && <div className="error-banner" role="alert"><span>!</span><div><strong>خلاصهٔ سراسری داشبورد دریافت نشد</strong><p>{dashboardError}</p></div><button onClick={() => setDashboardError('')} aria-label="بستن">×</button></div>}
+
+        {viewMode === 'overview' && <OperationsOverviewWorkbench demoMode={!token && new URLSearchParams(window.location.search).get('demo') === '1'} summary={dashboardSummary} onOpenMissions={openDashboardMissions} onOpenDispatch={openDashboardDispatch} onOpenSla={openDashboardSla} onOpenPresence={openDashboardPresence} onRefresh={() => void fetchDashboardSummary()} />}
+        {viewMode === 'dispatch' && <DashboardSummaryCards summary={dashboardSummary} actionsDisabled={!token} onOpenPresence={openDashboardPresence} onOpenDispatch={openDashboardDispatch} onOpenSla={openDashboardSla} onOpenMissions={openDashboardMissions} />}
+        {viewMode === 'presence' && <section className="kpi-grid" aria-label="خلاصهٔ حضور پیک‌های همین صفحه">
+          <article className="kpi-card"><span className="kpi-icon cyan">●</span><div><small>آنلاین در این صفحه</small><strong>{fa.format(presenceItems.filter((item) => item.status === 'ONLINE').length)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon amber">◯</span><div><small>آفلاین در این صفحه</small><strong>{fa.format(presenceItems.filter((item) => item.status === 'OFFLINE').length)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon blue">⌁</span><div><small>زون‌های مشخص در این صفحه</small><strong>{fa.format(new Set(presenceItems.map((item) => item.zone_id).filter(Boolean)).size)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon red">◷</span><div><small>بدون زمان حضور</small><strong>{fa.format(presenceItems.filter((item) => !item.updated_at).length)}</strong></div></article>
+        </section>}
+        {viewMode === 'issues' && <section className="kpi-grid" aria-label="خلاصهٔ صندوق مشکلات همین صفحه">
+          <article className="kpi-card"><span className="kpi-icon cyan">!</span><div><small>گزارش‌ها در این صفحه</small><strong>{fa.format(issueItems.length)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>باز در این صفحه</small><strong>{fa.format(issueItems.filter((item) => item.status === 'OPEN').length)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon blue">✓</span><div><small>رسیدگی‌شده در این صفحه</small><strong>{fa.format(issueItems.filter((item) => item.status === 'RESOLVED').length)}</strong></div></article>
+          <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>گزارش نگرانی ایمنی</small><strong>{fa.format(issueItems.filter((item) => item.issue_code === 'SAFETY_CONCERN').length)}</strong></div></article>
+        </section>}
+
+        {viewMode === 'workers' && <section className="worker-grid" aria-label="وضعیت پردازش‌های پس‌زمینه">
+          {([
+            ['mission', 'انقضای پیشنهادهای پیک', '/operations/v1/dispatch/offer-expiry-worker/status'],
+            ['webhook', 'ارسال webhookها', '/operations/v1/webhook-deliveries/worker-status'],
+          ] as const).map(([key, title, endpoint]) => {
+            const worker = workerSnapshots[key]
+            const errorText = workerErrors[key]
+            const stateLabels: Record<string, string> = { disabled: 'غیرفعال', blocked: 'مسدود', starting: 'در حال شروع', healthy: 'سالم', degraded: 'دارای خطا' }
+            return <article className="worker-card" key={key}>
+              <header><div><span className="eyebrow">وضعیت سرویس پس‌زمینه</span><h2>{title}</h2></div>
+                {worker && <span className={`badge ${worker.state === 'healthy' ? 'success' : worker.state === 'degraded' || worker.state === 'blocked' ? 'danger' : 'neutral'}`}>{stateLabels[worker.state] || worker.state}</span>}
+              </header>
+              {errorText ? <p className="worker-error" role="alert">دریافت وضعیت ناموفق بود: {errorText}</p> : worker ? <>
+                <dl className="worker-details">
+                  <div><dt>تنظیم فعال</dt><dd>{worker.enabled ? 'بله' : 'خیر'}</dd></div>
+                  <div><dt>آخرین تلاش</dt><dd>{formatDate(worker.last_attempt_at)}</dd></div>
+                  <div><dt>آخرین موفقیت</dt><dd>{formatDate(worker.last_success_at)}</dd></div>
+                  <div><dt>آخرین batch</dt><dd>{fa.format(worker.last_batch_claimed ?? worker.last_batch_candidates ?? 0)}</dd></div>
+                </dl>
+                <div className="worker-counts"><span>کل batchها <strong>{fa.format(worker.total_batches)}</strong></span><span>موفق <strong>{fa.format(worker.successful_batches)}</strong></span><span>ناموفق <strong>{fa.format(worker.failed_batches)}</strong></span></div>
+              </> : <p className="modal-state">برای دریافت وضعیت، صفحه را تازه‌سازی کنید.</p>}
+              <code dir="ltr">{endpoint}</code>
+            </article>
+          })}
+        </section>}
+        {viewMode === 'webhooks' && <div className="webhook-dashboard">
+          {webhookSummary && <section className="kpi-grid" aria-label="خلاصهٔ سراسری صف webhook">
+            <article className="kpi-card"><span className="kpi-icon cyan">↻</span><div><small>کل تحویل‌ها</small><strong>{fa.format(webhookSummary.total_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon amber">◷</span><div><small>موعد ارسال</small><strong>{fa.format(webhookSummary.due_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon red">!</span><div><small>قفل منقضی</small><strong>{fa.format(webhookSummary.stale_lease_count)}</strong></div></article>
+            <article className="kpi-card"><span className="kpi-icon blue">▤</span><div><small>Dead-letter در ۲۴ ساعت</small><strong>{fa.format(webhookSummary.dead_lettered_last_24_hours)}</strong></div></article>
+          </section>}
+          {webhookSummary && <p className="data-note">خلاصهٔ کل صف، مبنای مشاهده: {formatDate(webhookSummary.observed_at)} · باز: {fa.format(webhookSummary.pending_count + webhookSummary.in_progress_count + webhookSummary.retrying_count)} · موفق: {fa.format(webhookSummary.succeeded_count)} · لغوشده: {fa.format(webhookSummary.cancelled_count)} · قدیمی‌ترین کار باز: {formatDate(webhookSummary.oldest_open_delivery_at)}</p>}
+          {Object.entries(webhookErrors).filter(([, message]) => message).map(([key, message]) => <div className="webhook-inline-error" role="alert" key={key}>{key === 'summary' ? 'خلاصهٔ صف' : key === 'list' ? 'فهرست تحویل‌ها' : 'audit'}: {message}</div>)}
+          {webhookActionMessage && <div className="availability-write-success" role="status">{webhookActionMessage}</div>}
+          <section className="queue-panel webhook-panel">
+            <div className="panel-heading"><div><span className="eyebrow">پایش وب‌هوک خروجی</span><h2>تحویل‌ها و تاریخچهٔ عملیات</h2></div><span className="panel-meta">محتوای payload، URL مقصد و secret نمایش داده نمی‌شود</span></div>
+            <div className="webhook-tabs" role="tablist" aria-label="نمای وب‌هوک">
+              <button type="button" className={webhookTab === 'deliveries' ? 'active' : ''} onClick={() => setWebhookTab('deliveries')}>تحویل‌ها</button>
+              <button type="button" className={webhookTab === 'credentials' ? 'active' : ''} onClick={() => setWebhookTab('credentials')}>کلیدهای API</button>
+              <button type="button" className={webhookTab === 'audit' ? 'active' : ''} onClick={() => setWebhookTab('audit')}>سوابق عملیات</button>
+            </div>
+            {webhookTab === 'deliveries' ? <>
+              <form className="filters webhook-filters" onSubmit={applyFilters}>
+                <label>شناسهٔ مشتری<input value={webhookCustomerId} onChange={(event) => setWebhookCustomerId(event.target.value)} placeholder="cus_…" dir="ltr" autoComplete="off" /></label>
+                <label>شناسهٔ endpoint<input value={webhookEndpointId} onChange={(event) => setWebhookEndpointId(event.target.value)} placeholder="whk_…" dir="ltr" autoComplete="off" /></label>
+                <label>نوع رویداد<input value={webhookEventType} onChange={(event) => setWebhookEventType(event.target.value)} placeholder="mission.delivered" dir="ltr" autoComplete="off" /></label>
+                <label><span className="sr-only">وضعیت تحویل</span><select value={webhookStatus} onChange={(event) => setWebhookStatus(event.target.value)}><option value="">همهٔ وضعیت‌ها</option><option value="PENDING">در صف</option><option value="IN_PROGRESS">در حال ارسال</option><option value="RETRYING">تلاش مجدد</option><option value="SUCCEEDED">موفق</option><option value="DEAD_LETTERED">ناموفق نهایی</option><option value="CANCELLED">لغوشده</option></select></label>
+                <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال فیلتر</button>
+              </form>
+              <div className="table-wrap"><table className="webhook-table"><thead><tr><th>شناسهٔ تحویل</th><th>رویداد</th><th>وضعیت</th><th>تلاش</th><th>آخرین HTTP</th><th>کد خطا</th><th>ایجاد</th><th>اقدام</th></tr></thead><tbody>
+                {loading && <tr><td className="state-cell" colSpan={8}><span className="spinner"/>در حال دریافت اطلاعات…</td></tr>}
+                {!loading && webhookItems.map((item) => <tr key={item.delivery_id}>
+                  <td><strong className="mission-id" dir="ltr">{item.delivery_id}</strong><span className="cell-secondary" dir="ltr">{item.endpoint_id}</span></td>
+                  <td><span className="cell-primary" dir="ltr">{item.event_type}</span><span className="cell-secondary" dir="ltr">event {item.event_id}</span></td>
+                  <td><span className={`badge ${item.status === 'SUCCEEDED' ? 'success' : item.status === 'DEAD_LETTERED' ? 'danger' : item.status === 'CANCELLED' ? 'neutral' : 'warning'}`}>{item.status}</span></td>
+                  <td>{fa.format(item.attempt_count)}<span className="cell-secondary">نسل replay: {fa.format(item.replay_generation)}</span></td>
+                  <td>{item.last_http_status ?? '—'}</td><td dir="ltr">{item.last_error_code || '—'}</td><td>{formatDate(item.created_at)}</td>
+                  <td><div className="webhook-row-actions"><button className="history-button" onClick={() => void showWebhookDetail(item.delivery_id)}>جزئیات</button>
+                    {item.status === 'DEAD_LETTERED' && <button className="history-button" onClick={() => { setWebhookAction({ deliveryId: item.delivery_id, kind: 'replay' }); setWebhookActionError('') }}>Replay</button>}
+                    {(item.status === 'PENDING' || item.status === 'RETRYING') && <button className="history-button danger-action" onClick={() => { setWebhookAction({ deliveryId: item.delivery_id, kind: 'cancel' }); setWebhookActionError('') }}>لغو</button>}
+                  </div></td>
+                </tr>)}
+                {!loading && !webhookErrors.list && webhookItems.length === 0 && <tr><td className="state-cell" colSpan={8}><span className="empty-icon">⌕</span><strong>تحویلی پیدا نشد</strong><small>فیلترها را بررسی کنید یا صف را تازه‌سازی کنید.</small></td></tr>}
+              </tbody></table></div>
+              <footer className="table-footer"><span>{fa.format(webhookItems.length)} ردیف در این صفحه</span><div className="pagination"><button onClick={goPrevious} disabled={!token || loading || pageIndex === 0}>قبلی</button><span>صفحهٔ {fa.format(pageIndex + 1)}</span><button onClick={goNext} disabled={!token || loading || !webhookNextCursor}>بعدی</button></div></footer>
+            </> : webhookTab === 'credentials' ? <ApiKeyWorkbench token={token} /> : <div className="table-wrap"><table className="webhook-table"><thead><tr><th>زمان</th><th>کاربر عملیات</th><th>عمل</th><th>شناسهٔ منبع</th><th>نتیجه</th></tr></thead><tbody>
+              {webhookAudit?.items.map((item) => <tr key={item.audit_id}><td>{formatDate(item.occurred_at)}</td><td dir="ltr">{item.actor_id}</td><td dir="ltr">{item.action}</td><td dir="ltr">{item.resource_id || '—'}</td><td dir="ltr">{item.outcome_code || fa.format(item.result_count)}</td></tr>)}
+              {(!webhookAudit || webhookAudit.items.length === 0) && <tr><td className="state-cell" colSpan={5}><strong>رکورد audit برای این صفحه دریافت نشد</strong></td></tr>}
+            </tbody></table><p className="data-note webhook-audit-note">نمای audit شامل ۵۰ رکورد نخست است.</p></div>}
+          </section>
+          {webhookDetail && <section className="queue-panel webhook-detail">
+            <div className="panel-heading"><div><span className="eyebrow">جزئیات امن تحویل</span><h2 dir="ltr">{webhookDetail.delivery.delivery_id}</h2></div><button className="text-button" onClick={() => setWebhookDetail(null)}>بستن جزئیات</button></div>
+            <dl className="worker-details webhook-meta">
+              <div><dt>Endpoint</dt><dd dir="ltr">{webhookDetail.delivery.endpoint_id}</dd></div><div><dt>Event</dt><dd dir="ltr">{webhookDetail.delivery.event_id} · {webhookDetail.delivery.event_type}</dd></div>
+              <div><dt>وضعیت</dt><dd>{webhookDetail.delivery.status}</dd></div><div><dt>تلاش‌ها</dt><dd>{fa.format(webhookDetail.delivery.attempt_count)} · replay {fa.format(webhookDetail.delivery.replay_generation)}</dd></div>
+              <div><dt>آخرین تلاش</dt><dd>{formatDate(webhookDetail.delivery.last_attempt_at)}</dd></div><div><dt>تلاش بعدی</dt><dd>{formatDate(webhookDetail.delivery.next_attempt_at)}</dd></div>
+              <div><dt>پایان</dt><dd>{formatDate(webhookDetail.delivery.completed_at)}</dd></div><div><dt>HTTP / خطا</dt><dd>{webhookDetail.delivery.last_http_status ?? '—'} · {webhookDetail.delivery.last_error_code || '—'}</dd></div>
+            </dl>
+            {webhookDetailError && <p className="webhook-inline-error">{webhookDetailError}</p>}
+            <div className="table-wrap"><table className="webhook-table"><thead><tr><th>#</th><th>عمل</th><th>HTTP</th><th>کد خطا</th><th>زمان</th></tr></thead><tbody>
+              {webhookDetail.attempts.map((attempt, index) => <tr key={`${attempt.attempt_number}-${index}`}><td>{fa.format(attempt.attempt_number)}</td><td dir="ltr">{attempt.action}</td><td>{attempt.http_status ?? '—'}</td><td dir="ltr">{attempt.error_code || '—'}</td><td>{formatDate(attempt.occurred_at)}</td></tr>)}
+              {webhookDetail.attempts.length === 0 && <tr><td className="state-cell" colSpan={5}>تلاشی در تاریخچه ثبت نشده است.</td></tr>}
+            </tbody></table></div>
+          </section>}
+          {webhookDetailError && !webhookDetail && <div className="webhook-inline-error" role="alert">{webhookDetailError}</div>}
+        </div>}
+        {viewMode === 'policies' && <PolicyWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
+        {viewMode === 'routes' && <RoutePlanWorkbench token={token} reloadKey={routeReloadKey} demoMode={demoMode} onConnected={setConnected} />}
+        {viewMode === 'audit' && <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />}
+        {viewMode === 'admissions' && <AdmissionsWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} onOpenBusinesses={() => switchView('onboarding')} onOpenCouriers={() => switchView('couriers')} />}
+        {viewMode === 'onboarding' && <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
+        {viewMode === 'couriers' && <CourierControlWorkbench couriers={courierItems} selectedCourierId={selectedCourierId} detail={courierDetail} audit={courierAudit} loading={loading} detailLoading={timelineLoading && !timelineTitle && Boolean(selectedCourierId)} detailErrors={detailErrors} error={error} query={courierQuery} status={courierStatus} token={token} demoMode={demoMode} pageIndex={pageIndex} hasNext={Boolean(courierNextCursor)} onQueryChange={setCourierQuery} onStatusChange={setCourierStatus} onSearch={applyFilters} onSelect={(courierId) => demoMode ? setSelectedCourierId(courierId) : void showCourierDetails(courierId, true)} onPrevious={goPrevious} onNext={goNext} onRefresh={() => void fetchCourierPage(cursorStack[pageIndex] || null)} onOpenAdmissions={() => switchView('admissions')} onOpenZones={() => switchView('zones')} />}
+        {viewMode === 'zones' && <ZonesCapacityWorkbench token={token} demoMode={demoMode} onConnected={setConnected} />}
+        {viewMode === 'sla' && <SlaExceptionsWorkbench token={token} demoMode={demoMode} onConnected={setConnected} onOpenMission={(missionId) => void showMissionDetails(missionId)} />}
+        {viewMode === 'finance' && <FinanceWorkbench items={financeItems} loading={loading} error={error} token={token} query={financeQuery} status={financeStatus} pageIndex={pageIndex} hasNext={Boolean(financeNextCursor)} onQueryChange={setFinanceQuery} onStatusChange={setFinanceStatus} onSearch={(nextStatus) => void fetchFinancePage(null, [null], nextStatus)} onPrevious={goPrevious} onNext={goNext} />}
+        {shouldShowLegacyDataPanel() && <div className={viewMode === 'dispatch' ? 'operations-overview-layout' : ''}>
+          {viewMode === 'dispatch' && <aside className="operations-overview-aside">
+            <section className="operations-overview-card action-overview-card">
+              <header><strong>نیازمند اقدام</strong><span>{dashboardSummary ? fa.format([dashboardSummary.unassigned_mission_count, dashboardSummary.sla_at_risk_count, dashboardSummary.sla_overdue_count].filter((count) => count > 0).length) : '—'}</span></header>
+              <div className="overview-action-list">
+                <button onClick={openDashboardSla} disabled={!token}><span><strong>در معرض نقض SLA</strong><small>هشدارهای نیازمند پایش</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.sla_at_risk_count) : '—'}</b></button>
+                <button onClick={openDashboardSla} disabled={!token}><span><strong>از موعد گذشته</strong><small>در بازهٔ جاری API</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.sla_overdue_count) : '—'}</b></button>
+                <button onClick={openDashboardDispatch} disabled={!token}><span><strong>بدون تخصیص پیک</strong><small>در انتظار پیشنهاد پذیرفته‌شده</small></span><b>{dashboardSummary ? fa.format(dashboardSummary.unassigned_mission_count) : '—'}</b></button>
+              </div>
+            </section>
+            <section className="operations-overview-card capacity-overview-card">
+              <header><strong>ظرفیت مناطق</strong><button onClick={() => switchView('zones')}>برنامه‌ریزی</button></header>
+              {demoMode ? <div className="dispatch-capacity-list">{[['مرکزی',82,'مناسب'],['شمال',64,'پایش'],['غرب',41,'کم']].map(([zone,value,label]) => <div className="dispatch-capacity-row" key={String(zone)}><span>{label}</span><b>{fa.format(Number(value))}٪</b><strong>{zone}</strong><i><em style={{width:`${value}%`}} /></i></div>)}</div> : <div className="capacity-overview-empty"><span>◷</span><strong>ظرفیت منطقه‌ای این نما موجود نیست</strong><p>API ظرفیت را فقط برای زون و بازهٔ انتخاب‌شده برمی‌گرداند؛ اینجا مقدار منطقه‌ای حدس زده نمی‌شود.</p><button onClick={() => switchView('zones')}>مشاهدهٔ ظرفیت برنامه‌ریزی‌شده ←</button></div>}
+            </section>
+          </aside>}
+          <section className={`queue-panel ${viewMode === 'dispatch' ? 'operations-primary-card' : ''}`}>
+          <div className={`panel-heading ${viewMode === 'dispatch' ? 'dashboard-panel-heading' : ''}`}>
+            {viewMode === 'dispatch' && <div className="dashboard-panel-actions">
+              <button type="button" className="dashboard-toolbar-button" onClick={() => { void fetchPage(cursorStack[pageIndex] || null); void fetchDashboardSummary() }} disabled={!token || loading}>تازه‌سازی <span aria-hidden="true">↻</span></button>
+              <details className="dashboard-filter-details"><summary>فیلترها <span aria-hidden="true">☷</span></summary>
+                <form className="dashboard-filter-form" onSubmit={applyFilters}>
+                  <label>وضعیت موعد<select value={deliveryWindow} onChange={(event) => setDeliveryWindow(event.target.value)}><option value="">همهٔ موعدها</option><option value="upcoming">در پیش</option><option value="due_now">موعد همین حالا</option><option value="overdue">از موعد گذشته</option></select></label>
+                  <label>پیشنهاد فعال<select value={hasOffer} onChange={(event) => setHasOffer(event.target.value)}><option value="">همهٔ پیشنهادها</option><option value="true">دارای پیشنهاد فعال</option><option value="false">بدون پیشنهاد فعال</option></select></label>
+                  <label>ترتیب<select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="delivery_due">نزدیک‌ترین موعد</option><option value="created_at">جدیدترین مأموریت</option></select></label>
+                  <label>شناسهٔ مشتری<input value={customerId} onChange={(event) => setCustomerId(event.target.value)} placeholder="cus_…" dir="ltr" /></label>
+                  <label>ایجادشده تا تاریخ<input type="datetime-local" value={createdBefore} onChange={(event) => setCreatedBefore(event.target.value)} /></label>
+                  <button className="secondary-button" type="submit" disabled={!token || loading}>اعمال فیلتر</button>
+                </form>
+              </details>
+            </div>}
+            <div>{viewMode !== 'dispatch' && <span className="eyebrow">پایش عملیات</span>}<h2>{viewMode === 'dispatch' ? 'مأموریت‌های فعال' : viewMode === 'missions' ? 'همهٔ مأموریت‌ها' : viewMode === 'couriers' ? 'فهرست پیک‌ها' : viewMode === 'finance' ? 'بررسی برآورد کرایهٔ مأموریت' : viewMode === 'sla' ? 'فید هشدارهای تحویل' : viewMode === 'presence' ? 'فید حضور پیک‌ها' : viewMode === 'issues' ? 'گزارش مشکلات پیک‌ها' : 'ظرفیت و برنامه‌ریزی زون'}</h2></div>
             {viewMode !== 'dispatch' && <div className="panel-meta">{viewMode === 'sla' && slaEvaluatedAt ? `مبنای ارزیابی ${formatDate(slaEvaluatedAt)}` : updatedAt ? `به‌روزرسانی ${formatDate(updatedAt)}` : 'دادهٔ زنده از API'}</div>}
           </div>
           {viewMode === 'dispatch' ? <form className="filters dashboard-search-row" onSubmit={applyFilters}>
