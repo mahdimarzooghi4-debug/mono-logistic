@@ -47,4 +47,17 @@ describe('courier home', () => {
     fireEvent.click(screen.getByRole('button', { name: 'خانه' }))
     expect(screen.getByRole('heading', { name: 'پیشنهادهای ماموریت' })).toBeInTheDocument()
   })
+
+  it('shows the wallet and records a validated demo withdrawal', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: 'درآمد' }))
+    expect(screen.getByText('درآمد و کیف پول')).toBeInTheDocument()
+    expect(screen.getByText('۵۱۱٬۴۲۰ تومان')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'برداشت وجه' }))
+    fireEvent.change(screen.getByLabelText('مبلغ برداشت'), { target: { value: '200000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'تأیید برداشت نمایشی' }))
+    expect(screen.getByText('۳۱۱٬۴۲۰ تومان')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('به بک‌اند بانکی متصل نیست')
+    expect(screen.getAllByText('−۲۰۰٬۰۰۰ تومان')).toHaveLength(2)
+  })
 })
