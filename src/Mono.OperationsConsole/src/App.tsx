@@ -11,6 +11,8 @@ import SlaExceptionsWorkbench from './SlaExceptionsWorkbench'
 import RoutePlanWorkbench from './RoutePlanWorkbench'
 import AuditWorkbench from './AuditWorkbench'
 import ApiKeyWorkbench from './ApiKeyWorkbench'
+import FinanceWorkbench from './FinanceWorkbench'
+import type { MissionFare } from './FinanceWorkbench'
 import type { DashboardSummaryMetrics } from './DashboardSummaryCards'
 
 type Offer = {
@@ -70,7 +72,6 @@ type WebhookDelivery = { delivery_id: string; endpoint_id: string; event_id: str
 type WebhookPage = { items: WebhookDelivery[]; nextCursor: string | null }
 type WebhookDetail = { delivery: WebhookDelivery; attempts: Array<{ attempt_number: number; action: string; http_status: number | null; error_code: string | null; occurred_at: string }> }
 type WebhookAuditPage = { items: Array<{ audit_id: string; actor_id: string; action: string; result_count: number; resource_id: string | null; outcome_code: string | null; occurred_at: string }>; next_cursor: string | null }
-type MissionFare = { mission_id: string; customer_id: string; delivery_request_id: string; status: string; committed_delivery_at: string; created_at: string; quote_id: string; quote_version: number; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number; mono_commission_estimate_toman: number; commission_vat_estimate_toman: number; courier_net_estimate_toman: number }
 type MissionFarePage = { items: MissionFare[]; next_cursor: string | null }
 type MissionTimeline = { events?: Array<{ eventId: string; eventType: string; sequence: number; occurredAt: string }> }
 type CourierSummary = { courier_id: string; mode: string; status: string; preferred_zone_ids: string[]; approved_zone_ids: string[]; primary_zone_id: string | null; created_at: string; updated_at: string }
@@ -587,12 +588,13 @@ export default function App() {
     finally { setLoading(false) }
   }, [token, courierQuery, courierStatus])
 
-  const fetchFinancePage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>) => {
+  const fetchFinancePage = useCallback(async (cursor: string | null, nextStack?: Array<string | null>, statusOverride?: string) => {
     if (!token) { setError('برای مشاهدهٔ دادهٔ واقعی، توکن معتبر عملیات را وارد کنید.'); return }
     setLoading(true); setError(''); setFinanceItems([])
     const params = new URLSearchParams({ page_size: '25' })
     if (financeQuery.trim()) params.set('query', financeQuery.trim())
-    if (financeStatus) params.set('status', financeStatus)
+    const requestedStatus = statusOverride === undefined ? financeStatus : statusOverride
+    if (requestedStatus) params.set('status', requestedStatus)
     if (cursor) params.set('cursor', cursor)
     try {
       const response = await fetch(`/operations/v1/finance/mission-fares?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }, cache: 'no-store' })
@@ -1027,8 +1029,8 @@ export default function App() {
     admissions: 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها',
   }
 
-  function shouldShowShellTopbar() { return viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' }
-  function shouldShowLegacyDataPanel() { return viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' }
+  function shouldShowShellTopbar() { return viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
+  function shouldShowLegacyDataPanel() { return viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
 
   return (
     <div className="app-shell" dir="rtl">
@@ -1178,6 +1180,7 @@ export default function App() {
         {viewMode === 'couriers' && <CourierControlWorkbench couriers={courierItems} selectedCourierId={selectedCourierId} detail={courierDetail} audit={courierAudit} loading={loading} detailLoading={timelineLoading && !timelineTitle && Boolean(selectedCourierId)} detailErrors={detailErrors} error={error} query={courierQuery} status={courierStatus} token={token} pageIndex={pageIndex} hasNext={Boolean(courierNextCursor)} onQueryChange={setCourierQuery} onStatusChange={setCourierStatus} onSearch={applyFilters} onSelect={(courierId) => void showCourierDetails(courierId, true)} onPrevious={goPrevious} onNext={goNext} onRefresh={() => void fetchCourierPage(cursorStack[pageIndex] || null)} onOpenAdmissions={() => switchView('admissions')} onOpenZones={() => switchView('zones')} />}
         {viewMode === 'zones' && <ZonesCapacityWorkbench token={token} onConnected={setConnected} />}
         {viewMode === 'sla' && <SlaExceptionsWorkbench token={token} onConnected={setConnected} onOpenMission={(missionId) => void showMissionDetails(missionId)} />}
+        {viewMode === 'finance' && <FinanceWorkbench items={financeItems} loading={loading} error={error} token={token} query={financeQuery} status={financeStatus} pageIndex={pageIndex} hasNext={Boolean(financeNextCursor)} onQueryChange={setFinanceQuery} onStatusChange={setFinanceStatus} onSearch={(nextStatus) => void fetchFinancePage(null, [null], nextStatus)} onPrevious={goPrevious} onNext={goNext} onRefresh={() => void fetchFinancePage(cursorStack[pageIndex] || null)} />}
         {shouldShowLegacyDataPanel() && <div className={viewMode === 'dispatch' ? 'operations-overview-layout' : ''}>
           {viewMode === 'dispatch' && <aside className="operations-overview-aside">
             <section className="operations-overview-card action-overview-card">
