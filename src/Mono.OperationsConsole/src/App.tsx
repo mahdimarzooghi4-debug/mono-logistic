@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import PolicyWorkbench from './PolicyWorkbench'
 import OnboardingWorkbench from './OnboardingWorkbench'
 import CustomersDemoWorkbench from './CustomersDemoWorkbench'
+import VehiclesDemoWorkbench from './VehiclesDemoWorkbench'
 import AdmissionsWorkbench from './AdmissionsWorkbench'
 import DashboardSummaryCards from './DashboardSummaryCards'
 import OperationsOverviewWorkbench from './OperationsOverviewWorkbench'
@@ -197,7 +198,7 @@ async function readError(response: Response) {
 }
 
 export default function App() {
-  const [viewMode, setViewMode] = useState<'overview' | 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('overview')
+  const [viewMode, setViewMode] = useState<'overview' | 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'vehicles' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions'>('overview')
   const [policyReloadKey, setPolicyReloadKey] = useState(0)
   const [routeReloadKey, setRouteReloadKey] = useState(0)
   const [auditReloadKey, setAuditReloadKey] = useState(0)
@@ -963,7 +964,7 @@ export default function App() {
     void fetchSlaPage(null, [null], horizon)
   }
 
-  function switchView(mode: 'overview' | 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
+  function switchView(mode: 'overview' | 'dispatch' | 'missions' | 'routes' | 'audit' | 'couriers' | 'vehicles' | 'zones' | 'finance' | 'sla' | 'presence' | 'issues' | 'workers' | 'webhooks' | 'policies' | 'onboarding' | 'admissions') {
     setViewMode(mode)
     setCursorStack([null])
     setPageIndex(0)
@@ -983,6 +984,7 @@ export default function App() {
     else if (mode === 'policies') setPolicyReloadKey((value) => value + 1)
     else if (mode === 'onboarding') setPolicyReloadKey((value) => value + 1)
     else if (mode === 'admissions') setPolicyReloadKey((value) => value + 1)
+    else if (mode === 'vehicles') { setAvailabilityPage(null); setCapacityProjection(null) }
     else { setAvailabilityPage(null); setCapacityProjection(null); setCapacityError(''); setAvailabilityError('') }
   }
 
@@ -1096,7 +1098,7 @@ export default function App() {
   }
 
   const panelTitles: Record<typeof viewMode, string> = {
-    overview: 'نمای کلی عملیات', dispatch: 'داشبورد عملیات', missions: 'مأموریت‌ها', couriers: 'کنترل پیک‌ها', zones: 'مناطق و ظرفیت',
+    overview: 'نمای کلی عملیات', dispatch: 'داشبورد عملیات', missions: 'مأموریت‌ها', couriers: 'کنترل پیک‌ها', vehicles: 'وسایل نقلیه', zones: 'مناطق و ظرفیت',
     finance: 'مالی و بررسی کرایه', sla: 'استثناهای SLA', presence: 'وضعیت حضور پیک‌ها',
     issues: 'پشتیبانی و گزارش مشکلات', workers: 'سلامت پردازش‌ها', webhooks: 'یکپارچه‌سازی‌ها',
     policies: 'استانداردها و پیکربندی', onboarding: 'مشتریان و شعب', admissions: 'پذیرش و راه‌اندازی', routes: 'مسیرها', audit: 'ممیزی عملیات',
@@ -1109,12 +1111,12 @@ export default function App() {
     issues: 'گزارش‌های ساختاریافتهٔ مشکلات ثبت‌شده توسط پیک‌ها',
     workers: 'وضعیت پردازش‌های پس‌زمینه از API', webhooks: 'صف تحویل و تلاش‌های ارسال webhook',
     policies: 'نسخه‌ها و چرخهٔ عمر سیاست‌های عملیاتی',
-    onboarding: 'ثبت و بررسی مشتری‌ها و شعب با سابقهٔ ممیزی API',
+    onboarding: 'ثبت و بررسی مشتری‌ها و شعب با سابقهٔ ممیزی API', vehicles: 'ثبت وسیله، ظرفیت حمل، مدارک، پیک مرتبط و آمادگی برای تخصیص',
     admissions: 'نمای یکپارچهٔ صف پیک‌ها و کسب‌وکارها',
   }
 
-  function shouldShowShellTopbar() { return viewMode !== 'overview' && viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' && !(viewMode === 'onboarding' && demoMode) }
-  function shouldShowLegacyDataPanel() { return viewMode !== 'overview' && viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
+  function shouldShowShellTopbar() { return viewMode !== 'overview' && viewMode !== 'routes' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' && !(demoMode && (viewMode === 'onboarding' || viewMode === 'vehicles')) }
+  function shouldShowLegacyDataPanel() { return viewMode !== 'overview' && viewMode !== 'workers' && viewMode !== 'webhooks' && viewMode !== 'policies' && viewMode !== 'onboarding' && viewMode !== 'vehicles' && viewMode !== 'admissions' && viewMode !== 'routes' && viewMode !== 'audit' && viewMode !== 'couriers' && viewMode !== 'zones' && viewMode !== 'sla' && viewMode !== 'finance' }
   const activeDemoMission = demoMode ? DEMO_DISPATCH_MISSIONS.find((mission) => mission.missionId === timelineTitle) : undefined
 
   return (
@@ -1127,7 +1129,7 @@ export default function App() {
           <button className={`nav-item ${viewMode === 'dispatch' ? 'active' : ''}`} onClick={openDashboardDispatch}><span className="nav-icon"><NavIcon type="mission" /></span>مأموریت‌ها</button>
           <button className={`nav-item ${viewMode === 'routes' ? 'active' : ''}`} onClick={() => switchView('routes')}><span className="nav-icon"><NavIcon type="route" /></span>مسیرها</button>
           <button className={`nav-item ${viewMode === 'couriers' ? 'active' : ''}`} onClick={() => switchView('couriers')}><span className="nav-icon"><NavIcon type="courier" /></span>پیک‌ها</button>
-          <button className="nav-item" disabled title="فهرست و API مستقل وسایل نقلیه هنوز در دسترس نیست"><span className="nav-icon"><NavIcon type="vehicle" /></span>وسایل نقلیه</button>
+          <button className={`nav-item ${viewMode === 'vehicles' ? 'active' : ''}`} disabled={!demoMode} title={!demoMode ? 'فهرست و API مستقل وسایل نقلیه هنوز در دسترس نیست' : undefined} onClick={() => switchView('vehicles')}><span className="nav-icon"><NavIcon type="vehicle" /></span>وسایل نقلیه</button>
           <button className={`nav-item ${viewMode === 'zones' ? 'active' : ''}`} onClick={() => switchView('zones')}><span className="nav-icon"><NavIcon type="zone" /></span>مناطق و ظرفیت</button>
           <button className={`nav-item ${viewMode === 'policies' ? 'active' : ''}`} onClick={() => switchView('policies')}><span className="nav-icon"><NavIcon type="policy" /></span>سیاست‌ها و پیکربندی</button>
           <button className={`nav-item ${viewMode === 'onboarding' ? 'active' : ''}`} onClick={() => switchView('onboarding')}><span className="nav-icon"><NavIcon type="customers" /></span>مشتریان</button>
@@ -1260,6 +1262,7 @@ export default function App() {
         </div>}
         {viewMode === 'policies' && <PolicyWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />}
         {viewMode === 'routes' && <RoutePlanWorkbench token={token} reloadKey={routeReloadKey} demoMode={demoMode} onConnected={setConnected} />}
+        {viewMode === 'vehicles' && demoMode && <VehiclesDemoWorkbench />}
         {viewMode === 'audit' && <AuditWorkbench token={token} reloadKey={auditReloadKey} onConnected={setConnected} />}
         {viewMode === 'admissions' && <AdmissionsWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} onOpenBusinesses={() => switchView('onboarding')} onOpenCouriers={() => switchView('couriers')} />}
         {viewMode === 'onboarding' && (demoMode ? <CustomersDemoWorkbench /> : <OnboardingWorkbench token={token} reloadKey={policyReloadKey} onConnected={setConnected} />)}
