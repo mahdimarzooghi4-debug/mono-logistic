@@ -18,7 +18,7 @@ describe('OperationsOverviewWorkbench', () => {
 
   it('shows the labelled Figma sample dashboard in demo mode', () => {
     render(<OperationsOverviewWorkbench {...props} demoMode />)
-    expect(screen.getByText(/داده‌های این صفحه نمایشی‌اند/)).toBeInTheDocument()
+    expect(screen.getByText('دادهٔ نمایشی')).toHaveAttribute('title', 'داده‌های این صفحه نمایشی‌اند و فقط برای مقایسه با فیگما استفاده می‌شوند.')
     expect(screen.getByText('MIS-۱۰۴۸۲')).toBeInTheDocument()
     expect(screen.getByText('۹۴٫۶٪')).toBeInTheDocument()
     expect(screen.getByText('۸۲٪')).toBeInTheDocument()
