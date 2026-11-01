@@ -8,6 +8,18 @@ afterEach(() => {
 })
 
 describe('Operations route plan workbench', () => {
+  it('shows the Figma route-control preview with a sample map and active routes without calling the API', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const { container } = render(<RoutePlanWorkbench token="" reloadKey={0} demoMode onConnected={vi.fn()} />)
+    expect(screen.getByRole('heading', { name: 'RTE-071' })).toBeInTheDocument()
+    expect(container.querySelector('.route-control-kpis article:first-child')).toHaveTextContent('۲۸')
+    expect(screen.getByRole('img', { name: 'نقشهٔ عملیاتی نمونهٔ مسیر RTE-071' })).toBeInTheDocument()
+    expect(screen.getByText('RTE-068')).toBeInTheDocument()
+    expect(screen.getAllByText('۶ توقف').length).toBeGreaterThan(0)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('loads the persisted route plan and its scoped read audit without presenting sample routes', async () => {
     const routeId = 'route_tehran_01'
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
