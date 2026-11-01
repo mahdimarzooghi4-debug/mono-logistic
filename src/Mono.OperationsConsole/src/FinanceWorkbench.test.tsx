@@ -2,7 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import FinanceWorkbench, { type MissionFare } from './FinanceWorkbench'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); window.history.replaceState({}, '', '/') })
 
 const props = {
   items: [] as MissionFare[], loading: false, error: '', token: '', query: '', status: '', pageIndex: 0, hasNext: false,
@@ -16,10 +16,20 @@ describe('FinanceWorkbench', () => {
     expect(screen.getByRole('heading', { name: 'صورت‌حساب حنا' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'دفتر مالی مأموریت' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'کیف پول پیک' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'پرداخت‌ها' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'برداشت‌ها' })).toBeInTheDocument()
     expect(screen.getByText('برای مشاهدهٔ دادهٔ واقعی، به API عملیات متصل شوید.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'ثبت پرداخت' })).toBeDisabled()
-    expect(screen.getByText('پرداخت در انتظار').parentElement).toHaveTextContent('—')
+    expect(screen.getByRole('button', { name: 'ثبت برداشت' })).toBeDisabled()
+    expect(screen.getByText('برداشت در انتظار').parentElement).toHaveTextContent('—')
+    expect(screen.queryByText('MIS-10482')).not.toBeInTheDocument()
+  })
+
+  it('shows clearly labelled Figma sample figures only with the explicit demo query', () => {
+    window.history.pushState({}, '', '/?demo=1')
+    render(<FinanceWorkbench {...props} />)
+    expect(screen.getByText('دادهٔ نمایشی')).toBeInTheDocument()
+    expect(screen.getByText('MIS-10482')).toBeInTheDocument()
+    expect(screen.getByText('داده‌های این پیش‌نمایش ساختگی‌اند و فقط برای مقایسهٔ ظاهر با فیگما نمایش داده می‌شوند.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ثبت برداشت' })).toBeDisabled()
   })
 
   it('renders only fare snapshot amounts and does not claim a real payout', () => {
