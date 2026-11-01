@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
-type FinalDeliveryProps = { onNotice: (message: string) => void }
+type FinalDeliveryProps = { onNotice: (message: string) => void; onComplete: () => void }
 
-export default function FinalDelivery({ onNotice }: FinalDeliveryProps) {
+export default function FinalDelivery({ onNotice, onComplete }: FinalDeliveryProps) {
   const [recipientType, setRecipientType] = useState<'customer' | 'other'>('customer')
   const [recipient, setRecipient] = useState('علی رضایی')
   const [condition, setCondition] = useState<'intact' | 'issue'>('intact')
@@ -16,6 +16,7 @@ export default function FinalDelivery({ onNotice }: FinalDeliveryProps) {
     }
     setDelivered(true)
     onNotice('تحویل سفارش ثبت شد.')
+    onComplete()
   }
 
   return <section className="content-scroll final-delivery-content" dir="rtl">
