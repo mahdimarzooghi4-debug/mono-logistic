@@ -1,9 +1,9 @@
 import { useState } from 'react'
 
-type ReturnHandoffProps = { onNotice: (message: string) => void }
+type ReturnHandoffProps = { onNotice: (message: string) => void; onComplete: () => void }
 type ReturnCondition = 'all' | 'shortage'
 
-export default function ReturnHandoff({ onNotice }: ReturnHandoffProps) {
+export default function ReturnHandoff({ onNotice, onComplete }: ReturnHandoffProps) {
   const [condition, setCondition] = useState<ReturnCondition>('all')
   const [note, setNote] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -16,6 +16,7 @@ export default function ReturnHandoff({ onNotice }: ReturnHandoffProps) {
     }
     setSubmitted(true)
     onNotice('تحویل برگشتی در این پیش‌نمایش ثبت شد؛ ثبت نهایی به بک‌اند متصل نیست.')
+    onComplete()
   }
 
   return <section className="content-scroll return-handoff-content" dir="rtl">
