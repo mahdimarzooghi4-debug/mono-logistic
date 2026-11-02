@@ -33,6 +33,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
   const [notice, setNotice] = useState('')
   const [branchDrawer, setBranchDrawer] = useState(false)
   const [inviteDrawer, setInviteDrawer] = useState(false)
+  const [endpointDrawer, setEndpointDrawer] = useState(false)
   const title: Record<PreviewView, string> = {
     dashboard: 'داشبورد کسب‌وکار', deliveries: 'ارسال‌های شما', create: 'ثبت ارسال جدید',
     tracking: 'رهگیری', deliveryDetail: 'جزئیات ارسال', branches: 'شعب', billing: 'صورتحساب', settings: 'تنظیمات هویت بصری',
@@ -69,6 +70,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
       {notice && <div className="message success" role="status">{notice}</div>}
       {branchDrawer && <DemoBranchDrawer onClose={() => setBranchDrawer(false)} onSave={() => { setBranchDrawer(false); setNotice('شعبه فقط در پیش‌نمایش محلی اضافه شد؛ حساب واقعی تغییری نکرد.') }} />}
       {inviteDrawer && <DemoInviteDrawer onClose={() => setInviteDrawer(false)} onSave={() => { setInviteDrawer(false); setNotice('دعوت فقط در پیش‌نمایش محلی ثبت شد؛ برای Workspace واقعی ارسال نشد.') }} />}
+      {endpointDrawer && <DemoWebhookDrawer onClose={() => setEndpointDrawer(false)} onSave={() => { setEndpointDrawer(false); setNotice('Endpoint فقط در پیش‌نمایش محلی اضافه شد؛ به سامانهٔ واقعی متصل نیست.') }} />}
 
       {view === 'dashboard' && <>
         <section className="demo-kpi-strip" aria-label="شاخص‌های نمایشی"><DemoKpi label="ارسال فعال" value={fa.format(activeCount)} /><DemoKpi label="نیازمند اقدام" value="۲" tone="red" /><DemoKpi label="تحویل امروز" value="۵۸" tone="green" /><DemoKpi label="شعب فعال" value="۳" /><DemoKpi label="میانگین تحویل" value="۲۶ دقیقه" /></section>
@@ -120,7 +122,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
       {view === 'deliveryDetail' && trackingResult && <DemoDeliveryDetail item={trackingResult} />}
       {view === 'branches' && <DemoBranchesPage />}
       {view === 'billing' && <DemoBillingPage />}
-      {view === 'settings' && <MerchantBrandingSettings mode="demo" onDemoSave={() => setNotice('تنظیمات فقط در حافظهٔ پیش‌نمایش نمایشی نگه داشته شد؛ Workspace واقعی تغییر نکرد.')} onInvite={() => setInviteDrawer(true)} />}
+      {view === 'settings' && <MerchantBrandingSettings mode="demo" onDemoSave={() => setNotice('تنظیمات فقط در حافظهٔ پیش‌نمایش نمایشی نگه داشته شد؛ Workspace واقعی تغییر نکرد.')} onInvite={() => setInviteDrawer(true)} onAddEndpoint={() => setEndpointDrawer(true)} />}
     </main>
   </div>
 }
@@ -249,4 +251,8 @@ function DemoBranchDrawer({ onClose, onSave }: { onClose: () => void; onSave: ()
 
 function DemoInviteDrawer({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
   return <div className="demo-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="demo-drawer" role="dialog" aria-modal="true" aria-labelledby="invite-drawer-title" dir="rtl"><header><div><small>اعضا و دسترسی</small><h2 id="invite-drawer-title">دعوت عضو جدید</h2></div><button type="button" aria-label="بستن" onClick={onClose}>×</button></header><form onSubmit={event => { event.preventDefault(); onSave() }}><label>ایمیل یا شماره موبایل<input required placeholder="name@example.com یا ۰۹۱۲..." /></label><label>نقش<select defaultValue="operator"><option value="admin">ادمین</option><option value="operator">اپراتور</option><option value="finance">مالی</option><option value="viewer">مشاهده‌گر</option></select></label><label>محدودهٔ شعب<select defaultValue="all"><option value="all">همهٔ شعب</option><option value="vanak">ونک</option><option value="jordan">جردن</option></select></label><p className="data-note">این دعوت فقط در پیش‌نمایش طراحی ثبت می‌شود و پیام واقعی ارسال نمی‌کند.</p><footer><button type="button" className="secondary-button" onClick={onClose}>انصراف</button><button className="primary-button">ثبت دعوت</button></footer></form></section></div>
+}
+
+function DemoWebhookDrawer({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
+  return <div className="demo-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="demo-drawer" role="dialog" aria-modal="true" aria-labelledby="webhook-drawer-title" dir="rtl"><header><div><small>Webhook و رویدادهای خروجی</small><h2 id="webhook-drawer-title">افزودن Webhook Endpoint</h2></div><button type="button" aria-label="بستن" onClick={onClose}>×</button></header><form onSubmit={event => { event.preventDefault(); onSave() }}><label>نام Endpoint<input required defaultValue="ERP اصلی" /></label><label>محیط<select defaultValue="production"><option value="production">Production</option><option value="staging">Staging</option></select></label><label>URL مقصد<input type="url" required placeholder="https://example.com/webhooks/mono" /></label><label>Webhook Secret<input required placeholder="Secret را وارد کنید" /></label><fieldset className="demo-webhook-events"><legend>رویدادهای موردنیاز</legend>{['mission.updated','delivery.completed','incident.created','billing.created'].map((event,index)=><label key={event}><input type="checkbox" defaultChecked={index<3} />{event}</label>)}</fieldset><section className="panel demo-webhook-retry"><strong>Retry Policy</strong><p>۵ تلاش · Backoff نمایی · ۲۴ ساعت</p><label><input type="checkbox" defaultChecked />قبل از فعال‌سازی Endpoint را تست کن</label></section><label>توضیح داخلی<input defaultValue="اتصال اصلی ERP سپهر" /></label><p className="data-note">ثبت این فرم فقط در پیش‌نمایش انجام می‌شود و Endpoint واقعی ساخته نمی‌شود.</p><footer><button type="button" className="secondary-button" onClick={onClose}>انصراف</button><button className="primary-button">ذخیره Endpoint</button></footer></form></section></div>
 }

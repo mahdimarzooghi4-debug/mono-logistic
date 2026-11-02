@@ -28,11 +28,13 @@ export default function MerchantBrandingSettings({
   onTabChange,
   onDemoSave,
   onInvite,
+  onAddEndpoint,
 }: {
   mode: 'demo' | 'connected'
   onTabChange?: (tab: SettingsTab) => void
   onDemoSave?: () => void
   onInvite?: () => void
+  onAddEndpoint?: () => void
 }) {
   const isDemo = mode === 'demo'
   const [activeTab, setActiveTab] = useState<SettingsTab>('branding')
@@ -91,7 +93,7 @@ export default function MerchantBrandingSettings({
   return <section className="merchant-branding-page" dir="rtl">
     <header className="branding-page-header">
       <div><span className="eyebrow">{activeTab === 'branding' ? `هویت Workspace${isDemo ? ' · پیش‌نمایش' : ''}` : 'Workspace · پیش‌نمایش'}</span><h1>{tabCopy[activeTab][0]}</h1><p>{tabCopy[activeTab][1]}</p></div>
-      <div className="branding-header-actions">{activeTab === 'members' ? <button className="primary-button" onClick={onInvite}>دعوت عضو</button> : activeTab === 'branding' ? <><button className="secondary-button" onClick={resetDraft}>بازنشانی</button><button className="primary-button" disabled={!isDemo || savedPreview} title={!isDemo ? 'ذخیره‌سازی هویت بصری هنوز در API حساب موجود نیست.' : undefined} onClick={() => { setSavedPreview(true); onDemoSave?.() }}>ذخیره تغییرات</button></> : <button className="primary-button" disabled={!isDemo} title={!isDemo ? 'ذخیرهٔ تنظیمات از API هنوز پشتیبانی نمی‌شود.' : undefined} onClick={() => { setSavedPreview(true); onDemoSave?.() }}>ذخیره تغییرات</button>}</div>
+      <div className="branding-header-actions">{activeTab === 'members' ? <button className="primary-button" onClick={onInvite}>دعوت عضو</button> : activeTab === 'integrations' ? <><button className="secondary-button" type="button">مستندات API</button><button className="primary-button" onClick={onAddEndpoint}>افزودن Endpoint</button></> : activeTab === 'branding' ? <><button className="secondary-button" onClick={resetDraft}>بازنشانی</button><button className="primary-button" disabled={!isDemo || savedPreview} title={!isDemo ? 'ذخیره‌سازی هویت بصری هنوز در API حساب موجود نیست.' : undefined} onClick={() => { setSavedPreview(true); onDemoSave?.() }}>ذخیره تغییرات</button></> : <button className="primary-button" disabled={!isDemo} title={!isDemo ? 'ذخیرهٔ تنظیمات از API هنوز پشتیبانی نمی‌شود.' : undefined} onClick={() => { setSavedPreview(true); onDemoSave?.() }}>ذخیره تغییرات</button>}</div>
     </header>
     <nav className="settings-tabs branding-tabs" aria-label="بخش‌های تنظیمات Workspace" role="tablist">
       {tabLabels.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={id === activeTab} className={id === activeTab ? 'selected' : ''} disabled={id !== 'branding' && !isDemo && !onTabChange} onClick={() => { setActiveTab(id); if (id !== 'branding' && !isDemo) onTabChange?.(id) }}>{label}</button>)}
