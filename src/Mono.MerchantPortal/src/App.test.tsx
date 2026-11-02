@@ -43,6 +43,9 @@ describe('merchant portal delivery flow', () => {
       if (url === `/v1/delivery-requests/${requestId}`) {
         return new Response(JSON.stringify({ delivery_request_id: requestId, external_reference: 'ORDER-17', status: 'RECEIVED', created_at: '2026-10-23T10:00:00Z', mission_id: null, mission_status: null, committed_delivery_at: null, quote: null, promise: null }), { status: 200 })
       }
+      if (url === `/v1/delivery-requests/${requestId}/timeline`) {
+        return new Response(JSON.stringify({ delivery_request_id: requestId, events: [{ event_id: 'evt_001', event_type: 'quote.issued', sequence: 1, occurred_at: '2026-10-23T10:01:00Z' }] }), { status: 200 })
+      }
       throw new Error(`Unexpected request: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -60,8 +63,12 @@ describe('merchant portal delivery flow', () => {
 
     await user.type(screen.getByLabelText('شناسهٔ ارسال یا مأموریت'), requestId)
     await user.click(screen.getByRole('button', { name: 'جست‌وجو' }))
-    expect(await screen.findByRole('dialog')).toHaveTextContent('ORDER-17')
+    expect(await screen.findByRole('heading', { name: 'اطلاعات ارسال' })).toBeInTheDocument()
+    expect(screen.getByText('ORDER-17')).toBeInTheDocument()
+    expect(screen.getByText('مختصات مسیر در API مشتری موجود نیست')).toBeInTheDocument()
+    expect(await screen.findByText('پیشنهاد قیمت ثبت شد')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(`/v1/delivery-requests/${requestId}`, expect.objectContaining({ cache: 'no-store' }))
+    expect(fetchMock).toHaveBeenCalledWith(`/v1/delivery-requests/${requestId}/timeline`, expect.objectContaining({ cache: 'no-store' }))
   })
 
   it('connects with a customer token and creates a scoped, idempotent delivery request', async () => {

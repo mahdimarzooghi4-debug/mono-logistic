@@ -44,8 +44,17 @@ type DeliveryDetail = DeliveryRequest & {
   quote: Quote | null
   promise: PromiseRecord | null
 }
+type DeliveryTimelineEvent = {
+  event_id: string
+  event_type: string
+  aggregate_type?: string
+  sequence: number
+  occurred_at: string
+}
+type DeliveryTimeline = { delivery_request_id: string; events: DeliveryTimelineEvent[] }
+type MissionTimeline = { mission_id: string; events: DeliveryTimelineEvent[] }
 type ApiError = { error?: { code?: string; message?: string } }
-type View = 'dashboard' | 'deliveries' | 'create' | 'tracking' | 'branches' | 'billing' | 'settings' | 'branchAdd' | 'invite' | 'webhook'
+type View = 'dashboard' | 'deliveries' | 'create' | 'tracking' | 'deliveryDetail' | 'branches' | 'billing' | 'settings' | 'branchAdd' | 'invite' | 'webhook'
 
 const fa = new Intl.NumberFormat('fa-IR')
 const dateTime = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' })
@@ -114,7 +123,13 @@ function App() {
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [cursorStack, setCursorStack] = useState<Array<string | null>>([null])
   const [detail, setDetail] = useState<DeliveryDetail | null>(null)
+  const [trackingEvents, setTrackingEvents] = useState<DeliveryTimelineEvent[]>([])
+  const [timelineMessage, setTimelineMessage] = useState('')
   const [trackingInput, setTrackingInput] = useState('')
+  const [supportOpen, setSupportOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelError, setCancelError] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -122,6 +137,7 @@ function App() {
   const [createLoading, setCreateLoading] = useState(false)
   const [createError, setCreateError] = useState('')
   const createKey = useRef<{ fingerprint: string; key: string } | null>(null)
+  const cancelKey = useRef<{ missionId: string; key: string } | null>(null)
 
   const pageSummary = useMemo(() => ({
     count: items.length,
@@ -195,11 +211,56 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      setDetail(await api<DeliveryDetail>(`/v1/delivery-requests/${encodeURIComponent(deliveryRequestId)}`, token))
+      const loaded = await api<DeliveryDetail>(`/v1/delivery-requests/${encodeURIComponent(deliveryRequestId)}`, token)
+      setDetail(loaded)
+      setTrackingInput(deliveryRequestId)
+      setUpdatedAt(new Date().toISOString())
+      setView('deliveryDetail')
+      setTrackingEvents([])
+      setTimelineMessage('')
+      const requestTimeline = api<DeliveryTimeline>(`/v1/delivery-requests/${encodeURIComponent(deliveryRequestId)}/timeline`, token)
+      const missionTimeline = loaded.mission_id
+        ? api<MissionTimeline>(`/v1/missions/${encodeURIComponent(loaded.mission_id)}/timeline`, token)
+        : Promise.resolve(null)
+      const [requestHistory, missionHistory] = await Promise.allSettled([requestTimeline, missionTimeline])
+      const events = [
+        ...(requestHistory.status === 'fulfilled' ? requestHistory.value.events : []),
+        ...(missionHistory.status === 'fulfilled' && missionHistory.value ? missionHistory.value.events : []),
+      ]
+      const uniqueEvents = Array.from(new Map(events.map((event) => [event.event_id, event])).values())
+        .sort((left, right) => Date.parse(left.occurred_at) - Date.parse(right.occurred_at))
+      setTrackingEvents(uniqueEvents)
+      if (requestHistory.status === 'rejected' || (loaded.mission_id && missionHistory.status === 'rejected')) {
+        setTimelineMessage('بخشی از سابقهٔ ارسال از API دریافت نشد؛ اطلاعات موجود نمایش داده شده است.')
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'جزئیات ارسال دریافت نشد.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function submitCancellation() {
+    if (!token || !detail?.mission_id) return
+    setCancelLoading(true)
+    setCancelError('')
+    try {
+      if (cancelKey.current?.missionId !== detail.mission_id) {
+        cancelKey.current = { missionId: detail.mission_id, key: idempotencyKey() }
+      }
+      await api<{ mission_id: string; status: string }>(`/v1/missions/${encodeURIComponent(detail.mission_id)}/cancel`, token, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': cancelKey.current.key },
+        body: JSON.stringify({ reason_code: 'CUSTOMER_CANCELLED', external_reference: detail.external_reference }),
+      })
+      cancelKey.current = null
+      setCancelOpen(false)
+      setNotice('درخواست لغو مأموریت ثبت شد و در سابقهٔ رویدادها قرار گرفت.')
+      await openDetail(detail.delivery_request_id)
+    } catch (cause) {
+      setCancelError(cause instanceof Error ? cause.message : 'درخواست لغو ثبت نشد؛ وضعیت مأموریت را دوباره بررسی کنید.')
+    } finally {
+      setCancelLoading(false)
     }
   }
 
@@ -341,6 +402,7 @@ function App() {
     deliveries: { title: 'ارسال‌های شما', subtitle: 'فهرست صفحهٔ جاری از API مشتری' },
     create: { title: 'ارسال جدید', subtitle: 'اطلاعات ارسال را وارد کنید؛ امکان‌سنجی و قیمت فقط با دادهٔ معتبر سرویس مشخص می‌شود.' },
     tracking: { title: 'رهگیری ارسال', subtitle: 'مشاهدهٔ وضعیت و زمان تحویل ثبت‌شده برای یک شناسه' },
+    deliveryDetail: { title: 'جزئیات ارسال', subtitle: detail ? `${detail.external_reference} · رهگیری وضعیت ثبت‌شده در مونو` : 'جزئیات ارسال و سابقهٔ رویدادها' },
     branches: { title: 'شعب کسب‌وکار', subtitle: 'شعب فعال متصل به کلید API فعلی' },
     billing: { title: 'صورتحساب', subtitle: 'هزینهٔ ارسال‌ها و تطبیق مالی کسب‌وکار' },
     settings: { title: 'تنظیمات Workspace', subtitle: 'مدیریت هویت بصری، اعضا، اعلان‌ها و یکپارچه‌سازی' },
@@ -375,13 +437,15 @@ function App() {
       <main className={`workspace ${connected && view === 'dashboard' ? 'dashboard-workspace' : ''}`}>
         <header className="topbar">
           <div className="page-title"><h1>{titles[view].title}</h1><p>{titles[view].subtitle}</p></div>
-          <div className={`topbar-actions ${connected && view === 'create' ? 'create-topbar-actions' : ''}`}>
+          <div className={`topbar-actions ${connected && (view === 'create' || view === 'deliveryDetail') ? 'create-topbar-actions' : ''}`}>
             {connected && view === 'create' && <button className="secondary-button topbar-action" disabled title="ذخیرهٔ پیش‌نویس هنوز در API مشتری پشتیبانی نمی‌شود">ذخیره پیش‌نویس</button>}
+            {connected && view === 'deliveryDetail' && <button className="secondary-button topbar-action" onClick={() => setSupportOpen(true)}>پشتیبانی</button>}
+            {connected && view === 'deliveryDetail' && <button className="primary-button topbar-action" onClick={() => { setView('create'); setCreateError(''); setNotice('') }}>ارسال جدید</button>}
             {connected && view !== 'create' && <button className="secondary-button topbar-action" onClick={() => { setView('tracking'); setError('') }}>رهگیری سریع</button>}
             {connected && view !== 'create' && <button className="primary-button topbar-action" onClick={() => { setView('create'); setCreateError(''); setNotice('') }}>＋ ارسال جدید</button>}
-            {view !== 'create' && <span className={`system-pill ${connected ? 'online' : ''}`}><i />{connected ? 'اتصال برقرار' : 'بدون اتصال'}</span>}
-            {connected && view !== 'create' && <button className="icon-button" onClick={() => void refresh()} disabled={loading} aria-label="به‌روزرسانی">↻</button>}
-            {connected && view !== 'create' && <button className="text-button" onClick={disconnect}>قطع اتصال</button>}
+            {view !== 'create' && view !== 'deliveryDetail' && <span className={`system-pill ${connected ? 'online' : ''}`}><i />{connected ? 'اتصال برقرار' : 'بدون اتصال'}</span>}
+            {connected && view !== 'create' && view !== 'deliveryDetail' && <button className="icon-button" onClick={() => void refresh()} disabled={loading} aria-label="به‌روزرسانی">↻</button>}
+            {connected && view !== 'create' && view !== 'deliveryDetail' && <button className="text-button" onClick={disconnect}>قطع اتصال</button>}
           </div>
         </header>
 
@@ -517,6 +581,18 @@ function App() {
           </section>
         )}
 
+        {connected && view === 'deliveryDetail' && detail && (
+          <DeliveryTrackingPage
+            detail={detail}
+            events={trackingEvents}
+            timelineMessage={timelineMessage}
+            checkedAt={updatedAt}
+            onCancel={() => { setCancelError(''); setCancelOpen(true) }}
+            onSupport={() => setSupportOpen(true)}
+            onMissionDetails={() => document.getElementById('delivery-timeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          />
+        )}
+
         {connected && view === 'branches' && (
           <section className="panel"><div className="panel-heading"><div><span className="eyebrow">حساب مشتری</span><h2>شعب فعال</h2></div><div className="panel-heading-actions"><span className="panel-meta">{fa.format(branches.length)} شعبه</span><button className="primary-button" onClick={() => setView('branchAdd')}>＋ افزودن شعبه</button></div></div>
             {branches.length ? <div className="branch-grid">{branches.map((branch) => <article className="branch-card" key={branch.branchId}><span className="branch-symbol">⌂</span><div><strong>{branch.name}</strong><p>{branch.address || 'نشانی ثبت نشده'}</p><small>{branch.zoneId ? `زون ${branch.zoneId}` : 'زون ثبت نشده'}</small></div><span className="badge success">فعال</span></article>)}</div> : <div className="empty-state"><span>⌂</span><strong>شعبهٔ فعالی ثبت نشده است</strong><small>فهرست فقط شامل شعب فعال برگشتی از API است.</small></div>}
@@ -564,7 +640,9 @@ function App() {
 
       </main>
 
-      {detail && view !== 'tracking' && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetail(null) }}><section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title"><header><div><span className="eyebrow">جزئیات ارسال</span><h2 id="detail-title" dir="ltr">{detail.delivery_request_id}</h2></div><button className="icon-button" onClick={() => setDetail(null)} aria-label="بستن">×</button></header><DetailCard detail={detail} /></section></div>}
+      {detail && view !== 'tracking' && view !== 'deliveryDetail' && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetail(null) }}><section className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title"><header><div><span className="eyebrow">جزئیات ارسال</span><h2 id="detail-title" dir="ltr">{detail.delivery_request_id}</h2></div><button className="icon-button" onClick={() => setDetail(null)} aria-label="بستن">×</button></header><DetailCard detail={detail} /></section></div>}
+      {supportOpen && detail && <SupportDialog detail={detail} onClose={() => setSupportOpen(false)} />}
+      {cancelOpen && detail && <CancelDialog detail={detail} loading={cancelLoading} error={cancelError} onClose={() => setCancelOpen(false)} onConfirm={() => void submitCancellation()} />}
     </div>
   )
 }
@@ -595,6 +673,73 @@ function DetailCard({ detail }: { detail: DeliveryDetail }) {
   {detail.quote ? <section className="detail-subsection"><h3>پیشنهاد قیمت ثبت‌شده · نسخهٔ {fa.format(detail.quote.version)}</h3><div className="detail-grid"><div><dt>کرایهٔ ثبت‌شده</dt><dd>{money.format(detail.quote.fare_toman)} تومان</dd></div><div><dt>مسافت ثبت‌شده</dt><dd>{fa.format(detail.quote.distance_meters)} متر</dd></div><div><dt>اعتبار پیشنهاد</dt><dd>{detail.quote.is_expired ? 'منقضی‌شده' : `تا ${formatDate(detail.quote.expires_at)}`}</dd></div><div><dt>سهم خریدار / فروشنده</dt><dd>{money.format(detail.quote.buyer_share_toman)} / {money.format(detail.quote.seller_share_toman)} تومان</dd></div></div></section> : <div className="form-note">برای این ارسال هنوز پیشنهاد قیمت ثبت‌شده‌ای در پاسخ API موجود نیست.</div>}
   {detail.promise && <div className="promise-note"><strong>تعهد تحویل تأیید شده</strong><span>{formatDate(detail.promise.committed_delivery_at)} · نتیجه {detail.promise.outcome}</span></div>}
   </div>
+}
+
+const eventLabels: Record<string, string> = {
+  'quote.issued': 'پیشنهاد قیمت ثبت شد', 'promise.committed': 'تعهد تحویل ثبت شد', 'promise.revised': 'تعهد تحویل به‌روزرسانی شد',
+  'mission.created': 'مأموریت ایجاد شد', 'mission.promised': 'زمان تحویل تأیید شد', 'mission.searching_courier': 'جست‌وجوی پیک آغاز شد',
+  'courier.assigned': 'پیک تخصیص یافت', 'mission.courier_assigned': 'پیک تخصیص یافت', 'courier.arrived_pickup': 'پیک به مبدأ رسید',
+  'mission.arrived_pickup': 'پیک به مبدأ رسید', 'mission.handed_to_courier': 'مرسوله به پیک تحویل شد',
+  'mission.picked_up': 'مرسوله دریافت شد', 'mission.in_transit': 'ارسال در مسیر است', 'mission.arrived_dropoff': 'پیک به مقصد رسید',
+  'mission.delivered': 'مرسوله تحویل شد', 'mission.failed': 'ارسال ناموفق بود', 'mission.cancelled': 'مأموریت لغو شد',
+}
+
+function DeliveryTrackingPage({ detail, events, timelineMessage, checkedAt, onCancel, onSupport, onMissionDetails }: {
+  detail: DeliveryDetail; events: DeliveryTimelineEvent[]; timelineMessage: string; checkedAt: string | null
+  onCancel: () => void; onSupport: () => void; onMissionDetails: () => void
+}) {
+  const canCancel = Boolean(detail.mission_id && ['PROMISED', 'SEARCHING_COURIER', 'COURIER_ASSIGNED', 'ARRIVED_PICKUP'].includes((detail.mission_status || '').toUpperCase()))
+  const latestEvent = events.at(-1)
+  return <main className="delivery-detail-page" dir="rtl">
+    <div className="delivery-detail-banner"><span className="detail-banner-icon">✓</span><div><strong>وضعیت ارسال از سامانه دریافت شد</strong><span>اطلاعات این صفحه بر اساس پاسخ API و رویدادهای ثبت‌شده است.</span></div><span className="badge success">{statusText(detail.mission_status || detail.status)}</span></div>
+    <section className="delivery-detail-metrics" aria-label="خلاصه ارسال">
+      <DetailMetric label="وضعیت فعلی" value={statusText(detail.mission_status || detail.status)} />
+      <DetailMetric label="تعهد تحویل" value={formatDate(detail.committed_delivery_at)} />
+      <DetailMetric label="زمان ثبت" value={formatDate(detail.created_at)} />
+      <DetailMetric label="شناسه مأموریت" value={detail.mission_id || 'ایجاد نشده'} />
+      <DetailMetric label="آخرین رویداد ثبت‌شده" value={latestEvent ? formatDate(latestEvent.occurred_at) : 'رویدادی موجود نیست'} />
+    </section>
+    <div className="delivery-detail-columns">
+      <div className="delivery-detail-main">
+        <section className="panel delivery-map-panel"><div className="panel-heading"><div><span className="eyebrow">نمای مسیر</span><h2>موقعیت و مسیر ارسال</h2></div><span className="panel-meta">موقعیت زنده در دسترس نیست</span></div>
+          <div className="delivery-map-placeholder"><span className="map-pin">⌖</span><strong>مختصات مسیر در API مشتری موجود نیست</strong><p>برای نمایش مسیر یا موقعیت زندهٔ پیک، API مکان‌یابی مجاز لازم است. وضعیت زمانی رویدادها در سابقهٔ ارسال نمایش داده می‌شود.</p></div>
+        </section>
+        <section className="panel delivery-timeline-panel" id="delivery-timeline"><div className="panel-heading"><div><span className="eyebrow">سابقهٔ واقعی</span><h2>رویدادهای ارسال</h2></div><span className="panel-meta">{fa.format(events.length)} رویداد</span></div>
+          {timelineMessage && <p className="data-note" role="status">{timelineMessage}</p>}
+          {events.length ? <ol className="delivery-event-list">{events.map((event) => <li key={event.event_id}><span className="event-marker" /><div><strong>{eventLabels[event.event_type] || event.event_type}</strong><small>{formatDate(event.occurred_at)}</small></div><code dir="ltr">{event.event_id}</code></li>)}</ol> : <div className="empty-state"><span>◷</span><strong>رویدادی برای این ارسال برنگشت</strong><small>در صورت ایجاد مأموریت، رویدادهای ثبت‌شدهٔ آن در این بخش می‌آیند.</small></div>}
+        </section>
+      </div>
+      <aside className="delivery-detail-side">
+        <section className="panel delivery-summary-panel"><div className="panel-heading"><div><span className="eyebrow">خلاصه</span><h2>اطلاعات ارسال</h2></div></div>
+          <SummaryLine label="شماره سفارش" value={detail.external_reference || '—'} /><SummaryLine label="شناسه ارسال" value={detail.delivery_request_id} /><SummaryLine label="شناسه مأموریت" value={detail.mission_id || 'هنوز ایجاد نشده'} /><SummaryLine label="کرایه ثبت‌شده" value={detail.quote ? `${money.format(detail.quote.fare_toman)} تومان` : 'در API موجود نیست'} /><SummaryLine label="زمان تحویل" value={formatDate(detail.committed_delivery_at)} />
+        </section>
+        <section className="panel delivery-recipient-panel"><div className="panel-heading"><div><span className="eyebrow">مرسوله</span><h2>گیرنده و بسته</h2></div></div><p>نام و تماس گیرنده، نشانی مقصد و مشخصات بسته در پاسخ API جزئیات ارسال ارائه نمی‌شوند.</p></section>
+        <section className="panel delivery-actions-panel"><div className="panel-heading"><div><span className="eyebrow">اقدام‌ها</span><h2>کمک و پیگیری</h2></div></div>
+          <p>آخرین بررسی این صفحه: {formatDate(checkedAt)}{latestEvent ? ` · شناسه رویداد: ${latestEvent.event_id}` : ''}</p>
+          <button className="secondary-button" disabled={!canCancel} onClick={onCancel}>درخواست لغو مأموریت</button>
+          {!canCancel && <small className="capability-note">لغو فقط پیش از تحویل مرسوله به پیک و در وضعیت مجاز امکان‌پذیر است.</small>}
+          <button className="secondary-button" onClick={onSupport}>اطلاعات تماس پشتیبانی</button>
+          <button className="link-button" onClick={onMissionDetails}>مشاهدهٔ سابقهٔ کامل مأموریت ←</button>
+        </section>
+      </aside>
+    </div>
+  </main>
+}
+
+function DetailMetric({ label, value }: { label: string; value: string }) {
+  return <article><small>{label}</small><strong>{value}</strong></article>
+}
+
+function SupportDialog({ detail, onClose }: { detail: DeliveryDetail; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+  async function copyId() {
+    try { await navigator.clipboard.writeText(detail.delivery_request_id); setCopied(true) } catch { setCopied(false) }
+  }
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}><section className="action-dialog" role="dialog" aria-modal="true" aria-labelledby="support-title"><header><div><span className="eyebrow">پشتیبانی Mono</span><h2 id="support-title">اطلاعات پیگیری</h2></div><button className="icon-button" onClick={onClose} aria-label="بستن">×</button></header><p>در حال حاضر API ارسال، ثبت تیکت یا شمارهٔ تماس پشتیبانی را ارائه نمی‌کند. شناسهٔ زیر را برای پیگیری در اختیار تیم پشتیبانی قرار دهید.</p><code dir="ltr">{detail.delivery_request_id}</code><div className="form-actions"><button className="secondary-button" onClick={() => void copyId()}>{copied ? 'شناسه کپی شد' : 'کپی شناسه ارسال'}</button><button className="primary-button" onClick={onClose}>بستن</button></div></section></div>
+}
+
+function CancelDialog({ detail, loading, error, onClose, onConfirm }: { detail: DeliveryDetail; loading: boolean; error: string; onClose: () => void; onConfirm: () => void }) {
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !loading) onClose() }}><section className="action-dialog" role="dialog" aria-modal="true" aria-labelledby="cancel-title"><header><div><span className="eyebrow">لغو مأموریت</span><h2 id="cancel-title">درخواست لغو ارسال؟</h2></div><button className="icon-button" onClick={onClose} disabled={loading} aria-label="بستن">×</button></header><p>درخواست لغو برای مأموریت <code dir="ltr">{detail.mission_id}</code> ثبت می‌شود. سامانه وضعیت مجاز را دوباره بررسی می‌کند.</p>{error && <div className="inline-error" role="alert">{error}</div>}<div className="form-actions"><button className="secondary-button" disabled={loading} onClick={onClose}>بازگشت</button><button className="primary-button" disabled={loading} onClick={onConfirm}>{loading ? 'در حال ثبت…' : 'تأیید لغو مأموریت'}</button></div></section></div>
 }
 
 export default App
