@@ -13,19 +13,29 @@ const lockedColors = [
   { color: '#00A8C6', title: 'Powered by Mono', description: 'شناسهٔ زیرساخت لجستیک مونو' },
 ]
 const tabLabels: Array<[SettingsTab, string]> = [
-  ['integrations', 'یکپارچه‌سازی'], ['notifications', 'اعلان‌ها'], ['members', 'اعضا و دسترسی'], ['workspace', 'Workspace'], ['branding', 'هویت بصری'],
+  ['branding', 'هویت بصری'], ['workspace', 'Workspace'], ['members', 'اعضا و دسترسی'], ['notifications', 'اعلان‌ها'], ['integrations', 'یکپارچه‌سازی'],
 ]
+const tabCopy: Record<SettingsTab, [string, string]> = {
+  integrations: ['یکپارچه‌سازی', 'اتصال API، مدیریت Webhook و پایش تحویل رویدادها'],
+  notifications: ['تنظیمات اعلان‌ها', 'کانال‌ها، رویدادها و دریافت‌کنندگان اعلان‌ها'],
+  members: ['اعضا و دسترسی', 'مدیریت اعضای Workspace، نقش‌ها و محدودهٔ دسترسی'],
+  workspace: ['تنظیمات Workspace', 'پیکربندی فضای کاری، داده‌ها و پیش‌فرض‌های عملیاتی'],
+  branding: ['تنظیمات هویت بصری', 'ظاهر Workspace خودت را با برند کسب‌وکارت هماهنگ کن.'],
+}
 
 export default function MerchantBrandingSettings({
   mode,
   onTabChange,
   onDemoSave,
+  onInvite,
 }: {
   mode: 'demo' | 'connected'
   onTabChange?: (tab: SettingsTab) => void
   onDemoSave?: () => void
+  onInvite?: () => void
 }) {
   const isDemo = mode === 'demo'
+  const [activeTab, setActiveTab] = useState<SettingsTab>('branding')
   const [values, setValues] = useState<BrandValues>(isDemo ? sampleValues : { brandName: '', workspaceName: '', primary: sampleValues.primary, accent: sampleValues.accent })
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [logoError, setLogoError] = useState('')
@@ -79,14 +89,14 @@ export default function MerchantBrandingSettings({
   }
 
   return <section className="merchant-branding-page" dir="rtl">
-    {isDemo && <div className="demo-ribbon"><span>محیط نمایشی</span><b>همهٔ تغییرها موقت‌اند و به Workspace واقعی ذخیره یا ارسال نمی‌شوند.</b></div>}
     <header className="branding-page-header">
-      <div><span className="eyebrow">هویت Workspace</span><h1>تنظیمات هویت بصری</h1><p>ظاهر Workspace خودت را با برند کسب‌وکارت هماهنگ کن.</p></div>
+      <div><span className="eyebrow">{activeTab === 'branding' ? `هویت Workspace${isDemo ? ' · پیش‌نمایش' : ''}` : 'Workspace · پیش‌نمایش'}</span><h1>{tabCopy[activeTab][0]}</h1><p>{tabCopy[activeTab][1]}</p></div>
       <div className="branding-header-actions"><button className="secondary-button" onClick={resetDraft}>بازنشانی</button><button className="primary-button" disabled={!isDemo || savedPreview} title={!isDemo ? 'ذخیره‌سازی هویت بصری هنوز در API حساب موجود نیست.' : undefined} onClick={() => { setSavedPreview(true); onDemoSave?.() }}>ذخیره تغییرات</button></div>
     </header>
     <nav className="settings-tabs branding-tabs" aria-label="بخش‌های تنظیمات Workspace" role="tablist">
-      {tabLabels.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={id === 'branding'} className={id === 'branding' ? 'selected' : ''} disabled={id !== 'branding' && (!onTabChange || isDemo)} onClick={() => { if (id !== 'branding') onTabChange?.(id) }}>{label}</button>)}
+      {tabLabels.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={id === activeTab} className={id === activeTab ? 'selected' : ''} disabled={id !== 'branding' && !isDemo && !onTabChange} onClick={() => { setActiveTab(id); if (id !== 'branding' && !isDemo) onTabChange?.(id) }}>{label}</button>)}
     </nav>
+    {isDemo && activeTab !== 'branding' ? <DemoSettingsTab tab={activeTab} onInvite={onInvite} /> : <>
     {!isDemo && <p className="branding-capability-note">تنظیمات جاری از API هویت بصری دریافت نشده‌اند. مقادیر زیر فقط پیش‌نمایش موقت مرورگرند و دکمهٔ ذخیره تا آماده‌شدن API غیرفعال است.</p>}
     {savedPreview && isDemo && <p className="branding-preview-saved" role="status">تغییرهای این پیش‌نمایش در همین صفحه ثبت شدند.</p>}
     <div className="branding-layout">
@@ -125,5 +135,32 @@ export default function MerchantBrandingSettings({
         </section>
       </div>
     </div>
+    </>}
   </section>
+}
+
+function DemoSettingsTab({ tab, onInvite }: { tab: Exclude<SettingsTab, 'branding'>; onInvite?: () => void }) {
+  return <div className={`demo-settings-content demo-settings-${tab}`}>
+    {tab === 'workspace' && <div className="demo-settings-columns"><div className="demo-settings-stack"><section className="panel"><h2>مشخصات Workspace</h2><div className="demo-setting-grid"><Setting label="شناسه Workspace" value="WS-SEPEHR-001" /><Setting label="نام Workspace" value="فروشگاه سپهر" /><Setting label="کشور" value="ایران" /><Setting label="شهر پیش‌فرض" value="تهران" /><Setting label="نشانی تحویل" value="ونک، خیابان ملاصدرا، پلاک ۲۱" /></div></section><section className="panel"><h2>تنظیمات منطقه‌ای</h2><div className="demo-setting-grid"><Setting label="زبان" value="فارسی" /><Setting label="منطقه زمانی" value="Asia/Tehran" /><Setting label="واحد پول" value="تومان" /><Setting label="تقویم تاریخ" value="شمسی" /></div></section><section className="panel"><h2>داده و نگهداری</h2><Toggle label="ذخیره تاریخچه ارسال‌ها برای گزارش‌گیری" /><Toggle label="نگهداری لاگ فعالیت اعضا" /><Toggle label="نمایش اطلاعات تماس گیرنده فقط برای نقش‌های مجاز" /></section></div><div className="demo-settings-stack"><section className="panel"><h2>پیش‌فرض‌های عملیاتی</h2><div className="demo-setting-grid"><Setting label="سرویس پیش‌فرض" value="ارسال شهری" /><Setting label="شعاع سرویس" value="۵ کیلومتر" /><Setting label="زمان آمادگی پیش‌فرض" value="۱۰ دقیقه" /><Setting label="حد انتظار پیک" value="۳ دقیقه" /><Setting label="سقف Batch" value="۵ مأموریت" /></div></section><section className="panel"><h2>رفتار Workspace</h2><Toggle label="نمایش تعهد تحویل قبل از ثبت نهایی ارسال" /><Toggle label="نیاز به تأیید کاربر قبل از ثبت کرایه" /><Toggle label="فعال‌سازی رهگیری زنده برای سفارش‌ها" /><Toggle label="نمایش وضعیت استاندارد خدمت در لیست‌ها" /></section><section className="panel"><h2>خلاصه اعمال تنظیمات</h2><p className="data-note">تغییرات این پیش‌نمایش فقط روی Workspace نمونه اثر می‌گذارند.</p></section></div></div>}
+    {tab === 'members' && <DemoMembersSettings onInvite={onInvite} />}
+    {tab === 'notifications' && <DemoNotificationSettings />}
+    {tab === 'integrations' && <DemoIntegrationSettings />}
+  </div>
+}
+
+function Setting({ label, value }: { label: string; value: string }) { return <div className="demo-setting"><small>{label}</small><strong>{value}</strong></div> }
+function Toggle({ label }: { label: string }) { return <label className="demo-toggle"><input type="checkbox" defaultChecked /><span>{label}</span></label> }
+
+function DemoMembersSettings({ onInvite }: { onInvite?: () => void }) {
+  const members = [['مهدی مرادی','مالک','۰۹۱۲ ۳۴۵ ۸۷۱۱','امروز ۱۳:۳۱','فعال'],['سارا حسینی','ادمین','admin@sepehr.ir','امروز ۱۰:۵۸','فعال'],['علی رضایی','اپراتور','۰۹۱۲ ۴۷۰ ۸۷۱۱','امروز ۱۰:۴۲','فعال'],['مریم نادری','مالی','finance@sepehr.ir','دیروز ۱۸:۲۴','فعال'],['رضا شریفی','اپراتور','ops2@sepehr.ir','—','دعوت شده']]
+  return <><div className="demo-members-heading"><span>مدیریت نقش‌ها و دسترسی اعضای Workspace</span><button className="primary-button" onClick={onInvite}>دعوت عضو</button></div><div className="demo-member-kpis"><Setting label="دعوت در انتظار" value="۲" /><Setting label="مالی" value="۱" /><Setting label="اپراتور" value="۳" /><Setting label="ادمین" value="۲" /><Setting label="اعضای فعال" value="۸" /></div><div className="demo-settings-columns"><div className="demo-settings-stack"><section className="panel demo-member-table-panel"><div className="demo-table-scroll"><table className="demo-member-table"><thead><tr><th>عضو</th><th>موبایل/ایمیل</th><th>شعب</th><th>نقش</th><th>آخرین فعالیت</th><th>وضعیت</th></tr></thead><tbody>{members.map((row) => <tr key={row[0]}>{row.map((cell,index) => <td key={index}>{index===4?<span className={`badge ${cell==='فعال'?'success':'warning'}`}>{cell}</span>:cell}</td>)}</tr>)}</tbody></table></div></section><section className="panel"><h2>ماتریس نقش‌ها</h2><div className="demo-role-matrix">{[['مالک','همهٔ دسترسی‌ها'],['ادمین','مدیریت Workspace'],['اپراتور','ارسال و رهگیری'],['مالی','صورتحساب و گزارش'],['مشاهده‌گر','فقط مشاهده']].map(([r,d])=><div key={r}><strong>{r}</strong><small>{d}</small></div>)}</div></section></div><div className="demo-settings-stack"><section className="panel"><h2>مهدی مرادی</h2><Setting label="نقش" value="مالک"/><Setting label="موبایل" value="۰۹۱۲ ۳۴۵ ۸۷۱۱"/><Setting label="آخرین فعالیت" value="امروز ۱۳:۳۱"/></section><section className="panel"><h2>محدودهٔ دسترسی</h2><Setting label="شعب" value="ونک و جردن"/><Setting label="ارسال جدید" value="مجاز"/><Setting label="صورتحساب" value="فقط مشاهده"/><Setting label="تنظیمات Workspace" value="غیرمجاز"/></section><section className="panel"><h2>مجوزهای کلیدی</h2><Toggle label="ثبت و ویرایش ارسال"/><Toggle label="مشاهده رهگیری زنده"/><Toggle label="درخواست لغو قبل از Handoff"/><Toggle label="مدیریت اعضا"/></section></div></div></>
+}
+
+function DemoNotificationSettings() {
+  const events=['ثبت ارسال','تخصیص پیک','دریافت از شعبه','تحویل به گیرنده','ریسک استاندارد خدمت','حادثه / استثنا','لغو ارسال','صدور صورتحساب','موعد پرداخت']
+  return <div className="demo-settings-columns"><div className="demo-settings-stack"><section className="panel"><h2>کانال‌های اعلان</h2><div className="demo-channel-grid">{[['داخل پنل','فعال'],['پیامک','فعال'],['ایمیل','فعال'],['Webhook','متصل']].map(([c,v])=><div key={c}><strong>{c}</strong><small>{v}</small></div>)}</div></section><section className="panel demo-event-panel"><h2>رویدادها و کانال‌ها</h2>{events.map((e,i)=><div className="demo-event-row" key={e}><strong>{e}</strong><span className={i<4?'chosen':''}>ایمیل</span><span className={i===4||i===5?'chosen':''}>پیامک</span><span className="chosen">داخل پنل</span></div>)}</section><section className="panel"><h2>خلاصه ارسال اعلان</h2><p className="data-note">تاریخچهٔ نمونه: اعلان تحویل، امروز ساعت ۱۲:۵۸</p><button className="secondary-button">مشاهده تاریخچه اعلان‌ها</button></section></div><div className="demo-settings-stack"><section className="panel"><h2>دریافت‌کنندگان</h2><Toggle label="ادمین‌های Workspace"/><Toggle label="اپراتورهای شعب مرتبط"/><Toggle label="تیم مالی"/><Toggle label="مشاهده‌گرها"/></section><section className="panel"><h2>ساعات سکوت</h2><Toggle label="فعال‌سازی ساعات سکوت"/><div className="demo-setting-grid"><Setting label="شروع" value="۲۲:۰۰"/><Setting label="پایان" value="۰۷:۰۰"/></div></section><section className="panel"><h2>Escalation</h2><Toggle label="ارسال SMS برای Incident بحرانی"/><Toggle label="تکرار هشدار بعد از ۱۰ دقیقه"/><Toggle label="ارسال ایمیل خلاصه پایان روز"/></section><section className="panel"><h2>قاعده</h2><p className="data-note">اعلان‌ها و گیرندگان این صفحه فقط نمونه‌اند.</p></section></div></div>
+}
+
+function DemoIntegrationSettings() {
+  return <><div className="demo-member-kpis"><Setting label="خطای باز" value="۱"/><Setting label="آخرین Event" value="۱۲:۴۸"/><Setting label="موفقیت ۲۴ساعت" value="۹۹٫۲٪"/><Setting label="Webhook" value="۳ فعال"/><Setting label="API" value="فعال"/></div><div className="demo-settings-columns"><div className="demo-settings-stack"><section className="panel"><h2>دسترسی API</h2><Setting label="Environment" value="Production"/><Setting label="API Key" value="••••••••••••••••••۳۸۴A"/><div className="demo-settings-actions"><button className="secondary-button">چرخش کلید</button><button className="secondary-button">کپی شناسه</button></div></section><section className="panel"><h2>Webhook Endpoint</h2><Setting label="URL" value="https://api.sepehr.ir/hooks/mono"/><Setting label="وضعیت" value="فعال"/><Setting label="Secret" value="ذخیره‌شده و پنهان"/><div className="demo-chip-row"><span>mission.updated</span><span>delivery.completed</span><span>incident.created</span><span>billing.created</span></div><div className="demo-settings-actions"><button className="secondary-button">تست Endpoint</button><button className="secondary-button">ویرایش رویدادها</button></div></section></div><div className="demo-settings-stack"><section className="panel"><h2>سلامت Webhook</h2><Setting label="آخرین پاسخ" value="۲۰۰ · ۱۲:۴۸"/><Setting label="Latency" value="۱۸۰ ms"/><Setting label="Retry باز" value="۱"/><Setting label="آخرین تحویل" value="۱۲:۴۸"/></section><section className="panel demo-webhook-table"><h2>تحویل‌های اخیر</h2>{['delivery.completed','mission.updated','incident.created','delivery.completed'].map((x,i)=><div key={`${x}-${i}`}><span>{x}</span><b>{i===2?'خطا':'موفق'}</b></div>)}</section><section className="panel"><h2>سیاست Retry</h2><Setting label="تعداد تلاش" value="۵"/><Setting label="Backoff" value="۱، ۲، ۴، ۸ دقیقه"/><Setting label="حداکثر پنجره" value="۲۴ ساعت"/></section></div></div></>
 }

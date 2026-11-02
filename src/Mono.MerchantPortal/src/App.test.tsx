@@ -20,16 +20,16 @@ describe('merchant portal delivery flow', () => {
     expect(screen.getByRole('heading', { name: 'داشبورد کسب‌وکار' })).toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: 'ارسال جدید' })[0])
-    await user.clear(screen.getByLabelText('شمارهٔ سفارش'))
-    await user.type(screen.getByLabelText('شمارهٔ سفارش'), 'ORD-TEST')
-    await user.click(screen.getByRole('button', { name: 'ثبت نمونهٔ ارسال' }))
+    await user.clear(screen.getByLabelText('شناسه سفارش داخلی'))
+    await user.type(screen.getByLabelText('شناسه سفارش داخلی'), 'ORD-TEST')
+    await user.click(screen.getByRole('button', { name: 'تأیید و ثبت ارسال' }))
 
     expect(await screen.findByText('ORD-TEST')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('فقط در همین پیش‌نمایش')
     expect(fetchMock).not.toHaveBeenCalled()
     await user.click(screen.getAllByRole('button', { name: 'جزئیات' })[0])
     expect(screen.getByText('جزئیات و رهگیری ارسال', { selector: 'strong' })).toBeInTheDocument()
-    expect(screen.getByText('نام گیرنده، وضعیت‌ها و زمان‌ها در این صفحه نمونه هستند و از API دریافت نشده‌اند.')).toBeInTheDocument()
+    expect(screen.getAllByText('فروشگاه سپهر • محیط نمایشی').length).toBeGreaterThan(0)
     expect(screen.getByText('مختصات مسیر در API مشتری موجود نیست')).toBeInTheDocument()
   })
 

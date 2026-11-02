@@ -15,7 +15,7 @@ describe('merchant brand preview', () => {
     await user.clear(name)
     await user.type(name, 'کافهٔ آبان')
     expect(screen.getAllByText('کافهٔ آبان')).toHaveLength(1)
-    expect(screen.getByText('محیط نمایشی')).toBeInTheDocument()
+    expect(screen.getByText('هویت Workspace · پیش‌نمایش')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'ذخیره تغییرات' }))
     expect(screen.getByText('تغییرهای این پیش‌نمایش در همین صفحه ثبت شدند.')).toBeInTheDocument()
@@ -26,5 +26,18 @@ describe('merchant brand preview', () => {
     render(<MerchantBrandingSettings mode="connected" />)
     expect(screen.getByRole('button', { name: 'ذخیره تغییرات' })).toBeDisabled()
     expect(screen.getByText(/تنظیمات جاری از API هویت بصری دریافت نشده‌اند/)).toBeInTheDocument()
+  })
+
+  it('opens the remaining settings designs in the local demo without changing the connected account', async () => {
+    const user = userEvent.setup()
+    render(<MerchantBrandingSettings mode="demo" />)
+    await user.click(screen.getByRole('tab', { name: 'Workspace' }))
+    expect(screen.getByRole('heading', { name: 'مشخصات Workspace' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'اعضا و دسترسی' }))
+    expect(screen.getByRole('heading', { name: 'ماتریس نقش‌ها' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'اعلان‌ها' }))
+    expect(screen.getByRole('heading', { name: 'کانال‌های اعلان' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'یکپارچه‌سازی' }))
+    expect(screen.getByRole('heading', { name: 'سلامت Webhook' })).toBeInTheDocument()
   })
 })
