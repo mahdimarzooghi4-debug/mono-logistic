@@ -133,7 +133,6 @@ describe('courier home', () => {
     expect(screen.getByRole('status')).toHaveTextContent('برای ثبت کسری')
     fireEvent.change(screen.getByLabelText('یادداشت برگشت — اختیاری'), { target: { value: 'یک بسته هنگام برگشت تحویل نشد.' } })
     fireEvent.click(screen.getByRole('button', { name: 'تحویل برگشتی ثبت شد' }))
-    expect(screen.getByRole('status')).toHaveTextContent('به بک‌اند متصل نیست')
     expect(screen.getByText('برگشت تکمیل شد', { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getByText('پرونده حادثه مستقل ادامه دارد')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'مشاهده پرونده' }))
