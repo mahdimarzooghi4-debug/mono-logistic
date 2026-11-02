@@ -16,6 +16,9 @@ const initialDeliveries: PreviewDelivery[] = [
   { order: 'ORD-۰۳۷۱', recipient: 'آرش کاظمی', branch: 'جردن', status: 'نیازمند اقدام', mission: 'MIS-۱۰۴۹۳', deadline: '۱۲:۴۰' },
   { order: 'ORD-۰۳۶۸', recipient: 'الهام یوسفی', branch: 'میرداماد', status: 'در مسیر', mission: 'MIS-۱۰۵۰۲', deadline: '۱۳:۱۲' },
   { order: 'ORD-۰۳۶۵', recipient: 'پریسا کریمی', branch: 'ونک', status: 'دریافت', mission: 'MIS-۱۰۵۰۰', deadline: '۱۳:۲۰' },
+  { order: 'ORD-۰۳۶۲', recipient: 'محمد نادری', branch: 'جردن', status: 'تحویل', mission: 'MIS-۱۰۵۰۰', deadline: '۱۳:۳۰' },
+  { order: 'ORD-۰۳۵۷', recipient: 'نازنین احمدی', branch: 'ونک', status: 'تحویل', mission: 'MIS-۱۰۴۷۹', deadline: '۱۱:۳۲' },
+  { order: 'ORD-۰۳۵۴', recipient: 'سهیل جلالی', branch: 'میرداماد', status: 'نیازمند اقدام', mission: 'MIS-۱۰۴۷۴', deadline: '۱۲:۱۰' },
 ]
 
 const menu: Array<{ id: MerchantNavId; label: string }> = [
@@ -227,7 +230,7 @@ function DemoDeliveriesList({ items, onSelect }: { items: PreviewDelivery[]; onS
       <label>استاندارد خدمت<select defaultValue="همه"><option>همه</option><option>در محدوده</option></select></label>
       <button className="primary-button" onClick={() => setFilters(draft)}>اعمال فیلتر</button>
     </div></section>
-    <div className="delivery-list-columns"><section className="panel delivery-list-table-panel"><div className="panel-heading"><div><span className="eyebrow">فهرست نمایشی</span><h2>نتایج ارسال</h2></div><span className="panel-meta">{fa.format(visibleItems.length)} مورد نمونه</span></div>
+      <div className="delivery-list-columns"><section className="panel delivery-list-table-panel"><div className="panel-heading"><div><span className="eyebrow">فهرست نمایشی</span><h2>نتایج ارسال</h2></div><span className="panel-meta">{fa.format(visibleItems.length)} مورد نمونه</span></div>
       <div className="merchant-delivery-table-wrap"><table className="merchant-delivery-table demo-merchant-delivery-table"><thead><tr><th>عملیات</th><th>شماره سفارش</th><th>پیک / مأموریت</th><th>گیرنده</th><th>شعبه</th><th>تعهد</th><th>مبلغ</th><th>وضعیت</th></tr></thead><tbody>{visibleItems.map((item,index) => <tr key={item.order}><td><button className="history-button" onClick={() => onSelect(item)}>جزئیات</button></td><td dir="ltr">{item.order}</td><td><span dir="ltr">{item.mission}</span><small className="block">پیک نمونه</small></td><td>{item.recipient}</td><td>{item.branch}</td><td>{item.deadline}</td><td>{index % 2 ? '۲۷۰٬۰۰۰ تومان' : '۲۴۰٬۰۰۰ تومان'}</td><td><span className={`badge ${item.status === 'تحویل' ? 'success' : item.status === 'نیازمند اقدام' ? 'danger' : 'info'}`}>{item.status}</span></td></tr>)}</tbody></table>{!visibleItems.length && <div className="empty-state"><strong>ارسالی پیدا نشد</strong><small>جست‌وجو فقط بین ردیف‌های نمونه انجام می‌شود.</small></div>}</div>
       <p className="data-note">خروجی و فیلترهای عملیاتی از API واقعی استفاده می‌کنند؛ اینجا فقط تعامل نمایشی است.</p>
     </section><aside className="delivery-list-side"><section className="panel delivery-list-summary"><h2>خلاصهٔ فیلتر</h2><DemoSummary label="جست‌وجو" value={filters.query || 'همهٔ موارد نمونه'} /><DemoSummary label="وضعیت" value={filters.status || 'همهٔ وضعیت‌ها'} /><DemoSummary label="شعبه" value={filters.branch || 'همهٔ شعب'} /><DemoSummary label="نتیجه" value={`${fa.format(visibleItems.length)} ردیف نمونه`} /><button className="secondary-button" onClick={() => { const empty = { query: '', status: '', branch: '' }; setDraft(empty); setFilters(empty) }}>پاک‌کردن فیلترها</button></section>

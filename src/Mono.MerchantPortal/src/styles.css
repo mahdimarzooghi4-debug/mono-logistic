@@ -744,9 +744,13 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-deliveries-page .delivery-list-metrics article { min-height:70px; border:0; border-left:1px solid #e5ebed; border-radius:0; background:transparent; }
 .demo-deliveries-page .delivery-list-metrics article:last-child { border-left:0; }
 .demo-deliveries-page .delivery-list-columns { grid-template-columns:270px minmax(0,1fr); direction:rtl; }
-.demo-deliveries-page .delivery-list-table-panel { grid-column:2; }
-.demo-deliveries-page .delivery-list-side { grid-column:1; }
-.demo-merchant-delivery-table { min-width:760px; }
+.demo-deliveries-page .delivery-list-table-panel { grid-column:2; grid-row:1; }
+.demo-deliveries-page .delivery-list-side { grid-column:1; grid-row:1; }
+.demo-merchant-delivery-table { min-width:700px; }
+.demo-merchant-delivery-table th { font-size:9px; }
+.demo-merchant-delivery-table td { font-size:9px; }
+.demo-merchant-delivery-table .badge { font-size:8px; }
+.demo-merchant-delivery-table .block { font-size:8px; }
 .demo-merchant-delivery-table th:nth-child(1) { width:10%; }
 .demo-merchant-delivery-table th:nth-child(2) { width:13%; }
 .demo-merchant-delivery-table th:nth-child(3) { width:14%; }
