@@ -28,9 +28,9 @@ describe('merchant portal delivery flow', () => {
     expect(screen.getByRole('status')).toHaveTextContent('فقط در همین پیش‌نمایش')
     expect(fetchMock).not.toHaveBeenCalled()
     await user.click(screen.getAllByRole('button', { name: 'جزئیات' })[0])
-    expect(screen.getByText('جزئیات و رهگیری ارسال', { selector: 'strong' })).toBeInTheDocument()
+    expect(screen.getByText('جزئیات ارسال', { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getAllByText('فروشگاه سپهر • محیط نمایشی').length).toBeGreaterThan(0)
-    expect(screen.getByText('مختصات مسیر در API مشتری موجود نیست')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'مسیر نمونه از شعبهٔ ونک تا مقصد گیرنده' })).toBeInTheDocument()
   })
 
   it('renders the business dashboard tools from real account data and supports quick tracking', async () => {

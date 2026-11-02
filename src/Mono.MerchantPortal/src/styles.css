@@ -739,3 +739,49 @@ tbody tr:hover { background: #fbfdfd; }
 @media(max-width:480px){.tracking-side-column{grid-template-columns:1fr}.tracking-search-row{grid-template-columns:1fr}.tracking-search-row .primary-button{width:100%}.tracking-result-metrics{grid-template-columns:1fr 1fr}.tracking-event-list li{grid-template-columns:78px 1fr}}
 
 .tracking-search-row{direction:ltr}.tracking-search-row>*{direction:rtl}.tracking-result-metrics{direction:ltr}.tracking-result-metrics article{direction:rtl}.tracking-result-columns,.tracking-lower-columns{direction:ltr}.tracking-live-card,.tracking-side-column,.tracking-timeline-card,.tracking-recent-card{direction:rtl}.tracking-recent-card>button{direction:rtl}
+
+.demo-deliveries-page .delivery-list-metrics { gap:0; overflow:hidden; border:1px solid var(--border); border-radius:10px; background:#fff; }
+.demo-deliveries-page .delivery-list-metrics article { min-height:70px; border:0; border-left:1px solid #e5ebed; border-radius:0; background:transparent; }
+.demo-deliveries-page .delivery-list-metrics article:last-child { border-left:0; }
+.demo-deliveries-page .delivery-list-columns { grid-template-columns:270px minmax(0,1fr); direction:rtl; }
+.demo-deliveries-page .delivery-list-table-panel { grid-column:2; }
+.demo-deliveries-page .delivery-list-side { grid-column:1; }
+.demo-merchant-delivery-table { min-width:760px; }
+.demo-merchant-delivery-table th:nth-child(1) { width:10%; }
+.demo-merchant-delivery-table th:nth-child(2) { width:13%; }
+.demo-merchant-delivery-table th:nth-child(3) { width:14%; }
+.demo-merchant-delivery-table th:nth-child(4) { width:13%; }
+.demo-merchant-delivery-table th:nth-child(5) { width:10%; }
+.demo-merchant-delivery-table th:nth-child(6) { width:9%; }
+.demo-merchant-delivery-table th:nth-child(7) { width:14%; }
+.demo-merchant-delivery-table th:nth-child(8) { width:11%; }
+.demo-delivery-detail .delivery-detail-columns { grid-template-columns:minmax(260px,.9fr) minmax(0,1.8fr); direction:rtl; }
+.demo-delivery-detail .delivery-detail-main { grid-column:2; }
+.demo-delivery-detail .delivery-detail-side { grid-column:1; }
+.demo-delivery-detail .delivery-detail-metrics { gap:0; overflow:hidden; border:1px solid var(--border); border-radius:10px; background:#fff; }
+.demo-delivery-detail .delivery-detail-metrics article { min-height:66px; border:0; border-left:1px solid #e5ebed; border-radius:0; }
+.demo-delivery-detail .delivery-detail-metrics article:last-child { border-left:0; }
+.demo-route-map { position:relative; height:300px; overflow:hidden; border-radius:9px; background-color:#f4f7f8; background-image:linear-gradient(0deg,transparent 22%,#fff 23%,#fff 26%,transparent 27%,transparent 58%,#fff 59%,#fff 62%,transparent 63%),linear-gradient(90deg,transparent 12%,#fff 13%,#fff 16%,transparent 17%,transparent 43%,#fff 44%,#fff 47%,transparent 48%,transparent 76%,#fff 77%,#fff 80%,transparent 81%); background-size:190px 140px,210px 160px; }
+.demo-route-map::before,.demo-route-map::after { position:absolute; border-radius:8px; background:#e7ecee; content:""; }
+.demo-route-map::before { top:14%; left:17%; width:110px; height:24px; box-shadow:170px 40px #e7ecee,360px -5px #e7ecee,470px 100px #e7ecee,100px 150px #e7ecee; }
+.demo-route-map::after { top:68%; left:7%; width:125px; height:25px; box-shadow:230px -110px #e7ecee,420px -55px #e7ecee; }
+.demo-route-map svg { position:absolute; z-index:1; inset:0; width:100%; height:100%; }
+.demo-route-map .route-underlay { fill:none; stroke:#fff; stroke-width:12; stroke-linecap:round; }
+.demo-route-map .route-line { fill:none; stroke:#00a8c6; stroke-width:5; stroke-linecap:round; }
+.demo-route-map .route-origin,.demo-route-map .route-courier,.demo-route-map .route-destination { stroke:#fff; stroke-width:4; }
+.demo-route-map .route-origin { fill:#087f95; }
+.demo-route-map .route-courier { fill:#00a8c6; }
+.demo-route-map .route-destination { fill:#168a52; }
+.route-label { position:absolute; z-index:2; border:1px solid #e4eaec; border-radius:6px; padding:5px 8px; color:#34464d; background:#fff; font-size:9px; }
+.route-start { right:5%; bottom:8%; }
+.route-rider { top:42%; left:42%; }
+.route-end { top:7%; left:6%; }
+.demo-incident-note { display:grid; gap:6px; border:1px solid #f0dbb7; border-radius:8px; padding:10px; color:#9b620c; background:#fff9ef; }
+.demo-incident-note strong { font-size:9px; }
+.demo-incident-note small { color:#937b59; font-size:8px; }
+.delivery-action-buttons { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.delivery-action-buttons button,.delivery-actions-panel>.primary-button { min-height:36px; font-size:9px; }
+@media(max-width:1100px) { .demo-deliveries-page .delivery-list-columns { grid-template-columns:240px minmax(0,1fr); } }
+@media(max-width:760px) { .demo-deliveries-page .delivery-list-columns { grid-template-columns:1fr; } .demo-deliveries-page .delivery-list-table-panel,.demo-deliveries-page .delivery-list-side { grid-column:1; } }
+@media(max-width:1050px) { .demo-delivery-detail .delivery-detail-columns { grid-template-columns:minmax(240px,.9fr) minmax(0,1.35fr); } }
+@media(max-width:760px) { .demo-delivery-detail .delivery-detail-columns { grid-template-columns:1fr; } .demo-delivery-detail .delivery-detail-main,.demo-delivery-detail .delivery-detail-side { grid-column:1; } .demo-route-map { height:240px; } }
