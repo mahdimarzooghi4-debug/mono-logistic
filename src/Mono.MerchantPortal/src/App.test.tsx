@@ -35,7 +35,7 @@ describe('merchant portal delivery flow', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url === '/v1/branches') {
-        return new Response(JSON.stringify({ branches: [{ branchId, name: 'شعبه ونک', address: 'تهران', zoneId: 'central', status: 'ACTIVE' }] }), { status: 200 })
+        return new Response(JSON.stringify({ branches: [{ branchId, name: 'شعبه ونک', address: 'تهران', latitude: 35.75, longitude: 51.41, zoneId: 'central', status: 'ACTIVE' }] }), { status: 200 })
       }
       if (url.startsWith('/v1/delivery-requests?page_size=25')) {
         return new Response(JSON.stringify({ items: [], next_cursor: null }), { status: 200 })
@@ -70,7 +70,7 @@ describe('merchant portal delivery flow', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url === '/v1/branches') {
-        return new Response(JSON.stringify({ branches: [{ branchId, name: 'شعبه ونک', address: 'تهران', zoneId: 'central', status: 'ACTIVE' }] }), { status: 200 })
+        return new Response(JSON.stringify({ branches: [{ branchId, name: 'شعبه ونک', address: 'تهران', latitude: 35.75, longitude: 51.41, zoneId: 'central', status: 'ACTIVE' }] }), { status: 200 })
       }
       if (url.startsWith('/v1/delivery-requests?page_size=25')) {
         return new Response(JSON.stringify({ items: [], next_cursor: null }), { status: 200 })
@@ -90,13 +90,22 @@ describe('merchant portal delivery flow', () => {
     expect(await screen.findByRole('heading', { name: 'داشبورد کسب‌وکار' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'ارسال جدید' }))
-    await user.type(screen.getByLabelText('شمارهٔ سفارش کسب‌وکار'), 'ORDER-8421')
+    expect(screen.getByRole('navigation', { name: 'مراحل ثبت ارسال' })).toHaveTextContent('امکان‌سنجی و قیمت')
+    expect(screen.getByText('هنوز محاسبه نشده')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ذخیره پیش‌نویس' })).toBeDisabled()
+    await user.type(screen.getByLabelText('شناسه سفارش داخلی'), 'ORDER-8421')
     await user.selectOptions(screen.getByLabelText('شعبهٔ مبدا'), branchId)
-    await user.type(screen.getByLabelText('نشانی دریافت'), 'تهران، خیابان ونک')
-    await user.type(screen.getByLabelText('نشانی گیرنده'), 'تهران، یوسف‌آباد')
+    await user.type(screen.getByLabelText('آدرس مبدا'), 'تهران، خیابان ونک')
+    await user.type(screen.getByLabelText('آدرس مقصد'), 'تهران، یوسف‌آباد')
+    await user.type(screen.getByLabelText('عرض جغرافیایی مقصد'), '35.70')
+    await user.click(screen.getByRole('button', { name: 'ثبت درخواست برای بررسی' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('طول و عرض جغرافیایی را هر دو وارد کنید')
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/v1/delivery-requests' && init?.method === 'POST')).toBe(false)
+    await user.type(screen.getByLabelText('طول جغرافیایی مقصد'), '51.40')
     await user.clear(screen.getByLabelText('تعداد کیسه'))
     await user.type(screen.getByLabelText('تعداد کیسه'), '2')
-    await user.click(screen.getByRole('button', { name: 'ثبت درخواست ارسال' }))
+    await user.type(screen.getByLabelText('وزن تقریبی (کیلوگرم)'), '2.5')
+    await user.click(screen.getByRole('button', { name: 'ثبت درخواست برای بررسی' }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(requestId)
     expect(screen.getByRole('status')).toHaveTextContent('مختصات هنوز ثبت نشده')
@@ -109,9 +118,9 @@ describe('merchant portal delivery flow', () => {
     expect(JSON.parse(String(options?.body))).toMatchObject({
       external_reference: 'ORDER-8421',
       branch_id: branchId,
-      pickup: { address_text: 'تهران، خیابان ونک' },
-      dropoff: { address_text: 'تهران، یوسف‌آباد' },
-      shipment: { shipment_model: 'BAG_BASED', bag_count: 2, load_class: 'M' },
+      pickup: { address_text: 'تهران، خیابان ونک', latitude: 35.75, longitude: 51.41 },
+      dropoff: { address_text: 'تهران، یوسف‌آباد', latitude: 35.7, longitude: 51.4 },
+      shipment: { shipment_model: 'BAG_BASED', bag_count: 2, estimated_weight_kg: 2.5, load_class: 'M' },
       requested_service: 'URBAN_DELIVERY',
       requested_priority: 'STANDARD',
     })
