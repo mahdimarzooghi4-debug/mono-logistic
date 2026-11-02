@@ -408,8 +408,8 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-settings-columns { direction:rtl; }
 .demo-settings-stack { display:grid; align-content:start; gap:12px; min-width:0; }
 .demo-settings-stack { direction:rtl; }
-.demo-settings-columns > .demo-settings-stack:first-child { grid-column:2; }
-.demo-settings-columns > .demo-settings-stack:last-child { grid-column:1; }
+.demo-settings-columns > .demo-settings-stack:first-child { grid-column:2; grid-row:1; }
+.demo-settings-columns > .demo-settings-stack:last-child { grid-column:1; grid-row:1; }
 .demo-settings-stack > .panel { min-width:0; padding:14px; }
 .demo-settings-stack h2,.demo-settings-content .panel h2 { margin:0 0 11px; color:#17282f; font-size:12px; }
 .demo-setting-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
@@ -465,7 +465,7 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-webhook-table > div { display:flex; justify-content:space-between; gap:8px; border-top:1px solid #edf1f2; padding:9px 0; font-size:8px; }
 .demo-webhook-table b { color:#168a52; }
 .demo-webhook-table > div:nth-of-type(4) b { color:#b46a00; }
-@media(max-width:900px) { .demo-settings-columns { grid-template-columns:1fr; } .demo-settings-columns > .demo-settings-stack:first-child,.demo-settings-columns > .demo-settings-stack:last-child { grid-column:1; } }
+@media(max-width:900px) { .demo-settings-columns { grid-template-columns:1fr; } .demo-settings-columns > .demo-settings-stack:first-child,.demo-settings-columns > .demo-settings-stack:last-child { grid-column:1; grid-row:auto; } }
 @media(max-width:620px) { .demo-member-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); } .demo-role-matrix { grid-template-columns:repeat(2,minmax(0,1fr)); } .demo-channel-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .demo-event-row { grid-template-columns:minmax(86px,1fr) repeat(3,minmax(45px,.34fr)); gap:4px; } }
 .demo-shell .sidebar-footer { min-height: 74px; justify-content: space-between; align-items: flex-end; gap: 8px; padding: 10px 8px 0; font-size: 9px; }
 .demo-account > div { display: grid; gap: 3px; text-align: right; }
