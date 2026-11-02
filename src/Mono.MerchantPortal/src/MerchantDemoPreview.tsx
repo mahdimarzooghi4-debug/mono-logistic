@@ -5,6 +5,7 @@ import trackingIcon from './assets/figma-dashboard/icon-2.svg'
 import branchesIcon from './assets/figma-dashboard/icon-3.svg'
 import billingIcon from './assets/figma-dashboard/icon-4.svg'
 import settingsIcon from './assets/figma-dashboard/icon-5.svg'
+import trackingMap from './assets/figma-tracking/tracking-map.svg'
 
 type PreviewView = 'dashboard' | 'deliveries' | 'create' | 'tracking' | 'deliveryDetail' | 'branches' | 'billing' | 'settings'
 type PreviewDelivery = { order: string; recipient: string; branch: string; status: string; mission: string; deadline: string }
@@ -78,13 +79,39 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
 
       {view === 'deliveries' && <DemoDeliveriesList items={deliveries} onSelect={item => { setTrackingResult(item); setView('deliveryDetail') }} />}
       {view === 'create' && <section className="panel form-panel"><div className="panel-heading"><div><span className="eyebrow">مرحلهٔ ۱ از ۲</span><h2>اطلاعات ارسال</h2></div><span className="panel-meta">فرم نمایشی</span></div><form className="delivery-form demo-create-form" onSubmit={createSample}><div className="form-grid two"><label>شمارهٔ سفارش<input name="order" required defaultValue="ORD-۰۳۹۰" /></label><label>شعبهٔ مبدأ<select defaultValue="ونک"><option>ونک</option><option>جردن</option><option>میرداماد</option></select></label><label className="wide">نشانی مبدأ<input required defaultValue="تهران، خیابان ولیعصر" /></label><label className="wide">نشانی گیرنده<input required defaultValue="تهران، میدان ونک" /></label><label>نام گیرنده<input name="recipient" defaultValue="مشتری نمونه" /></label><label>تلفن گیرنده<input inputMode="tel" defaultValue="۰۹۱۲۰۰۰۰۰۰۰" /></label><label>تعداد بسته<input type="number" min="1" defaultValue="1" /></label></div><p className="form-note">این ثبت فقط در حافظهٔ پیش‌نمایش انجام می‌شود.</p><button className="primary-button">ثبت نمونهٔ ارسال</button></form></section>}
-      {view === 'tracking' && <section className="panel demo-tracking"><div className="panel-heading"><div><span className="eyebrow">رهگیری</span><h2>وضعیت ارسال</h2></div></div><form className="quick-track-form" onSubmit={event => { event.preventDefault(); const found = deliveries.find(item => item.order === tracking || item.mission === tracking) || null; setTrackingResult(found); if (found) setView('deliveryDetail') }}><input aria-label="شناسهٔ ارسال یا مأموریت" value={tracking} onChange={event => setTracking(event.target.value)} /><button className="primary-button">جست‌وجو</button></form>{trackingResult ? <article className="demo-track-result"><strong>{trackingResult.order}</strong><span className="badge success">{trackingResult.status}</span><p>گیرنده: {trackingResult.recipient} · شعبه: {trackingResult.branch}</p><p>تعهد تحویل: {trackingResult.deadline} · مأموریت: {trackingResult.mission}</p><button className="secondary-button" onClick={() => setView('deliveryDetail')}>مشاهدهٔ جزئیات ارسال</button></article> : <div className="empty-state"><strong>ارسالی با این شناسه پیدا نشد</strong><small>در این محیط فقط شناسه‌های نمونه قابل جست‌وجو هستند.</small></div>}</section>}
+      {view === 'tracking' && <DemoTrackingPage tracking={tracking} setTracking={setTracking} deliveries={deliveries} selected={trackingResult} onSelect={setTrackingResult} onDetails={() => setView('deliveryDetail')} />}
       {view === 'deliveryDetail' && trackingResult && <DemoDeliveryDetail item={trackingResult} />}
       {view === 'branches' && <section className="panel"><div className="panel-heading"><div><span className="eyebrow">سه شعبهٔ نمونه</span><h2>شعب فعال</h2></div></div><div className="branch-grid">{[['ونک','تهران، خیابان ملاصدرا'],['جردن','تهران، بلوار نلسون ماندلا'],['میرداماد','تهران، خیابان میرداماد']].map(([name,address]) => <article className="branch-card" key={name}><span className="branch-symbol">⌂</span><div><strong>{name}</strong><p>{address}</p><small>زون شهری تهران</small></div><span className="badge success">فعال</span></article>)}</div><p className="data-note">مدیریت واقعی شعب به API ایجاد و ویرایش شعبه نیاز دارد.</p></section>}
       {view === 'billing' && <section className="panel demo-blocked"><span className="eyebrow">صورتحساب</span><h2>اطلاعات مالی نمایشی نیست</h2><p>تا اتصال دفترکل و قرارداد صورتحساب، مبلغ یا ماندهٔ ساختگی نشان نمی‌دهیم. این صفحه در نسخهٔ عملیاتی فقط با API مالی معتبر فعال می‌شود.</p></section>}
       {view === 'settings' && <section className="panel settings-panel"><div className="panel-heading"><div><span className="eyebrow">حساب کسب‌وکار</span><h2>تنظیمات</h2></div></div><div className="settings-tabs">{['یکپارچه‌سازی','اعلان‌ها','اعضا و دسترسی','Workspace','هویت بصری'].map(label => <button key={label} onClick={() => setNotice(`بخش «${label}» در پیش‌نمایش فقط برای مرور چیدمان است.`)}>{label}</button>)}</div><div className="settings-content"><div className="empty-state"><strong>تنظیمات نمایشی</strong><small>مدیریت اعضا، اعلان‌ها، برند و Workspace تا آماده‌شدن APIهای حساب غیرفعال می‌ماند.</small></div><button className="secondary-button" onClick={() => setView('deliveries')}>بازگشت به ارسال‌ها</button></div></section>}
     </main>
   </div>
+}
+
+function DemoTrackingPage({ tracking, setTracking, deliveries, selected, onSelect, onDetails }: {
+  tracking: string; setTracking: (value: string) => void; deliveries: PreviewDelivery[]; selected: PreviewDelivery | null
+  onSelect: (item: PreviewDelivery | null) => void; onDetails: () => void
+}) {
+  function search(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    onSelect(deliveries.find((item) => item.order === tracking || item.mission === tracking) || null)
+  }
+  const recent = [selected, ...deliveries.filter((item) => item !== selected)].filter((item): item is PreviewDelivery => Boolean(item)).slice(0, 3)
+  return <main className="merchant-tracking-page demo-tracking-page" dir="rtl">
+    <div className="demo-ribbon"><span>محیط نمایشی</span><b>وضعیت‌ها، نام‌ها، ETA و مسیر زیر کاملاً نمونه‌اند و از سامانه دریافت نشده‌اند.</b></div>
+    <section className="tracking-search-card"><h2>چه چیزی را می‌خواهی رهگیری کنی؟</h2><form className="tracking-search-row" onSubmit={search}><label className="sr-only" htmlFor="demo-tracking-id">شناسهٔ سفارش یا مأموریت</label><input id="demo-tracking-id" value={tracking} onChange={(event) => setTracking(event.target.value)} placeholder="شماره سفارش یا مأموریت نمونه" required /><button className="primary-button">جست‌وجو</button></form></section>
+    {selected ? <>
+      <section className="tracking-result-metrics"><DetailMetric label="وضعیت نمونه" value={selected.status} /><DetailMetric label="تعهد تحویل نمونه" value={`تا ${selected.deadline}`} /><DetailMetric label="ETA نمونه" value="۱۲ دقیقه" /><DetailMetric label="پیک نمونه" value="CR-۲۸۴" /><DetailMetric label="استاندارد خدمت نمونه" value="ایمن" /></section>
+      <div className="tracking-result-columns"><section className="tracking-live-card"><div className="tracking-card-heading"><div><strong>{selected.order} · {selected.mission}</strong><small>{selected.recipient} · شعبهٔ {selected.branch} · نمونه</small></div><span className="badge info">نمایشی</span></div><img className="tracking-map-illustration" src={trackingMap} alt="نقشه و مسیر نمونه برای پیش‌نمایش طراحی" /></section>
+        <aside className="tracking-side-column"><section className="tracking-summary-card"><h2>خلاصهٔ ارسال · نمونه</h2><TrackingSummaryLine label="سفارش" value={selected.order} /><TrackingSummaryLine label="مأموریت" value={selected.mission} /><TrackingSummaryLine label="گیرنده" value={selected.recipient} /><TrackingSummaryLine label="شعبه" value={selected.branch} /><TrackingSummaryLine label="پیک" value="رضا احمدی · CR-۲۸۴" /><TrackingSummaryLine label="آخرین بروزرسانی" value="همین حالا · نمونه" /></section><section className="tracking-actions-card"><h2>اقدام</h2><button className="primary-button" onClick={onDetails}>باز کردن جزئیات ارسال</button><button className="secondary-button" disabled title="پشتیبانی در پیش‌نمایش نمایشی متصل نیست">تماس با پشتیبانی</button><small>این صفحه فقط برای مرور چیدمان است.</small></section></aside></div>
+      <div className="tracking-lower-columns"><section className="tracking-timeline-card"><div className="tracking-card-heading"><strong>آخرین رویدادها</strong><span className="badge info">نمونه</span></div><ol className="tracking-event-list"><li><time>۱۲:۴۱</time><div><strong>در مسیر مقصد</strong><small>ETA فعلی ۱۲ دقیقه · نمونه</small></div></li><li><time>۱۲:۴۰</time><div><strong>سفارش دریافت شد</strong><small>۲ بسته از شعبهٔ {selected.branch} · نمونه</small></div></li><li><time>۱۲:۳۳</time><div><strong>پیک تخصیص داده شد</strong><small>رضا احمدی · CR-۲۸۴ · نمونه</small></div></li><li><time>۱۲:۳۲</time><div><strong>ارسال ثبت شد</strong><small>تعهد و کرایه نمونه قفل شد</small></div></li></ol></section>
+        <section className="tracking-recent-card"><h2>جست‌وجوهای اخیر · نمونه</h2>{recent.map((item) => <button key={item.order} onClick={() => { setTracking(item.order); onSelect(item) }}><span className="badge info">{item.status}</span><b>{item.recipient}<small>{item.order} · {item.mission}</small></b></button>)}</section></div>
+    </> : <section className="tracking-empty-card"><strong>ارسالی با این شناسه در داده‌های نمونه پیدا نشد</strong><p>شناسهٔ سفارش یا مأموریت یکی از ردیف‌های نمونه را وارد کنید.</p></section>}
+  </main>
+}
+
+function TrackingSummaryLine({ label, value }: { label: string; value: string }) {
+  return <div className="tracking-summary-line"><span>{label}</span><strong>{value}</strong></div>
 }
 
 function DemoKpi({ label, value, tone = 'cyan' }: { label: string; value: string; tone?: string }) {

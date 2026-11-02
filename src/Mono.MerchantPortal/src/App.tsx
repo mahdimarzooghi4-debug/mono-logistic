@@ -126,6 +126,7 @@ function App() {
   const [trackingEvents, setTrackingEvents] = useState<DeliveryTimelineEvent[]>([])
   const [timelineMessage, setTimelineMessage] = useState('')
   const [trackingInput, setTrackingInput] = useState('')
+  const [recentTrackingIds, setRecentTrackingIds] = useState<string[]>([])
   const [supportOpen, setSupportOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
@@ -206,7 +207,7 @@ function App() {
     setNotice('اطلاعات همین صفحه به‌روز شد.')
   }
 
-  async function openDetail(deliveryRequestId: string) {
+  async function openDetail(deliveryRequestId: string, destination: 'deliveryDetail' | 'tracking' = 'deliveryDetail') {
     if (!token) return
     setLoading(true)
     setError('')
@@ -214,8 +215,9 @@ function App() {
       const loaded = await api<DeliveryDetail>(`/v1/delivery-requests/${encodeURIComponent(deliveryRequestId)}`, token)
       setDetail(loaded)
       setTrackingInput(deliveryRequestId)
+      setRecentTrackingIds((previous) => [loaded.delivery_request_id, ...previous.filter((id) => id !== loaded.delivery_request_id)].slice(0, 3))
       setUpdatedAt(new Date().toISOString())
-      setView('deliveryDetail')
+      setView(destination)
       setTrackingEvents([])
       setTimelineMessage('')
       const requestTimeline = api<DeliveryTimeline>(`/v1/delivery-requests/${encodeURIComponent(deliveryRequestId)}/timeline`, token)
@@ -268,7 +270,7 @@ function App() {
     event.preventDefault()
     const id = trackingInput.trim()
     if (!id) return
-    await openDetail(id)
+    await openDetail(id, 'tracking')
   }
 
   async function createDelivery(event: FormEvent<HTMLFormElement>) {
@@ -571,12 +573,7 @@ function App() {
         )}
 
         {connected && view === 'tracking' && (
-          <section className="panel tracking-panel">
-            <div className="panel-heading"><div><span className="eyebrow">رهگیری با شناسهٔ دقیق</span><h2>وضعیت ارسال را بررسی کنید</h2></div></div>
-            <form className="tracking-form" onSubmit={(event) => void track(event)}><label htmlFor="tracking-id">شناسهٔ Mono ارسال</label><div><input id="tracking-id" value={trackingInput} onChange={(event) => setTrackingInput(event.target.value)} placeholder="drq_…" required /><button className="primary-button" disabled={loading}>جست‌وجو</button></div></form>
-            {detail && <DetailCard detail={detail} />}
-            {!detail && <p className="data-note">برای رهگیری، شناسهٔ دریافتی هنگام ثبت ارسال را وارد کنید.</p>}
-          </section>
+          <MerchantTrackingSearch detail={detail} events={trackingEvents} recentIds={recentTrackingIds} input={trackingInput} loading={loading} onInput={setTrackingInput} onSearch={(event) => void track(event)} onRecent={(id) => { setTrackingInput(id); void openDetail(id, 'tracking') }} onOpenDetail={() => setView('deliveryDetail')} onSupport={() => setSupportOpen(true)} />
         )}
 
         {connected && view === 'deliveryDetail' && detail && (
@@ -799,6 +796,49 @@ function DeliveryTrackingPage({ detail, events, timelineMessage, checkedAt, onCa
 
 function DetailMetric({ label, value }: { label: string; value: string }) {
   return <article><small>{label}</small><strong>{value}</strong></article>
+}
+
+function MerchantTrackingSearch({ detail, events, recentIds, input, loading, onInput, onSearch, onRecent, onOpenDetail, onSupport }: {
+  detail: DeliveryDetail | null; events: DeliveryTimelineEvent[]; recentIds: string[]; input: string; loading: boolean
+  onInput: (value: string) => void; onSearch: (event: FormEvent<HTMLFormElement>) => void; onRecent: (id: string) => void
+  onOpenDetail: () => void; onSupport: () => void
+}) {
+  const latest = events.at(-1)
+  const selected = Boolean(detail)
+  return <main className="merchant-tracking-page" dir="rtl">
+    <section className="tracking-search-card"><h2>چه چیزی را می‌خواهی رهگیری کنی؟</h2><form className="tracking-search-row" onSubmit={onSearch}>
+      <label className="sr-only" htmlFor="tracking-id">شناسهٔ ارسال یا مأموریت</label><input id="tracking-id" value={input} onChange={(event) => onInput(event.target.value)} placeholder="شناسهٔ ارسال Mono یا مأموریت" required />
+      <button className="primary-button" disabled={loading}>{loading ? 'در حال جست‌وجو…' : 'جست‌وجو'}</button>
+    </form></section>
+    {selected && detail ? <>
+      <section className="tracking-result-metrics" aria-label="وضعیت ثبت‌شده">
+        <DetailMetric label="وضعیت" value={statusText(detail.mission_status || detail.status)} />
+        <DetailMetric label="تعهد تحویل" value={formatDate(detail.committed_delivery_at)} />
+        <DetailMetric label="ETA زنده" value="در API موجود نیست" />
+        <DetailMetric label="پیک" value="در API موجود نیست" />
+        <DetailMetric label="به‌روزرسانی وضعیت" value={latest ? formatDate(latest.occurred_at) : formatDate(detail.created_at)} />
+      </section>
+      <div className="tracking-result-columns">
+        <section className="tracking-live-card">
+          <div className="tracking-card-heading"><div><strong>{detail.external_reference || detail.delivery_request_id}{detail.mission_id ? ` · ${detail.mission_id}` : ''}</strong><small>اطلاعات فقط از API مشتری</small></div><span className="badge neutral">موقعیت زنده موجود نیست</span></div>
+          <div className="tracking-map-unavailable"><span aria-hidden="true">⌖</span><strong>موقعیت و مسیر از API در دسترس نیست</strong><p>این صفحه فقط وضعیت‌ها و زمان رویدادهای ثبت‌شده را نشان می‌دهد. برای نمایش نقشهٔ زنده، API مجاز مکان‌یابی لازم است.</p></div>
+        </section>
+        <aside className="tracking-side-column">
+          <section className="tracking-summary-card"><h2>خلاصهٔ ارسال</h2>
+            <TrackingSummaryLine label="سفارش" value={detail.external_reference || '—'} /><TrackingSummaryLine label="شناسهٔ ارسال" value={detail.delivery_request_id} /><TrackingSummaryLine label="مأموریت" value={detail.mission_id || 'ایجاد نشده'} /><TrackingSummaryLine label="گیرنده و شعبه" value="در API موجود نیست" /><TrackingSummaryLine label="کرایه" value={detail.quote ? `${money.format(detail.quote.fare_toman)} تومان` : 'در API موجود نیست'} /><TrackingSummaryLine label="آخرین رویداد" value={latest ? formatDate(latest.occurred_at) : 'رویدادی ثبت نشده'} />
+          </section>
+          <section className="tracking-actions-card"><h2>اقدام</h2><button className="primary-button" onClick={onOpenDetail}>باز کردن جزئیات ارسال</button><button className="secondary-button" onClick={onSupport}>اطلاعات پیگیری پشتیبانی</button><small>لغو در جزئیات ارسال و فقط در وضعیت مجاز انجام می‌شود.</small></section>
+        </aside>
+      </div>
+      <div className="tracking-lower-columns"><section className="tracking-timeline-card"><div className="tracking-card-heading"><strong>آخرین رویدادها</strong><span className="badge neutral">{fa.format(events.length)} رویداد</span></div>
+        {events.length ? <ol className="tracking-event-list">{events.slice(-4).reverse().map((event) => <li key={event.event_id}><time>{formatDate(event.occurred_at)}</time><div><strong>{eventLabels[event.event_type] || event.event_type}</strong><small>{event.event_type}</small></div></li>)}</ol> : <p className="data-note">برای این ارسال هنوز رویدادی از API برنگشته است.</p>}
+      </section><section className="tracking-recent-card"><h2>جست‌وجوهای اخیر این نشست</h2>{recentIds.length ? recentIds.map((id) => <button key={id} onClick={() => onRecent(id)}><span className="badge neutral">بازکردن</span><b dir="ltr">{id}</b></button>) : <p>پس از جست‌وجوی موفق، شناسه‌ها تا پایان این نشست اینجا می‌مانند.</p>}</section></div>
+    </> : <section className="tracking-empty-card"><strong>{loading ? 'در حال دریافت اطلاعات ارسال…' : 'ارسال را با شناسهٔ دقیق پیدا کنید'}</strong><p>جست‌وجو فقط با شناسهٔ ارسال یا مأموریت پشتیبانی می‌شود. نام گیرنده و شماره موبایل در API مشتری برای جست‌وجو موجود نیست.</p></section>}
+  </main>
+}
+
+function TrackingSummaryLine({ label, value }: { label: string; value: string }) {
+  return <div className="tracking-summary-line"><span>{label}</span><strong>{value}</strong></div>
 }
 
 function SupportDialog({ detail, onClose }: { detail: DeliveryDetail; onClose: () => void }) {

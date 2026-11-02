@@ -67,8 +67,11 @@ describe('merchant portal delivery flow', () => {
 
     await user.type(screen.getByLabelText('شناسهٔ ارسال یا مأموریت'), requestId)
     await user.click(screen.getByRole('button', { name: 'جست‌وجو' }))
+    expect(await screen.findByRole('heading', { name: 'خلاصهٔ ارسال' })).toBeInTheDocument()
+    expect(screen.getAllByText('ORDER-17').length).toBeGreaterThan(0)
+    expect(screen.getByText('موقعیت و مسیر از API در دسترس نیست')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'باز کردن جزئیات ارسال' }))
     expect(await screen.findByRole('heading', { name: 'اطلاعات ارسال' })).toBeInTheDocument()
-    expect(screen.getByText('ORDER-17')).toBeInTheDocument()
     expect(screen.getByText('مختصات مسیر در API مشتری موجود نیست')).toBeInTheDocument()
     expect(await screen.findByText('پیشنهاد قیمت ثبت شد')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(`/v1/delivery-requests/${requestId}`, expect.objectContaining({ cache: 'no-store' }))
