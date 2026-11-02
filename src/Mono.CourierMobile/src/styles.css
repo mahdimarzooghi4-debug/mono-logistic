@@ -60,3 +60,41 @@
 .incident-registered-actions{height:40px;display:flex;direction:ltr;gap:8px;margin-top:12px}
 .incident-registered-actions button{height:40px;flex:1;border:1px solid #d9e3e7;border-radius:11px;background:#fff;color:#0b0b0e;font-size:10px;font-weight:600}
 .incident-acknowledge-button{width:100%;height:46px;margin-top:8px;border:0;border-radius:11px;background:#00a8c6;color:#fff;font-size:11px;font-weight:700}
+.return-origin-content{padding:18px 18px 8px}
+.return-decision-card,.return-status-card,.return-origin-card{width:100%;overflow:hidden;border:1px solid #dde6e9;border-radius:14px;background:#fff}
+.return-decision-card{height:132px;display:flex;flex-direction:column;gap:8px;margin-top:12px;padding:10px 12px;border-color:#ecd7ad;background:#fff9ef}
+.return-decision-head{height:27px;display:flex;direction:ltr;align-items:center;gap:8px}
+.return-decision-head>span{flex:none;padding:4px 9px;border-radius:999px;background:#fff0d9;color:#b46a00;text-align:center;font-size:9px;font-weight:600}
+.return-decision-head>strong{flex:1;color:#0b0b0e;text-align:right;font-size:13px;line-height:24px}
+.return-decision-card>p{height:24px;margin:0;color:#6b5a3d;text-align:right;font-size:9px;line-height:24px;white-space:nowrap}
+.return-reason-row{height:28px;display:flex;direction:ltr;align-items:center;gap:8px;background:#fff}
+.return-reason-row>strong{flex:1;color:#b46a00;text-align:left;font-size:10px;font-weight:600}
+.return-reason-row>span{width:110px;flex:none;color:#7a858c;text-align:right;font-size:9px}
+.return-status-card{height:100px;display:grid;direction:ltr;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:16px;padding:10px 12px;text-align:center}
+.return-status-card>div{display:flex;flex-direction:column;align-items:center;gap:4px}
+.return-status-card small{color:#7a858c;font-size:9px;line-height:18px}
+.return-status-card strong{color:#0b0b0e;font-size:12px;line-height:20px}
+.return-status-card .return-package-status{color:#007f96}
+.return-map{position:relative;width:100%;height:238px;overflow:hidden;margin-top:16px;border:1px solid #dde6e9;border-radius:14px;background:#f3f6f7}
+.return-map-road{position:absolute;z-index:1;display:block;background:#fff;border-radius:4px}
+.return-map-road.horizontal{left:-21px;width:410px;height:8px}
+.return-map-road.horizontal.tilted-left{transform:rotate(-7deg)}
+.return-map-road.horizontal.tilted-right{transform:rotate(6deg)}
+.return-map-road.vertical{top:-21px;width:8px;height:280px}
+.return-map-road.vertical.tilted-right{transform:rotate(7deg)}
+.return-map-road.vertical.tilted-left{transform:rotate(-6deg)}
+.return-map-block{position:absolute;z-index:2;display:block;border-radius:6px;background:#e8ecee}
+.return-route-line{position:absolute;z-index:3;left:77px;top:51px;width:212px;height:146px}
+.return-route-origin,.return-route-destination{position:absolute;z-index:4}
+.return-route-origin{left:66px;top:40px;width:22px;height:22px}
+.return-route-destination{left:276px;top:184px;width:18px;height:18px}
+.return-map-time{position:absolute;z-index:5;left:11px;top:11px;display:grid;width:124px;height:36px;place-items:center;border-radius:9px;background:#fffffff0;color:#0b0b0e;font-size:9px;font-weight:600}
+.return-origin-card{height:94px;display:flex;flex-direction:column;gap:5px;margin-top:16px;padding:10px 12px}
+.return-origin-head{height:24px;display:flex;direction:ltr;align-items:center;gap:8px}
+.return-origin-head>span{flex:none;padding:4px 9px;border-radius:999px;background:#eaf8fa;color:#007f96;text-align:center;font-size:9px;font-weight:600}
+.return-origin-head>strong{flex:1;color:#0b0b0e;text-align:right;font-size:13px;line-height:24px}
+.return-origin-card>p{height:24px;margin:0;color:#66727a;text-align:right;font-size:9px;line-height:24px}
+.return-origin-actions{height:38px;display:flex;direction:ltr;gap:8px;margin-top:14px}
+.return-origin-actions button{height:38px;width:146px;flex:none;border:1px solid #d9e3e7;border-radius:11px;background:#fff;color:#0b0b0e;font-size:10px;font-weight:600}
+.return-origin-actions button.return-arrived-button{width:auto;flex:1;border-color:#00a8c6;background:#00a8c6;color:#fff}
+.return-origin-actions button:disabled{border-color:#168a52;background:#168a52;color:#fff;cursor:default}

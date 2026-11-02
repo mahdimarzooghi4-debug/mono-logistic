@@ -1,6 +1,6 @@
-type IncidentRegisteredProps = { onNotice: (message: string) => void }
+type IncidentRegisteredProps = { onNotice: (message: string) => void; onContinue: () => void }
 
-export default function IncidentRegistered({ onNotice }: IncidentRegisteredProps) {
+export default function IncidentRegistered({ onNotice, onContinue }: IncidentRegisteredProps) {
   return <section className="content-scroll incident-registered-content" dir="rtl">
     <header className="profile-header">
       <img className="avatar" src="/figma/arrived-avatar.svg" alt="" />
@@ -47,6 +47,9 @@ export default function IncidentRegistered({ onNotice }: IncidentRegisteredProps
       <button onClick={() => onNotice('تماس با پشتیبانی در این پیش‌نمایش فعال نیست.')}>تماس با پشتیبانی</button>
       <button onClick={() => onNotice('جزئیات پرونده در این پیش‌نمایش ثبت شده است.')}>مشاهده پرونده</button>
     </div>
-    <button className="incident-acknowledge-button" onClick={() => onNotice('وضعیت بسته نزد شما باقی می‌ماند؛ منتظر تصمیم پشتیبانی باشید.')}>متوجه شدم؛ منتظر می‌مانم</button>
+    <button className="incident-acknowledge-button" onClick={() => {
+      onNotice('در پیش‌نمایش، تصمیم نمونهٔ پشتیبانی بازگشت سفارش به شعبه است؛ اتصال واقعی فعال نیست.')
+      onContinue()
+    }}>متوجه شدم؛ منتظر می‌مانم</button>
   </section>
 }
