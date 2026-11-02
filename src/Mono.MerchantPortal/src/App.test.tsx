@@ -27,7 +27,7 @@ describe('merchant portal delivery flow', () => {
     expect(await screen.findByText('ORD-TEST')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('فقط در همین پیش‌نمایش')
     expect(fetchMock).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('row', { name: /ORD-TEST/ }))
+    await user.click(screen.getAllByRole('button', { name: 'جزئیات' })[0])
     expect(screen.getByText('جزئیات و رهگیری ارسال', { selector: 'strong' })).toBeInTheDocument()
     expect(screen.getByText('نام گیرنده، وضعیت‌ها و زمان‌ها در این صفحه نمونه هستند و از API دریافت نشده‌اند.')).toBeInTheDocument()
     expect(screen.getByText('مختصات مسیر در API مشتری موجود نیست')).toBeInTheDocument()
@@ -73,6 +73,34 @@ describe('merchant portal delivery flow', () => {
     expect(await screen.findByText('پیشنهاد قیمت ثبت شد')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith(`/v1/delivery-requests/${requestId}`, expect.objectContaining({ cache: 'no-store' }))
     expect(fetchMock).toHaveBeenCalledWith(`/v1/delivery-requests/${requestId}/timeline`, expect.objectContaining({ cache: 'no-store' }))
+  })
+
+  it('filters the current API page and labels fields the list endpoint does not provide', async () => {
+    const branchId = `br_${'e'.repeat(32)}`
+    const items = [
+      { delivery_request_id: `drq_${'1'.repeat(32)}`, external_reference: 'ORDER-100', status: 'RECEIVED', created_at: '2026-10-23T10:00:00Z', mission_id: `mis_${'a'.repeat(32)}`, mission_status: 'COURIER_ASSIGNED', committed_delivery_at: '2026-10-23T10:30:00Z' },
+      { delivery_request_id: `drq_${'2'.repeat(32)}`, external_reference: 'ORDER-200', status: 'RECEIVED', created_at: '2026-10-22T10:00:00Z', mission_id: null, mission_status: null, committed_delivery_at: null },
+    ]
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/v1/branches') return new Response(JSON.stringify({ branches: [{ branchId, name: 'شعبه ونک', address: 'تهران', latitude: 35.75, longitude: 51.41, zoneId: 'central', status: 'ACTIVE' }] }), { status: 200 })
+      if (url.startsWith('/v1/delivery-requests?page_size=25')) return new Response(JSON.stringify({ items, next_cursor: null }), { status: 200 })
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+    await user.type(screen.getByLabelText('کلید API'), 'customer-key-for-test')
+    await user.click(screen.getByRole('button', { name: 'اتصال به پنل' }))
+    await user.click(await screen.findByRole('button', { name: 'ارسال‌ها' }))
+    expect(screen.getByText('ارسال در این صفحه')).toBeInTheDocument()
+    expect(screen.getByLabelText('فیلتر شعبه در دسترس نیست')).toBeDisabled()
+    expect(screen.getAllByText('در API فهرست نیست')).toHaveLength(4)
+    await user.type(screen.getByLabelText('جست‌وجو در صفحهٔ جاری'), 'ORDER-100')
+    await user.click(screen.getByRole('button', { name: 'اعمال فیلتر' }))
+    expect(screen.getByRole('row', { name: /ORDER-100/ })).toBeInTheDocument()
+    expect(screen.queryByRole('row', { name: /ORDER-200/ })).not.toBeInTheDocument()
+    expect(screen.getByText(/جست‌وجو و فیلتر تاریخ فقط روی صفحهٔ دریافت‌شده اعمال می‌شوند/)).toBeInTheDocument()
   })
 
   it('connects with a customer token and creates a scoped, idempotent delivery request', async () => {

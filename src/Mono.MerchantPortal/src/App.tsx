@@ -441,11 +441,11 @@ function App() {
             {connected && view === 'create' && <button className="secondary-button topbar-action" disabled title="ذخیرهٔ پیش‌نویس هنوز در API مشتری پشتیبانی نمی‌شود">ذخیره پیش‌نویس</button>}
             {connected && view === 'deliveryDetail' && <button className="secondary-button topbar-action" onClick={() => setSupportOpen(true)}>پشتیبانی</button>}
             {connected && view === 'deliveryDetail' && <button className="primary-button topbar-action" onClick={() => { setView('create'); setCreateError(''); setNotice('') }}>ارسال جدید</button>}
-            {connected && view !== 'create' && <button className="secondary-button topbar-action" onClick={() => { setView('tracking'); setError('') }}>رهگیری سریع</button>}
+            {connected && view !== 'create' && view !== 'deliveries' && <button className="secondary-button topbar-action" onClick={() => { setView('tracking'); setError('') }}>رهگیری سریع</button>}
             {connected && view !== 'create' && <button className="primary-button topbar-action" onClick={() => { setView('create'); setCreateError(''); setNotice('') }}>＋ ارسال جدید</button>}
-            {view !== 'create' && view !== 'deliveryDetail' && <span className={`system-pill ${connected ? 'online' : ''}`}><i />{connected ? 'اتصال برقرار' : 'بدون اتصال'}</span>}
-            {connected && view !== 'create' && view !== 'deliveryDetail' && <button className="icon-button" onClick={() => void refresh()} disabled={loading} aria-label="به‌روزرسانی">↻</button>}
-            {connected && view !== 'create' && view !== 'deliveryDetail' && <button className="text-button" onClick={disconnect}>قطع اتصال</button>}
+            {view !== 'create' && view !== 'deliveryDetail' && view !== 'deliveries' && <span className={`system-pill ${connected ? 'online' : ''}`}><i />{connected ? 'اتصال برقرار' : 'بدون اتصال'}</span>}
+            {connected && view !== 'create' && view !== 'deliveryDetail' && view !== 'deliveries' && <button className="icon-button" onClick={() => void refresh()} disabled={loading} aria-label="به‌روزرسانی">↻</button>}
+            {connected && view !== 'create' && view !== 'deliveryDetail' && view !== 'deliveries' && <button className="text-button" onClick={disconnect}>قطع اتصال</button>}
           </div>
         </header>
 
@@ -513,14 +513,12 @@ function App() {
           </>
         )}
 
-        {connected && view === 'deliveries' && (
-          <section className="panel">
-            <div className="panel-heading"><div><span className="eyebrow">فهرست API</span><h2>ارسال‌ها</h2></div><span className="panel-meta">{fa.format(items.length)} مورد در این صفحه</span></div>
-            <DeliveryTable items={items} loading={loading} onOpen={openDetail} />
-            <div className="pagination"><span>صفحهٔ {fa.format(cursorStack.length)}</span><div><button disabled={loading || cursorStack.length <= 1} onClick={() => { const stack = cursorStack.slice(0, -1); void fetchDeliveries(token, stack.at(-1) ?? null, stack) }}>قبلی</button><button disabled={loading || !nextCursor} onClick={() => { const stack = [...cursorStack, nextCursor]; void fetchDeliveries(token, nextCursor, stack) }}>بعدی</button></div></div>
-            <p className="data-note">صفحه‌بندی با نشانگر API انجام می‌شود. جست‌وجوی سراسری در قرارداد فعلی این API وجود ندارد.</p>
-          </section>
-        )}
+        {connected && view === 'deliveries' && <MerchantDeliveriesPage
+          items={items} branches={branches} loading={loading} pageNumber={cursorStack.length} hasPrevious={cursorStack.length > 1} hasNext={Boolean(nextCursor)}
+          onOpen={openDetail}
+          onPrevious={() => { const stack = cursorStack.slice(0, -1); void fetchDeliveries(token, stack.at(-1) ?? null, stack) }}
+          onNext={() => { const stack = [...cursorStack, nextCursor]; void fetchDeliveries(token, nextCursor, stack) }}
+        />}
 
         {connected && view === 'create' && (
           <div className="create-workspace">
@@ -663,6 +661,79 @@ function DeliveryTable({ items, loading, onOpen }: { items: DeliveryRequest[]; l
   if (loading && !items.length) return <div className="empty-state"><span className="spinner" /><strong>در حال دریافت اطلاعات</strong></div>
   if (!items.length) return <div className="empty-state"><span>▤</span><strong>هنوز ارسالی برای نمایش وجود ندارد</strong><small>پس از ثبت درخواست، وضعیت اینجا نمایش داده می‌شود.</small></div>
   return <div className="table-wrap"><table><thead><tr><th>شمارهٔ سفارش</th><th>شناسهٔ ارسال</th><th>وضعیت ارسال</th><th>مأموریت</th><th>زمان تحویل</th><th>زمان ثبت</th><th>جزئیات</th></tr></thead><tbody>{items.map((item) => <tr key={item.delivery_request_id}><td>{item.external_reference}</td><td dir="ltr" className="mono">{item.delivery_request_id}</td><td><span className={`badge ${item.mission_id ? 'success' : 'neutral'}`}>{statusText(item.status)}</span></td><td>{item.mission_id ? <><span className="mono" dir="ltr">{item.mission_id}</span><small className="block">{statusText(item.mission_status)}</small></> : '—'}</td><td>{formatDate(item.committed_delivery_at)}</td><td>{formatDate(item.created_at)}</td><td><button className="history-button" onClick={() => onOpen(item.delivery_request_id)}>مشاهده</button></td></tr>)}</tbody></table></div>
+}
+
+type DeliveryFilters = { query: string; status: string; from: string; to: string }
+const emptyDeliveryFilters: DeliveryFilters = { query: '', status: '', from: '', to: '' }
+
+function MerchantDeliveriesPage({ items, branches, loading, pageNumber, hasPrevious, hasNext, onOpen, onPrevious, onNext }: {
+  items: DeliveryRequest[]; branches: Branch[]; loading: boolean; pageNumber: number; hasPrevious: boolean; hasNext: boolean
+  onOpen: (id: string) => void; onPrevious: () => void; onNext: () => void
+}) {
+  const [draft, setDraft] = useState<DeliveryFilters>(emptyDeliveryFilters)
+  const [filters, setFilters] = useState<DeliveryFilters>(emptyDeliveryFilters)
+  const availableStatuses = Array.from(new Set(items.map((item) => item.status).filter(Boolean)))
+  const filtered = items.filter((item) => {
+    const query = filters.query.trim().toLocaleLowerCase()
+    const matchesQuery = !query || [item.external_reference, item.delivery_request_id, item.mission_id || ''].some((value) => value.toLocaleLowerCase().includes(query))
+    const matchesStatus = !filters.status || item.status === filters.status
+    const createdDate = item.created_at.slice(0, 10)
+    const matchesFrom = !filters.from || createdDate >= filters.from
+    const matchesTo = !filters.to || createdDate <= filters.to
+    return matchesQuery && matchesStatus && matchesFrom && matchesTo
+  })
+  const deliveredCount = items.filter((item) => (item.mission_status || item.status).toUpperCase() === 'DELIVERED').length
+  const missionCount = items.filter((item) => item.mission_id).length
+  const promisedCount = items.filter((item) => item.committed_delivery_at).length
+
+  function exportCsv() {
+    const headers = ['شماره سفارش', 'شناسه ارسال', 'وضعیت ارسال', 'شناسه مأموریت', 'وضعیت مأموریت', 'زمان تحویل تعهدشده', 'زمان ثبت']
+    const rows = filtered.map((item) => [item.external_reference, item.delivery_request_id, statusText(item.status), item.mission_id || '', statusText(item.mission_status), item.committed_delivery_at || '', item.created_at])
+    const csv = [headers, ...rows].map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `mono-deliveries-page-${pageNumber}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function resetFilters() {
+    setDraft(emptyDeliveryFilters)
+    setFilters(emptyDeliveryFilters)
+  }
+
+  return <section className="merchant-deliveries-page" dir="rtl">
+    <div className="delivery-list-toolbar"><span className="panel-meta">خروجی فقط برای داده‌های فیلترشدهٔ صفحهٔ جاری ساخته می‌شود.</span><button className="secondary-button" onClick={exportCsv}>خروجی CSV</button></div>
+    <section className="delivery-list-metrics" aria-label="خلاصهٔ صفحهٔ جاری">
+      <DetailMetric label="ارسال در این صفحه" value={fa.format(items.length)} />
+      <DetailMetric label="دارای مأموریت" value={fa.format(missionCount)} />
+      <DetailMetric label="تعهد تحویل ثبت‌شده" value={fa.format(promisedCount)} />
+      <DetailMetric label="تحویل‌شده در این صفحه" value={fa.format(deliveredCount)} />
+      <DetailMetric label="شعب فعال حساب" value={fa.format(branches.length)} />
+    </section>
+    <section className="panel delivery-list-filter-panel"><div className="delivery-list-filters">
+      <label className="delivery-search-field">جست‌وجو در صفحهٔ جاری<input value={draft.query} onChange={(event) => setDraft((current) => ({ ...current, query: event.target.value }))} placeholder="شماره سفارش، شناسه ارسال یا مأموریت" /></label>
+      <label>وضعیت ارسال<select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))}><option value="">همهٔ وضعیت‌ها</option>{availableStatuses.map((status) => <option key={status} value={status}>{statusText(status)}</option>)}</select></label>
+      <label>شعبه<select disabled aria-label="فیلتر شعبه در دسترس نیست"><option>همهٔ شعب · اتصال در API موجود نیست</option></select></label>
+      <label>از تاریخ<input type="date" value={draft.from} onChange={(event) => setDraft((current) => ({ ...current, from: event.target.value }))} /></label>
+      <label>تا تاریخ<input type="date" value={draft.to} onChange={(event) => setDraft((current) => ({ ...current, to: event.target.value }))} /></label>
+      <button className="primary-button apply-delivery-filters" onClick={() => setFilters(draft)}>اعمال فیلتر</button>
+    </div></section>
+    <div className="delivery-list-columns">
+      <section className="panel delivery-list-table-panel"><div className="panel-heading"><div><span className="eyebrow">ارسال‌های مشتری</span><h2>نتایج ارسال</h2></div><span className="panel-meta">{fa.format(filtered.length)} از {fa.format(items.length)} مورد این صفحه</span></div>
+        <div className="merchant-delivery-table-wrap"><table className="merchant-delivery-table"><thead><tr><th>وضعیت</th><th>زمان تحویل</th><th>کرایه</th><th>شعبه</th><th>گیرنده</th><th>پیک / مأموریت</th><th>شماره سفارش</th><th>شناسه ارسال</th><th>جزئیات</th></tr></thead><tbody>
+          {filtered.map((item) => <tr key={item.delivery_request_id}><td><span className={`badge ${item.mission_id ? 'success' : 'neutral'}`}>{statusText(item.mission_status || item.status)}</span></td><td>{formatDate(item.committed_delivery_at)}</td><td>از API دریافت نمی‌شود</td><td>در API فهرست نیست</td><td>در API فهرست نیست</td><td>{item.mission_id ? <><span dir="ltr" className="mono">{item.mission_id}</span><small className="block">{statusText(item.mission_status)}</small></> : 'مأموریت ثبت نشده'}</td><td>{item.external_reference || '—'}</td><td dir="ltr" className="mono">{item.delivery_request_id}</td><td><button className="history-button" onClick={() => onOpen(item.delivery_request_id)}>جزئیات</button></td></tr>)}
+        </tbody></table>{loading && <div className="table-loading" role="status">در حال دریافت فهرست…</div>}{!loading && !filtered.length && <div className="empty-state"><span>⌕</span><strong>{items.length ? 'با این فیلتر موردی پیدا نشد' : 'ارسالی در این صفحه نیست'}</strong><small>{items.length ? 'فیلترها را تغییر دهید یا پاک کنید.' : 'پس از ثبت ارسال، موارد واقعی از API اینجا نمایش داده می‌شوند.'}</small></div>}</div>
+        <div className="pagination delivery-list-pagination"><span>صفحهٔ {fa.format(pageNumber)} · {fa.format(filtered.length)} نتیجه در صفحه</span><div><button disabled={loading || !hasPrevious} onClick={onPrevious}>قبلی</button><button disabled={loading || !hasNext} onClick={onNext}>بعدی</button></div></div>
+      </section>
+      <aside className="delivery-list-side">
+        <section className="panel delivery-list-summary"><h2>خلاصهٔ فیلتر</h2><SummaryLine label="وضعیت" value={filters.status ? statusText(filters.status) : 'همهٔ وضعیت‌ها'} /><SummaryLine label="بازهٔ تاریخ" value={filters.from || filters.to ? `${filters.from || 'ابتدا'} تا ${filters.to || 'امروز'}` : 'همهٔ تاریخ‌ها'} /><SummaryLine label="نتیجهٔ این صفحه" value={fa.format(filtered.length)} /><p>جست‌وجو و فیلتر تاریخ فقط روی صفحهٔ دریافت‌شده اعمال می‌شوند؛ API فهرست، فیلتر سراسری و شمارش کل ندارد.</p><button className="secondary-button" onClick={resetFilters}>پاک‌کردن فیلترها</button></section>
+        <section className="panel delivery-list-exceptions"><div className="panel-heading"><div><h2>موارد نیازمند اقدام</h2></div><span className="badge neutral">داده‌ای نیست</span></div><p>گزارش استثناها و علت نیاز به اقدام در API مشتری ارائه نمی‌شود.</p></section>
+        <section className="panel delivery-list-saved-view"><h2>نمای ذخیره‌شده</h2><p>ذخیره و اشتراک نمای فیلترشده در API حساب پشتیبانی نمی‌شود.</p><button className="secondary-button" disabled>ذخیرهٔ نمای فعلی</button></section>
+      </aside>
+    </div>
+  </section>
 }
 
 function DetailCard({ detail }: { detail: DeliveryDetail }) {
