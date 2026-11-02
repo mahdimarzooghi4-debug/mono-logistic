@@ -1,10 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import newDeliveryIcon from './assets/figma-dashboard/icon-1.svg'
-import trackingIcon from './assets/figma-dashboard/icon-2.svg'
-import branchesIcon from './assets/figma-dashboard/icon-3.svg'
-import billingIcon from './assets/figma-dashboard/icon-4.svg'
-import settingsIcon from './assets/figma-dashboard/icon-5.svg'
+import MerchantNavIcon, { type MerchantNavId } from './MerchantNavIcon'
+import MerchantBrandingSettings from './MerchantBrandingSettings'
 import trackingMap from './assets/figma-tracking/tracking-map.svg'
 
 type PreviewView = 'dashboard' | 'deliveries' | 'create' | 'tracking' | 'deliveryDetail' | 'branches' | 'billing' | 'settings'
@@ -21,11 +18,11 @@ const initialDeliveries: PreviewDelivery[] = [
   { order: 'ORD-۰۳۶۵', recipient: 'پریسا کریمی', branch: 'ونک', status: 'دریافت', mission: 'MIS-۱۰۵۰۰', deadline: '۱۳:۲۰' },
 ]
 
-const menu: Array<{ id: PreviewView; label: string; icon: string | null }> = [
-  { id: 'dashboard', label: 'داشبورد', icon: null }, { id: 'create', label: 'ارسال جدید', icon: newDeliveryIcon },
-  { id: 'deliveries', label: 'ارسال‌ها', icon: null }, { id: 'tracking', label: 'رهگیری', icon: trackingIcon },
-  { id: 'branches', label: 'شعب', icon: branchesIcon }, { id: 'billing', label: 'صورتحساب', icon: billingIcon },
-  { id: 'settings', label: 'تنظیمات', icon: settingsIcon },
+const menu: Array<{ id: MerchantNavId; label: string }> = [
+  { id: 'dashboard', label: 'داشبورد' }, { id: 'create', label: 'ارسال جدید' },
+  { id: 'deliveries', label: 'ارسال‌ها' }, { id: 'tracking', label: 'رهگیری' },
+  { id: 'branches', label: 'شعب' }, { id: 'billing', label: 'صورتحساب' },
+  { id: 'settings', label: 'تنظیمات' },
 ]
 
 export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) {
@@ -36,7 +33,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
   const [notice, setNotice] = useState('')
   const title: Record<PreviewView, string> = {
     dashboard: 'داشبورد کسب‌وکار', deliveries: 'ارسال‌های شما', create: 'ثبت ارسال جدید',
-    tracking: 'رهگیری ارسال', deliveryDetail: 'جزئیات ارسال', branches: 'شعب کسب‌وکار', billing: 'صورتحساب', settings: 'تنظیمات Workspace',
+    tracking: 'رهگیری ارسال', deliveryDetail: 'جزئیات ارسال', branches: 'شعب کسب‌وکار', billing: 'صورتحساب', settings: 'تنظیمات هویت بصری',
   }
   const activeCount = useMemo(() => 24 + Math.max(0, deliveries.length - initialDeliveries.length), [deliveries])
 
@@ -53,12 +50,12 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
   return <div className="app-shell demo-shell">
     <aside className="sidebar" aria-label="ناوبری اصلی نسخهٔ نمایشی">
       <div className="merchant-brand-card"><div className="brand-mark" aria-hidden="true">س</div><div><strong>فروشگاه سپهر</strong><small>پنل ارسال و لجستیک</small><em>Powered by Mono</em></div></div>
-      <nav className="navigation">{menu.map((item, index) => <button key={`${item.id}-${index}`} className={`nav-item ${view === item.id ? 'active' : ''}`} onClick={() => { setView(item.id); setNotice('') }}><span className={`nav-icon ${item.id === 'dashboard' ? 'dashboard-icon' : item.id === 'deliveries' ? 'deliveries-icon' : ''}`} aria-hidden="true">{item.icon ? <img src={item.icon} alt="" /> : item.id === 'dashboard' ? <><i /><i /><i /><i /></> : <i />}</span>{item.label}</button>)}</nav>
+      <nav className="navigation">{menu.map((item) => <button key={item.id} className={`nav-item ${view === item.id ? 'active' : ''}`} onClick={() => { setView(item.id); setNotice('') }}><span className="nav-icon"><MerchantNavIcon id={item.id} /></span>{item.label}</button>)}</nav>
       <div className="sidebar-footer demo-account"><div><strong>مدیر حساب سپهر</strong><small>Workspace فروشگاه سپهر</small><small className="demo-label sr-only">محیط نمایشی · داده‌های ساختگی</small></div><button className="sidebar-logout" onClick={onExit}>خروج</button></div>
     </aside>
 
-    <main className="workspace">
-      <header className="topbar"><div className="topbar-actions">{view === 'deliveryDetail' && <button className="secondary-button topbar-action" onClick={() => setView('deliveries')}>بازگشت به ارسال‌ها</button>}<button className="secondary-button topbar-action" onClick={() => setView('tracking')}>رهگیری سریع</button><button className="primary-button topbar-action" onClick={() => setView('create')}>ارسال جدید</button></div><div className="page-title"><h1>{title[view]}</h1><p>{view === 'dashboard' ? 'فروشگاه سپهر • مدیریت ارسال‌های شهری و شعب' : 'فروشگاه سپهر • محیط نمایشی'}</p></div></header>
+    <main className={`workspace ${view === 'settings' ? 'workspace-branding' : ''}`}>
+      {view !== 'settings' && <header className="topbar"><div className="topbar-actions">{view === 'deliveryDetail' && <button className="secondary-button topbar-action" onClick={() => setView('deliveries')}>بازگشت به ارسال‌ها</button>}<button className="secondary-button topbar-action" onClick={() => setView('tracking')}>رهگیری سریع</button><button className="primary-button topbar-action" onClick={() => setView('create')}>ارسال جدید</button></div><div className="page-title"><h1>{title[view]}</h1><p>{view === 'dashboard' ? 'فروشگاه سپهر • مدیریت ارسال‌های شهری و شعب' : 'فروشگاه سپهر • محیط نمایشی'}</p></div></header>}
       {notice && <div className="message success" role="status">{notice}</div>}
 
       {view === 'dashboard' && <>
@@ -83,7 +80,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
       {view === 'deliveryDetail' && trackingResult && <DemoDeliveryDetail item={trackingResult} />}
       {view === 'branches' && <section className="panel"><div className="panel-heading"><div><span className="eyebrow">سه شعبهٔ نمونه</span><h2>شعب فعال</h2></div></div><div className="branch-grid">{[['ونک','تهران، خیابان ملاصدرا'],['جردن','تهران، بلوار نلسون ماندلا'],['میرداماد','تهران، خیابان میرداماد']].map(([name,address]) => <article className="branch-card" key={name}><span className="branch-symbol">⌂</span><div><strong>{name}</strong><p>{address}</p><small>زون شهری تهران</small></div><span className="badge success">فعال</span></article>)}</div><p className="data-note">مدیریت واقعی شعب به API ایجاد و ویرایش شعبه نیاز دارد.</p></section>}
       {view === 'billing' && <section className="panel demo-blocked"><span className="eyebrow">صورتحساب</span><h2>اطلاعات مالی نمایشی نیست</h2><p>تا اتصال دفترکل و قرارداد صورتحساب، مبلغ یا ماندهٔ ساختگی نشان نمی‌دهیم. این صفحه در نسخهٔ عملیاتی فقط با API مالی معتبر فعال می‌شود.</p></section>}
-      {view === 'settings' && <section className="panel settings-panel"><div className="panel-heading"><div><span className="eyebrow">حساب کسب‌وکار</span><h2>تنظیمات</h2></div></div><div className="settings-tabs">{['یکپارچه‌سازی','اعلان‌ها','اعضا و دسترسی','Workspace','هویت بصری'].map(label => <button key={label} onClick={() => setNotice(`بخش «${label}» در پیش‌نمایش فقط برای مرور چیدمان است.`)}>{label}</button>)}</div><div className="settings-content"><div className="empty-state"><strong>تنظیمات نمایشی</strong><small>مدیریت اعضا، اعلان‌ها، برند و Workspace تا آماده‌شدن APIهای حساب غیرفعال می‌ماند.</small></div><button className="secondary-button" onClick={() => setView('deliveries')}>بازگشت به ارسال‌ها</button></div></section>}
+      {view === 'settings' && <MerchantBrandingSettings mode="demo" onDemoSave={() => setNotice('تنظیمات فقط در حافظهٔ پیش‌نمایش نمایشی نگه داشته شد؛ Workspace واقعی تغییر نکرد.')} />}
     </main>
   </div>
 }

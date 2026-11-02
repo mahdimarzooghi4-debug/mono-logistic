@@ -2,6 +2,8 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import WebhookEndpointWorkbench from './WebhookEndpointWorkbench'
 import MerchantDemoPreview from './MerchantDemoPreview'
+import MerchantNavIcon, { type MerchantNavId } from './MerchantNavIcon'
+import MerchantBrandingSettings from './MerchantBrandingSettings'
 
 type Branch = {
   branchId: string
@@ -389,14 +391,14 @@ function App() {
     setView('dashboard')
   }
 
-  const navigation: Array<{ id: View; label: string; icon: string }> = [
-    { id: 'dashboard', label: 'داشبورد', icon: '⌂' },
-    { id: 'create', label: 'ارسال جدید', icon: '+' },
-    { id: 'deliveries', label: 'ارسال‌ها', icon: '▤' },
-    { id: 'tracking', label: 'رهگیری', icon: '⌖' },
-    { id: 'branches', label: 'شعب', icon: '⌘' },
-    { id: 'billing', label: 'صورتحساب', icon: '◷' },
-    { id: 'settings', label: 'تنظیمات', icon: '⚙' },
+  const navigation: Array<{ id: MerchantNavId; label: string }> = [
+    { id: 'dashboard', label: 'داشبورد' },
+    { id: 'create', label: 'ارسال جدید' },
+    { id: 'deliveries', label: 'ارسال‌ها' },
+    { id: 'tracking', label: 'رهگیری' },
+    { id: 'branches', label: 'شعب' },
+    { id: 'billing', label: 'صورتحساب' },
+    { id: 'settings', label: 'تنظیمات' },
   ]
 
   const titles: Record<View, { title: string; subtitle: string }> = {
@@ -425,7 +427,7 @@ function App() {
         <nav className="navigation">
           {navigation.map((item) => (
             <button className={`nav-item ${view === item.id ? 'active' : ''}`} key={item.id} onClick={() => { setView(item.id); setError('') }}>
-              <span className="nav-icon" aria-hidden="true">{item.icon}</span>{item.label}
+              <span className="nav-icon"><MerchantNavIcon id={item.id} /></span>{item.label}
             </button>
           ))}
         </nav>
@@ -436,8 +438,8 @@ function App() {
         </div>
       </aside>
 
-      <main className={`workspace ${connected && view === 'dashboard' ? 'dashboard-workspace' : ''}`}>
-        <header className="topbar">
+      <main className={`workspace ${connected && view === 'dashboard' ? 'dashboard-workspace' : ''} ${connected && view === 'settings' && settingsTab === 'branding' ? 'workspace-branding' : ''}`}>
+        {!(connected && view === 'settings' && settingsTab === 'branding') && <header className="topbar">
           <div className="page-title"><h1>{titles[view].title}</h1><p>{titles[view].subtitle}</p></div>
           <div className={`topbar-actions ${connected && (view === 'create' || view === 'deliveryDetail') ? 'create-topbar-actions' : ''}`}>
             {connected && view === 'create' && <button className="secondary-button topbar-action" disabled title="ذخیرهٔ پیش‌نویس هنوز در API مشتری پشتیبانی نمی‌شود">ذخیره پیش‌نویس</button>}
@@ -449,7 +451,7 @@ function App() {
             {connected && view !== 'create' && view !== 'deliveryDetail' && view !== 'deliveries' && <button className="icon-button" onClick={() => void refresh()} disabled={loading} aria-label="به‌روزرسانی">↻</button>}
             {connected && view !== 'create' && view !== 'deliveryDetail' && view !== 'deliveries' && <button className="text-button" onClick={disconnect}>قطع اتصال</button>}
           </div>
-        </header>
+        </header>}
 
         {!connected && (
           <section className="connect-card">
@@ -604,6 +606,8 @@ function App() {
           </section>
         )}
 
+        {connected && view === 'settings' && settingsTab === 'branding' && <MerchantBrandingSettings mode="connected" onTabChange={setSettingsTab} />}
+
         {connected && view === 'settings' && (
           <section className="panel settings-panel">
             <div className="panel-heading"><div><span className="eyebrow">Workspace برند سپهر</span><h2>تنظیمات Workspace</h2></div><span className="panel-meta">دسترسی API محدود</span></div>
@@ -617,7 +621,6 @@ function App() {
             {settingsTab === 'notifications' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">کانال‌ها و رویدادها</span><h3>تنظیمات اعلان‌ها</h3></div></div><div className="empty-state"><span>♧</span><strong>تنظیمات اعلان حساب در API موجود نیست</strong><small>کانال داخل پنل، پیامک و ایمیل پس از افزودن تنظیمات پایدار حساب قابل‌مدیریت می‌شوند.</small></div></div>}
             {settingsTab === 'members' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">نقش‌ها و محدوده دسترسی</span><h3>اعضای Workspace</h3></div><button className="secondary-button" onClick={() => setView('invite')}>دعوت عضو جدید</button></div><div className="empty-state"><span>♙</span><strong>فهرست اعضا از API حساب دریافت نمی‌شود</strong><small>تا اضافه‌شدن API اعضا و نقش‌ها، نام و تعداد نمونهٔ فیگما نمایش داده نمی‌شود.</small></div></div>}
             {settingsTab === 'workspace' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">مشخصات Workspace</span><h3>پیکربندی فضای کاری</h3></div></div><div className="settings-summary-grid"><article><small>نام Workspace</small><strong>از API مشتری</strong></article><article><small>شناسه Workspace</small><strong>از API مشتری</strong></article><article><small>کشور</small><strong>ایران</strong></article></div><p className="data-note">نام و شناسه در نسخهٔ جاری پاسخ API مشتری ارائه نمی‌شود؛ برای جلوگیری از نمایش دادهٔ ساختگی، فیلدها قابل تغییر نیستند.</p></div>}
-            {settingsTab === 'branding' && <div className="settings-content"><div className="panel-heading"><div><span className="eyebrow">هویت برند</span><h3>تنظیمات هویت بصری</h3></div></div><div className="empty-state"><span>▧</span><strong>هویت بصری Workspace هنوز در سرویس حساب ذخیره نمی‌شود</strong><small>لوگو، نام تجاری و رنگ برند پس از آماده‌شدن API تنظیمات قابل بارگذاری و ذخیره خواهند بود.</small></div></div>}
           </section>
         )}
 
