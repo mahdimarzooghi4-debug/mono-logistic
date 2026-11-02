@@ -27,6 +27,10 @@ describe('merchant portal delivery flow', () => {
     expect(await screen.findByText('ORD-TEST')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('فقط در همین پیش‌نمایش')
     expect(fetchMock).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('row', { name: /ORD-TEST/ }))
+    expect(screen.getByText('جزئیات و رهگیری ارسال', { selector: 'strong' })).toBeInTheDocument()
+    expect(screen.getByText('نام گیرنده، وضعیت‌ها و زمان‌ها در این صفحه نمونه هستند و از API دریافت نشده‌اند.')).toBeInTheDocument()
+    expect(screen.getByText('مختصات مسیر در API مشتری موجود نیست')).toBeInTheDocument()
   })
 
   it('renders the business dashboard tools from real account data and supports quick tracking', async () => {
