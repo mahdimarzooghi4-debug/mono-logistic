@@ -372,6 +372,8 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-branch-filters input,.demo-branch-filters select,.demo-billing-filters input,.demo-billing-filters select { width:100%; height:36px; font-size:9px; }
 .demo-branch-filters button { min-height:36px; font-size:9px; }
 .demo-branch-columns { display:grid; grid-template-columns:minmax(0,1.72fr) minmax(275px,.95fr); align-items:start; gap:12px; }
+.demo-branch-columns,.demo-billing-columns { direction:ltr; }
+.demo-branch-columns > *,.demo-billing-columns > * { direction:rtl; }
 .demo-branch-table-panel { min-width:0; min-height:500px; padding:12px; }
 .demo-table-scroll { width:100%; overflow-x:auto; }
 .demo-branch-table,.demo-invoice-table { width:100%; min-width:660px; border-collapse:collapse; }
@@ -402,7 +404,9 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-members-heading .primary-button { min-height:36px; font-size:10px; }
 .demo-settings-content > .demo-settings-columns { margin-top:0; }
 .demo-settings-columns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:start; gap:12px; }
+.demo-settings-columns { direction:ltr; }
 .demo-settings-stack { display:grid; align-content:start; gap:12px; min-width:0; }
+.demo-settings-stack { direction:rtl; }
 .demo-settings-stack > .panel { min-width:0; padding:14px; }
 .demo-settings-stack h2,.demo-settings-content .panel h2 { margin:0 0 11px; color:#17282f; font-size:12px; }
 .demo-setting-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
@@ -413,8 +417,6 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-toggle { display:flex; min-height:37px; align-items:center; gap:10px; border-bottom:1px solid #eef1f2; color:#34454b; font-size:9px; }
 .demo-toggle:last-child { border-bottom:0; }
 .demo-toggle input { width:24px; height:14px; flex:0 0 24px; accent-color:#00a8c6; }
-.demo-settings-workspace .demo-settings-columns { direction:ltr; }
-.demo-settings-workspace .demo-settings-stack { direction:rtl; }
 .demo-member-kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); border:1px solid var(--border); border-radius:10px; background:#fff; }
 .demo-member-kpis > .demo-setting { min-height:66px; border:0; border-left:1px solid #e8edef; border-radius:0; padding:8px 12px; background:transparent; }
 .demo-member-kpis > .demo-setting:last-child { border-left:0; }
