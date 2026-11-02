@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 
-type DeliveryIncidentProps = { onNotice: (message: string) => void }
+type DeliveryIncidentProps = { onNotice: (message: string) => void; onRegistered: () => void }
 type IncidentType = 'damage' | 'missing' | 'opened' | 'other'
 
 const incidentOptions: { id: IncidentType; label: string }[] = [
@@ -17,7 +17,7 @@ const incidentLabels: Record<IncidentType, string> = {
   other: 'نیازمند بررسی',
 }
 
-export default function DeliveryIncident({ onNotice }: DeliveryIncidentProps) {
+export default function DeliveryIncident({ onNotice, onRegistered }: DeliveryIncidentProps) {
   const [type, setType] = useState<IncidentType>('damage')
   const [packageNumber, setPackageNumber] = useState('1')
   const [explanationOpen, setExplanationOpen] = useState(false)
@@ -43,6 +43,7 @@ export default function DeliveryIncident({ onNotice }: DeliveryIncidentProps) {
     }
     setRegistered(true)
     onNotice('گزارش حادثه در پیش‌نمایش ثبت شد؛ به پشتیبانی متصل نیست.')
+    onRegistered()
   }
 
   return <section className="content-scroll delivery-incident-content" dir="rtl">
