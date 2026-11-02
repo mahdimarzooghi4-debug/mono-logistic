@@ -380,4 +380,84 @@ tbody tr:hover { background: #fbfdfd; }
   .demo-delivery-table { min-width: 700px; }
   .issue-age { width: 120px; flex-basis: 120px; }
 }
+.dashboard-workspace { max-width: none; padding: 24px 28px 28px; }
+.dashboard-workspace .topbar { height: 62px; margin: 0 0 18px; background: #fff; }
+.dashboard-workspace .page-title { direction: rtl; }
+.dashboard-workspace .page-title h1 { font-size: 27px; }
+.dashboard-workspace .page-title p { margin-top: 3px; font-size: 11px; }
+.dashboard-workspace .topbar-actions { gap: 8px; }
+.dashboard-workspace .topbar-action { width: 132px; min-height: 40px; border-radius: 9px; font-size: 11px; }
+.dashboard-workspace .topbar-actions .secondary-button { border-color: #d9e3e7; color: #0b0b0e; background: #fff; }
+.dashboard-workspace .system-pill,.dashboard-workspace .icon-button,.dashboard-workspace .text-button { display: none; }
+.dashboard-api-kpis { display: grid; height: 72px; grid-template-columns: repeat(5,minmax(0,1fr)); overflow: hidden; margin-bottom: 18px; border: 1px solid #dce4e8; border-radius: 11px; background: #fff; direction: ltr; }
+.dashboard-metric { position: relative; display: grid; min-width: 0; align-content: center; gap: 2px; padding: 8px 12px; text-align: center; direction: rtl; }
+.dashboard-metric:not(:last-child)::after { position: absolute; top: 14px; right: 0; width: 1px; height: 42px; background: #e7ecef; content: ''; }
+.dashboard-metric small { overflow: hidden; color: #6c767d; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-metric strong { overflow: hidden; color: #0b0b0e; font-size: 18px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-workspace .merchant-dashboard { grid-template-columns: minmax(0,770fr) minmax(0,348fr); gap: 18px; direction: ltr; }
+.dashboard-workspace .dashboard-main-column,.dashboard-workspace .dashboard-aside { min-width: 0; direction: rtl; gap: 16px; }
+.dashboard-workspace .dashboard-main-column { grid-template-rows: 488px 296px; }
+.dashboard-workspace .dashboard-aside { grid-template-rows: 206px 128px 122px 296px; }
+.dashboard-workspace .dashboard-deliveries-panel,.dashboard-workspace .dashboard-exceptions,.dashboard-workspace .dashboard-widget { min-width: 0; border-color: #dce4e8; border-radius: 12px; box-shadow: none; }
+.dashboard-workspace .dashboard-deliveries-panel { display: flex; min-height: 0; flex-direction: column; }
+.dashboard-workspace .dashboard-deliveries-panel .panel-heading,.dashboard-workspace .dashboard-exceptions .panel-heading { flex: none; padding: 12px 14px 8px; }
+.dashboard-workspace .dashboard-deliveries-panel .panel-heading h2,.dashboard-workspace .dashboard-exceptions .panel-heading h2 { font-size: 16px; }
+.dashboard-workspace .dashboard-deliveries-panel .table-wrap { min-height: 0; flex: 1; overflow: auto; border-top: 0; }
+.dashboard-workspace .dashboard-deliveries-panel table { width: 100%; min-width: 720px; height: 100%; table-layout: fixed; }
+.dashboard-workspace .dashboard-deliveries-panel th { height: 40px; padding: 7px 5px; font-size: 8px; text-align: center; }
+.dashboard-workspace .dashboard-deliveries-panel td { height: 56px; padding: 5px 4px; font-size: 8px; text-align: center; }
+.dashboard-workspace .dashboard-deliveries-panel th:nth-child(1),.dashboard-workspace .dashboard-deliveries-panel td:nth-child(1) { width: 14%; }
+.dashboard-workspace .dashboard-deliveries-panel th:nth-child(2),.dashboard-workspace .dashboard-deliveries-panel td:nth-child(2) { width: 17%; }
+.dashboard-workspace .dashboard-deliveries-panel th:nth-child(3),.dashboard-workspace .dashboard-deliveries-panel td:nth-child(3) { width: 16%; }
+.dashboard-workspace .dashboard-deliveries-panel th:nth-child(4),.dashboard-workspace .dashboard-deliveries-panel td:nth-child(4) { width: 15%; }
+.dashboard-workspace .dashboard-deliveries-panel th:nth-child(5),.dashboard-workspace .dashboard-deliveries-panel td:nth-child(5) { width: 17%; }
+.dashboard-workspace .dashboard-deliveries-panel th:nth-child(6),.dashboard-workspace .dashboard-deliveries-panel td:nth-child(6) { width: 13%; }
+.dashboard-workspace .dashboard-deliveries-panel th:nth-child(7),.dashboard-workspace .dashboard-deliveries-panel td:nth-child(7) { width: 8%; }
+.dashboard-data-note { flex: none; margin: 0; border-top: 1px solid #edf1f2; padding: 5px 10px; color: #718188; font-size: 8px; text-align: right; }
+.dashboard-workspace .dashboard-exceptions { display: grid; grid-template-rows: auto 1fr; align-content: start; padding-bottom: 13px; }
+.dashboard-empty-note { display: grid; align-content: center; justify-items: end; gap: 5px; margin: 0 14px 14px; border-radius: 9px; padding: 15px; background: #f7fafb; text-align: right; }
+.dashboard-empty-note strong { color: #354a51; font-size: 10px; }
+.dashboard-empty-note span { color: #718188; font-size: 9px; line-height: 1.7; }
+.dashboard-workspace .dashboard-widget { height: auto; padding: 14px; }
+.dashboard-workspace .quick-create-widget { display: flex; flex-direction: column; gap: 8px; }
+.dashboard-workspace .quick-create-widget .panel-heading { padding: 0; }
+.dashboard-workspace .quick-create-widget .panel-heading h2 { font-size: 15px; }
+.dashboard-workspace .dashboard-widget > p { margin: 0; font-size: 9px; line-height: 1.7; }
+.dashboard-workspace .quick-create-fields { flex: 1; min-height: 58px; }
+.dashboard-workspace .quick-create-fields button { min-height: 0; }
+.dashboard-workspace .quick-create-widget .full-width { width: 100%; min-height: 40px; margin: 0; }
+.dashboard-workspace .quick-track-widget .panel-heading,.dashboard-workspace .branch-widget .panel-heading,.dashboard-workspace .service-widget .panel-heading { padding: 0 0 7px; }
+.dashboard-workspace .dashboard-widget .panel-heading h2 { font-size: 13px; }
+.dashboard-workspace .quick-track-form { min-height: 40px; padding: 0 9px; }
+.dashboard-workspace .branch-status-list { padding: 0; }
+.dashboard-workspace .branch-status-list li { min-height: 22px; border: 0; color: #0b0b0e; font-size: 10px; direction: ltr; }
+.dashboard-workspace .branch-active { width: 54px; color: #168a52; font-size: 9px; font-weight: 600; }
+.dashboard-workspace .service-widget { display: grid; align-content: start; gap: 5px; }
+.dashboard-workspace .service-widget dl { gap: 0; padding: 0; }
+.dashboard-workspace .service-widget dl > div { min-height: 25px; align-items: center; }
+.dashboard-workspace .service-widget dt { font-size: 9px; }
+.dashboard-workspace .service-widget dd { max-width: 62%; color: #0b0b0e; font-size: 9px; }
+.dashboard-workspace .service-widget dl > div:first-child dd { color: #007f96; }
+.dashboard-workspace .service-widget .service-note { gap: 3px; margin-top: 4px; padding: 8px 9px; }
+@media(max-width:1100px) and (min-width:721px) {
+  .dashboard-workspace { padding-inline: 20px; }
+  .dashboard-workspace .merchant-dashboard { grid-template-columns: minmax(0,1.5fr) minmax(220px,1fr); }
+  .dashboard-workspace .dashboard-main-column { grid-template-rows: 488px 296px; }
+}
+@media(max-width:720px) {
+  .dashboard-workspace { padding: 17px 12px 25px; }
+  .dashboard-workspace .topbar { height: auto; min-height: 62px; align-items: flex-start; margin-bottom: 14px; }
+  .dashboard-workspace .page-title h1 { font-size: 17px; }
+  .dashboard-workspace .topbar-action { width: auto; min-height: 34px; padding-inline: 9px; font-size: 9px; }
+  .dashboard-api-kpis { height: auto; grid-template-columns: repeat(2,minmax(0,1fr)); margin-bottom: 14px; }
+  .dashboard-metric { min-height: 62px; border-bottom: 1px solid #e7ecef; }
+  .dashboard-metric:last-child { grid-column: 1/-1; }
+  .dashboard-metric::after { display: none; }
+  .dashboard-workspace .merchant-dashboard { grid-template-columns: 1fr; }
+  .dashboard-workspace .dashboard-main-column,.dashboard-workspace .dashboard-aside { grid-template-rows: auto; gap: 12px; }
+  .dashboard-workspace .dashboard-deliveries-panel,.dashboard-workspace .dashboard-exceptions { min-height: 260px; }
+  .dashboard-workspace .dashboard-deliveries-panel table { min-width: 720px; }
+  .dashboard-workspace .dashboard-aside { grid-template-columns: 1fr 1fr; }
+  .dashboard-workspace .service-widget { grid-column: 1/-1; min-height: 240px; }
+}
 

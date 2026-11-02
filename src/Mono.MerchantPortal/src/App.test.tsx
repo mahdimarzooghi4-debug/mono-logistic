@@ -54,6 +54,9 @@ describe('merchant portal delivery flow', () => {
     expect(await screen.findByRole('heading', { name: 'وضعیت شعب' })).toBeInTheDocument()
     expect(screen.getByText('شعبه ونک')).toBeInTheDocument()
     expect(screen.getByText('ارسال شهری')).toBeInTheDocument()
+    expect(screen.getByText('آخرین به‌روزرسانی')).toBeInTheDocument()
+    expect(screen.getByText('گزارش استثناها در API این پنل موجود نیست')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /انتخاب شعبه/ })).toBeInTheDocument()
 
     await user.type(screen.getByLabelText('شناسهٔ ارسال یا مأموریت'), requestId)
     await user.click(screen.getByRole('button', { name: 'جست‌وجو' }))
