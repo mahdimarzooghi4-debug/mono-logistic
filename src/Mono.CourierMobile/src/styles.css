@@ -125,9 +125,9 @@
 .return-condition-options img{width:14px;height:14px;flex:none}
 .return-condition-options span{flex:1;color:#4f5a61;text-align:right;font-size:9px;white-space:nowrap}
 .return-condition-options label.selected span{color:#168a52;font-weight:600}
-.return-package-status-card{height:126px;display:flex;flex-direction:column;gap:6px;margin-top:16px;padding:10px 12px}
+.return-package-status-card{height:126px;display:flex;flex-direction:column;gap:2px;margin-top:16px;padding:10px 12px}
 .return-package-status-card h2{font-size:12px}
-.return-package-status-card .return-handoff-row{height:28px;min-height:28px}
+.return-package-status-card .return-handoff-row{height:22px;min-height:22px}
 .return-package-status-card .return-package-damage{color:#c83a3a}
 .return-package-status-card .return-package-good{color:#168a52}
 .return-package-status-card .return-package-pending{color:#b46a00}
