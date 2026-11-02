@@ -1,6 +1,4 @@
-import { useState } from 'react'
-
-type ReturningToOriginProps = { onNotice: (message: string) => void }
+type ReturningToOriginProps = { onNotice: (message: string) => void; onArrive: () => void }
 
 const roads = [
   { axis: 'horizontal', x: -21, y: 35 },
@@ -21,13 +19,10 @@ const blocks = [
   [27, 197, 88, 24], [153, 197, 58, 24], [251, 195, 64, 26],
 ]
 
-export default function ReturningToOrigin({ onNotice }: ReturningToOriginProps) {
-  const [arrived, setArrived] = useState(false)
-
+export default function ReturningToOrigin({ onNotice, onArrive }: ReturningToOriginProps) {
   function confirmArrival() {
-    if (arrived) return
-    setArrived(true)
-    onNotice('رسیدن به شعبه در این پیش‌نمایش ثبت شد؛ تحویل به شعبه هنوز به بک‌اند متصل نیست.')
+    onNotice('رسیدن به شعبه در پیش‌نمایش ثبت شد؛ تحویل برگشتی را تأیید کن.')
+    onArrive()
   }
 
   return <section className="content-scroll return-origin-content" dir="rtl">
@@ -64,9 +59,7 @@ export default function ReturningToOrigin({ onNotice }: ReturningToOriginProps) 
 
     <div className="return-origin-actions">
       <button onClick={() => onNotice('تماس با شعبه در این پیش‌نمایش فعال نیست.')}>تماس با شعبه</button>
-      <button className="return-arrived-button" onClick={confirmArrival} disabled={arrived}>
-        {arrived ? 'رسیدن به مبدا ثبت شد' : 'رسیدم به مبدا'}
-      </button>
+      <button className="return-arrived-button" onClick={confirmArrival}>رسیدم به مبدا</button>
     </div>
   </section>
 }
