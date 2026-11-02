@@ -15,7 +15,6 @@ export default function ReturnHandoff({ onNotice, onComplete }: ReturnHandoffPro
       return
     }
     setSubmitted(true)
-    onNotice('تحویل برگشتی در این پیش‌نمایش ثبت شد؛ ثبت نهایی به بک‌اند متصل نیست.')
     onComplete()
   }
 
