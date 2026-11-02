@@ -789,3 +789,33 @@ tbody tr:hover { background: #fbfdfd; }
 @media(max-width:760px) { .demo-deliveries-page .delivery-list-columns { grid-template-columns:1fr; } .demo-deliveries-page .delivery-list-table-panel,.demo-deliveries-page .delivery-list-side { grid-column:1; } }
 @media(max-width:1050px) { .demo-delivery-detail .delivery-detail-columns { grid-template-columns:minmax(240px,.9fr) minmax(0,1.35fr); } }
 @media(max-width:760px) { .demo-delivery-detail .delivery-detail-columns { grid-template-columns:1fr; } .demo-delivery-detail .delivery-detail-main,.demo-delivery-detail .delivery-detail-side { grid-column:1; } .demo-route-map { height:240px; } }
+
+/* Keep the demo panels beside each other at desktop widths, matching the Figma frames. */
+.demo-deliveries-page .delivery-list-columns,
+.demo-delivery-detail .delivery-detail-columns,
+.demo-branch-columns,
+.demo-billing-columns { display:flex; direction:ltr; align-items:flex-start; gap:12px; }
+.demo-deliveries-page .delivery-list-table-panel,
+.demo-delivery-detail .delivery-detail-main,
+.demo-branch-table-panel,
+.demo-invoice-table-panel { flex:1 1 0; min-width:0; direction:rtl; }
+.demo-deliveries-page .delivery-list-side,
+.demo-delivery-detail .delivery-detail-side,
+.demo-branch-detail,
+.demo-invoice-detail { flex:0 0 270px; direction:rtl; }
+.demo-delivery-detail .delivery-detail-side { flex-basis:290px; }
+.demo-billing-columns .demo-invoice-detail { flex-basis:300px; }
+@media(max-width:760px) {
+  .demo-deliveries-page .delivery-list-columns,
+  .demo-delivery-detail .delivery-detail-columns,
+  .demo-branch-columns,
+  .demo-billing-columns { flex-direction:column; }
+  .demo-deliveries-page .delivery-list-table-panel,
+  .demo-delivery-detail .delivery-detail-main,
+  .demo-branch-table-panel,
+  .demo-invoice-table-panel,
+  .demo-deliveries-page .delivery-list-side,
+  .demo-delivery-detail .delivery-detail-side,
+  .demo-branch-detail,
+  .demo-invoice-detail { width:100%; flex:0 0 auto; }
+}
