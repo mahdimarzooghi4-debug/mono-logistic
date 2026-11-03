@@ -28,6 +28,24 @@ function mockConnectedApi(detail: unknown = { ...baseDelivery, quote: null, prom
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/') })
 
 describe('Mono merchant mobile P0', () => {
+  it('matches the Figma active-deliveries empty state and starts the first delivery', async () => {
+    window.history.replaceState({}, '', '/?demo=1&state=empty')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.getByRole('heading', { level: 1, name: 'ارسال‌ها' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'فعال' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('heading', { level: 2, name: 'هنوز ارسال فعالی ندارید' })).toBeInTheDocument()
+    expect(screen.getByText('اولین ارسال را ثبت کنید تا وضعیت و تعهد تحویل را همین‌جا دنبال کنید.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('جست‌وجوی سفارش')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ثبت اولین ارسال' }))
+    expect(screen.getByRole('heading', { name: 'ثبت ارسال جدید' })).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('shows the Figma mobile preview flow without calling the API', async () => {
     window.history.replaceState({}, '', '/?demo=1')
     const fetchMock = vi.fn()
