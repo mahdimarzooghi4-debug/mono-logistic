@@ -99,6 +99,25 @@ describe('Mono merchant mobile P0', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('explains a delivery exception and returns to its shipment', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /یک ارسال در معرض دیرکرد/ }))
+    await user.click(screen.getByRole('button', { name: 'مشاهده اقدام‌ها' }))
+    expect(screen.getByText('استثنای ارسال')).toBeInTheDocument()
+    expect(screen.getByText('۱۲ دقیقه ریسک دیرکرد')).toBeInTheDocument()
+    expect(screen.getByText('کندی مسیر و تراکم ترافیکی')).toBeInTheDocument()
+    expect(screen.getByText('پایش مسیر جایگزین و کنترل تعهد')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'تماس با پشتیبانی' }))
+    expect(screen.getByRole('status')).toHaveTextContent('پشتیبانی')
+    await user.click(screen.getByRole('button', { name: 'بستن پیام' }))
+    await user.click(screen.getByRole('button', { name: 'بازگشت به ارسال' }))
+    expect(screen.getByRole('heading', { name: 'جزئیات ارسال' })).toBeInTheDocument()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
