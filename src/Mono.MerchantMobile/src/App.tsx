@@ -244,10 +244,10 @@ export default function App() {
   </main>
 }
 
-type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'loading' | 'error' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'loading' | 'error' | 'infeasible' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
 
 function MerchantMobileDemo() {
-  const [screen,setScreen]=useState<DemoMobileScreen>(()=>{const state=new URLSearchParams(window.location.search).get('state');return state==='empty'?'deliveries':state==='loading'?'loading':state==='error'?'error':'home'})
+  const [screen,setScreen]=useState<DemoMobileScreen>(()=>{const state=new URLSearchParams(window.location.search).get('state');return state==='empty'?'deliveries':state==='loading'?'loading':state==='error'?'error':state==='infeasible'?'infeasible':'home'})
   const [filter,setFilter]=useState<'active'|'completed'|'failed'>('active')
   const [search,setSearch]=useState('')
   const [order,setOrder]=useState('۸۴۲۱')
@@ -284,7 +284,7 @@ function MerchantMobileDemo() {
     {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
-  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='loading'?'بررسی هزینه و زمان':screen==='error'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='security'?'امنیت و نشست‌ها':screen==='support'?'پشتیبانی':'بیشتر'
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='loading'?'بررسی هزینه و زمان':screen==='error'?'ثبت ارسال':screen==='infeasible'?'نتیجه بررسی':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='security'?'امنیت و نشست‌ها':screen==='support'?'پشتیبانی':'بیشتر'
   const headerSubtitle=screen==='exception'||screen==='support'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='security'?'حساب کاربری':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
@@ -306,7 +306,7 @@ function MerchantMobileDemo() {
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
-      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='security'&&screen!=='support'&&screen!=='loading'&&screen!=='error'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
+      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='security'&&screen!=='support'&&screen!=='loading'&&screen!=='error'&&screen!=='infeasible'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
@@ -337,6 +337,14 @@ function MerchantMobileDemo() {
         <section className="demo-exception-section"><h2>اقدام مونو</h2><div className="demo-exception-card demo-exception-action"><strong>پایش مسیر جایگزین و کنترل تعهد</strong><p>اگر نیاز به مداخله باشد، تیم عملیات اقدام می‌کند.</p></div></section>
         <section className="demo-exception-section demo-exception-user"><h2>اقدام شما</h2><div className="demo-exception-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>تماس با پشتیبانی</button><button className="primary-button" onClick={()=>{setScreen('detail');setToast('')}}>بازگشت به ارسال</button></div></section>
       </>}
+      {screen==='infeasible'&&<section className="demo-infeasible" aria-label="نتیجه بررسی ارسال">
+        <span className="demo-infeasible-badge">قابل اجرا نیست</span>
+        <h1>در حال حاضر نمی‌توانیم برای این ارسال تعهد بدهیم</h1>
+        <section className="demo-infeasible-reason"><small>دلیل</small><strong>ظرفیت موثر این محدوده در بازه انتخاب‌شده تکمیل است.</strong><span>اطلاعات واردشده حفظ می‌شود.</span></section>
+        <h2>چه کاری می‌توانید انجام دهید؟</h2>
+        <section className="demo-infeasible-guidance"><strong>زمان آمادگی را تغییر دهید</strong><p>یا مقصد / شعبه مبدأ را اصلاح کنید و دوباره بررسی را انجام دهید.</p></section>
+        <button className="primary-button" onClick={()=>setScreen('create')}>ویرایش و بررسی دوباره</button>
+      </section>}
       {screen==='error'&&<section className="demo-error" role="alert" aria-label="بررسی ارسال انجام نشد">
         <div className="demo-error-icon" aria-hidden="true">!</div>
         <h1>بررسی ارسال انجام نشد</h1>
