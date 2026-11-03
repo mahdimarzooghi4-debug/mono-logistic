@@ -260,6 +260,7 @@ function MerchantMobileDemo() {
   const [demoRecipient,setDemoRecipient]=useState('مریم اکبری')
   const [demoPhone,setDemoPhone]=useState('۰۹۱۲ ۱۲۳ ۴۵۶۷')
   const [demoDestination,setDemoDestination]=useState('سعادت‌آباد، بلوار دریا')
+  const [demoReadyTime,setDemoReadyTime]=useState('همین حالا')
   const pinnedLoadingPreview=new URLSearchParams(window.location.search).get('state')==='loading'
   useEffect(()=>{if(screen!=='loading'||pinnedLoadingPreview)return;const timer=window.setTimeout(()=>setScreen(current=>current==='loading'?'review':current),1800);return()=>window.clearTimeout(timer)},[screen,pinnedLoadingPreview])
   const nav:[DemoMobileScreen,string,string][]=[['more','بیشتر','more'],['notifications','اعلان‌ها','bell'],['create','ثبت','plus'],['deliveries','ارسال‌ها','list'],['home','خانه','home']]
@@ -363,9 +364,9 @@ function MerchantMobileDemo() {
       {screen==='create'&&<>
         <div className="section-head compact demo-page-heading"><div><span className="eyebrow">۱ از ۲</span><h1>ثبت ارسال جدید</h1></div><span className="step-pill">اطلاعات ارسال</span></div>
         <form className="stack-form create-form demo-create-form" onSubmit={event=>{event.preventDefault();review()}}>
-          <section className="form-section"><b>مبدأ</b><label>شعبه مبدأ<input value={`شعبه ${activeBranch}`} readOnly /></label><label>نام گیرنده<input value={demoRecipient} onChange={event=>setDemoRecipient(event.target.value)} /></label><label>شماره تماس<input inputMode="tel" value={demoPhone} onChange={event=>setDemoPhone(event.target.value)} /></label></section>
+          <section className="form-section"><b>مبدأ</b><label>شعبه مبدأ<select aria-label="شعبه مبدأ" value={activeBranch} onChange={event=>setActiveBranch(event.target.value)}><option>ونک</option><option>جردن</option><option>میرداماد</option><option>پاسداران</option></select></label><label>نام گیرنده<input value={demoRecipient} onChange={event=>setDemoRecipient(event.target.value)} /></label><label>شماره تماس<input inputMode="tel" value={demoPhone} onChange={event=>setDemoPhone(event.target.value)} /></label></section>
           <section className="form-section"><b>مقصد</b><label>نشانی مقصد<input value={demoDestination} onChange={event=>setDemoDestination(event.target.value)} /></label></section>
-          <section className="form-section"><b>بسته</b><label>نوع بسته<input value="بسته معمولی • ۲ کیلوگرم" readOnly /></label><label>زمان آمادگی<input value="همین حالا" readOnly /></label></section>
+          <section className="form-section"><b>بسته</b><label>نوع بسته<input value="بسته معمولی • ۲ کیلوگرم" readOnly /></label><label>زمان آمادگی<select aria-label="زمان آمادگی" value={demoReadyTime} onChange={event=>setDemoReadyTime(event.target.value)}><option>همین حالا</option><option>۳۰ دقیقه دیگر</option><option>یک ساعت دیگر</option></select></label></section>
           <button className="primary-button" type="submit">بررسی هزینه و زمان</button>
         </form>
       </>}
