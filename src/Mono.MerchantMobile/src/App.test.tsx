@@ -37,7 +37,7 @@ describe('Mono merchant mobile P0', () => {
     expect(screen.getByText('بررسی هزینه و زمان')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'در حال بررسی امکان اجرا' })).toBeInTheDocument()
     expect(screen.getByText('مونو پوشش، ظرفیت، مسیر و زمان تحویل را بررسی می‌کند.')).toBeInTheDocument()
-    expect(screen.getByText('شعبه ونک')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'مسیر ارسال' })).getByText('شعبه ونک')).toBeInTheDocument()
     expect(screen.getByText('سعادت‌آباد، بلوار دریا')).toBeInTheDocument()
     expect(screen.getByText('این مرحله معمولاً چند ثانیه طول می‌کشد.')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
