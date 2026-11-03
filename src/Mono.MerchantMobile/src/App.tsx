@@ -252,6 +252,9 @@ function MerchantMobileDemo() {
   const [order,setOrder]=useState('۸۴۲۱')
   const [confirmed,setConfirmed]=useState(false)
   const [toast,setToast]=useState('')
+  const [demoRecipient,setDemoRecipient]=useState('مریم اکبری')
+  const [demoPhone,setDemoPhone]=useState('۰۹۱۲ ۱۲۳ ۴۵۶۷')
+  const [demoDestination,setDemoDestination]=useState('سعادت‌آباد، بلوار دریا')
   const nav:[DemoMobileScreen,string,string][]=[['more','بیشتر','more'],['notifications','اعلان‌ها','bell'],['create','ثبت','plus'],['deliveries','ارسال‌ها','list'],['home','خانه','home']]
   const orders=[
     {id:'۸۴۳۰',route:'ونک ← یوسف‌آباد',detail:'تحویل تا ۱۹:۲۰',status:'فعال',warning:false},
@@ -262,7 +265,7 @@ function MerchantMobileDemo() {
   const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='notifications'?'اعلان‌ها':'بیشتر'
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function review(){setScreen('review');setToast('')}
-  function confirm(){setConfirmed(true);setScreen('detail');setToast('ارسال برای ثبت نهایی آماده است؛ این فقط پیش‌نمایش است.')}
+  function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('detail');setToast('درخواست نمایشی ثبت شد؛ در نسخهٔ واقعی باید به حساب مشتری متصل باشد.')}
   const visibleOrders=orders.filter(item=>filter==='active'||(filter==='failed'&&item.warning)||(filter==='completed'&&item.id==='۸۴۱۸'))
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>شعبه ونک</span></div></header>
@@ -285,18 +288,18 @@ function MerchantMobileDemo() {
         <div className="delivery-list demo-delivery-list">{visibleOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}</div>
       </>}
       {screen==='detail'&&<>
-        <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className="status-badge warning">در معرض دیرکرد</span></div>
-        <section className="demo-detail-promise"><span>تعهد تحویل</span><strong>۱۸:۴۵</strong><small>زمان فعلی برآوردی: ۱۸:۵۷</small></section>
-        <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline"><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></div></section>
-        <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه ونک</strong></div><div><small>مقصد</small><strong>یوسف‌آباد، خیابان شصت‌وچهارم</strong></div></section>
+        <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${confirmed?'':'warning'}`}>{confirmed?'در انتظار تخصیص پیک':'در معرض دیرکرد'}</span></div>
+        <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':'تعهد تحویل'}</span><strong>{confirmed?'۱۹:۳۵':'۱۸:۴۵'}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
+        <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
+        <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه ونک</strong></div><div><small>مقصد</small><strong>{confirmed?demoDestination:'یوسف‌آباد، خیابان شصت‌وچهارم'}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
         <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>پشتیبانی</button><button className="primary-button" onClick={()=>setToast('اقدامی برای این ارسال در محیط نمایشی ثبت نمی‌شود.')}>مشاهده اقدام‌ها</button></div>
-        {confirmed&&<p className="demo-confirmed-note">پیشنهاد ارسال تأیید شد.</p>}
+        {confirmed&&<p className="demo-confirmed-note">درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.</p>}
       </>}
       {screen==='create'&&<>
         <div className="section-head compact demo-page-heading"><div><span className="eyebrow">۱ از ۲</span><h1>ثبت ارسال جدید</h1></div><span className="step-pill">اطلاعات ارسال</span></div>
         <form className="stack-form create-form demo-create-form" onSubmit={event=>{event.preventDefault();review()}}>
-          <section className="form-section"><b>مبدأ</b><label>شعبه مبدأ<input value="شعبه ونک" readOnly /></label><label>نام گیرنده<input defaultValue="مریم اکبری" /></label><label>شماره تماس<input inputMode="tel" defaultValue="۰۹۱۲ ۱۲۳ ۴۵۶۷" /></label></section>
-          <section className="form-section"><b>مقصد</b><label>نشانی مقصد<input defaultValue="سعادت‌آباد، بلوار دریا" /></label></section>
+          <section className="form-section"><b>مبدأ</b><label>شعبه مبدأ<input value="شعبه ونک" readOnly /></label><label>نام گیرنده<input value={demoRecipient} onChange={event=>setDemoRecipient(event.target.value)} /></label><label>شماره تماس<input inputMode="tel" value={demoPhone} onChange={event=>setDemoPhone(event.target.value)} /></label></section>
+          <section className="form-section"><b>مقصد</b><label>نشانی مقصد<input value={demoDestination} onChange={event=>setDemoDestination(event.target.value)} /></label></section>
           <section className="form-section"><b>بسته</b><label>نوع بسته<input value="بسته معمولی • ۲ کیلوگرم" readOnly /></label><label>زمان آمادگی<input value="همین حالا" readOnly /></label></section>
           <button className="primary-button" type="submit">بررسی هزینه و زمان</button>
         </form>
@@ -304,7 +307,7 @@ function MerchantMobileDemo() {
       {screen==='review'&&<>
         <div className="section-head compact demo-page-heading"><h1>پیشنهاد مونو</h1><span className="status-badge">قابل اجرا</span></div>
         <section className="demo-offer"><div><span>تعهد تحویل</span><strong>تا ۱۹:۳۵</strong></div><div><span>هزینه ارسال</span><strong>۴۲٬۵۰۰ تومان</strong></div></section>
-        <section className="demo-detail-card demo-review-summary"><h2>خلاصه ارسال</h2><div><span>مبدأ</span><strong>شعبه ونک</strong></div><div><span>مقصد</span><strong>سعادت‌آباد، بلوار دریا</strong></div><div><span>گیرنده</span><strong>مریم اکبری</strong></div><div><span>تعهد</span><strong>فقط پس از تأیید ثبت می‌شود.</strong></div></section>
+        <section className="demo-detail-card demo-review-summary"><h2>خلاصه ارسال</h2><div><span>مبدأ</span><strong>شعبه ونک</strong></div><div><span>مقصد</span><strong>{demoDestination}</strong></div><div><span>گیرنده</span><strong>{demoRecipient}</strong></div><div><span>تعهد</span><strong>فقط پس از تأیید ثبت می‌شود.</strong></div></section>
         <div className="demo-review-actions"><button className="secondary-button" onClick={()=>setScreen('create')}>بازگشت</button><button className="primary-button" onClick={confirm}>تأیید و ثبت ارسال</button></div>
       </>}
       {screen==='notifications'&&<><div className="section-head compact demo-page-heading"><h1>اعلان‌ها</h1></div><EmptyState title="اعلان‌های حساب کسب‌وکار" body="برای دریافت اعلان‌های واقعی، اتصال به حساب مشتری لازم است."/></>}
