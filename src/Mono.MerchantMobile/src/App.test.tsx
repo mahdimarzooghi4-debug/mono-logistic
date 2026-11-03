@@ -213,7 +213,7 @@ describe('Mono merchant mobile P0', () => {
     await user.click(screen.getByRole('button', { name: /یک ارسال در معرض دیرکرد/ }))
     await user.click(screen.getByRole('button', { name: 'پشتیبانی' }))
     expect(screen.getByRole('heading', { name: 'زمینه ارسال به‌صورت خودکار متصل شد' })).toBeInTheDocument()
-    expect(screen.getByText('سفارش ۸۴۲۱')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'سفارش ۸۴۲۱' })).getByText('سفارش ۸۴۲۱')).toBeInTheDocument()
     await user.click(screen.getByRole('radio', { name: 'موضوع دیگر' }))
     await user.type(screen.getByLabelText('توضیح کوتاه'), 'پیگیری زمان تحویل')
     await user.click(screen.getByRole('button', { name: 'ثبت درخواست پشتیبانی' }))
