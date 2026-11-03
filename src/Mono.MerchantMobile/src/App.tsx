@@ -249,6 +249,7 @@ type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'create' | 'review' |
 function MerchantMobileDemo() {
   const [screen,setScreen]=useState<DemoMobileScreen>('home')
   const [filter,setFilter]=useState<'active'|'completed'|'failed'>('active')
+  const [search,setSearch]=useState('')
   const [order,setOrder]=useState('۸۴۲۱')
   const [confirmed,setConfirmed]=useState(false)
   const [toast,setToast]=useState('')
@@ -269,6 +270,8 @@ function MerchantMobileDemo() {
   function review(){setScreen('review');setToast('')}
   function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('detail');setToast('درخواست نمایشی ثبت شد؛ در نسخهٔ واقعی باید به حساب مشتری متصل باشد.')}
   const visibleOrders=orders.filter(item=>filter==='active'?['فعال','در معرض دیرکرد'].includes(item.status):filter==='failed'?item.status==='ناموفق':item.status==='تحویل‌شده')
+  const query=search.trim().toLocaleLowerCase()
+  const filteredDemoOrders=visibleOrders.filter(item=>!query||`${item.id} ${item.route} ${item.detail} ${item.status}`.toLocaleLowerCase().includes(query))
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>شعبه ونک</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
@@ -286,8 +289,8 @@ function MerchantMobileDemo() {
       {screen==='deliveries'&&<>
         <div className="section-head compact demo-page-heading"><h1>ارسال‌ها</h1><span className="eyebrow">همه شعب</span></div>
         <div className="filter-tabs" role="tablist">{([['active','فعال'],['completed','تکمیل‌شده'],['failed','ناموفق']] as const).map(([key,label])=><button role="tab" aria-selected={filter===key} className={filter===key?'selected':''} key={key} onClick={()=>setFilter(key)}>{label}</button>)}</div>
-        <label className="search-box"><span>⌕</span><input aria-label="جست‌وجوی سفارش" placeholder="جست‌وجوی سفارش یا گیرنده" /></label>
-        <div className="delivery-list demo-delivery-list">{visibleOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}</div>
+        <label className="search-box"><span>⌕</span><input aria-label="جست‌وجوی سفارش" placeholder="جست‌وجوی شماره یا نشانی" value={search} onChange={event=>setSearch(event.target.value)} /></label>
+        <div className="delivery-list demo-delivery-list">{filteredDemoOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}{!filteredDemoOrders.length&&<EmptyState title="ارسالی پیدا نشد" body="شماره سفارش یا نشانی دیگری را جست‌وجو کنید."/>}</div>
       </>}
       {screen==='detail'&&<>
         <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${!confirmed&&['۸۴۲۱','۸۴۱۲'].includes(order)?'warning':''}`}>{confirmed?'در انتظار تخصیص پیک':order==='۸۴۱۸'?'تحویل‌شده':order==='۸۴۱۲'?'ناموفق':'در معرض دیرکرد'}</span></div>
