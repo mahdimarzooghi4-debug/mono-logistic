@@ -893,3 +893,35 @@ tbody tr:hover { background: #fbfdfd; }
   .demo-delivery-detail .delivery-detail-main,.demo-delivery-detail .delivery-detail-side,
   .demo-branch-table-panel,.demo-invoice-table-panel,.demo-branch-detail,.demo-invoice-detail { grid-row:auto; }
 }
+
+/* Member access page geometry and rows follow Figma frame 238:2. */
+.demo-settings-members .demo-settings-columns { grid-template-columns:minmax(0,1fr) minmax(0,1.8fr); gap:14px; }
+.demo-settings-members .demo-settings-stack { gap:14px; }
+.demo-settings-members .demo-member-kpis { min-height:72px; }
+.demo-settings-members .demo-member-kpis > .demo-setting { min-height:70px; }
+.demo-settings-members .demo-member-table-panel { height:510px; min-height:510px; padding:15px; }
+.demo-settings-members .demo-member-table { width:100%; min-width:0; table-layout:fixed; }
+.demo-settings-members .demo-member-table th { height:48px; font-size:9px; }
+.demo-settings-members .demo-member-table td { height:52px; font-size:9px; }
+.demo-settings-members .demo-member-roles-panel { min-height:212px; padding:15px; }
+.demo-settings-members .demo-role-matrix { gap:7px; }
+.demo-settings-members .demo-role-matrix > div { min-height:94px; }
+.demo-settings-members .demo-settings-columns > .demo-settings-stack:last-child > .panel { padding:15px; }
+.demo-settings-members .demo-member-summary-panel { min-height:176px; }
+.demo-settings-members .demo-member-scope-panel { min-height:190px; }
+.demo-settings-members .demo-member-permissions-panel { min-height:230px; }
+.demo-settings-members .demo-member-actions-panel { min-height:118px; }
+.demo-settings-members .demo-member-selected-head { display:flex; height:32px; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; direction:ltr; }
+.demo-settings-members .demo-member-selected-head h2 { margin:0; font-size:12px; text-align:right; direction:rtl; }
+.demo-settings-members .demo-member-summary-panel .demo-setting,
+.demo-settings-members .demo-member-scope-panel .demo-setting { display:flex; min-height:28px; align-items:center; justify-content:space-between; gap:8px; border:0; border-radius:0; padding:2px 0; background:transparent; }
+.demo-settings-members .demo-member-summary-panel .demo-setting small,
+.demo-settings-members .demo-member-scope-panel .demo-setting small { font-size:9px; }
+.demo-settings-members .demo-member-summary-panel .demo-setting strong,
+.demo-settings-members .demo-member-scope-panel .demo-setting strong { font-size:10px; font-weight:600; text-align:left; }
+.demo-settings-members .demo-member-permissions { display:grid; gap:8px; }
+.demo-settings-members .demo-member-permission { display:flex; min-height:32px; align-items:center; justify-content:space-between; gap:8px; direction:ltr; font-size:9px; }
+.demo-settings-members .demo-member-permission > span:last-child { direction:rtl; text-align:right; }
+.demo-settings-members .demo-member-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; direction:ltr; }
+.demo-settings-members .demo-member-actions button { min-height:40px; font-size:10px; }
+.demo-settings-members .demo-member-actions-panel p { margin:8px 0 0; color:#738188; font-size:8px; text-align:right; }
