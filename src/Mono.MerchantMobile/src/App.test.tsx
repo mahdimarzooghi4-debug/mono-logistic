@@ -243,6 +243,24 @@ describe('Mono merchant mobile P0', () => {
     expect(screen.getByText(/اعلان‌های بحرانی عملیاتی حتی در حالت کم‌صدا نمایش داده می‌شوند/)).toBeInTheDocument()
   })
 
+  it('opens security and sessions from account settings with demo-only actions', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'بیشتر' }))
+    await user.click(screen.getByText('تنظیمات', { exact: true }))
+    await user.click(screen.getByRole('button', { name: /امنیت و نشست‌ها، دستگاه‌ها/ }))
+    expect(screen.getByRole('heading', { level: 1, name: 'امنیت' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'این دستگاه' })).toHaveTextContent('آیفون • تهران')
+    expect(screen.getByRole('button', { name: 'مرورگر وب تهران • امروز ۱۲:۴۵ ‹' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'خروج از حساب' }))
+    expect(screen.getByRole('status')).toHaveTextContent('خروج از حساب در نسخهٔ نمایشی انجام نمی‌شود')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
