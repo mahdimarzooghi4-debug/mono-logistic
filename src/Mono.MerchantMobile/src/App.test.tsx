@@ -203,6 +203,24 @@ describe('Mono merchant mobile P0', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('opens support from a delivery and submits the demo request form', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /یک ارسال در معرض دیرکرد/ }))
+    await user.click(screen.getByRole('button', { name: 'پشتیبانی' }))
+    expect(screen.getByRole('heading', { name: 'زمینه ارسال به‌صورت خودکار متصل شد' })).toBeInTheDocument()
+    expect(screen.getByText('سفارش ۸۴۲۱')).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'موضوع دیگر' }))
+    await user.type(screen.getByLabelText('توضیح کوتاه'), 'پیگیری زمان تحویل')
+    await user.click(screen.getByRole('button', { name: 'ثبت درخواست پشتیبانی' }))
+    expect(screen.getByRole('status')).toHaveTextContent('درخواست پشتیبانی نمایشی ثبت شد')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
