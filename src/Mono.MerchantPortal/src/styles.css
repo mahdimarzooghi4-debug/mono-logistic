@@ -401,6 +401,15 @@ tbody tr:hover { background: #fbfdfd; }
 @media(max-width:760px) { .demo-branch-columns,.demo-billing-columns { grid-template-columns:1fr; } .demo-branch-table-panel,.demo-invoice-table-panel,.demo-branch-detail,.demo-invoice-detail { grid-column:1; } .demo-branch-detail,.demo-invoice-detail { grid-template-columns:repeat(2,minmax(0,1fr)); } .demo-branch-kpis,.demo-billing-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); } .demo-branch-filters,.demo-billing-filters { grid-template-columns:repeat(2,minmax(0,1fr)); } .demo-create-workspace .create-layout { grid-template-columns:1fr; } }
 @media(max-width:480px) { .demo-branch-detail,.demo-invoice-detail { grid-template-columns:1fr; } .demo-branch-kpis,.demo-billing-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .demo-branch-filters,.demo-billing-filters { grid-template-columns:1fr; } .branch-filter-search { grid-column:auto; } }
 .demo-settings-content { display:grid; gap:12px; }
+/* Workspace settings geometry follows Figma frame 237:2. */
+.demo-settings-workspace .demo-settings-stack > .panel { padding:13px 14px; }
+.demo-settings-workspace .demo-settings-stack h2 { min-height:24px; margin:0 0 6px; }
+.demo-settings-workspace .demo-setting-grid { gap:6px 10px; }
+.demo-settings-workspace .demo-setting { min-height:64px; padding:8px 11px; }
+.demo-settings-workspace .demo-setting-grid > .demo-setting:last-child:nth-child(odd) { grid-column:1 / -1; min-height:58px; }
+.demo-settings-workspace .demo-setting strong { font-size:10px; }
+.demo-settings-workspace .demo-toggle { min-height:42px; font-size:10px; }
+
 .demo-members-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#718087; font-size:10px; }
 .demo-members-heading .primary-button { min-height:36px; font-size:10px; }
 .demo-settings-content > .demo-settings-columns { margin-top:0; }
