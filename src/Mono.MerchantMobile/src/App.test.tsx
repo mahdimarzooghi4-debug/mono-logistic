@@ -184,6 +184,25 @@ describe('Mono merchant mobile P0', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('opens Figma account settings from More and routes the default branch setting', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'بیشتر' }))
+    await user.click(screen.getByRole('button', { name: /تنظیمات، اعلان‌ها، امنیت/ }))
+    expect(screen.getByRole('heading', { name: 'تنظیمات' })).toBeInTheDocument()
+    expect(screen.getByText('حساب و برنامه')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /امنیت و نشست‌ها، دستگاه‌ها/ })).toBeInTheDocument()
+    expect(screen.getByText('مدیریت اعضا، دسترسی‌ها، اتصال‌ها و هویت بصری از پنل وب انجام می‌شود.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /شعبه پیش‌فرض، شعبه ونک/ }))
+    expect(screen.getByText('انتخاب شعبه')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
