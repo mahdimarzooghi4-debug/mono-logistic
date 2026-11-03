@@ -84,3 +84,17 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-review-summary>div:last-child strong { color:#718087; font-size:9px; }
 .demo-review-actions { position:sticky; bottom:0; padding:10px 0; background:var(--canvas); }
 @media(max-width:389px) { .demo-shell { border-radius:0; } }
+
+.demo-notification-filters{display:flex;height:38px;gap:4px;margin:0 0 19px;padding:3px;border-radius:11px;background:#edf2f3}
+.demo-notification-filters button{min-width:0;flex:1;padding:0 5px;border:0;border-radius:8px;background:transparent;color:#697980;font-size:9px;white-space:nowrap}
+.demo-notification-filters button.selected{background:#fff;color:var(--teal);font-weight:700;box-shadow:0 1px 5px #152e3712}
+.demo-notification-group{margin:0 0 20px}
+.demo-notification-group h2{margin:0 0 10px;color:#394a50;font-size:12px;font-weight:700}
+.demo-notification-list{display:grid;gap:12px}
+.demo-notification-card{display:grid;width:100%;height:78px;min-height:78px;grid-template-columns:14px minmax(0,1fr) 32px;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:13px;background:white;text-align:right}
+.demo-notification-dot{width:12px;height:12px;justify-self:center;border-radius:50%;background:#00a8c6}
+.demo-notification-dot.read{border:1px solid #d8e2e4;background:transparent}
+.demo-notification-copy{display:grid;min-width:0;gap:5px}
+.demo-notification-copy strong{overflow:hidden;color:#26363d;font-size:10px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+.demo-notification-copy small{overflow:hidden;color:#718087;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.demo-notification-arrow{color:#7b8a90;font-size:22px;line-height:1}
