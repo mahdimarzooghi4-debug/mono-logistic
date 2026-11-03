@@ -28,6 +28,34 @@ function mockConnectedApi(detail: unknown = { ...baseDelivery, quote: null, prom
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/') })
 
 describe('Mono merchant mobile P0', () => {
+  it('shows the Figma error state and retries the delivery feasibility check', async () => {
+    window.history.replaceState({}, '', '/?demo=1&state=error')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'بررسی ارسال انجام نشد' })).toBeInTheDocument()
+    expect(screen.getByText(/ارتباط با سرویس موقتاً قطع شده است/)).toBeInTheDocument()
+    expect(screen.getByText('اطلاعات فرم شما حفظ شده است')).toBeInTheDocument()
+    expect(screen.getByText('مبدأ، مقصد، گیرنده و بسته پاک نشده‌اند.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'تلاش دوباره' }))
+    expect(screen.getByRole('heading', { name: 'در حال بررسی امکان اجرا' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'پیشنهاد مونو' })).toBeInTheDocument(), { timeout: 3500 })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns from the Figma error state to the preserved delivery form', async () => {
+    window.history.replaceState({}, '', '/?demo=1&state=error')
+    render(<App />)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'بازگشت به فرم' }))
+
+    expect(screen.getByRole('heading', { name: 'ثبت ارسال جدید' })).toBeInTheDocument()
+    expect(screen.getByLabelText('نام گیرنده')).toHaveValue('مریم اکبری')
+    expect(screen.getByLabelText('نشانی مقصد')).toHaveValue('سعادت‌آباد، بلوار دریا')
+  })
+
   it('shows the Figma feasibility loading screen with pickup and destination', () => {
     window.history.replaceState({}, '', '/?demo=1&state=loading')
     const fetchMock = vi.fn()
