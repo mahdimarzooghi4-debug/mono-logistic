@@ -39,6 +39,7 @@ describe('Mono merchant mobile P0', () => {
 
     await user.click(screen.getByRole('button', { name: 'ارسال‌ها' }))
     await user.click(screen.getByRole('tab', { name: 'تکمیل‌شده' }))
+    await user.type(screen.getByLabelText('جست‌وجوی سفارش'), 'میرداماد')
     const completedOrder = screen.getByRole('button', { name: /سفارش ۸۴۱۸/ })
     expect(completedOrder).toHaveTextContent('تحویل‌شده')
     await user.click(completedOrder)
@@ -47,6 +48,7 @@ describe('Mono merchant mobile P0', () => {
 
     await user.click(screen.getByRole('button', { name: 'ارسال‌ها' }))
     await user.click(screen.getByRole('tab', { name: 'ناموفق' }))
+    await user.clear(screen.getByLabelText('جست‌وجوی سفارش'))
     const failedOrder = screen.getByRole('button', { name: /سفارش ۸۴۱۲/ })
     expect(failedOrder).toHaveTextContent('ناموفق')
     await user.click(failedOrder)
