@@ -244,7 +244,7 @@ export default function App() {
   </main>
 }
 
-type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'more'
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'finance' | 'more'
 
 function MerchantMobileDemo() {
   const [screen,setScreen]=useState<DemoMobileScreen>('home')
