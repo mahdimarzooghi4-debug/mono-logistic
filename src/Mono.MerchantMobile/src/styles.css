@@ -110,5 +110,5 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-exception-card p{margin:0;color:#718087;font-size:9px;line-height:1.9}
 .demo-exception-action{min-height:102px}
 .demo-exception-user{margin-top:26px}
-.demo-exception-actions{display:flex;gap:14px}
-.demo-exception-actions button{min-width:0;height:48px;min-height:48px;flex:1;padding:0 5px;border-radius:11px;font-size:9px;white-space:nowrap}
+.demo-exception-actions{display:flex;gap:14px;direction:ltr}
+.demo-exception-actions button{direction:rtl;min-width:0;height:48px;min-height:48px;flex:1;padding:0 5px;border-radius:11px;font-size:9px;white-space:nowrap}
