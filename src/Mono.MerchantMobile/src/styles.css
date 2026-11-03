@@ -163,3 +163,17 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-finance-amount small{color:#718087}
 .demo-finance-note{margin:15px 4px 6px;color:#65757b;font-size:9px;line-height:1.8;text-align:center}
 .demo-finance-demo-label{display:block;margin:0 0 6px;color:#8a969a;font-size:8px;text-align:center}
+
+
+.demo-profile-details{display:grid;gap:10px}
+.demo-profile-identity{display:grid;justify-items:center;gap:5px;margin:8px 0 12px}
+.demo-profile-large-avatar{display:grid;width:88px;height:88px;place-items:center;margin-bottom:5px;border:1px solid #d6e9ec;border-radius:50%;background:#eaf7f8;color:var(--teal);font-size:29px;font-weight:700}
+.demo-profile-identity>strong{font-size:14px}
+.demo-profile-identity>small{color:#718087;font-size:10px}
+.demo-profile-identity>b{margin-top:2px;padding:5px 10px;border-radius:999px;background:#e9f7f9;color:var(--teal);font-size:9px}
+.demo-profile-details>h2{margin:5px 0 1px;font-size:12px}
+.demo-profile-field{display:grid;min-height:52px;align-content:center;gap:3px;padding:7px 12px;border:1px solid var(--border);border-radius:11px;background:white}
+.demo-profile-field>span{color:#718087;font-size:8px}
+.demo-profile-field>strong{color:#34464c;font-size:10px;font-weight:600}
+.demo-profile-edit{min-height:48px;margin-top:5px;border:1px solid #bfe6ec;border-radius:11px;background:#f4fbfc;color:var(--teal);font-size:10px;font-weight:700}
+.demo-profile-demo-label{color:#8a969a;font-size:8px;text-align:center}
