@@ -260,14 +260,20 @@ function MerchantMobileDemo() {
   const [demoPhone,setDemoPhone]=useState('۰۹۱۲ ۱۲۳ ۴۵۶۷')
   const [demoDestination,setDemoDestination]=useState('سعادت‌آباد، بلوار دریا')
   const nav:[DemoMobileScreen,string,string][]=[['more','بیشتر','more'],['notifications','اعلان‌ها','bell'],['create','ثبت','plus'],['deliveries','ارسال‌ها','list'],['home','خانه','home']]
-  const orders=[
-    {id:'۸۴۳۰',route:'ونک ← یوسف‌آباد',detail:'تحویل تا ۱۹:۲۰',status:'فعال',warning:false},
-    {id:'۸۴۲۱',route:'ونک ← جردن',detail:'تعهد ۱۸:۴۵ • ۱۲ دقیقه ریسک',status:'در معرض دیرکرد',warning:true},
-    {id:'۸۴۱۸',route:'ونک ← میرداماد',detail:'تحویل شد ۱۹:۵۸',status:'تحویل‌شده',warning:false},
-    {id:'۸۴۱۵',route:'ونک ← سعادت‌آباد',detail:'تحویل تا ۲۰:۳۰',status:'فعال',warning:false},
-    {id:'۸۴۱۲',route:'ونک ← تهران‌پارس',detail:'ارسال لغو شد • ۱۸:۲۰',status:'ناموفق',warning:true},
-    {id:'۸۴۱۰',route:'ونک ← شهرک غرب',detail:'تحویل تا ۲۰:۴۰',status:'فعال',warning:false},
-  ]
+  const orders=activeBranch==='ونک'?[
+    {id:'۸۴۳۰',route:'ونک ← یوسف‌آباد',destination:'یوسف‌آباد',promiseTime:'۱۹:۲۰',detail:'تحویل تا ۱۹:۲۰',status:'فعال',warning:false},
+    {id:'۸۴۲۱',route:'ونک ← جردن',destination:'جردن',promiseTime:'۱۸:۴۵',detail:'تعهد ۱۸:۴۵ • ۱۲ دقیقه ریسک',status:'در معرض دیرکرد',warning:true},
+    {id:'۸۴۱۸',route:'ونک ← میرداماد',destination:'میرداماد',promiseTime:'۱۹:۵۸',detail:'تحویل شد ۱۹:۵۸',status:'تحویل‌شده',warning:false},
+    {id:'۸۴۱۵',route:'ونک ← سعادت‌آباد',destination:'سعادت‌آباد',promiseTime:'۲۰:۳۰',detail:'تحویل تا ۲۰:۳۰',status:'فعال',warning:false},
+    {id:'۸۴۱۲',route:'ونک ← تهران‌پارس',destination:'تهران‌پارس',promiseTime:'ناموفق',detail:'ارسال لغو شد • ۱۸:۲۰',status:'ناموفق',warning:true},
+    {id:'۸۴۱۰',route:'ونک ← شهرک غرب',destination:'شهرک غرب',promiseTime:'۲۰:۴۰',detail:'تحویل تا ۲۰:۴۰',status:'فعال',warning:false},
+  ]:activeBranch==='جردن'?[
+    {id:'۸۴۵۲',route:'جردن ← قلهک',destination:'قلهک',promiseTime:'۲۰:۰۵',detail:'تحویل تا ۲۰:۰۵',status:'فعال',warning:false},
+    {id:'۸۴۵۱',route:'جردن ← میرداماد',destination:'میرداماد',promiseTime:'۲۰:۲۰',detail:'تحویل تا ۲۰:۲۰',status:'فعال',warning:false},
+  ]:activeBranch==='پاسداران'?[
+    {id:'۸۴۴۸',route:'پاسداران ← هروی',destination:'هروی',promiseTime:'۱۹:۵۰',detail:'تحویل تا ۱۹:۵۰',status:'فعال',warning:false},
+  ]:[]
+
   const demoNotifications=[
     {id:'risk-8421',day:'today',kind:'action' as const,title:'ریسک دیرکرد برای سفارش ۸۴۲۱',detail:'تعهد ۱۸:۴۵ • شعبه ونک',orderId:'۸۴۲۱'},
     {id:'assigned-8430',day:'today',kind:'info' as const,title:'سفارش ۸۴۳۰ به پیک تخصیص داده شد',detail:'تحویل تا ۱۹:۲۰',orderId:'۸۴۳۰'},
@@ -286,6 +292,12 @@ function MerchantMobileDemo() {
   function review(){setScreen('review');setToast('')}
   function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('detail');setToast('درخواست نمایشی ثبت شد؛ در نسخهٔ واقعی باید به حساب مشتری متصل باشد.')}
   const visibleOrders=orders.filter(item=>filter==='active'?['فعال','در معرض دیرکرد'].includes(item.status):filter==='failed'?item.status==='ناموفق':item.status==='تحویل‌شده')
+  const selectedOrder=orders.find(item=>item.id===order)
+  const activeCount=orders.filter(item=>['فعال','در معرض دیرکرد'].includes(item.status)).length
+  const attentionCount=orders.filter(item=>item.warning).length
+  const detailStatus=confirmed?'در انتظار تخصیص پیک':selectedOrder?.status||(order==='۸۴۱۸'?'تحویل‌شده':order==='۸۴۱۲'?'ناموفق':'در معرض دیرکرد')
+  const detailPromise=confirmed?'۱۹:۳۵':selectedOrder?.promiseTime||(order==='۸۴۱۸'?'۱۹:۵۸':order==='۸۴۱۲'?'ناموفق':'۱۸:۴۵')
+  const detailDestination=confirmed?demoDestination:selectedOrder?.destination||(order==='۸۴۱۸'?'میرداماد':order==='۸۴۱۲'?'تهران‌پارس':order==='۸۴۱۵'?'سعادت‌آباد':order==='۸۴۱۰'?'شهرک غرب':'یوسف‌آباد، خیابان شصت‌وچهارم')
   const query=search.trim().toLocaleLowerCase()
   const filteredDemoOrders=visibleOrders.filter(item=>!query||`${item.id} ${item.route} ${item.detail} ${item.status}`.toLocaleLowerCase().includes(query))
   const filteredDemoNotifications=demoNotifications.filter(item=>notificationFilter==='all'||item.kind===notificationFilter)
@@ -296,12 +308,12 @@ function MerchantMobileDemo() {
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
-        <button className="risk-card demo-risk" onClick={()=>openDetail('۸۴۲۱')}><span className="risk-icon">!</span><span><strong>یک ارسال در معرض دیرکرد</strong><small>سفارش ۸۴۲۱ • تعهد تا ۱۸:۴۵</small></span><b>‹</b></button>
+        {attentionCount>0&&<button className="risk-card demo-risk" onClick={()=>openDetail('۸۴۲۱')}><span className="risk-icon">!</span><span><strong>یک ارسال در معرض دیرکرد</strong><small>سفارش ۸۴۲۱ • تعهد تا ۱۸:۴۵</small></span><b>‹</b></button>}
         <div className="section-head compact demo-section-title"><h2>ارسال‌های فعال</h2></div>
-        <div className="summary-card demo-summary"><div><b>۴</b><span>در حال اجرا</span></div><i/><div><b className="warning-number">۱</b><span>نیازمند توجه</span></div></div>
+        <div className="summary-card demo-summary"><div><b>{fa.format(activeCount)}</b><span>در حال اجرا</span></div><i/><div><b className="warning-number">{fa.format(attentionCount)}</b><span>نیازمند توجه</span></div></div>
         <button className="primary-button full" onClick={()=>setScreen('create')}>ثبت ارسال جدید</button>
         <div className="section-head compact demo-section-title"><h2>آخرین ارسال‌ها</h2></div>
-        <div className="delivery-list demo-delivery-list">{orders.slice(0,2).map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}</div>
+        <div className="delivery-list demo-delivery-list">{orders.slice(0,2).map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}{!orders.length&&<EmptyState title="ارسالی برای این شعبه نیست" body="از شعبهٔ دیگری انتخاب کنید یا ارسال جدید ثبت کنید."/>}</div>
       </>}
       {screen==='deliveries'&&<>
         <div className="section-head compact demo-page-heading"><h1>ارسال‌ها</h1><span className="eyebrow">همه شعب</span></div>
@@ -310,9 +322,9 @@ function MerchantMobileDemo() {
         <div className="delivery-list demo-delivery-list">{filteredDemoOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}{!filteredDemoOrders.length&&<EmptyState title="ارسالی پیدا نشد" body="شماره سفارش یا نشانی دیگری را جست‌وجو کنید."/>}</div>
       </>}
       {screen==='detail'&&<>
-        <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${!confirmed&&['۸۴۲۱','۸۴۱۲'].includes(order)?'warning':''}`}>{confirmed?'در انتظار تخصیص پیک':order==='۸۴۱۸'?'تحویل‌شده':order==='۸۴۱۲'?'ناموفق':'در معرض دیرکرد'}</span></div>
-        <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':order==='۸۴۱۸'?'زمان تحویل':order==='۸۴۱۲'?'وضعیت ارسال':'تعهد تحویل'}</span><strong>{confirmed?'۱۹:۳۵':order==='۸۴۱۸'?'۱۹:۵۸':order==='۸۴۱۲'?'ناموفق':'۱۸:۴۵'}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':order==='۸۴۱۸'?'تحویل به گیرنده انجام شد':order==='۸۴۱۲'?'ارسال لغو شد؛ نیاز به بررسی دارد':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
-        <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:order==='۸۴۱۸'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۲۰</small></span></div><div className="done"><i/><span><strong>تحویل به پیک</strong><small>۱۹:۱۰</small></span></div><div className="done"><i/><span><strong>تحویل به گیرنده</strong><small>۱۹:۵۸</small></span></div></>:order==='۸۴۱۲'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۰۵</small></span></div><div className="late"><i/><span><strong>ارسال ناموفق شد</strong><small>۱۸:۲۰</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
+        <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${!confirmed&&detailStatus!=='فعال'?'warning':''}`}>{detailStatus}</span></div>
+        <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':detailStatus==='تحویل‌شده'?'زمان تحویل':detailStatus==='ناموفق'?'وضعیت ارسال':'تعهد تحویل'}</span><strong>{detailPromise}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':detailStatus==='تحویل‌شده'?'تحویل به گیرنده انجام شد':detailStatus==='ناموفق'?'ارسال لغو شد؛ نیاز به بررسی دارد':detailStatus==='فعال'?'ارسال در جریان؛ دادهٔ نمایشی':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
+        <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:detailStatus==='تحویل‌شده'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۲۰</small></span></div><div className="done"><i/><span><strong>تحویل به پیک</strong><small>۱۹:۱۰</small></span></div><div className="done"><i/><span><strong>تحویل به گیرنده</strong><small>۱۹:۵۸</small></span></div></>:detailStatus==='ناموفق'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۰۵</small></span></div><div className="late"><i/><span><strong>ارسال ناموفق شد</strong><small>۱۸:۲۰</small></span></div></>:detailStatus==='فعال'?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>در حال اجرا</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
         <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه {activeBranch}</strong></div><div><small>مقصد</small><strong>{confirmed?demoDestination:order==='۸۴۱۸'?'میرداماد':order==='۸۴۱۲'?'تهران‌پارس':order==='۸۴۱۵'?'سعادت‌آباد':order==='۸۴۱۰'?'شهرک غرب':'یوسف‌آباد، خیابان شصت‌وچهارم'}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
         <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>پشتیبانی</button><button className="primary-button" onClick={()=>order==='۸۴۲۱'?setScreen('exception'):setToast('برای این ارسال نمونه، استثنای فعالی ثبت نشده است.')}>مشاهده اقدام‌ها</button></div>
         {confirmed&&<p className="demo-confirmed-note">درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.</p>}
