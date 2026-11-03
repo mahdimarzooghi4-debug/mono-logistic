@@ -925,3 +925,7 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-settings-members .demo-member-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; direction:ltr; }
 .demo-settings-members .demo-member-actions button { min-height:40px; font-size:10px; }
 .demo-settings-members .demo-member-actions-panel p { margin:8px 0 0; color:#738188; font-size:8px; text-align:right; }
+
+/* Figma parity: notification settings use a wider event column. */
+.demo-settings-notifications .demo-settings-columns { grid-template-columns:minmax(0,1fr) minmax(0,1.8fr); }
+@media(max-width:900px) { .demo-settings-notifications .demo-settings-columns { grid-template-columns:1fr; } }
