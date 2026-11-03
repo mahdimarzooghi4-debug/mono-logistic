@@ -247,7 +247,7 @@ export default function App() {
 type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
 
 function MerchantMobileDemo() {
-  const [screen,setScreen]=useState<DemoMobileScreen>('home')
+  const [screen,setScreen]=useState<DemoMobileScreen>(()=>new URLSearchParams(window.location.search).get('state')==='empty'?'deliveries':'home')
   const [filter,setFilter]=useState<'active'|'completed'|'failed'>('active')
   const [search,setSearch]=useState('')
   const [order,setOrder]=useState('۸۴۲۱')
@@ -318,8 +318,8 @@ function MerchantMobileDemo() {
       {screen==='deliveries'&&<>
         <div className="section-head compact demo-page-heading"><h1>ارسال‌ها</h1><span className="eyebrow">همه شعب</span></div>
         <div className="filter-tabs" role="tablist">{([['active','فعال'],['completed','تکمیل‌شده'],['failed','ناموفق']] as const).map(([key,label])=><button role="tab" aria-selected={filter===key} className={filter===key?'selected':''} key={key} onClick={()=>setFilter(key)}>{label}</button>)}</div>
-        <label className="search-box"><span>⌕</span><input aria-label="جست‌وجوی سفارش" placeholder="جست‌وجوی شماره یا نشانی" value={search} onChange={event=>setSearch(event.target.value)} /></label>
-        <div className="delivery-list demo-delivery-list">{filteredDemoOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}{!filteredDemoOrders.length&&<EmptyState title="ارسالی پیدا نشد" body="شماره سفارش یا نشانی دیگری را جست‌وجو کنید."/>}</div>
+        {new URLSearchParams(window.location.search).get('state')!=='empty'&&<label className="search-box"><span>⌕</span><input aria-label="جست‌وجوی سفارش" placeholder="جست‌وجوی شماره یا نشانی" value={search} onChange={event=>setSearch(event.target.value)} /></label>}
+        <div className="delivery-list demo-delivery-list">{new URLSearchParams(window.location.search).get('state')==='empty'&&filter==='active'?<section className="demo-empty-deliveries" aria-label="ارسال‌های فعال خالی"><div className="demo-empty-icon" aria-hidden="true"><span>↙</span></div><h2>هنوز ارسال فعالی ندارید</h2><p>اولین ارسال را ثبت کنید تا وضعیت و تعهد تحویل را همین‌جا دنبال کنید.</p><button className="primary-button" onClick={()=>setScreen('create')}>ثبت اولین ارسال</button></section>:<>{filteredDemoOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}{!filteredDemoOrders.length&&<EmptyState title="ارسالی پیدا نشد" body="شماره سفارش یا نشانی دیگری را جست‌وجو کنید."/>}</>}</div>
       </>}
       {screen==='detail'&&<>
         <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${!confirmed&&detailStatus!=='فعال'?'warning':''}`}>{detailStatus}</span></div>
