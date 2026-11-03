@@ -676,6 +676,13 @@ tbody tr:hover { background: #fbfdfd; }
 .create-fields label { display: grid; min-width: 0; gap: 4px; color: #7b898e; font-size: 9px; }
 .create-fields label.full { grid-column: 1/-1; }
 .create-fields input,.create-fields select { width: 100%; height: 42px; border-color: #d9e3e6; border-radius: 8px; padding-inline: 10px; color: #1f2a2e; background: #f8fafb; font-size: 10px; }
+.persian-datetime-field { position:relative; display:flex; height:42px; align-items:center; border:1px solid #d9e3e6; border-radius:8px; padding-inline:9px; background:#f8fafb; direction:rtl; }
+.persian-datetime-field:focus-within { outline:2px solid #00a8c633; border-color:#00a8c6; }
+.persian-datetime-field>input[type="text"] { min-width:0; height:40px; flex:1; border:0; outline:0; padding:0; color:#1f2a2e; background:transparent; font:inherit; font-size:10px; cursor:pointer; }
+.persian-datetime-field>input[type="text"]::placeholder { color:#8b989d; }
+.persian-datetime-field>button { display:grid; width:25px; height:30px; flex:0 0 25px; place-items:center; border:0; padding:0; color:#56666c; background:transparent; cursor:pointer; }
+.persian-datetime-field>button svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.6; }
+.persian-datetime-picker { position:absolute; width:1px!important; height:1px!important; overflow:hidden; clip-path:inset(50%); opacity:0; pointer-events:none; }
 .create-fields select:disabled { opacity: 1; color: #27363c; }
 .handling-options { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
 .handling-options label { display: flex; min-height: 35px; align-items: center; gap: 7px; border: 1px solid #dce4e8; border-radius: 8px; padding: 0 9px; color: #4d5e64; background: #f8fafb; font-size: 9px; }

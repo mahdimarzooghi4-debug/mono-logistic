@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import MerchantNavIcon, { type MerchantNavId } from './MerchantNavIcon'
 import MerchantBrandingSettings from './MerchantBrandingSettings'
+import { PersianDateTimeField } from './PersianDateTimeField'
 import trackingMap from './assets/figma-tracking/tracking-map.svg'
 
 type PreviewView = 'dashboard' | 'deliveries' | 'create' | 'tracking' | 'deliveryDetail' | 'branches' | 'billing' | 'settings'
@@ -98,7 +99,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
           <div className="create-form-column">
             <section className="panel create-form-section"><h2>مبدا و زمان آمادگی</h2><div className="create-fields two">
               <label>شعبهٔ مبدا<select name="branch" defaultValue="ونک"><option>ونک</option><option>جردن</option><option>میرداماد</option></select></label>
-              <label>زمان تقریبی آماده‌شدن<input type="datetime-local" lang="fa-IR" dir="rtl" defaultValue="2026-11-02T12:30" /></label>
+              <label>زمان تقریبی آماده‌شدن<PersianDateTimeField name="estimated_ready_at" label="زمان تقریبی آماده‌شدن" defaultValue="2026-11-02T12:30" /></label>
               <label className="full">آدرس مبدا<input defaultValue="تهران، ونک، خیابان ملاصدرا" /></label>
             </div></section>
             <section className="panel create-form-section"><h2>گیرنده و مقصد</h2><div className="create-fields two">

@@ -4,6 +4,7 @@ import WebhookEndpointWorkbench from './WebhookEndpointWorkbench'
 import MerchantDemoPreview from './MerchantDemoPreview'
 import MerchantNavIcon, { type MerchantNavId } from './MerchantNavIcon'
 import MerchantBrandingSettings from './MerchantBrandingSettings'
+import { PersianDateTimeField } from './PersianDateTimeField'
 
 type Branch = {
   branchId: string
@@ -537,7 +538,7 @@ function App() {
                 <div className="create-form-column">
                   <section className="panel create-form-section"><h2>مبدا و زمان آمادگی</h2><div className="create-fields two">
                     <label>شعبهٔ مبدا<select name="branch_id" required defaultValue=""><option value="" disabled>انتخاب شعبه</option>{branches.map((branch) => <option key={branch.branchId} value={branch.branchId}>{branch.name}</option>)}</select></label>
-                    <label>زمان تقریبی آماده‌شدن<input name="estimated_ready_at" type="datetime-local" /></label>
+                    <label>زمان تقریبی آماده‌شدن<PersianDateTimeField name="estimated_ready_at" label="زمان تقریبی آماده‌شدن" /></label>
                     <label className="full">آدرس مبدا<input name="pickup_address" required maxLength={500} placeholder="نشانی کامل شعبه" /></label>
                   </div></section>
                   <section className="panel create-form-section"><h2>گیرنده و مقصد</h2><div className="create-fields two">
