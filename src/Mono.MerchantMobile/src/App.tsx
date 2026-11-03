@@ -253,6 +253,8 @@ function MerchantMobileDemo() {
   const [order,setOrder]=useState('۸۴۲۱')
   const [confirmed,setConfirmed]=useState(false)
   const [toast,setToast]=useState('')
+  const [notificationFilter,setNotificationFilter]=useState<'all'|'action'|'info'>('all')
+  const [readNotificationIds,setReadNotificationIds]=useState<string[]>([])
   const [demoRecipient,setDemoRecipient]=useState('مریم اکبری')
   const [demoPhone,setDemoPhone]=useState('۰۹۱۲ ۱۲۳ ۴۵۶۷')
   const [demoDestination,setDemoDestination]=useState('سعادت‌آباد، بلوار دریا')
@@ -265,13 +267,26 @@ function MerchantMobileDemo() {
     {id:'۸۴۱۲',route:'ونک ← تهران‌پارس',detail:'ارسال لغو شد • ۱۸:۲۰',status:'ناموفق',warning:true},
     {id:'۸۴۱۰',route:'ونک ← شهرک غرب',detail:'تحویل تا ۲۰:۴۰',status:'فعال',warning:false},
   ]
+  const demoNotifications=[
+    {id:'risk-8421',day:'today',kind:'action' as const,title:'ریسک دیرکرد برای سفارش ۸۴۲۱',detail:'تعهد ۱۸:۴۵ • شعبه ونک',orderId:'۸۴۲۱'},
+    {id:'assigned-8430',day:'today',kind:'info' as const,title:'سفارش ۸۴۳۰ به پیک تخصیص داده شد',detail:'تحویل تا ۱۹:۲۰',orderId:'۸۴۳۰'},
+    {id:'handoff-8418',day:'today',kind:'info' as const,title:'سفارش ۸۴۱۸ از شعبه تحویل شد',detail:'در مسیر مقصد',orderId:'۸۴۱۸'},
+    {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
+    {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
+  ]
   const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='notifications'?'اعلان‌ها':'بیشتر'
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
+  function openDemoNotification(item:typeof demoNotifications[number]) {
+    setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
+    if(item.orderId) openDetail(item.orderId)
+    else setToast('این صورتحساب فقط نمونهٔ نمایشی است و دادهٔ مالی واقعی نیست.')
+  }
   function review(){setScreen('review');setToast('')}
   function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('detail');setToast('درخواست نمایشی ثبت شد؛ در نسخهٔ واقعی باید به حساب مشتری متصل باشد.')}
   const visibleOrders=orders.filter(item=>filter==='active'?['فعال','در معرض دیرکرد'].includes(item.status):filter==='failed'?item.status==='ناموفق':item.status==='تحویل‌شده')
   const query=search.trim().toLocaleLowerCase()
   const filteredDemoOrders=visibleOrders.filter(item=>!query||`${item.id} ${item.route} ${item.detail} ${item.status}`.toLocaleLowerCase().includes(query))
+  const filteredDemoNotifications=demoNotifications.filter(item=>notificationFilter==='all'||item.kind===notificationFilter)
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>شعبه ونک</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
@@ -315,7 +330,12 @@ function MerchantMobileDemo() {
         <section className="demo-detail-card demo-review-summary"><h2>خلاصه ارسال</h2><div><span>مبدأ</span><strong>شعبه ونک</strong></div><div><span>مقصد</span><strong>{demoDestination}</strong></div><div><span>گیرنده</span><strong>{demoRecipient}</strong></div><div><span>تعهد</span><strong>فقط پس از تأیید ثبت می‌شود.</strong></div></section>
         <div className="demo-review-actions"><button className="secondary-button" onClick={()=>setScreen('create')}>بازگشت</button><button className="primary-button" onClick={confirm}>تأیید و ثبت ارسال</button></div>
       </>}
-      {screen==='notifications'&&<><div className="section-head compact demo-page-heading"><h1>اعلان‌ها</h1></div><EmptyState title="اعلان‌های حساب کسب‌وکار" body="برای دریافت اعلان‌های واقعی، اتصال به حساب مشتری لازم است."/></>}
+      {screen==='notifications'&&<>
+        <div className="section-head compact demo-page-heading"><h1>اعلان‌ها</h1></div>
+        <div className="demo-notification-filters" role="tablist" aria-label="دسته‌بندی اعلان‌ها">{([['all','همه'],['action','نیازمند اقدام'],['info','اطلاع‌رسانی']] as const).map(([key,label])=><button key={key} role="tab" aria-selected={notificationFilter===key} className={notificationFilter===key?'selected':''} onClick={()=>setNotificationFilter(key)}>{label}</button>)}</div>
+        {(['today','yesterday'] as const).map(day=>{const items=filteredDemoNotifications.filter(item=>item.day===day);return items.length>0&&<section className="demo-notification-group" key={day} aria-label={day==='today'?'امروز':'دیروز'}><h2>{day==='today'?'امروز':'دیروز'}</h2><div className="demo-notification-list">{items.map(item=>{const isRead=readNotificationIds.includes(item.id);return <button key={item.id} className="demo-notification-card" aria-label={item.title} onClick={()=>openDemoNotification(item)}><span className={'demo-notification-dot '+(isRead?'read':'')} aria-label={isRead?'خوانده شده':'خوانده نشده'}/><span className="demo-notification-copy"><strong>{item.title}</strong><small>{item.detail}</small></span><span className="demo-notification-arrow" aria-hidden="true">‹</span></button>})}</div></section>})}
+        {!filteredDemoNotifications.length&&<EmptyState title="اعلانی در این دسته نیست" body="با انتخاب دستهٔ دیگر، اعلان‌های بیشتری می‌بینید."/>}
+      </>}
       {screen==='more'&&<><div className="section-head compact demo-page-heading"><h1>بیشتر</h1></div><div className="settings-card"><p><span>شعبهٔ انتخاب‌شده</span><strong>شعبه ونک</strong></p><button className="branch-option"><span>شعبه ونک</span><span>✓</span></button><small>نسخهٔ نمایشی با داده‌های نمونه</small></div></>}
     </section>
     <nav className="bottom-nav demo-bottom-nav" aria-label="ناوبری اصلی">{nav.map(([id,title,icon])=><button key={id} className={(screen===id?'active ':'')+(id==='create'?'create-tab':'')} onClick={()=>{setScreen(id);setToast('')}} aria-current={screen===id?'page':undefined}><DemoNavIcon name={icon}/><small>{title}</small></button>)}</nav>
