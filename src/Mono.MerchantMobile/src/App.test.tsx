@@ -25,9 +25,28 @@ function mockConnectedApi(detail: unknown = { ...baseDelivery, quote: null, prom
   return fetchMock
 }
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/') })
 
 describe('Mono merchant mobile P0', () => {
+  it('shows the Figma mobile preview flow without calling the API', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+    expect(screen.getByText('یک ارسال در معرض دیرکرد')).toBeInTheDocument()
+    expect(screen.getByText('سفارش ۸۴۲۱ • تعهد تا ۱۸:۴۵')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ثبت ارسال جدید' }))
+    expect(screen.getByRole('heading', { name: 'ثبت ارسال جدید' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'بررسی هزینه و زمان' }))
+    expect(screen.getByRole('heading', { name: 'پیشنهاد مونو' })).toBeInTheDocument()
+    expect(screen.getByText('۴۲٬۵۰۰ تومان')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'تأیید و ثبت ارسال' }))
+    expect(screen.getByText('پیشنهاد ارسال تأیید شد.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
