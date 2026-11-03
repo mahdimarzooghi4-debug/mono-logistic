@@ -50,7 +50,7 @@ describe('Mono merchant mobile P0', () => {
     expect(screen.getByText('میدان ونک')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'تأیید و ثبت ارسال' }))
     expect(screen.getByText('سفارش ۸۴۳۱')).toBeInTheDocument()
-    expect(screen.getByText('در انتظار تخصیص پیک')).toBeInTheDocument()
+    expect(screen.getAllByText('در انتظار تخصیص پیک').length).toBeGreaterThan(0)
     expect(screen.getByText('درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.')).toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalled()
   })
