@@ -112,3 +112,17 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-exception-user{margin-top:26px}
 .demo-exception-actions{display:flex;gap:14px;direction:ltr}
 .demo-exception-actions button{direction:rtl;min-width:0;height:48px;min-height:48px;flex:1;padding:0 5px;border-radius:11px;font-size:9px;white-space:nowrap}
+
+.demo-branch-card{display:flex;width:100%;min-height:76px;align-items:center;gap:14px;margin:0;padding:12px 14px;border:1px solid var(--border);border-radius:13px;background:white;text-align:right}
+.demo-branch-card.selected{min-height:86px;border-color:#bfe6ec;background:#f4fbfc}
+.demo-branch-card:disabled{cursor:not-allowed;opacity:.56}
+.demo-branch-radio{width:14px;height:14px;flex:0 0 14px;border:1px solid #aebdc1;border-radius:50%;background:white}
+.demo-branch-card.selected .demo-branch-radio{border:4px solid var(--teal)}
+.demo-branch-copy{display:grid;flex:1;gap:5px}
+.demo-branch-copy strong{color:#26363d;font-size:11px}
+.demo-branch-copy small{color:#718087;font-size:9px}
+.demo-branch-arrow{color:#7b8a90;font-size:22px;line-height:1}
+.demo-branch-other-title{min-height:24px;margin:24px 0 10px}
+.demo-branch-other-title h2{margin:0;font-size:12px}
+.demo-branch-list{display:grid;gap:12px}
+.demo-branch-note{margin:18px 22px;color:#718087;font-size:9px;text-align:center}
