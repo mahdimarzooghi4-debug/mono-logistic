@@ -28,6 +28,33 @@ function mockConnectedApi(detail: unknown = { ...baseDelivery, quote: null, prom
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/') })
 
 describe('Mono merchant mobile P0', () => {
+  it('shows the Figma infeasible result and lets the merchant edit the preserved options', async () => {
+    window.history.replaceState({}, '', '/?demo=1&state=infeasible')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.getByText('قابل اجرا نیست')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'در حال حاضر نمی‌توانیم برای این ارسال تعهد بدهیم' })).toBeInTheDocument()
+    expect(screen.getByText('ظرفیت موثر این محدوده در بازه انتخاب‌شده تکمیل است.')).toBeInTheDocument()
+    expect(screen.getByText('اطلاعات واردشده حفظ می‌شود.')).toBeInTheDocument()
+    expect(screen.getByText('زمان آمادگی را تغییر دهید')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ویرایش و بررسی دوباره' }))
+    expect(screen.getByRole('heading', { name: 'ثبت ارسال جدید' })).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('شعبه مبدأ'), 'جردن')
+    await user.selectOptions(screen.getByLabelText('زمان آمادگی'), '۳۰ دقیقه دیگر')
+    expect(screen.getByLabelText('شعبه مبدأ')).toHaveValue('جردن')
+    expect(screen.getByLabelText('زمان آمادگی')).toHaveValue('۳۰ دقیقه دیگر')
+    expect(screen.getByLabelText('نشانی مقصد')).toHaveValue('سعادت‌آباد، بلوار دریا')
+
+    await user.click(screen.getByRole('button', { name: 'بررسی هزینه و زمان' }))
+    expect(screen.getByRole('heading', { name: 'در حال بررسی امکان اجرا' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'پیشنهاد مونو' })).toBeInTheDocument(), { timeout: 3500 })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('shows the Figma error state and retries the delivery feasibility check', async () => {
     window.history.replaceState({}, '', '/?demo=1&state=error')
     const fetchMock = vi.fn()
