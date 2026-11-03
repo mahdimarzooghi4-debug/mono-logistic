@@ -221,6 +221,28 @@ describe('Mono merchant mobile P0', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('opens notification preferences and toggles operational and financial alerts', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'بیشتر' }))
+    await user.click(screen.getByText('تنظیمات', { exact: true }))
+    await user.click(screen.getByRole('button', { name: /اعلان‌ها، انتخاب اعلان‌های عملیاتی و مالی/ }))
+    expect(screen.getByRole('heading', { name: 'چه اعلان‌هایی دریافت کنید؟' })).toBeInTheDocument()
+    expect(screen.getByText('عملیاتی')).toBeInTheDocument()
+
+    const riskSwitch = screen.getByRole('switch', { name: 'ریسک دیرکرد و استثنا' })
+    const financeSwitch = screen.getByRole('switch', { name: 'مالی' })
+    expect(riskSwitch).toHaveAttribute('aria-checked', 'true')
+    expect(financeSwitch).toHaveAttribute('aria-checked', 'false')
+    await user.click(financeSwitch)
+    expect(financeSwitch).toHaveAttribute('aria-checked', 'true')
+    await user.click(riskSwitch)
+    expect(riskSwitch).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText(/اعلان‌های بحرانی عملیاتی حتی در حالت کم‌صدا نمایش داده می‌شوند/)).toBeInTheDocument()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
