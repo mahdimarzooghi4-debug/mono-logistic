@@ -270,7 +270,25 @@ function DemoBranchDrawer({ onClose, onSave }: { onClose: () => void; onSave: ()
 }
 
 function DemoInviteDrawer({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  return <div className="demo-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="demo-drawer" role="dialog" aria-modal="true" aria-labelledby="invite-drawer-title" dir="rtl"><header><div><small>اعضا و دسترسی</small><h2 id="invite-drawer-title">دعوت عضو جدید</h2></div><button type="button" aria-label="بستن" onClick={onClose}>×</button></header><form onSubmit={event => { event.preventDefault(); onSave() }}><label>ایمیل یا شماره موبایل<input required placeholder="name@example.com یا ۰۹۱۲..." /></label><label>نقش<select defaultValue="operator"><option value="admin">ادمین</option><option value="operator">اپراتور</option><option value="finance">مالی</option><option value="viewer">مشاهده‌گر</option></select></label><label>محدودهٔ شعب<select defaultValue="all"><option value="all">همهٔ شعب</option><option value="vanak">ونک</option><option value="jordan">جردن</option></select></label><p className="data-note">این دعوت فقط در پیش‌نمایش طراحی ثبت می‌شود و پیام واقعی ارسال نمی‌کند.</p><footer><button type="button" className="secondary-button" onClick={onClose}>انصراف</button><button className="primary-button">ثبت دعوت</button></footer></form></section></div>
+  const [role, setRole] = useState('operator')
+  const roles = [['admin', 'ادمین'], ['operator', 'اپراتور'], ['finance', 'مالی'], ['viewer', 'مشاهده‌گر']] as const
+  const permissions = ['ثبت و ویرایش ارسال', 'مشاهده رهگیری زنده', 'درخواست لغو قبل از Handoff', 'مشاهده صورتحساب']
+  return <div className="demo-drawer-backdrop invite-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="demo-drawer invite-drawer" role="dialog" aria-modal="true" aria-labelledby="invite-drawer-title" dir="rtl">
+    <header><button type="button" onClick={onClose}>بستن</button><div><h2 id="invite-drawer-title">دعوت عضو جدید</h2><small>دعوت به Workspace سپهر</small></div></header>
+    <form onSubmit={event => { event.preventDefault(); onSave() }}>
+      <label className="invite-drawer-field">نام و نام خانوادگی<input required /></label>
+      <label className="invite-drawer-field">موبایل یا ایمیل<input required /></label>
+      <strong className="invite-drawer-label">نقش</strong>
+      <div className="invite-drawer-roles" role="radiogroup" aria-label="نقش عضو">{roles.map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={role === id} className={role === id ? 'selected' : ''} onClick={() => setRole(id)}>{label}</button>)}</div>
+      <label className="invite-drawer-field">محدوده شعب<input defaultValue="ونک + جردن" /></label>
+      <strong className="invite-drawer-label">مجوزهای کلیدی</strong>
+      <div className="invite-drawer-permissions">{permissions.map((permission, index) => <label key={permission}><input type="checkbox" defaultChecked={index < 3} /><span>{permission}</span></label>)}</div>
+      <label className="invite-drawer-field">اعتبار دعوت<select defaultValue="7"><option value="1">۱ روز</option><option value="7">۷ روز</option><option value="14">۱۴ روز</option></select></label>
+      <label className="invite-drawer-field">یادداشت — اختیاری<input /></label>
+      <p className="invite-drawer-note">لینک دعوت به موبایل یا ایمیل واردشده ارسال می‌شود و تا زمان پذیرش، وضعیت عضو «دعوت شده» خواهد بود.</p>
+      <footer><button type="button" className="secondary-button" onClick={onClose}>انصراف</button><button className="primary-button">ارسال دعوت</button></footer>
+    </form>
+  </section></div>
 }
 
 function DemoWebhookDrawer({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
