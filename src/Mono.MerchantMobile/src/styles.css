@@ -239,3 +239,19 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-empty-deliveries h2 { margin:26px 0 0; color:#0b0b0e; font-size:18px; line-height:1.65; font-weight:700; }
 .demo-empty-deliveries p { max-width:294px; margin:12px 16px 0; color:#66727a; font-size:11px; line-height:24px; }
 .demo-empty-deliveries .primary-button { width:100%; min-height:50px; margin:38px 0 0; border-radius:12px; font-size:12.5px; }
+
+
+/* Figma 374:8 — delivery feasibility loading state */
+.demo-checking { display:flex; flex-direction:column; align-items:center; width:100%; text-align:center; }
+.demo-checking h1 { margin:28px 0 0; color:#0b0b0e; font-size:18px; line-height:1.6; font-weight:700; }
+.demo-checking-spinner { position:relative; display:grid; place-items:center; width:116px; height:116px; margin:54px auto 0; border:3px solid #b8dde4; border-radius:50%; background:#fff; }
+.demo-checking-spinner::before { position:absolute; inset:0; border:5px solid transparent; border-top-color:#00a8c6; border-right-color:#00a8c6; border-radius:50%; content:""; animation:demo-check-spin 1.2s linear infinite; }
+.demo-checking-spinner::after { width:13px; height:13px; border-radius:50%; background:#00a8c6; content:""; box-shadow:-8px 2px 0 -4px #00a8c6,8px 2px 0 -4px #00a8c6; }
+@keyframes demo-check-spin { to { transform:rotate(360deg); } }
+.demo-checking p { max-width:300px; margin:36px 0 0; color:#66727a; font-size:11px; line-height:25px; }
+.demo-checking-route { display:flex; flex-direction:column; justify-content:center; gap:16px; width:100%; height:150px; margin:64px 0 0; padding:14px 18px; border:1px solid #dde7ea; border-radius:14px; background:#fff; text-align:right; }
+.demo-checking-route div { display:grid; gap:5px; }
+.demo-checking-route small { color:#7a858b; font-size:9.5px; }
+.demo-checking-route strong { color:#0b0b0e; font-size:11.5px; font-weight:600; }
+.demo-checking-hint { margin-top:42px; color:#8a949a; font-size:10px; }
+@media (prefers-reduced-motion: reduce) { .demo-checking-spinner::before { animation-duration:3s; } }
