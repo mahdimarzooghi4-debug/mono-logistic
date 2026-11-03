@@ -163,6 +163,27 @@ describe('Mono merchant mobile P0', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('opens the Figma profile from More and shows demo account details', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'بیشتر' }))
+    await user.click(screen.getByRole('button', { name: /پروفایل، مشخصات فردی و نقش/ }))
+    expect(screen.getByRole('heading', { name: 'پروفایل' })).toBeInTheDocument()
+    expect(screen.getByText('مهدی کاظمی')).toBeInTheDocument()
+    expect(screen.getByText('۰۹۱۲ ۱۲۳ ۴۵۶۷')).toBeInTheDocument()
+    expect(screen.getByText('m.kazemi@example.com')).toBeInTheDocument()
+    expect(screen.getByText('فروشگاه سپهر')).toBeInTheDocument()
+    expect(screen.getByText('ونک')).toBeInTheDocument()
+    expect(screen.getByText(/اطلاعات این صفحه نمونهٔ نمایشی هستند/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'ویرایش مشخصات' }))
+    expect(screen.getByRole('status')).toHaveTextContent('ویرایش اطلاعات حساب')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
