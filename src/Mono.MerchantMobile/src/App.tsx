@@ -244,13 +244,13 @@ export default function App() {
   </main>
 }
 
-type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'loading' | 'error' | 'infeasible' | 'cancelConfirm' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'loading' | 'error' | 'infeasible' | 'cancelConfirm' | 'success' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
 
 function MerchantMobileDemo() {
-  const [screen,setScreen]=useState<DemoMobileScreen>(()=>{const state=new URLSearchParams(window.location.search).get('state');return state==='empty'?'deliveries':state==='loading'?'loading':state==='error'?'error':state==='infeasible'?'infeasible':state==='cancel'?'cancelConfirm':'home'})
+  const [screen,setScreen]=useState<DemoMobileScreen>(()=>{const state=new URLSearchParams(window.location.search).get('state');return state==='empty'?'deliveries':state==='loading'?'loading':state==='error'?'error':state==='infeasible'?'infeasible':state==='cancel'?'cancelConfirm':state==='success'?'success':'home'})
   const [filter,setFilter]=useState<'active'|'completed'|'failed'>('active')
   const [search,setSearch]=useState('')
-  const [order,setOrder]=useState(()=>new URLSearchParams(window.location.search).get('state')==='cancel'?'۸۴۳۰':'۸۴۲۱')
+  const [order,setOrder]=useState(()=>new URLSearchParams(window.location.search).get('state')==='cancel'?'۸۴۳۰':new URLSearchParams(window.location.search).get('state')==='success'?'۸۴۳۱':'۸۴۲۱')
   const [activeBranch,setActiveBranch]=useState('ونک')
   const [confirmed,setConfirmed]=useState(false)
   const [toast,setToast]=useState('')
@@ -285,8 +285,8 @@ function MerchantMobileDemo() {
     {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
-  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='loading'?'بررسی هزینه و زمان':screen==='error'?'ثبت ارسال':screen==='infeasible'?'نتیجه بررسی':screen==='cancelConfirm'?'لغو ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='security'?'امنیت و نشست‌ها':screen==='support'?'پشتیبانی':'بیشتر'
-  const headerSubtitle=screen==='exception'||screen==='support'||screen==='cancelConfirm'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='security'?'حساب کاربری':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='loading'?'بررسی هزینه و زمان':screen==='error'?'ثبت ارسال':screen==='infeasible'?'نتیجه بررسی':screen==='cancelConfirm'?'لغو ارسال':screen==='success'?'ارسال ثبت شد':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='security'?'امنیت و نشست‌ها':screen==='support'?'پشتیبانی':'بیشتر'
+  const headerSubtitle=screen==='exception'||screen==='support'||screen==='cancelConfirm'?'سفارش '+order:screen==='success'?'شعبه '+activeBranch:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='security'?'حساب کاربری':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
     setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
@@ -294,7 +294,7 @@ function MerchantMobileDemo() {
     else setToast('این صورتحساب فقط نمونهٔ نمایشی است و دادهٔ مالی واقعی نیست.')
   }
   function review(){setScreen('loading');setToast('')}
-  function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('detail');setToast('درخواست نمایشی ثبت شد؛ در نسخهٔ واقعی باید به حساب مشتری متصل باشد.')}
+  function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('success');setToast('')}
   const visibleOrders=allOrders.filter(item=>filter==='active'?['فعال','در معرض دیرکرد'].includes(item.status):filter==='failed'?item.status==='ناموفق':item.status==='تحویل‌شده')
   const activeCount=orders.filter(item=>['فعال','در معرض دیرکرد'].includes(item.status)).length
   const attentionCount=orders.filter(item=>item.status==='در معرض دیرکرد').length
@@ -307,7 +307,7 @@ function MerchantMobileDemo() {
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
-      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='security'&&screen!=='support'&&screen!=='loading'&&screen!=='error'&&screen!=='infeasible'&&screen!=='cancelConfirm'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
+      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='security'&&screen!=='support'&&screen!=='loading'&&screen!=='error'&&screen!=='infeasible'&&screen!=='cancelConfirm'&&screen!=='success'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
@@ -324,6 +324,7 @@ function MerchantMobileDemo() {
         {new URLSearchParams(window.location.search).get('state')!=='empty'&&<label className="search-box"><span>⌕</span><input aria-label="جست‌وجوی سفارش" placeholder="جست‌وجوی شماره یا نشانی" value={search} onChange={event=>setSearch(event.target.value)} /></label>}
         <div className="delivery-list demo-delivery-list">{new URLSearchParams(window.location.search).get('state')==='empty'&&filter==='active'?<section className="demo-empty-deliveries" aria-label="ارسال‌های فعال خالی"><div className="demo-empty-icon" aria-hidden="true"><span>↙</span></div><h2>هنوز ارسال فعالی ندارید</h2><p>اولین ارسال را ثبت کنید تا وضعیت و تعهد تحویل را همین‌جا دنبال کنید.</p><button className="primary-button" onClick={()=>setScreen('create')}>ثبت اولین ارسال</button></section>:<>{filteredDemoOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}{!filteredDemoOrders.length&&<EmptyState title="ارسالی پیدا نشد" body="شماره سفارش یا نشانی دیگری را جست‌وجو کنید."/>}</>}</div>
       </>}
+      {screen==='success'&&<section className="demo-success" aria-label="ثبت موفق ارسال"><div className="demo-success-icon" aria-hidden="true">✓</div><h1>ارسال با موفقیت ثبت شد</h1><p>تعهد تحویل ثبت شده و عملیات تخصیص آغاز شده است.</p><section className="demo-success-card" aria-label="جزئیات ارسال ثبت‌شده"><div><span>شناسه سفارش</span><strong>۸۴۳۱</strong><b>در انتظار تخصیص</b></div><div><span>تعهد تحویل</span><strong>تا ۱۹:۳۵</strong></div></section><button className="primary-button" onClick={()=>{setScreen('detail');setToast('')}}>مشاهده ارسال</button><button className="secondary-button" onClick={()=>{setConfirmed(false);setOrder('۸۴۳۲');setScreen('create');setToast('')}}>ثبت ارسال دیگر</button></section>}
       {screen==='detail'&&<>
         <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${!confirmed&&detailStatus!=='فعال'?'warning':''}`}>{detailStatus}</span></div>
         <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':detailStatus==='تحویل‌شده'?'زمان تحویل':detailStatus==='ناموفق'?'وضعیت ارسال':'تعهد تحویل'}</span><strong>{detailPromise}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':detailStatus==='تحویل‌شده'?'تحویل به گیرنده انجام شد':detailStatus==='ناموفق'?'ارسال لغو شد؛ نیاز به بررسی دارد':detailStatus==='فعال'?'ارسال در جریان؛ دادهٔ نمایشی':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
