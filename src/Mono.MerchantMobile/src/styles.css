@@ -282,3 +282,20 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-infeasible-guidance strong { color:#007f96; font-size:12.5px; font-weight:600; }
 .demo-infeasible-guidance p { margin:0; color:#5d6c72; font-size:10.5px; line-height:23px; }
 .demo-infeasible>.primary-button { width:100%; min-height:50px; margin-top:40px; border-radius:12px; font-size:12.5px; }
+
+
+/* Figma 374:11 — cancel confirmation */
+.demo-cancel-entry { width:100%; min-height:44px; margin-top:10px; border:1px solid #f0d2ca; border-radius:12px; background:#fff8f6; color:#aa4d31; font-size:11px; font-weight:700; }
+.demo-cancel-confirm { display:flex; flex-direction:column; width:100%; padding-top:51px; }
+.demo-cancel-eligibility { display:flex; flex-direction:column; justify-content:center; gap:10px; width:100%; min-height:116px; padding:18px; border:1px solid #f1d7c2; border-radius:14px; background:#fff7f0; text-align:right; }
+.demo-cancel-eligibility strong { color:#9a571f; font-size:14px; font-weight:700; }
+.demo-cancel-eligibility p { margin:0; color:#7d6b60; font-size:10.5px; }
+.demo-cancel-confirm h2 { margin:30px 0 10px; color:#0b0b0e; font-size:14px; line-height:1.6; }
+.demo-cancel-consequences { display:flex; flex-direction:column; justify-content:center; gap:5px; width:100%; min-height:162px; padding:16px 18px; border:1px solid #dde7ea; border-radius:14px; background:#fff; text-align:right; }
+.demo-cancel-consequences p { margin:0; color:#0b0b0e; font-size:11px; line-height:31px; }
+.demo-cancel-consequences strong { margin-top:2px; color:#b94b3d; font-size:10.5px; font-weight:600; }
+.demo-cancel-confirm-note { display:grid; min-height:88px; place-items:center; margin-top:38px; border-radius:14px; background:#f7fafb; color:#0b0b0e; font-size:11px; font-weight:600; text-align:center; }
+.demo-cancel-actions { display:flex; gap:14px; margin-top:40px; }
+.demo-cancel-actions button { min-height:50px; border-radius:12px; font-size:12px; font-weight:600; }
+.demo-cancel-actions .secondary-button { flex:0 0 110px; border:1px solid #cbd9dd; background:#fff; color:#0b0b0e; box-shadow:none; }
+.demo-cancel-approve { flex:1; border:0; background:#b94b3d; color:#fff; }
