@@ -131,6 +131,12 @@ describe('Mono merchant mobile P0', () => {
 
     await user.click(screen.getByRole('button', { name: /جردن.*۲ ارسال فعال/ }))
     expect(screen.getByText('شعبه جردن')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /سفارش ۸۴۵۲/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /سفارش ۸۴۲۱/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ارسال‌ها' }))
+    expect(screen.getByRole('button', { name: /سفارش ۸۴۵۲/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /سفارش ۸۴۲۱/ })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'جردن ⌄' }))
     expect(screen.getByRole('button', { name: /شعبه جردن، انتخاب‌شده/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /پونک.*موقتاً غیرفعال/ })).toBeDisabled()
