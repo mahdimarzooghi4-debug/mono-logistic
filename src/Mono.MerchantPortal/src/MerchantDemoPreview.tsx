@@ -98,7 +98,7 @@ export default function MerchantDemoPreview({ onExit }: { onExit: () => void }) 
           <div className="create-form-column">
             <section className="panel create-form-section"><h2>مبدا و زمان آمادگی</h2><div className="create-fields two">
               <label>شعبهٔ مبدا<select name="branch" defaultValue="ونک"><option>ونک</option><option>جردن</option><option>میرداماد</option></select></label>
-              <label>زمان تقریبی آماده‌شدن<input type="datetime-local" defaultValue="2026-11-02T12:30" /></label>
+              <label>زمان تقریبی آماده‌شدن<input type="datetime-local" lang="fa-IR" dir="rtl" defaultValue="2026-11-02T12:30" /></label>
               <label className="full">آدرس مبدا<input defaultValue="تهران، ونک، خیابان ملاصدرا" /></label>
             </div></section>
             <section className="panel create-form-section"><h2>گیرنده و مقصد</h2><div className="create-fields two">
