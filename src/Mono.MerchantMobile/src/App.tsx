@@ -258,15 +258,17 @@ function MerchantMobileDemo() {
   const nav:[DemoMobileScreen,string,string][]=[['more','بیشتر','more'],['notifications','اعلان‌ها','bell'],['create','ثبت','plus'],['deliveries','ارسال‌ها','list'],['home','خانه','home']]
   const orders=[
     {id:'۸۴۳۰',route:'ونک ← یوسف‌آباد',detail:'تحویل تا ۱۹:۲۰',status:'فعال',warning:false},
-    {id:'۸۴۲۱',route:'ونک ← جردن',detail:'تعهد ۱۸:۴۵ • ۱۲ دقیقه ریسک',status:'تاخیر',warning:true},
-    {id:'۸۴۱۸',route:'ونک ← میرداماد',detail:'تحویل تا ۲۰:۱۰',status:'فعال',warning:false},
+    {id:'۸۴۲۱',route:'ونک ← جردن',detail:'تعهد ۱۸:۴۵ • ۱۲ دقیقه ریسک',status:'در معرض دیرکرد',warning:true},
+    {id:'۸۴۱۸',route:'ونک ← میرداماد',detail:'تحویل شد ۱۹:۵۸',status:'تحویل‌شده',warning:false},
     {id:'۸۴۱۵',route:'ونک ← سعادت‌آباد',detail:'تحویل تا ۲۰:۳۰',status:'فعال',warning:false},
+    {id:'۸۴۱۲',route:'ونک ← تهران‌پارس',detail:'ارسال لغو شد • ۱۸:۲۰',status:'ناموفق',warning:true},
+    {id:'۸۴۱۰',route:'ونک ← شهرک غرب',detail:'تحویل تا ۲۰:۴۰',status:'فعال',warning:false},
   ]
   const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='notifications'?'اعلان‌ها':'بیشتر'
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function review(){setScreen('review');setToast('')}
   function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('detail');setToast('درخواست نمایشی ثبت شد؛ در نسخهٔ واقعی باید به حساب مشتری متصل باشد.')}
-  const visibleOrders=orders.filter(item=>filter==='active'||(filter==='failed'&&item.warning)||(filter==='completed'&&item.id==='۸۴۱۸'))
+  const visibleOrders=orders.filter(item=>filter==='active'?['فعال','در معرض دیرکرد'].includes(item.status):filter==='failed'?item.status==='ناموفق':item.status==='تحویل‌شده')
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>شعبه ونک</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
@@ -288,10 +290,10 @@ function MerchantMobileDemo() {
         <div className="delivery-list demo-delivery-list">{visibleOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}</div>
       </>}
       {screen==='detail'&&<>
-        <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${confirmed?'':'warning'}`}>{confirmed?'در انتظار تخصیص پیک':'در معرض دیرکرد'}</span></div>
-        <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':'تعهد تحویل'}</span><strong>{confirmed?'۱۹:۳۵':'۱۸:۴۵'}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
+        <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${!confirmed&&['۸۴۲۱','۸۴۱۲'].includes(order)?'warning':''}`}>{confirmed?'در انتظار تخصیص پیک':order==='۸۴۱۸'?'تحویل‌شده':order==='۸۴۱۲'?'ناموفق':'در معرض دیرکرد'}</span></div>
+        <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':order==='۸۴۱۸'?'زمان تحویل':order==='۸۴۱۲'?'وضعیت ارسال':'تعهد تحویل'}</span><strong>{confirmed?'۱۹:۳۵':order==='۸۴۱۸'?'۱۹:۵۸':order==='۸۴۱۲'?'ناموفق':'۱۸:۴۵'}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':order==='۸۴۱۸'?'تحویل به گیرنده انجام شد':order==='۸۴۱۲'?'ارسال لغو شد؛ نیاز به بررسی دارد':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
         <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
-        <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه ونک</strong></div><div><small>مقصد</small><strong>{confirmed?demoDestination:'یوسف‌آباد، خیابان شصت‌وچهارم'}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
+        <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه ونک</strong></div><div><small>مقصد</small><strong>{confirmed?demoDestination:order==='۸۴۱۸'?'میرداماد':order==='۸۴۱۲'?'تهران‌پارس':order==='۸۴۱۵'?'سعادت‌آباد':order==='۸۴۱۰'?'شهرک غرب':'یوسف‌آباد، خیابان شصت‌وچهارم'}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
         <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>پشتیبانی</button><button className="primary-button" onClick={()=>setToast('اقدامی برای این ارسال در محیط نمایشی ثبت نمی‌شود.')}>مشاهده اقدام‌ها</button></div>
         {confirmed&&<p className="demo-confirmed-note">درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.</p>}
       </>}
