@@ -11,7 +11,7 @@ type DeliveryPage = { items: Delivery[]; next_cursor: string | null }
 type Quote = { quote_id: string; version: number; expires_at: string; is_expired: boolean; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number }
 type PromiseRecord = { promise_id: string; version: number; committed_delivery_at: string; outcome: string }
 type Detail = Delivery & { quote: Quote | null; promise: PromiseRecord | null }
-type View = 'home' | 'deliveries' | 'create' | 'notifications' | 'finance' | 'profile' | 'settings' | 'more'
+type View = 'home' | 'deliveries' | 'create' | 'notifications' | 'finance' | 'profile' | 'settings' | 'support' | 'more'
 type ApiError = { error?: { code?: string; message?: string } }
 
 const fa = new Intl.NumberFormat('fa-IR')
@@ -244,7 +244,7 @@ export default function App() {
   </main>
 }
 
-type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'more'
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'support' | 'more'
 
 function MerchantMobileDemo() {
   const [screen,setScreen]=useState<DemoMobileScreen>('home')
@@ -281,8 +281,8 @@ function MerchantMobileDemo() {
     {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
-  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':'بیشتر'
-  const headerSubtitle=screen==='exception'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='support'?'پشتیبانی':'بیشتر'
+  const headerSubtitle=screen==='exception'||screen==='support'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
     setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
@@ -303,7 +303,7 @@ function MerchantMobileDemo() {
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
-      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
+      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='support'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
@@ -325,7 +325,7 @@ function MerchantMobileDemo() {
         <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':detailStatus==='تحویل‌شده'?'زمان تحویل':detailStatus==='ناموفق'?'وضعیت ارسال':'تعهد تحویل'}</span><strong>{detailPromise}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':detailStatus==='تحویل‌شده'?'تحویل به گیرنده انجام شد':detailStatus==='ناموفق'?'ارسال لغو شد؛ نیاز به بررسی دارد':detailStatus==='فعال'?'ارسال در جریان؛ دادهٔ نمایشی':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
         <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:detailStatus==='تحویل‌شده'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۲۰</small></span></div><div className="done"><i/><span><strong>تحویل به پیک</strong><small>۱۹:۱۰</small></span></div><div className="done"><i/><span><strong>تحویل به گیرنده</strong><small>۱۹:۵۸</small></span></div></>:detailStatus==='ناموفق'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۰۵</small></span></div><div className="late"><i/><span><strong>ارسال ناموفق شد</strong><small>۱۸:۲۰</small></span></div></>:detailStatus==='فعال'?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>در حال اجرا</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
         <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه {confirmed?activeBranch:selectedOrder?.branchName||activeBranch}</strong></div><div><small>مقصد</small><strong>{detailDestination}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
-        <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>پشتیبانی</button><button className="primary-button" onClick={()=>order==='۸۴۲۱'?setScreen('exception'):setToast('برای این ارسال نمونه، استثنای فعالی ثبت نشده است.')}>مشاهده اقدام‌ها</button></div>
+        <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>{setScreen('support');setToast('')}}>پشتیبانی</button><button className="primary-button" onClick={()=>order==='۸۴۲۱'?setScreen('exception'):setToast('برای این ارسال نمونه، استثنای فعالی ثبت نشده است.')}>مشاهده اقدام‌ها</button></div>
         {confirmed&&<p className="demo-confirmed-note">درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.</p>}
       </>}
       {screen==='exception'&&<>
@@ -356,6 +356,20 @@ function MerchantMobileDemo() {
         <div className="demo-branch-list">{[{name:'جردن',count:'۲',available:true},{name:'میرداماد',count:'۰',available:true},{name:'پونک',count:'۰',available:false},{name:'پاسداران',count:'۱',available:true}].filter(branch=>branch.name!==activeBranch).map(branch=><button className="demo-branch-card" key={branch.name} disabled={!branch.available} aria-label={`${branch.name}؛ ${branch.available?`آماده ارسال • ${branch.count} ارسال فعال`:'موقتاً غیرفعال'}`} onClick={()=>{setActiveBranch(branch.name);setScreen('home');setToast('')}}><span className="demo-branch-copy"><strong>{branch.name}</strong><small>{branch.available?`آماده ارسال • ${branch.count} ارسال فعال`:'موقتاً غیرفعال'}</small></span><span className="demo-branch-arrow" aria-hidden="true">‹</span></button>)}</div>
         <p className="demo-branch-note">ارسال جدید از شعبهٔ انتخاب‌شده ثبت می‌شود.</p>
       </>}
+      {screen==='support'&&<>
+        <div className="section-head compact demo-page-heading"><h1>زمینه ارسال به‌صورت خودکار متصل شد</h1></div>
+        <section className="demo-support-order" aria-label={`سفارش ${order}`}>
+          <strong>سفارش {order}</strong>
+          <span>{order==='۸۴۲۱'?'در معرض دیرکرد • تعهد ۱۸:۴۵':selectedOrder?.detail||'در حال ارسال'}</span>
+        </section>
+        <fieldset className="demo-support-topics">
+          <legend>موضوع درخواست</legend>
+          {['تاخیر در تحویل','تغییر اطلاعات گیرنده','مشکل در لغو','موضوع دیگر'].map(topic=><label className="demo-support-topic" key={topic}><input type="radio" name="support-topic" value={topic} defaultChecked={topic==='تاخیر در تحویل'}/><span>{topic}</span></label>)}
+        </fieldset>
+        <label className="demo-support-description">توضیح کوتاه<textarea aria-label="توضیح کوتاه" placeholder="در صورت نیاز توضیح بیشتری اضافه کنید…"/></label>
+        <button className="demo-support-submit" onClick={()=>setToast('درخواست پشتیبانی نمایشی ثبت شد؛ هنوز به سامانهٔ پشتیبانی وصل نیست.')}>ثبت درخواست پشتیبانی</button>
+        <small className="demo-support-demo-label">ارسال درخواست در این نسخه فقط نمایشی است.</small>
+      </>}
       {screen==='notifications'&&<>
         <div className="section-head compact demo-page-heading"><h1>اعلان‌ها</h1></div>
         <div className="demo-notification-filters" role="tablist" aria-label="دسته‌بندی اعلان‌ها">{([['all','همه'],['action','نیازمند اقدام'],['info','اطلاع‌رسانی']] as const).map(([key,label])=><button key={key} role="tab" aria-selected={notificationFilter===key} className={notificationFilter===key?'selected':''} onClick={()=>setNotificationFilter(key)}>{label}</button>)}</div>
@@ -369,7 +383,7 @@ function MerchantMobileDemo() {
           <button className="demo-more-item" aria-label="پروفایل، مشخصات فردی و نقش" onClick={()=>setScreen('profile')}><span className="demo-more-icon">م</span><span><strong>پروفایل</strong><small>مشخصات فردی و نقش</small></span><b>‹</b></button>
           <button className="demo-more-item" onClick={()=>setScreen('branch')}><span className="demo-more-icon">⌂</span><span><strong>شعب</strong><small>مشاهده و تغییر شعبه فعال</small></span><b>‹</b></button>
           <button className="demo-more-item" aria-label="مالی، خلاصه هزینه‌ها و وضعیت تسویه" onClick={()=>setScreen('finance')}><span className="demo-more-icon">▤</span><span><strong>مالی</strong><small>خلاصه هزینه‌ها و وضعیت تسویه</small></span><b>‹</b></button>
-          <button className="demo-more-item" onClick={()=>setToast('بخش پشتیبانی در نسخهٔ نمایشی در دسترس نیست.')}><span className="demo-more-icon">؟</span><span><strong>پشتیبانی</strong><small>درخواست‌ها و ارتباط با پشتیبانی</small></span><b>‹</b></button>
+          <button className="demo-more-item" onClick={()=>{setOrder('۸۴۲۱');setScreen('support');setToast('')}}><span className="demo-more-icon">؟</span><span><strong>پشتیبانی</strong><small>درخواست‌ها و ارتباط با پشتیبانی</small></span><b>‹</b></button>
           <button className="demo-more-item" onClick={()=>setScreen('settings')}><span className="demo-more-icon">⚙</span><span><strong>تنظیمات</strong><small>اعلان‌ها، امنیت و ترجیحات</small></span><b>‹</b></button>
           <div className="demo-more-web"><strong>تنظیمات سازمانی کامل</strong><small>مدیریت اعضا، اتصال‌ها و هویت بصری در پنل وب</small></div>
         </div>
