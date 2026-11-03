@@ -244,7 +244,7 @@ export default function App() {
   </main>
 }
 
-type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'support' | 'more'
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'support' | 'more'
 
 function MerchantMobileDemo() {
   const [screen,setScreen]=useState<DemoMobileScreen>('home')
@@ -254,6 +254,7 @@ function MerchantMobileDemo() {
   const [activeBranch,setActiveBranch]=useState('ونک')
   const [confirmed,setConfirmed]=useState(false)
   const [toast,setToast]=useState('')
+  const [notificationPrefs,setNotificationPrefs]=useState({risk:true,assignment:true,pickup:true,completion:true,finance:false})
   const [notificationFilter,setNotificationFilter]=useState<'all'|'action'|'info'>('all')
   const [readNotificationIds,setReadNotificationIds]=useState<string[]>([])
   const [demoRecipient,setDemoRecipient]=useState('مریم اکبری')
@@ -281,8 +282,8 @@ function MerchantMobileDemo() {
     {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
-  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='support'?'پشتیبانی':'بیشتر'
-  const headerSubtitle=screen==='exception'||screen==='support'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='support'?'پشتیبانی':'بیشتر'
+  const headerSubtitle=screen==='exception'||screen==='support'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
     setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
@@ -303,7 +304,7 @@ function MerchantMobileDemo() {
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
-      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='support'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
+      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='support'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
@@ -356,6 +357,20 @@ function MerchantMobileDemo() {
         <div className="demo-branch-list">{[{name:'جردن',count:'۲',available:true},{name:'میرداماد',count:'۰',available:true},{name:'پونک',count:'۰',available:false},{name:'پاسداران',count:'۱',available:true}].filter(branch=>branch.name!==activeBranch).map(branch=><button className="demo-branch-card" key={branch.name} disabled={!branch.available} aria-label={`${branch.name}؛ ${branch.available?`آماده ارسال • ${branch.count} ارسال فعال`:'موقتاً غیرفعال'}`} onClick={()=>{setActiveBranch(branch.name);setScreen('home');setToast('')}}><span className="demo-branch-copy"><strong>{branch.name}</strong><small>{branch.available?`آماده ارسال • ${branch.count} ارسال فعال`:'موقتاً غیرفعال'}</small></span><span className="demo-branch-arrow" aria-hidden="true">‹</span></button>)}</div>
         <p className="demo-branch-note">ارسال جدید از شعبهٔ انتخاب‌شده ثبت می‌شود.</p>
       </>}
+      {screen==='notificationSettings'&&<>
+        <div className="section-head compact demo-page-heading"><h1>چه اعلان‌هایی دریافت کنید؟</h1></div>
+        <div className="demo-notification-preferences" aria-label="ترجیحات اعلان‌های عملیاتی">
+          {([
+            ['risk','ریسک دیرکرد و استثنا','همیشه برای موارد نیازمند توجه'],
+            ['assignment','تخصیص پیک','وقتی پیک به ارسال تخصیص داده شد'],
+            ['pickup','تحویل از شعبه','وقتی سفارش از مبدأ تحویل گرفته شد'],
+            ['completion','تحویل نهایی','پس از تحویل موفق یا ناموفق'],
+            ['finance','مالی','صورتحساب و اعلان‌های مالی'],
+          ] as const).map(([key,title,description])=><button type="button" role="switch" aria-checked={notificationPrefs[key]} aria-label={title} className="demo-notification-preference" key={key} onClick={()=>setNotificationPrefs(prefs=>({...prefs,[key]:!prefs[key]}))}><span className="demo-notification-preference-copy"><strong>{title}</strong><small>{description}</small></span><span className={'demo-toggle '+(notificationPrefs[key]?'on':'')} aria-hidden="true"><i/></span></button>)}
+        </div>
+        <div className="demo-critical-notice">اعلان‌های بحرانی عملیاتی حتی در حالت کم‌صدا نمایش داده می‌شوند.</div>
+        <small className="demo-settings-demo-label">ترجیحات در این نسخهٔ نمایشی ذخیره نمی‌شوند.</small>
+      </>}
       {screen==='support'&&<>
         <div className="section-head compact demo-page-heading"><h1>زمینه ارسال به‌صورت خودکار متصل شد</h1></div>
         <section className="demo-support-order" aria-label={`سفارش ${order}`}>
@@ -392,7 +407,7 @@ function MerchantMobileDemo() {
         <div className="section-head compact demo-page-heading"><h1>تنظیمات</h1></div>
         <h2 className="demo-settings-section-title">تنظیمات</h2>
         <div className="demo-settings-list">
-          <button className="demo-settings-item" aria-label="اعلان‌ها، انتخاب اعلان‌های عملیاتی و مالی" onClick={()=>setToast('تنظیمات اعلان در صفحهٔ بعد تکمیل می‌شود.')}><span className="demo-settings-icon">♧</span><span><strong>اعلان‌ها</strong><small>انتخاب اعلان‌های عملیاتی و مالی</small></span><b>‹</b></button>
+          <button className="demo-settings-item" aria-label="اعلان‌ها، انتخاب اعلان‌های عملیاتی و مالی" onClick={()=>{setScreen('notificationSettings');setToast('')}}><span className="demo-settings-icon">♧</span><span><strong>اعلان‌ها</strong><small>انتخاب اعلان‌های عملیاتی و مالی</small></span><b>‹</b></button>
           <button className="demo-settings-item" aria-label={`شعبه پیش‌فرض، شعبه ${activeBranch}`} onClick={()=>setScreen('branch')}><span className="demo-settings-icon">⌂</span><span><strong>شعبه پیش‌فرض</strong><small>شعبه {activeBranch}</small></span><b>‹</b></button>
           <button className="demo-settings-item" aria-label="امنیت و نشست‌ها، دستگاه‌ها و خروج از نشست" onClick={()=>setToast('مدیریت نشست‌ها در صفحهٔ امنیت تکمیل می‌شود.')}><span className="demo-settings-icon">▣</span><span><strong>امنیت و نشست‌ها</strong><small>دستگاه‌ها و خروج از نشست</small></span><b>‹</b></button>
           <button className="demo-settings-item" aria-label="ظاهر برنامه، حالت روشن" onClick={()=>setToast('حالت روشن در این نسخه فعال است.')}><span className="demo-settings-icon">☼</span><span><strong>ظاهر برنامه</strong><small>حالت روشن</small></span><b>‹</b></button>
