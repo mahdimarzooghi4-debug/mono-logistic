@@ -454,11 +454,11 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-drawer .demo-drawer-check { display:flex; align-items:center; gap:8px; }
 .demo-drawer form>footer { display:flex; gap:8px; margin-top:8px; padding-top:16px; border-top:1px solid #e7edef; }
 .demo-drawer form>footer button { min-height:38px; font-size:11px; }
-.branch-drawer-backdrop { right:248px; background:#0b0b0e33; }
+.branch-drawer-backdrop { right:248px; background:#0b0b0e33; direction:ltr; }
 .branch-drawer { display:flex; width:min(480px,100%); height:min(837px,100dvh); flex:none; flex-direction:column; gap:8px; overflow:auto; border-right:1px solid #dce4e8; padding:18px 24px; box-shadow:none; }
-.demo-drawer.branch-drawer>header { display:flex; height:58px; flex:none; align-items:center; gap:8px; margin:0; padding:0; border:0; }
+.demo-drawer.branch-drawer>header { display:flex; height:58px; flex:none; align-items:center; gap:8px; margin:0; padding:0; border:0; direction:ltr; }
 .demo-drawer.branch-drawer>header>button { width:74px; height:34px; flex:none; border:1px solid #d9e3e7; border-radius:9px; color:#0b0b0e; background:#fff; font:600 12px Vazirmatn, sans-serif; cursor:pointer; }
-.branch-drawer-header>div { min-width:0; flex:1; text-align:right; }
+.branch-drawer-header>div { min-width:0; flex:1; direction:rtl; text-align:right; }
 .demo-drawer.branch-drawer>header h2 { margin:0; color:#0b0b0e; font-size:22px; line-height:1.25; }
 .demo-drawer.branch-drawer>header small { display:block; color:#66727a; font-size:9px; }
 .demo-drawer.branch-drawer form { display:flex; min-height:0; flex:1; flex-direction:column; gap:8px; }
@@ -466,13 +466,17 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-drawer.branch-drawer .branch-drawer-field>input,.demo-drawer.branch-drawer .branch-drawer-field>select { width:100%; height:22px; min-height:22px; border:0; outline:0; padding:0; color:#0b0b0e; background:transparent; font:600 10.5px Vazirmatn, sans-serif; }
 .demo-drawer.branch-drawer .branch-drawer-field>input::placeholder { color:#9aa4aa; }
 .demo-drawer.branch-drawer .branch-drawer-field>input[readonly] { color:#0b0b0e; }
-.branch-drawer-row { display:grid; flex:none; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-.branch-drawer-toggle { display:flex; min-height:32px; flex:none; align-items:center; gap:8px; margin:0; color:#0b0b0e; font-size:10.5px; font-weight:600; }
-.branch-drawer-toggle input { width:34px; height:20px; margin:0; accent-color:#00a8c6; }
+.branch-drawer-row { display:grid; flex:none; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; direction:ltr; }
+.branch-drawer-row>.branch-drawer-field { direction:rtl; }
+.branch-drawer-toggle { display:flex; min-height:32px; flex:none; align-items:center; gap:8px; margin:0; color:#0b0b0e; font-size:10.5px; font-weight:600; direction:ltr; }
+.branch-drawer-toggle span { direction:rtl; }
+.demo-drawer.branch-drawer .branch-drawer-toggle input { appearance:none; position:relative; width:34px; height:20px; margin:0; border:0; border-radius:999px; background:#00a8c6; cursor:pointer; }
+.demo-drawer.branch-drawer .branch-drawer-toggle input::after { position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; content:""; transition:transform .15s ease; }
+.demo-drawer.branch-drawer .branch-drawer-toggle input:checked::after { transform:translateX(14px); }
 .branch-drawer-note { margin:auto 0 0; border-radius:9px; padding:7px 10px; color:#66727a; background:#f4fbfc; font-size:8px; line-height:1.7; text-align:right; }
 .demo-drawer.branch-drawer form>footer.branch-drawer-actions { display:flex; height:42px; flex:none; gap:8px; margin:0; border:0; padding:0; direction:ltr; }
 .demo-drawer.branch-drawer form>footer.branch-drawer-actions button { height:42px; min-height:42px; font-size:12px; }
-.demo-drawer.branch-drawer form>footer.branch-drawer-actions .secondary-button { width:150px; }
+.demo-drawer.branch-drawer form>footer.branch-drawer-actions .secondary-button { width:150px; border:1px solid #d9e3e7; color:#0b0b0e; background:#fff; }
 .demo-drawer.branch-drawer form>footer.branch-drawer-actions .primary-button { flex:1; }
 @media(max-width:1000px){.branch-drawer-backdrop{right:210px}}
 @media(max-width:720px){.branch-drawer-backdrop{right:0}.branch-drawer{height:100dvh;padding:16px}.branch-drawer-row{gap:7px}}
