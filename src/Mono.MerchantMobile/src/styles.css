@@ -267,3 +267,18 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-error-preserved span { color:#66727a; font-size:10.5px; }
 .demo-error>.primary-button,.demo-error>.secondary-button { width:100%; min-height:50px; margin-top:42px; border-radius:12px; font-size:12.5px; }
 .demo-error>.secondary-button { min-height:48px; margin-top:18px; border:1px solid #cbd9dd; background:#fff; color:#0b0b0e; box-shadow:none; }
+
+
+/* Figma 374:10 — infeasible delivery result */
+.demo-infeasible { display:flex; flex-direction:column; align-items:center; width:100%; padding-top:40px; text-align:center; }
+.demo-infeasible-badge { display:grid; min-width:114px; height:30px; place-items:center; padding:0 12px; border-radius:999px; background:#fff1ee; color:#b94b3d; font-size:10px; font-weight:600; }
+.demo-infeasible h1 { max-width:322px; margin:20px 0 0; color:#0b0b0e; font-size:20px; line-height:34px; font-weight:700; }
+.demo-infeasible-reason { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:12px; width:100%; min-height:136px; margin-top:54px; padding:15px 18px; border:1px solid #dde7ea; border-radius:14px; background:#fff; text-align:right; }
+.demo-infeasible-reason small { color:#7a858b; font-size:10px; }
+.demo-infeasible-reason strong { color:#0b0b0e; font-size:12px; line-height:26px; font-weight:600; }
+.demo-infeasible-reason span { color:#66727a; font-size:10px; }
+.demo-infeasible h2 { align-self:flex-start; margin:32px 0 12px; color:#0b0b0e; font-size:14px; line-height:1.6; }
+.demo-infeasible-guidance { display:flex; flex-direction:column; justify-content:center; gap:10px; width:100%; min-height:122px; padding:15px 18px; border:1px solid #c7e3e8; border-radius:14px; background:#eef8fa; text-align:right; }
+.demo-infeasible-guidance strong { color:#007f96; font-size:12.5px; font-weight:600; }
+.demo-infeasible-guidance p { margin:0; color:#5d6c72; font-size:10.5px; line-height:23px; }
+.demo-infeasible>.primary-button { width:100%; min-height:50px; margin-top:40px; border-radius:12px; font-size:12.5px; }
