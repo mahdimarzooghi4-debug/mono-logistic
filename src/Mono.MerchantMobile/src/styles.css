@@ -98,3 +98,17 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-notification-copy strong{overflow:hidden;color:#26363d;font-size:10px;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
 .demo-notification-copy small{overflow:hidden;color:#718087;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
 .demo-notification-arrow{color:#7b8a90;font-size:22px;line-height:1}
+
+.demo-exception-overview{display:grid;gap:7px;margin:10px 0 20px;padding:16px;border:1px solid #f0d5bf;border-radius:14px;background:#fff8f1}
+.demo-exception-badge{justify-self:start;padding:5px 9px;border-radius:999px;background:#fff0df;color:#a85a1d;font-size:9px;font-weight:700}
+.demo-exception-overview>strong{color:#a85a1d;font-size:13px}
+.demo-exception-overview>small{color:#84746b;font-size:9px}
+.demo-exception-section{margin:0 0 20px}
+.demo-exception-section h2{margin:0 0 10px;color:#394a50;font-size:12px}
+.demo-exception-card{min-height:116px;padding:14px 16px;border:1px solid var(--border);border-radius:13px;background:white}
+.demo-exception-card strong{display:block;margin:0 0 8px;color:#26363d;font-size:11px}
+.demo-exception-card p{margin:0;color:#718087;font-size:9px;line-height:1.9}
+.demo-exception-action{min-height:102px}
+.demo-exception-user{margin-top:26px}
+.demo-exception-actions{display:flex;gap:14px}
+.demo-exception-actions button{min-width:0;height:48px;min-height:48px;flex:1;padding:0 5px;border-radius:11px;font-size:9px;white-space:nowrap}
