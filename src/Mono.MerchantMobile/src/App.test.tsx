@@ -37,6 +37,13 @@ describe('Mono merchant mobile P0', () => {
     expect(screen.getByText('یک ارسال در معرض دیرکرد')).toBeInTheDocument()
     expect(screen.getByText('سفارش ۸۴۲۱ • تعهد تا ۱۸:۴۵')).toBeInTheDocument()
 
+    await user.click(screen.getByRole('button', { name: 'ارسال‌ها' }))
+    await user.click(screen.getByRole('tab', { name: 'تکمیل‌شده' }))
+    expect(screen.getByRole('button', { name: /سفارش ۸۴۱۸/ })).toHaveTextContent('تحویل‌شده')
+    await user.click(screen.getByRole('tab', { name: 'ناموفق' }))
+    expect(screen.getByRole('button', { name: /سفارش ۸۴۱۲/ })).toHaveTextContent('ناموفق')
+    await user.click(screen.getByRole('tab', { name: 'فعال' }))
+
     await user.click(screen.getByRole('button', { name: 'ثبت ارسال جدید' }))
     expect(screen.getByRole('heading', { name: 'ثبت ارسال جدید' })).toBeInTheDocument()
     await user.clear(screen.getByLabelText('نام گیرنده'))
