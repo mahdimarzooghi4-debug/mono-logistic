@@ -28,6 +28,21 @@ function mockConnectedApi(detail: unknown = { ...baseDelivery, quote: null, prom
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/') })
 
 describe('Mono merchant mobile P0', () => {
+  it('shows the Figma feasibility loading screen with pickup and destination', () => {
+    window.history.replaceState({}, '', '/?demo=1&state=loading')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    expect(screen.getByText('بررسی هزینه و زمان')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'در حال بررسی امکان اجرا' })).toBeInTheDocument()
+    expect(screen.getByText('مونو پوشش، ظرفیت، مسیر و زمان تحویل را بررسی می‌کند.')).toBeInTheDocument()
+    expect(screen.getByText('شعبه ونک')).toBeInTheDocument()
+    expect(screen.getByText('سعادت‌آباد، بلوار دریا')).toBeInTheDocument()
+    expect(screen.getByText('این مرحله معمولاً چند ثانیه طول می‌کشد.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('matches the Figma active-deliveries empty state and starts the first delivery', async () => {
     window.history.replaceState({}, '', '/?demo=1&state=empty')
     const fetchMock = vi.fn()
@@ -83,7 +98,8 @@ describe('Mono merchant mobile P0', () => {
     await user.clear(screen.getByLabelText('نشانی مقصد'))
     await user.type(screen.getByLabelText('نشانی مقصد'), 'میدان ونک')
     await user.click(screen.getByRole('button', { name: 'بررسی هزینه و زمان' }))
-    expect(screen.getByRole('heading', { name: 'پیشنهاد مونو' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'در حال بررسی امکان اجرا' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'پیشنهاد مونو' })).toBeInTheDocument(), { timeout: 3500 })
     expect(screen.getByText('۴۲٬۵۰۰ تومان')).toBeInTheDocument()
     expect(screen.getByText('علی رضایی')).toBeInTheDocument()
     expect(screen.getByText('میدان ونک')).toBeInTheDocument()
