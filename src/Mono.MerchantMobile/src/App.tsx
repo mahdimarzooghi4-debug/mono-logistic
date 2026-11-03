@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 
 type Branch = { branchId: string; name: string; address: string | null; status: string }
 type BranchPage = { branches: Branch[] }
@@ -55,6 +55,7 @@ function newIdempotencyKey() {
 }
 
 export default function App() {
+  const [demoPreview] = useState(() => new URLSearchParams(window.location.search).get('demo') === '1')
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [view, setView] = useState<View>('home')
@@ -173,6 +174,8 @@ export default function App() {
     { id: 'create', title: 'ثبت', icon: '+' }, { id: 'deliveries', title: 'ارسال‌ها', icon: '▤' }, { id: 'home', title: 'خانه', icon: '⌂' },
   ]
 
+  if (demoPreview) return <MerchantMobileDemo />
+
   return <main className="mobile-shell">
     <header className="app-header">
       <div className="brand-mark" aria-hidden="true">م</div>
@@ -239,6 +242,91 @@ export default function App() {
 
     {token && <nav className="bottom-nav" aria-label="ناوبری اصلی">{nav.map(item => <button key={item.id} className={`${view === item.id ? 'active' : ''} ${item.id === 'create' ? 'create-tab' : ''}`} onClick={() => { setView(item.id); setError(''); setNotice('') }} aria-current={view === item.id ? 'page' : undefined}><span>{item.icon}</span><small>{item.title}</small></button>)}</nav>}
   </main>
+}
+
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'create' | 'review' | 'notifications' | 'more'
+
+function MerchantMobileDemo() {
+  const [screen,setScreen]=useState<DemoMobileScreen>('home')
+  const [filter,setFilter]=useState<'active'|'completed'|'failed'>('active')
+  const [order,setOrder]=useState('۸۴۲۱')
+  const [confirmed,setConfirmed]=useState(false)
+  const [toast,setToast]=useState('')
+  const nav:[DemoMobileScreen,string,string][]=[['more','بیشتر','more'],['notifications','اعلان‌ها','bell'],['create','ثبت','plus'],['deliveries','ارسال‌ها','list'],['home','خانه','home']]
+  const orders=[
+    {id:'۸۴۳۰',route:'ونک ← یوسف‌آباد',detail:'تحویل تا ۱۹:۲۰',status:'فعال',warning:false},
+    {id:'۸۴۲۱',route:'ونک ← جردن',detail:'تعهد ۱۸:۴۵ • ۱۲ دقیقه ریسک',status:'تاخیر',warning:true},
+    {id:'۸۴۱۸',route:'ونک ← میرداماد',detail:'تحویل تا ۲۰:۱۰',status:'فعال',warning:false},
+    {id:'۸۴۱۵',route:'ونک ← سعادت‌آباد',detail:'تحویل تا ۲۰:۳۰',status:'فعال',warning:false},
+  ]
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='notifications'?'اعلان‌ها':'بیشتر'
+  function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
+  function review(){setScreen('review');setToast('')}
+  function confirm(){setConfirmed(true);setScreen('detail');setToast('ارسال برای ثبت نهایی آماده است؛ این فقط پیش‌نمایش است.')}
+  const visibleOrders=orders.filter(item=>filter==='active'||(filter==='failed'&&item.warning)||(filter==='completed'&&item.id==='۸۴۱۸'))
+  return <main className="mobile-shell demo-shell">
+    <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>شعبه ونک</span></div></header>
+    <section className="page-content demo-page" aria-live="polite">
+      {screen!=='detail'&&screen!=='review'&&screen!=='create'&&<button className="demo-branch-chip" onClick={()=>setScreen('more')}>ونک <span>⌄</span></button>}
+      {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
+      {screen==='home'&&<>
+        <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
+        <button className="risk-card demo-risk" onClick={()=>openDetail('۸۴۲۱')}><span className="risk-icon">!</span><span><strong>یک ارسال در معرض دیرکرد</strong><small>سفارش ۸۴۲۱ • تعهد تا ۱۸:۴۵</small></span><b>‹</b></button>
+        <div className="section-head compact demo-section-title"><h2>ارسال‌های فعال</h2></div>
+        <div className="summary-card demo-summary"><div><b>۴</b><span>در حال اجرا</span></div><i/><div><b className="warning-number">۱</b><span>نیازمند توجه</span></div></div>
+        <button className="primary-button full" onClick={()=>setScreen('create')}>ثبت ارسال جدید</button>
+        <div className="section-head compact demo-section-title"><h2>آخرین ارسال‌ها</h2></div>
+        <div className="delivery-list demo-delivery-list">{orders.slice(0,2).map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}</div>
+      </>}
+      {screen==='deliveries'&&<>
+        <div className="section-head compact demo-page-heading"><h1>ارسال‌ها</h1><span className="eyebrow">همه شعب</span></div>
+        <div className="filter-tabs" role="tablist">{([['active','فعال'],['completed','تکمیل‌شده'],['failed','ناموفق']] as const).map(([key,label])=><button role="tab" aria-selected={filter===key} className={filter===key?'selected':''} key={key} onClick={()=>setFilter(key)}>{label}</button>)}</div>
+        <label className="search-box"><span>⌕</span><input aria-label="جست‌وجوی سفارش" placeholder="جست‌وجوی سفارش یا گیرنده" /></label>
+        <div className="delivery-list demo-delivery-list">{visibleOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}</div>
+      </>}
+      {screen==='detail'&&<>
+        <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className="status-badge warning">در معرض دیرکرد</span></div>
+        <section className="demo-detail-promise"><span>تعهد تحویل</span><strong>۱۸:۴۵</strong><small>زمان فعلی برآوردی: ۱۸:۵۷</small></section>
+        <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline"><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></div></section>
+        <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه ونک</strong></div><div><small>مقصد</small><strong>یوسف‌آباد، خیابان شصت‌وچهارم</strong></div></section>
+        <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>پشتیبانی</button><button className="primary-button" onClick={()=>setToast('اقدامی برای این ارسال در محیط نمایشی ثبت نمی‌شود.')}>مشاهده اقدام‌ها</button></div>
+        {confirmed&&<p className="demo-confirmed-note">پیشنهاد ارسال تأیید شد.</p>}
+      </>}
+      {screen==='create'&&<>
+        <div className="section-head compact demo-page-heading"><div><span className="eyebrow">۱ از ۲</span><h1>ثبت ارسال جدید</h1></div><span className="step-pill">اطلاعات ارسال</span></div>
+        <form className="stack-form create-form demo-create-form" onSubmit={event=>{event.preventDefault();review()}}>
+          <section className="form-section"><b>مبدأ</b><label>شعبه مبدأ<input value="شعبه ونک" readOnly /></label><label>نام گیرنده<input defaultValue="مریم اکبری" /></label><label>شماره تماس<input inputMode="tel" defaultValue="۰۹۱۲ ۱۲۳ ۴۵۶۷" /></label></section>
+          <section className="form-section"><b>مقصد</b><label>نشانی مقصد<input defaultValue="سعادت‌آباد، بلوار دریا" /></label></section>
+          <section className="form-section"><b>بسته</b><label>نوع بسته<input value="بسته معمولی • ۲ کیلوگرم" readOnly /></label><label>زمان آمادگی<input value="همین حالا" readOnly /></label></section>
+          <button className="primary-button" type="submit">بررسی هزینه و زمان</button>
+        </form>
+      </>}
+      {screen==='review'&&<>
+        <div className="section-head compact demo-page-heading"><h1>پیشنهاد مونو</h1><span className="status-badge">قابل اجرا</span></div>
+        <section className="demo-offer"><div><span>تعهد تحویل</span><strong>تا ۱۹:۳۵</strong></div><div><span>هزینه ارسال</span><strong>۴۲٬۵۰۰ تومان</strong></div></section>
+        <section className="demo-detail-card demo-review-summary"><h2>خلاصه ارسال</h2><div><span>مبدأ</span><strong>شعبه ونک</strong></div><div><span>مقصد</span><strong>سعادت‌آباد، بلوار دریا</strong></div><div><span>گیرنده</span><strong>مریم اکبری</strong></div><div><span>تعهد</span><strong>فقط پس از تأیید ثبت می‌شود.</strong></div></section>
+        <div className="demo-review-actions"><button className="secondary-button" onClick={()=>setScreen('create')}>بازگشت</button><button className="primary-button" onClick={confirm}>تأیید و ثبت ارسال</button></div>
+      </>}
+      {screen==='notifications'&&<><div className="section-head compact demo-page-heading"><h1>اعلان‌ها</h1></div><EmptyState title="اعلان‌های حساب کسب‌وکار" body="برای دریافت اعلان‌های واقعی، اتصال به حساب مشتری لازم است."/></>}
+      {screen==='more'&&<><div className="section-head compact demo-page-heading"><h1>بیشتر</h1></div><div className="settings-card"><p><span>شعبهٔ انتخاب‌شده</span><strong>شعبه ونک</strong></p><button className="branch-option"><span>شعبه ونک</span><span>✓</span></button><small>نسخهٔ نمایشی با داده‌های نمونه</small></div></>}
+    </section>
+    <nav className="bottom-nav demo-bottom-nav" aria-label="ناوبری اصلی">{nav.map(([id,title,icon])=><button key={id} className={(screen===id?'active ':'')+(id==='create'?'create-tab':'')} onClick={()=>{setScreen(id);setToast('')}} aria-current={screen===id?'page':undefined}><DemoNavIcon name={icon}/><small>{title}</small></button>)}</nav>
+  </main>
+}
+
+function DemoOrderCard({item,onClick}:{item:{id:string;route:string;detail:string;status:string;warning:boolean};onClick:()=>void}) {
+  return <button className="delivery-card demo-order-card" onClick={onClick}><span className="delivery-symbol">↙</span><span className="delivery-main"><strong>سفارش {item.id}</strong><small>{item.route}</small><small>{item.detail}</small></span><span className={'status-badge '+(item.warning?'warning':'')}>{item.status}</span></button>
+}
+
+function DemoNavIcon({name}:{name:string}) {
+  if(name==='plus') return <span className="demo-plus-icon">＋</span>
+  const paths:Record<string,ReactNode>={
+    home:<><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
+    list:<><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
+    bell:<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
+    more:<><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
+  }
+  return <svg className="demo-nav-svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }
 
 function DeliveryCard({ item, onClick }: { item: Delivery; onClick: () => void }) {
