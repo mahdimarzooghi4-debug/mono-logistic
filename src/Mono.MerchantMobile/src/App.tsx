@@ -244,7 +244,7 @@ export default function App() {
   </main>
 }
 
-type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'create' | 'review' | 'notifications' | 'more'
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'create' | 'review' | 'notifications' | 'more'
 
 function MerchantMobileDemo() {
   const [screen,setScreen]=useState<DemoMobileScreen>('home')
@@ -274,7 +274,8 @@ function MerchantMobileDemo() {
     {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
-  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='notifications'?'اعلان‌ها':'بیشتر'
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='notifications'?'اعلان‌ها':'بیشتر'
+  const headerSubtitle=screen==='exception'?'سفارش '+order:'شعبه ونک'
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
     setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
@@ -288,9 +289,9 @@ function MerchantMobileDemo() {
   const filteredDemoOrders=visibleOrders.filter(item=>!query||`${item.id} ${item.route} ${item.detail} ${item.status}`.toLocaleLowerCase().includes(query))
   const filteredDemoNotifications=demoNotifications.filter(item=>notificationFilter==='all'||item.kind===notificationFilter)
   return <main className="mobile-shell demo-shell">
-    <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>شعبه ونک</span></div></header>
+    <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
-      {screen!=='detail'&&screen!=='review'&&screen!=='create'&&<button className="demo-branch-chip" onClick={()=>setScreen('more')}>ونک <span>⌄</span></button>}
+      {screen!=='detail'&&screen!=='exception'&&screen!=='review'&&screen!=='create'&&<button className="demo-branch-chip" onClick={()=>setScreen('more')}>ونک <span>⌄</span></button>}
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
@@ -312,8 +313,14 @@ function MerchantMobileDemo() {
         <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':order==='۸۴۱۸'?'زمان تحویل':order==='۸۴۱۲'?'وضعیت ارسال':'تعهد تحویل'}</span><strong>{confirmed?'۱۹:۳۵':order==='۸۴۱۸'?'۱۹:۵۸':order==='۸۴۱۲'?'ناموفق':'۱۸:۴۵'}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':order==='۸۴۱۸'?'تحویل به گیرنده انجام شد':order==='۸۴۱۲'?'ارسال لغو شد؛ نیاز به بررسی دارد':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
         <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:order==='۸۴۱۸'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۲۰</small></span></div><div className="done"><i/><span><strong>تحویل به پیک</strong><small>۱۹:۱۰</small></span></div><div className="done"><i/><span><strong>تحویل به گیرنده</strong><small>۱۹:۵۸</small></span></div></>:order==='۸۴۱۲'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۰۵</small></span></div><div className="late"><i/><span><strong>ارسال ناموفق شد</strong><small>۱۸:۲۰</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
         <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه ونک</strong></div><div><small>مقصد</small><strong>{confirmed?demoDestination:order==='۸۴۱۸'?'میرداماد':order==='۸۴۱۲'?'تهران‌پارس':order==='۸۴۱۵'?'سعادت‌آباد':order==='۸۴۱۰'?'شهرک غرب':'یوسف‌آباد، خیابان شصت‌وچهارم'}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
-        <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>پشتیبانی</button><button className="primary-button" onClick={()=>setToast('اقدامی برای این ارسال در محیط نمایشی ثبت نمی‌شود.')}>مشاهده اقدام‌ها</button></div>
+        <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>پشتیبانی</button><button className="primary-button" onClick={()=>order==='۸۴۲۱'?setScreen('exception'):setToast('برای این ارسال نمونه، استثنای فعالی ثبت نشده است.')}>مشاهده اقدام‌ها</button></div>
         {confirmed&&<p className="demo-confirmed-note">درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.</p>}
+      </>}
+      {screen==='exception'&&<>
+        <section className="demo-exception-overview"><span className="demo-exception-badge">نیازمند توجه</span><strong>۱۲ دقیقه ریسک دیرکرد</strong><small>تعهد: ۱۸:۴۵ • برآورد فعلی: ۱۸:۵۷</small></section>
+        <section className="demo-exception-section"><h2>چه اتفاقی افتاده؟</h2><div className="demo-exception-card"><strong>کندی مسیر و تراکم ترافیکی</strong><p>مونو مسیر و زمان تحویل را دوباره ارزیابی کرده و وضعیت را تحت پایش نگه داشته است.</p></div></section>
+        <section className="demo-exception-section"><h2>اقدام مونو</h2><div className="demo-exception-card demo-exception-action"><strong>پایش مسیر جایگزین و کنترل تعهد</strong><p>اگر نیاز به مداخله باشد، تیم عملیات اقدام می‌کند.</p></div></section>
+        <section className="demo-exception-section demo-exception-user"><h2>اقدام شما</h2><div className="demo-exception-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>تماس با پشتیبانی</button><button className="primary-button" onClick={()=>{setScreen('detail');setToast('')}}>بازگشت به ارسال</button></div></section>
       </>}
       {screen==='create'&&<>
         <div className="section-head compact demo-page-heading"><div><span className="eyebrow">۱ از ۲</span><h1>ثبت ارسال جدید</h1></div><span className="step-pill">اطلاعات ارسال</span></div>
