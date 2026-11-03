@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12332)
-Total output lines: 278
-
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import MerchantNavIcon, { type MerchantNavId } from './MerchantNavIcon'
@@ -168,7 +165,13 @@ function DemoBranchesPage() {
     ['ونک','مهدی کاظمی','ونک','۸–۲۲','بله','فعال'],
     ['جردن','سارا جوادی','جردن','۸–۲۲','بله','فعال'],
     ['میرداماد','حسین قربانی','میرداماد','۹–۲۲','بله','فعال'],
-    ['یوسف‌آباد','الهام مرادی','یوسف‌آباد','۸–۲۲…332 tokens truncated…Name="demo-table-scroll"><table className="demo-branch-table"><thead><tr><th>عملیات</th><th>شعبه</th><th>مسئول</th><th>منطقه</th><th>ساعات کاری</th><th>آماده ارسال</th><th>وضعیت</th></tr></thead><tbody>{branches.map((row) => <tr key={row[0]}><td><button type="button" className="link-button">باز</button></td><td><strong>{row[0]}</strong></td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td className={row[4] === 'بله' ? 'good' : 'bad'}>{row[4]}</td><td><span className={`badge ${row[5] === 'فعال' ? 'success' : 'warning'}`}>{row[5]}</span></td></tr>)}</tbody></table></div><p className="data-note">فهرست و اعداد برای بازبینی طراحی نمونه هستند.</p></section>
+    ['یوسف‌آباد','الهام مرادی','یوسف‌آباد','۸–۲۲','بله','فعال'],
+    ['پاسداران','رضا شریفی','پاسداران','—','خیر','غیرفعال'],
+  ]
+  return <main className="demo-branches-page" dir="rtl">
+    <section className="demo-branch-kpis" aria-label="خلاصه شعب"><Metric label="کل شعب" value="۵" /><Metric label="فعال" value="۴" tone="green" /><Metric label="موقتاً غیرفعال" value="۱" tone="orange" /><Metric label="آماده ارسال" value="۴" tone="cyan" /><Metric label="ساعات سرویس امروز" value="۸ تا ۲۲" /></section>
+    <section className="demo-branch-filters"><label>منطقه<select defaultValue="همه مناطق"><option>همه مناطق</option><option>ونک</option></select></label><label>آمادگی ارسال<select defaultValue="همه"><option>همه</option><option>آماده</option></select></label><label>وضعیت<select defaultValue="همه وضعیت‌ها"><option>همه وضعیت‌ها</option><option>فعال</option></select></label><label className="branch-filter-search">جست‌وجو<input placeholder="نام، منطقه یا مسئول شعبه" /></label><button className="secondary-button">اعمال فیلتر</button></section>
+    <div className="demo-branch-columns"><section className="panel demo-branch-table-panel"><div className="demo-table-scroll"><table className="demo-branch-table"><thead><tr><th>عملیات</th><th>شعبه</th><th>مسئول</th><th>منطقه</th><th>ساعات کاری</th><th>آماده ارسال</th><th>وضعیت</th></tr></thead><tbody>{branches.map((row) => <tr key={row[0]}><td><button type="button" className="link-button">باز</button></td><td><strong>{row[0]}</strong></td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td className={row[4] === 'بله' ? 'good' : 'bad'}>{row[4]}</td><td><span className={`badge ${row[5] === 'فعال' ? 'success' : 'warning'}`}>{row[5]}</span></td></tr>)}</tbody></table></div><p className="data-note">فهرست و اعداد برای بازبینی طراحی نمونه هستند.</p></section>
       <aside className="demo-branch-detail"><section className="panel"><div className="panel-heading"><h2>شعبه ونک</h2><span className="badge success">فعال</span></div><DemoSummary label="کد شعبه" value="BR-۰۱" /><DemoSummary label="مسئول شعبه" value="مهدی کاظمی" /><DemoSummary label="وضعیت ارسال" value="آماده" /></section><section className="panel"><h2>موقعیت و ساعات کاری</h2><DemoSummary label="آدرس" value="ونک، ملاصدرا، پلاک ۲۱" /><DemoSummary label="مختصات" value="۳۵٫۷۵۲۱، ۵۱٫۴۰۹۸" /><DemoSummary label="ساعات کاری" value="هر روز ۸ تا ۲۲" /><DemoSummary label="تماس" value="۰۲۱ ۸۸۷۷ ۱۲۳۴" /></section><section className="panel"><h2>تنظیمات مبدا ارسال</h2><DemoSummary label="زمان پیش‌فرض آمادگی" value="۱۰ دقیقه" /><DemoSummary label="حد انتظار پیک" value="۳ دقیقه" /><DemoSummary label="شعاع سرویس" value="۵ کیلومتر" /><DemoSummary label="تحویل بسته" value="پیشخوان ارسال" /><button className="secondary-button full-width" disabled>ویرایش شعبه</button></section></aside>
     </div>
   </main>
