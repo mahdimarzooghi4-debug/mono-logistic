@@ -299,3 +299,17 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-cancel-actions button { min-height:50px; border-radius:12px; font-size:12px; font-weight:600; }
 .demo-cancel-actions .secondary-button { flex:0 0 110px; border:1px solid #cbd9dd; background:#fff; color:#0b0b0e; box-shadow:none; }
 .demo-cancel-approve { flex:1; border:0; background:#b94b3d; color:#fff; }
+
+/* Figma 374:12 — successful delivery creation */
+.demo-success{display:flex;flex-direction:column;align-items:center;width:100%;padding-top:39px;text-align:center}
+.demo-success-icon{display:grid;width:116px;height:116px;place-items:center;margin:0 auto;border:1px solid #b8dde4;border-radius:50%;background:#eef8fa;color:#168a52;font-size:44px;font-weight:700}
+.demo-success h1{margin:31px 0 0;color:#0b0b0e;font-size:20px;line-height:1.6;font-weight:700}
+.demo-success>p{max-width:290px;margin:10px 0 0;color:#66727a;font-size:11px;line-height:24px}
+.demo-success-card{display:flex;width:100%;min-height:156px;align-items:center;justify-content:space-between;gap:14px;margin-top:35px;padding:18px 20px;border:1px solid #dde7ea;border-radius:14px;background:#fff;text-align:right}
+.demo-success-card>div{display:grid;align-content:center;justify-items:start;gap:8px}
+.demo-success-card span{color:#7a858b;font-size:9.5px}
+.demo-success-card strong{color:#0b0b0e;font-size:15px;font-weight:700}
+.demo-success-card>div:last-child strong{color:#007f96;font-size:18px}
+.demo-success-card b{padding:6px 10px;border-radius:999px;background:#eef8fa;color:#007f96;font-size:9px;font-weight:600;white-space:nowrap}
+.demo-success>.primary-button,.demo-success>.secondary-button{width:100%;min-height:50px;margin-top:45px;border-radius:12px;font-size:12.5px}
+.demo-success>.secondary-button{min-height:48px;margin-top:18px;border:1px solid #cbd9dd;background:#fff;color:#0b0b0e;box-shadow:none}
