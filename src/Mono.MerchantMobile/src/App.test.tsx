@@ -118,6 +118,24 @@ describe('Mono merchant mobile P0', () => {
     expect(screen.getByRole('heading', { name: 'جزئیات ارسال' })).toBeInTheDocument()
   })
 
+  it('selects an available branch and keeps an inactive branch unavailable', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'ونک ⌄' }))
+    expect(screen.getByText('انتخاب شعبه')).toBeInTheDocument()
+    expect(screen.getByText('فروشگاه سپهر')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /شعبه ونک، انتخاب‌شده/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /پونک.*موقتاً غیرفعال/ })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: /جردن.*۲ ارسال فعال/ }))
+    expect(screen.getByText('شعبه جردن')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'جردن ⌄' }))
+    expect(screen.getByRole('button', { name: /شعبه جردن، انتخاب‌شده/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /پونک.*موقتاً غیرفعال/ })).toBeDisabled()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
