@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "npm --prefix ../Mono.MerchantMobile ci --no-audit --no-fund && npm --prefix ../Mono.MerchantMobile run build && rm -rf public/mobile && mkdir -p public/mobile && cp -R ../Mono.MerchantMobile/dist/. public/mobile/ && tsc -b && vite build",
+    "build": "npm --prefix ../Mono.MerchantMobile ci --no-audit --no-fund && npm --prefix ../Mono.MerchantMobile test && npm --prefix ../Mono.MerchantMobile run build && rm -rf public/mobile && mkdir -p public/mobile && cp -R ../Mono.MerchantMobile/dist/. public/mobile/ && tsc -b && vite build",
     "test": "vitest run",
     "preview": "vite preview --host 127.0.0.1"
   },
