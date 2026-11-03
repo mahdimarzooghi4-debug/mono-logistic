@@ -192,8 +192,8 @@ describe('Mono merchant mobile P0', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: 'بیشتر' }))
-    await user.click(screen.getByRole('button', { name: /تنظیمات اعلان‌ها، امنیت/ }))
-    expect(screen.getByRole('heading', { name: 'تنظیمات' })).toBeInTheDocument()
+    await user.click(screen.getByText('تنظیمات', { exact: true }))
+    expect(screen.getByRole('heading', { level: 1, name: 'تنظیمات' })).toBeInTheDocument()
     expect(screen.getByText('حساب و برنامه')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /امنیت و نشست‌ها، دستگاه‌ها/ })).toBeInTheDocument()
     expect(screen.getByText('مدیریت اعضا، دسترسی‌ها، اتصال‌ها و هویت بصری از پنل وب انجام می‌شود.')).toBeInTheDocument()
