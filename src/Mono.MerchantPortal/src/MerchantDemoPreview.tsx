@@ -292,5 +292,20 @@ function DemoInviteDrawer({ onClose, onSave }: { onClose: () => void; onSave: ()
 }
 
 function DemoWebhookDrawer({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  return <div className="demo-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="demo-drawer" role="dialog" aria-modal="true" aria-labelledby="webhook-drawer-title" dir="rtl"><header><div><small>Webhook و رویدادهای خروجی</small><h2 id="webhook-drawer-title">افزودن Webhook Endpoint</h2></div><button type="button" aria-label="بستن" onClick={onClose}>×</button></header><form onSubmit={event => { event.preventDefault(); onSave() }}><label>نام Endpoint<input required defaultValue="ERP اصلی" /></label><label>محیط<select defaultValue="production"><option value="production">Production</option><option value="staging">Staging</option></select></label><label>URL مقصد<input type="url" required placeholder="https://example.com/webhooks/mono" /></label><label>Webhook Secret<input required placeholder="Secret را وارد کنید" /></label><fieldset className="demo-webhook-events"><legend>رویدادهای موردنیاز</legend>{['mission.updated','delivery.completed','incident.created','billing.created'].map((event,index)=><label key={event}><input type="checkbox" defaultChecked={index<3} />{event}</label>)}</fieldset><section className="panel demo-webhook-retry"><strong>Retry Policy</strong><p>۵ تلاش · Backoff نمایی · ۲۴ ساعت</p><label><input type="checkbox" defaultChecked />قبل از فعال‌سازی Endpoint را تست کن</label></section><label>توضیح داخلی<input defaultValue="اتصال اصلی ERP سپهر" /></label><p className="data-note">ثبت این فرم فقط در پیش‌نمایش انجام می‌شود و Endpoint واقعی ساخته نمی‌شود.</p><footer><button type="button" className="secondary-button" onClick={onClose}>انصراف</button><button className="primary-button">ذخیره Endpoint</button></footer></form></section></div>
+  return <div className="demo-drawer-backdrop webhook-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="demo-drawer webhook-drawer" role="dialog" aria-modal="true" aria-labelledby="webhook-drawer-title" dir="rtl">
+    <header><button type="button" onClick={onClose}>بستن</button><div><h2 id="webhook-drawer-title">افزودن Webhook Endpoint</h2><small>دریافت Eventهای مونو در سیستم کسب‌وکار</small></div></header>
+    <form onSubmit={event => { event.preventDefault(); onSave() }}>
+      <label className="webhook-drawer-field">نام Endpoint<input required defaultValue="ERP اصلی" /></label>
+      <label className="webhook-drawer-field">Environment<select defaultValue="production"><option value="production">Production</option><option value="staging">Staging</option></select></label>
+      <label className="webhook-drawer-field">URL<input type="url" required defaultValue="https://api.sepehr.ir/mono/events" /></label>
+      <label className="webhook-drawer-field">Webhook Secret<input readOnly value="به‌صورت خودکار تولید شود" /></label>
+      <strong className="webhook-drawer-label">رویدادهای مشترک</strong>
+      <div className="webhook-drawer-events">{['mission.updated','delivery.completed','incident.created','billing.created'].map(event=><label key={event}><input type="checkbox" defaultChecked /><span>{event}</span></label>)}</div>
+      <label className="webhook-drawer-field">Retry Policy<input readOnly value="۵ تلاش • Backoff نمایی • ۲۴ ساعت" /></label>
+      <label className="webhook-drawer-test"><input type="checkbox" defaultChecked /><span>قبل از ذخیره Endpoint تست شود</span></label>
+      <label className="webhook-drawer-field">توضیح — اختیاری<input defaultValue="اتصال اصلی ERP سپهر" /></label>
+      <p className="webhook-drawer-note">پس از ذخیره، Secret فقط یک‌بار کامل نمایش داده می‌شود. در صورت نیاز بعداً می‌توان آن را Rotate کرد.</p>
+      <footer><button type="button" className="secondary-button" onClick={onClose}>انصراف</button><button className="primary-button">ذخیره Endpoint</button></footer>
+    </form>
+  </section></div>
 }

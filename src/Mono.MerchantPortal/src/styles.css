@@ -507,6 +507,32 @@ tbody tr:hover { background: #fbfdfd; }
 .demo-drawer.invite-drawer form>footer .primary-button { flex:1; }
 @media(max-width:1000px){.invite-drawer-backdrop{right:210px}}
 @media(max-width:720px){.invite-drawer-backdrop{right:0}.demo-drawer.invite-drawer{height:100dvh;padding:16px}}
+.webhook-drawer-backdrop { right:248px; background:#0b0b0e33; direction:ltr; }
+.demo-drawer.webhook-drawer { display:flex; width:min(480px,100%); height:min(849px,100dvh); flex:none; flex-direction:column; gap:8px; overflow:auto; border-right:1px solid #dce4e8; padding:18px 24px; box-shadow:none; }
+.demo-drawer.webhook-drawer>header { display:flex; height:58px; flex:none; align-items:center; gap:8px; margin:0; border:0; padding:0; direction:ltr; }
+.demo-drawer.webhook-drawer>header>button { width:74px; height:34px; flex:none; border:1px solid #d9e3e7; border-radius:9px; color:#0b0b0e; background:#fff; font:600 12px Vazirmatn,sans-serif; cursor:pointer; }
+.demo-drawer.webhook-drawer>header>div { min-width:0; flex:1; direction:rtl; text-align:right; }
+.demo-drawer.webhook-drawer>header h2 { margin:0; color:#0b0b0e; font-size:20px; line-height:1.25; white-space:nowrap; }
+.demo-drawer.webhook-drawer>header small { display:block; color:#66727a; font-size:9px; }
+.demo-drawer.webhook-drawer form { display:flex; min-height:0; flex:1; flex-direction:column; gap:8px; }
+.demo-drawer.webhook-drawer .webhook-drawer-field { display:flex; height:52px; min-width:0; flex:none; flex-direction:column; justify-content:center; gap:0; margin:0; border:1px solid #dde6e9; border-radius:9px; padding:5px 10px; background:#f8fafb; color:#7e898f; font-size:8.5px; }
+.demo-drawer.webhook-drawer .webhook-drawer-field>input,.demo-drawer.webhook-drawer .webhook-drawer-field>select { width:100%; height:22px; min-height:22px; border:0; outline:0; padding:0; color:#0b0b0e; background:transparent; font:600 10.5px Vazirmatn,sans-serif; }
+.demo-drawer.webhook-drawer .webhook-drawer-field>input[readonly] { color:#0b0b0e; }
+.webhook-drawer-label { flex:none; color:#0b0b0e; font-size:10px; }
+.webhook-drawer-events { display:grid; flex:none; gap:0; direction:ltr; }
+.demo-drawer.webhook-drawer .webhook-drawer-events label { display:flex; height:32px; align-items:center; gap:8px; margin:0; color:#0b0b0e; font-size:10.5px; direction:ltr; }
+.webhook-drawer-events span { direction:ltr; }
+.demo-drawer.webhook-drawer .webhook-drawer-events input,.demo-drawer.webhook-drawer .webhook-drawer-test input { appearance:none; width:18px; height:18px; flex:none; margin:0; border:1px solid #9eacb3; border-radius:5px; background:#fff; cursor:pointer; }
+.demo-drawer.webhook-drawer .webhook-drawer-events input:checked,.demo-drawer.webhook-drawer .webhook-drawer-test input:checked { border-color:#00a8c6; background:#00a8c6; }
+.webhook-drawer-test { display:flex; height:32px; flex:none; align-items:center; gap:8px; margin:0; color:#0b0b0e; font-size:10.5px; direction:ltr; }
+.webhook-drawer-test span { direction:rtl; }
+.webhook-drawer-note { margin:auto 0 0; border-radius:9px; padding:7px 10px; color:#66727a; background:#f4fbfc; font-size:8px; line-height:1.7; text-align:right; }
+.demo-drawer.webhook-drawer form>footer { display:flex; height:42px; flex:none; gap:8px; margin:0; border:0; padding:0; direction:ltr; }
+.demo-drawer.webhook-drawer form>footer button { height:42px; min-height:42px; font-size:12px; }
+.demo-drawer.webhook-drawer form>footer .secondary-button { width:150px; border:1px solid #d9e3e7; color:#0b0b0e; background:#fff; }
+.demo-drawer.webhook-drawer form>footer .primary-button { flex:1; }
+@media(max-width:1000px){.webhook-drawer-backdrop{right:210px}}
+@media(max-width:720px){.webhook-drawer-backdrop{right:0}.demo-drawer.webhook-drawer{height:100dvh;padding:16px}}
 .demo-webhook-events { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0; border:1px solid #e3eaed; border-radius:8px; padding:12px; }
 .demo-webhook-events legend { padding:0 5px; color:#586970; font-size:11px; }
 .demo-webhook-events label,.demo-webhook-retry label { display:flex; align-items:center; gap:7px; color:#45565c; font-size:10px; }
