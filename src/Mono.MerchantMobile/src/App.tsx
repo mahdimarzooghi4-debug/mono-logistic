@@ -244,7 +244,7 @@ export default function App() {
   </main>
 }
 
-type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'support' | 'more'
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
 
 function MerchantMobileDemo() {
   const [screen,setScreen]=useState<DemoMobileScreen>('home')
@@ -282,8 +282,8 @@ function MerchantMobileDemo() {
     {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
-  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='support'?'پشتیبانی':'بیشتر'
-  const headerSubtitle=screen==='exception'||screen==='support'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='security'?'امنیت و نشست‌ها':screen==='support'?'پشتیبانی':'بیشتر'
+  const headerSubtitle=screen==='exception'||screen==='support'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='security'?'حساب کاربری':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
     setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
@@ -304,7 +304,7 @@ function MerchantMobileDemo() {
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
-      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='support'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
+      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='security'&&screen!=='support'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
@@ -356,6 +356,22 @@ function MerchantMobileDemo() {
         <div className="section-head compact demo-branch-other-title"><h2>شعب دیگر</h2></div>
         <div className="demo-branch-list">{[{name:'جردن',count:'۲',available:true},{name:'میرداماد',count:'۰',available:true},{name:'پونک',count:'۰',available:false},{name:'پاسداران',count:'۱',available:true}].filter(branch=>branch.name!==activeBranch).map(branch=><button className="demo-branch-card" key={branch.name} disabled={!branch.available} aria-label={`${branch.name}؛ ${branch.available?`آماده ارسال • ${branch.count} ارسال فعال`:'موقتاً غیرفعال'}`} onClick={()=>{setActiveBranch(branch.name);setScreen('home');setToast('')}}><span className="demo-branch-copy"><strong>{branch.name}</strong><small>{branch.available?`آماده ارسال • ${branch.count} ارسال فعال`:'موقتاً غیرفعال'}</small></span><span className="demo-branch-arrow" aria-hidden="true">‹</span></button>)}</div>
         <p className="demo-branch-note">ارسال جدید از شعبهٔ انتخاب‌شده ثبت می‌شود.</p>
+      </>}
+      {screen==='security'&&<>
+        <div className="section-head compact demo-page-heading"><h1>امنیت</h1></div>
+        <section className="demo-security-device" aria-label="این دستگاه">
+          <div className="demo-security-copy"><strong>این دستگاه</strong><span>آیفون • تهران</span><small>آخرین فعالیت: همین حالا</small></div>
+          <span className="demo-security-active">فعال</span>
+        </section>
+        <h2 className="demo-security-section-title">نشست‌های دیگر</h2>
+        <button className="demo-security-session" onClick={()=>setToast('نشست مرورگر فقط نمونه است و به حساب واقعی وصل نیست.')}><span><strong>مرورگر وب</strong><small>تهران • امروز ۱۲:۴۵</small></span><b aria-hidden="true">‹</b></button>
+        <h2 className="demo-security-section-title demo-security-access-title">ورود و امنیت</h2>
+        <div className="demo-settings-list">
+          <button className="demo-settings-item" onClick={()=>setToast('تغییر رمز عبور در نسخهٔ نمایشی انجام نمی‌شود.')}><span className="demo-settings-icon">⌑</span><span><strong>تغییر رمز عبور</strong><small>به‌روزرسانی رمز حساب</small></span><b>‹</b></button>
+          <button className="demo-settings-item" onClick={()=>setToast('خروج از نشست‌های دیگر در نسخهٔ نمایشی انجام نمی‌شود.')}><span className="demo-settings-icon">↗</span><span><strong>خروج از همه دستگاه‌ها</strong><small>به‌جز این دستگاه</small></span><b>‹</b></button>
+        </div>
+        <button className="demo-security-signout" onClick={()=>setToast('خروج از حساب در نسخهٔ نمایشی انجام نمی‌شود.')}>خروج از حساب</button>
+        <small className="demo-settings-demo-label">نشست‌ها و اطلاعات این صفحه نمونهٔ نمایشی هستند.</small>
       </>}
       {screen==='notificationSettings'&&<>
         <div className="section-head compact demo-page-heading"><h1>چه اعلان‌هایی دریافت کنید؟</h1></div>
@@ -409,7 +425,7 @@ function MerchantMobileDemo() {
         <div className="demo-settings-list">
           <button className="demo-settings-item" aria-label="اعلان‌ها، انتخاب اعلان‌های عملیاتی و مالی" onClick={()=>{setScreen('notificationSettings');setToast('')}}><span className="demo-settings-icon">♧</span><span><strong>اعلان‌ها</strong><small>انتخاب اعلان‌های عملیاتی و مالی</small></span><b>‹</b></button>
           <button className="demo-settings-item" aria-label={`شعبه پیش‌فرض، شعبه ${activeBranch}`} onClick={()=>setScreen('branch')}><span className="demo-settings-icon">⌂</span><span><strong>شعبه پیش‌فرض</strong><small>شعبه {activeBranch}</small></span><b>‹</b></button>
-          <button className="demo-settings-item" aria-label="امنیت و نشست‌ها، دستگاه‌ها و خروج از نشست" onClick={()=>setToast('مدیریت نشست‌ها در صفحهٔ امنیت تکمیل می‌شود.')}><span className="demo-settings-icon">▣</span><span><strong>امنیت و نشست‌ها</strong><small>دستگاه‌ها و خروج از نشست</small></span><b>‹</b></button>
+          <button className="demo-settings-item" aria-label="امنیت و نشست‌ها، دستگاه‌ها و خروج از نشست" onClick={()=>setScreen('security')}><span className="demo-settings-icon">▣</span><span><strong>امنیت و نشست‌ها</strong><small>دستگاه‌ها و خروج از نشست</small></span><b>‹</b></button>
           <button className="demo-settings-item" aria-label="ظاهر برنامه، حالت روشن" onClick={()=>setToast('حالت روشن در این نسخه فعال است.')}><span className="demo-settings-icon">☼</span><span><strong>ظاهر برنامه</strong><small>حالت روشن</small></span><b>‹</b></button>
           <button className="demo-settings-item" aria-label="درباره برنامه، نسخه و قوانین" onClick={()=>setToast('نسخهٔ نمایشی مونو • اطلاعات حقوقی در پنل وب.')}><span className="demo-settings-icon">i</span><span><strong>درباره برنامه</strong><small>نسخه، قوانین و حریم خصوصی</small></span><b>‹</b></button>
         </div>
