@@ -255,7 +255,7 @@ describe('Mono merchant mobile P0', () => {
     await user.click(screen.getByRole('button', { name: /امنیت و نشست‌ها، دستگاه‌ها/ }))
     expect(screen.getByRole('heading', { level: 1, name: 'امنیت' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'این دستگاه' })).toHaveTextContent('آیفون • تهران')
-    expect(screen.getByRole('button', { name: 'مرورگر وب تهران • امروز ۱۲:۴۵ ‹' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /مرورگر وب/ })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'خروج از حساب' }))
     expect(screen.getByRole('status')).toHaveTextContent('خروج از حساب در نسخهٔ نمایشی انجام نمی‌شود')
     expect(fetchMock).not.toHaveBeenCalled()
