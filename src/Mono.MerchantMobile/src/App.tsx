@@ -244,13 +244,13 @@ export default function App() {
   </main>
 }
 
-type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'loading' | 'error' | 'infeasible' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'loading' | 'error' | 'infeasible' | 'cancelConfirm' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
 
 function MerchantMobileDemo() {
-  const [screen,setScreen]=useState<DemoMobileScreen>(()=>{const state=new URLSearchParams(window.location.search).get('state');return state==='empty'?'deliveries':state==='loading'?'loading':state==='error'?'error':state==='infeasible'?'infeasible':'home'})
+  const [screen,setScreen]=useState<DemoMobileScreen>(()=>{const state=new URLSearchParams(window.location.search).get('state');return state==='empty'?'deliveries':state==='loading'?'loading':state==='error'?'error':state==='infeasible'?'infeasible':state==='cancel'?'cancelConfirm':'home'})
   const [filter,setFilter]=useState<'active'|'completed'|'failed'>('active')
   const [search,setSearch]=useState('')
-  const [order,setOrder]=useState('۸۴۲۱')
+  const [order,setOrder]=useState(()=>new URLSearchParams(window.location.search).get('state')==='cancel'?'۸۴۳۰':'۸۴۲۱')
   const [activeBranch,setActiveBranch]=useState('ونک')
   const [confirmed,setConfirmed]=useState(false)
   const [toast,setToast]=useState('')
@@ -285,8 +285,8 @@ function MerchantMobileDemo() {
     {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
-  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='loading'?'بررسی هزینه و زمان':screen==='error'?'ثبت ارسال':screen==='infeasible'?'نتیجه بررسی':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='security'?'امنیت و نشست‌ها':screen==='support'?'پشتیبانی':'بیشتر'
-  const headerSubtitle=screen==='exception'||screen==='support'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='security'?'حساب کاربری':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='loading'?'بررسی هزینه و زمان':screen==='error'?'ثبت ارسال':screen==='infeasible'?'نتیجه بررسی':screen==='cancelConfirm'?'لغو ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='security'?'امنیت و نشست‌ها':screen==='support'?'پشتیبانی':'بیشتر'
+  const headerSubtitle=screen==='exception'||screen==='support'||screen==='cancelConfirm'?'سفارش '+order:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='security'?'حساب کاربری':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
     setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
@@ -307,7 +307,7 @@ function MerchantMobileDemo() {
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
-      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='security'&&screen!=='support'&&screen!=='loading'&&screen!=='error'&&screen!=='infeasible'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
+      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='security'&&screen!=='support'&&screen!=='loading'&&screen!=='error'&&screen!=='infeasible'&&screen!=='cancelConfirm'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
@@ -330,6 +330,7 @@ function MerchantMobileDemo() {
         <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:detailStatus==='تحویل‌شده'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۲۰</small></span></div><div className="done"><i/><span><strong>تحویل به پیک</strong><small>۱۹:۱۰</small></span></div><div className="done"><i/><span><strong>تحویل به گیرنده</strong><small>۱۹:۵۸</small></span></div></>:detailStatus==='ناموفق'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۰۵</small></span></div><div className="late"><i/><span><strong>ارسال ناموفق شد</strong><small>۱۸:۲۰</small></span></div></>:detailStatus==='فعال'?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>در حال اجرا</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
         <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه {confirmed?activeBranch:selectedOrder?.branchName||activeBranch}</strong></div><div><small>مقصد</small><strong>{detailDestination}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
         <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>{setScreen('support');setToast('')}}>پشتیبانی</button><button className="primary-button" onClick={()=>order==='۸۴۲۱'?setScreen('exception'):setToast('برای این ارسال نمونه، استثنای فعالی ثبت نشده است.')}>مشاهده اقدام‌ها</button></div>
+        {!confirmed&&detailStatus==='فعال'&&<button className="demo-cancel-entry" onClick={()=>{setToast('');setScreen('cancelConfirm')}}>لغو ارسال</button>}
         {confirmed&&<p className="demo-confirmed-note">درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.</p>}
       </>}
       {screen==='exception'&&<>
@@ -345,6 +346,13 @@ function MerchantMobileDemo() {
         <h2>چه کاری می‌توانید انجام دهید؟</h2>
         <section className="demo-infeasible-guidance"><strong>زمان آمادگی را تغییر دهید</strong><p>یا مقصد / شعبه مبدأ را اصلاح کنید و دوباره بررسی را انجام دهید.</p></section>
         <button className="primary-button" onClick={()=>setScreen('create')}>ویرایش و بررسی دوباره</button>
+      </section>}
+      {screen==='cancelConfirm'&&<section className="demo-cancel-confirm" aria-label="تأیید لغو ارسال">
+        <section className="demo-cancel-eligibility"><strong>لغو این ارسال هنوز مجاز است</strong><p>تحویل از مبدأ هنوز انجام نشده است.</p></section>
+        <h2>پیامد لغو</h2>
+        <section className="demo-cancel-consequences"><p>• مأموریت متوقف می‌شود.</p><p>• پیک از این ارسال آزاد می‌شود.</p><p>• وضعیت مالی براساس سیاست لغو به‌روزرسانی می‌شود.</p><strong>این اقدام قابل بازگشت نیست.</strong></section>
+        <div className="demo-cancel-confirm-note">برای ادامه، لغو ارسال را تأیید کنید.</div>
+        <div className="demo-cancel-actions"><button className="secondary-button" onClick={()=>{setScreen('detail');setToast('')}}>انصراف</button><button className="demo-cancel-approve" onClick={()=>{setScreen('detail');setToast('لغو ارسال در نسخهٔ نمایشی ثبت نشد؛ وضعیت سفارش تغییری نکرد.')}}>تأیید لغو ارسال</button></div>
       </section>}
       {screen==='error'&&<section className="demo-error" role="alert" aria-label="بررسی ارسال انجام نشد">
         <div className="demo-error-icon" aria-hidden="true">!</div>
