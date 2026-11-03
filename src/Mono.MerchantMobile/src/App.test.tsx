@@ -76,6 +76,29 @@ describe('Mono merchant mobile P0', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('filters demo notifications, opens linked orders, and marks read items', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'اعلان‌ها' }))
+    expect(screen.getByRole('heading', { name: 'اعلان‌ها' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'نیازمند اقدام' }))
+    expect(screen.getByRole('button', { name: 'ریسک دیرکرد برای سفارش ۸۴۲۱' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'سفارش ۸۴۳۰ به پیک تخصیص داده شد' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'ریسک دیرکرد برای سفارش ۸۴۲۱' }))
+    expect(screen.getByRole('heading', { name: 'جزئیات ارسال' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'اعلان‌ها' }))
+    await user.click(screen.getByRole('tab', { name: 'اطلاع‌رسانی' }))
+    await user.click(screen.getByRole('button', { name: 'صورتحساب هفتگی صادر شد' }))
+    expect(screen.getByRole('status')).toHaveTextContent('فقط نمونهٔ نمایشی')
+    expect(screen.getByLabelText('خوانده شده')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
