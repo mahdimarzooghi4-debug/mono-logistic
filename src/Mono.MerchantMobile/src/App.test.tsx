@@ -434,4 +434,21 @@ describe('Mono merchant mobile P0', () => {
     expect(JSON.parse(String(request?.body))).toEqual({ quote_id: 'quote-17', promise_version: 4 })
     expect(screen.getByText('۸۵٬۰۰۰ تومان')).toBeInTheDocument()
   })
+
+  it('shows the Figma success state and routes its next action', async () => {
+    window.history.replaceState({}, '', '/?demo=1&state=success')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: 'ارسال با موفقیت ثبت شد' })).toBeInTheDocument()
+    expect(screen.getByText('۸۴۳۱')).toBeInTheDocument()
+    expect(screen.getByText('در انتظار تخصیص')).toBeInTheDocument()
+    expect(screen.getByText('تا ۱۹:۳۵')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'مشاهده ارسال' }))
+    expect(screen.getByRole('heading', { name: 'جزئیات ارسال' })).toBeInTheDocument()
+    expect(screen.getByText('درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
