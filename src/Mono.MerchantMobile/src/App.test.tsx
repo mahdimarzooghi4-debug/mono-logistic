@@ -28,6 +28,28 @@ function mockConnectedApi(detail: unknown = { ...baseDelivery, quote: null, prom
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, '', '/') })
 
 describe('Mono merchant mobile P0', () => {
+  it('shows Figma cancel consequences and keeps the demo shipment unchanged', async () => {
+    window.history.replaceState({}, '', '/?demo=1&state=cancel')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.getByText('لغو این ارسال هنوز مجاز است')).toBeInTheDocument()
+    expect(screen.getByText('تحویل از مبدأ هنوز انجام نشده است.')).toBeInTheDocument()
+    expect(screen.getByText('پیامد لغو')).toBeInTheDocument()
+    expect(screen.getByText('این اقدام قابل بازگشت نیست.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'انصراف' }))
+    expect(screen.getByRole('heading', { name: 'جزئیات ارسال' })).toBeInTheDocument()
+    expect(screen.getByText('فعال')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'لغو ارسال' }))
+    await user.click(screen.getByRole('button', { name: 'تأیید لغو ارسال' }))
+    expect(screen.getByRole('status')).toHaveTextContent('لغو ارسال در نسخهٔ نمایشی ثبت نشد')
+    expect(screen.getByText('فعال')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('shows the Figma infeasible result and lets the merchant edit the preserved options', async () => {
     window.history.replaceState({}, '', '/?demo=1&state=infeasible')
     const fetchMock = vi.fn()
