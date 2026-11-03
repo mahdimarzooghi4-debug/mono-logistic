@@ -177,3 +177,16 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-profile-field>strong{color:#34464c;font-size:10px;font-weight:600}
 .demo-profile-edit{min-height:48px;margin-top:5px;border:1px solid #bfe6ec;border-radius:11px;background:#f4fbfc;color:var(--teal);font-size:10px;font-weight:700}
 .demo-profile-demo-label{color:#8a969a;font-size:8px;text-align:center}
+
+
+.demo-settings-section-title{margin:8px 0 11px;color:#394a50;font-size:12px}
+.demo-settings-list{display:grid;gap:11px}
+.demo-settings-item{display:flex;width:100%;min-height:72px;align-items:center;gap:12px;padding:10px 13px;border:1px solid var(--border);border-radius:13px;background:#fff;text-align:right}
+.demo-settings-icon{display:grid;width:28px;height:28px;flex:0 0 28px;place-items:center;border-radius:50%;background:#eff8f9;color:var(--teal);font-size:14px}
+.demo-settings-item>span:nth-child(2){display:grid;flex:1;gap:4px}
+.demo-settings-item strong{color:#26363d;font-size:10px}
+.demo-settings-item small{color:#718087;font-size:8px}
+.demo-settings-item>b{color:#74838a;font-size:21px;font-weight:400}
+.demo-settings-org-title{margin-top:21px}
+.demo-settings-org-note{display:flex;min-height:76px;align-items:center;padding:12px 15px;border:1px solid #e2e9eb;border-radius:13px;background:#f6f9f9;color:#53636a;font-size:9px;line-height:1.9}
+.demo-settings-demo-label{display:block;margin:10px 4px;color:#8a969a;font-size:8px;text-align:center}
