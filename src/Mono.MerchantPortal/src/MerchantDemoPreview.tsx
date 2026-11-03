@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 12332)
+Total output lines: 278
+
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import MerchantNavIcon, { type MerchantNavId } from './MerchantNavIcon'
@@ -165,13 +168,7 @@ function DemoBranchesPage() {
     ['ونک','مهدی کاظمی','ونک','۸–۲۲','بله','فعال'],
     ['جردن','سارا جوادی','جردن','۸–۲۲','بله','فعال'],
     ['میرداماد','حسین قربانی','میرداماد','۹–۲۲','بله','فعال'],
-    ['یوسف‌آباد','الهام مرادی','یوسف‌آباد','۸–۲۲','بله','فعال'],
-    ['پاسداران','رضا شریفی','پاسداران','—','خیر','غیرفعال'],
-  ]
-  return <main className="demo-branches-page" dir="rtl">
-    <section className="demo-branch-kpis" aria-label="خلاصه شعب"><Metric label="کل شعب" value="۵" /><Metric label="فعال" value="۴" tone="green" /><Metric label="موقتاً غیرفعال" value="۱" tone="orange" /><Metric label="آماده ارسال" value="۴" tone="cyan" /><Metric label="ساعات سرویس امروز" value="۸ تا ۲۲" /></section>
-    <section className="demo-branch-filters"><label>منطقه<select defaultValue="همه مناطق"><option>همه مناطق</option><option>ونک</option></select></label><label>آمادگی ارسال<select defaultValue="همه"><option>همه</option><option>آماده</option></select></label><label>وضعیت<select defaultValue="همه وضعیت‌ها"><option>همه وضعیت‌ها</option><option>فعال</option></select></label><label className="branch-filter-search">جست‌وجو<input placeholder="نام، منطقه یا مسئول شعبه" /></label><button className="secondary-button">اعمال فیلتر</button></section>
-    <div className="demo-branch-columns"><section className="panel demo-branch-table-panel"><div className="demo-table-scroll"><table className="demo-branch-table"><thead><tr><th>عملیات</th><th>شعبه</th><th>مسئول</th><th>منطقه</th><th>ساعات کاری</th><th>آماده ارسال</th><th>وضعیت</th></tr></thead><tbody>{branches.map((row) => <tr key={row[0]}><td><button type="button" className="link-button">باز</button></td><td><strong>{row[0]}</strong></td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td className={row[4] === 'بله' ? 'good' : 'bad'}>{row[4]}</td><td><span className={`badge ${row[5] === 'فعال' ? 'success' : 'warning'}`}>{row[5]}</span></td></tr>)}</tbody></table></div><p className="data-note">فهرست و اعداد برای بازبینی طراحی نمونه هستند.</p></section>
+    ['یوسف‌آباد','الهام مرادی','یوسف‌آباد','۸–۲۲…332 tokens truncated…Name="demo-table-scroll"><table className="demo-branch-table"><thead><tr><th>عملیات</th><th>شعبه</th><th>مسئول</th><th>منطقه</th><th>ساعات کاری</th><th>آماده ارسال</th><th>وضعیت</th></tr></thead><tbody>{branches.map((row) => <tr key={row[0]}><td><button type="button" className="link-button">باز</button></td><td><strong>{row[0]}</strong></td><td>{row[1]}</td><td>{row[2]}</td><td>{row[3]}</td><td className={row[4] === 'بله' ? 'good' : 'bad'}>{row[4]}</td><td><span className={`badge ${row[5] === 'فعال' ? 'success' : 'warning'}`}>{row[5]}</span></td></tr>)}</tbody></table></div><p className="data-note">فهرست و اعداد برای بازبینی طراحی نمونه هستند.</p></section>
       <aside className="demo-branch-detail"><section className="panel"><div className="panel-heading"><h2>شعبه ونک</h2><span className="badge success">فعال</span></div><DemoSummary label="کد شعبه" value="BR-۰۱" /><DemoSummary label="مسئول شعبه" value="مهدی کاظمی" /><DemoSummary label="وضعیت ارسال" value="آماده" /></section><section className="panel"><h2>موقعیت و ساعات کاری</h2><DemoSummary label="آدرس" value="ونک، ملاصدرا، پلاک ۲۱" /><DemoSummary label="مختصات" value="۳۵٫۷۵۲۱، ۵۱٫۴۰۹۸" /><DemoSummary label="ساعات کاری" value="هر روز ۸ تا ۲۲" /><DemoSummary label="تماس" value="۰۲۱ ۸۸۷۷ ۱۲۳۴" /></section><section className="panel"><h2>تنظیمات مبدا ارسال</h2><DemoSummary label="زمان پیش‌فرض آمادگی" value="۱۰ دقیقه" /><DemoSummary label="حد انتظار پیک" value="۳ دقیقه" /><DemoSummary label="شعاع سرویس" value="۵ کیلومتر" /><DemoSummary label="تحویل بسته" value="پیشخوان ارسال" /><button className="secondary-button full-width" disabled>ویرایش شعبه</button></section></aside>
     </div>
   </main>
@@ -250,7 +247,23 @@ function DemoSummary({ label, value }: { label: string; value: string }) {
 }
 
 function DemoBranchDrawer({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  return <div className="demo-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="demo-drawer" role="dialog" aria-modal="true" aria-labelledby="branch-drawer-title" dir="rtl"><header><div><small>مدیریت شعب</small><h2 id="branch-drawer-title">افزودن شعبه</h2></div><button type="button" aria-label="بستن" onClick={onClose}>×</button></header><form onSubmit={event => { event.preventDefault(); onSave() }}><label>نام شعبه<input required defaultValue="شعبه جدید" /></label><label>مسئول شعبه<input required placeholder="نام مسئول" /></label><label>شماره تماس<input required inputMode="tel" placeholder="۰۲۱ ..." /></label><label>آدرس<input required placeholder="تهران، خیابان، پلاک" /></label><div className="demo-drawer-grid"><label>ساعت شروع<input type="time" defaultValue="08:00" /></label><label>ساعت پایان<input type="time" defaultValue="22:00" /></label></div><label>شعاع سرویس<select defaultValue="5"><option value="3">۳ کیلومتر</option><option value="5">۵ کیلومتر</option><option value="8">۸ کیلومتر</option></select></label><label className="demo-drawer-check"><input type="checkbox" defaultChecked />آمادهٔ پذیرش ارسال</label><footer><button type="button" className="secondary-button" onClick={onClose}>انصراف</button><button className="primary-button">ثبت شعبه</button></footer></form></section></div>
+  return <div className="demo-drawer-backdrop branch-drawer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><section className="demo-drawer branch-drawer" role="dialog" aria-modal="true" aria-labelledby="branch-drawer-title" dir="rtl">
+    <header className="branch-drawer-header"><button type="button" onClick={onClose}>بستن</button><div><h2 id="branch-drawer-title">افزودن شعبه</h2><small>مبدا جدید برای ثبت ارسال</small></div></header>
+    <form onSubmit={event => { event.preventDefault(); onSave() }}>
+      <label className="branch-drawer-field">نام شعبه<input required aria-label="نام شعبه" /></label>
+      <div className="branch-drawer-row"><label className="branch-drawer-field">کد داخلی<input value="BR-۰۶" readOnly /></label><label className="branch-drawer-field">مسئول شعبه<input placeholder="" /></label></div>
+      <label className="branch-drawer-field">شماره تماس<input inputMode="tel" /></label>
+      <label className="branch-drawer-field">آدرس کامل<input /></label>
+      <label className="branch-drawer-field">مختصات<input /></label>
+      <div className="branch-drawer-row"><label className="branch-drawer-field">شروع ساعت کاری<input defaultValue="۰۸:۰۰" /></label><label className="branch-drawer-field">پایان ساعت کاری<input defaultValue="۲۳:۰۰" /></label></div>
+      <div className="branch-drawer-row"><label className="branch-drawer-field">آمادگی پیش‌فرض<select defaultValue="10"><option value="10">۱۰ دقیقه</option><option value="15">۱۵ دقیقه</option><option value="20">۲۰ دقیقه</option></select></label><label className="branch-drawer-field">حد انتظار پیک<select defaultValue="3"><option value="3">۳ دقیقه</option><option value="5">۵ دقیقه</option><option value="10">۱۰ دقیقه</option></select></label></div>
+      <label className="branch-drawer-field">شعاع سرویس<select defaultValue="5"><option value="3">۳ کیلومتر</option><option value="5">۵ کیلومتر</option><option value="8">۸ کیلومتر</option></select></label>
+      <label className="branch-drawer-field">یادداشت تحویل به پیک<input defaultValue="کد سفارش روی بسته درج شود." /></label>
+      <label className="branch-drawer-toggle"><input type="checkbox" defaultChecked /><span>شعبه برای ثبت ارسال فعال باشد</span></label>
+      <p className="branch-drawer-note">پس از ذخیره، شعبه به‌عنوان مبدا قابل انتخاب در «ارسال جدید» نمایش داده می‌شود.</p>
+      <footer className="branch-drawer-actions"><button type="button" className="secondary-button" onClick={onClose}>انصراف</button><button className="primary-button">ذخیره شعبه</button></footer>
+    </form>
+  </section></div>
 }
 
 function DemoInviteDrawer({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
