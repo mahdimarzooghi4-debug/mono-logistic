@@ -252,7 +252,7 @@ function MerchantMobileDemo() {
   const [search,setSearch]=useState('')
   const [order,setOrder]=useState(()=>new URLSearchParams(window.location.search).get('state')==='cancel'?'۸۴۳۰':new URLSearchParams(window.location.search).get('state')==='success'?'۸۴۳۱':'۸۴۲۱')
   const [activeBranch,setActiveBranch]=useState('ونک')
-  const [confirmed,setConfirmed]=useState(false)
+  const [confirmed,setConfirmed]=useState(()=>new URLSearchParams(window.location.search).get('state')==='success')
   const [toast,setToast]=useState('')
   const [notificationPrefs,setNotificationPrefs]=useState({risk:true,assignment:true,pickup:true,completion:true,finance:false})
   const [notificationFilter,setNotificationFilter]=useState<'all'|'action'|'info'>('all')
