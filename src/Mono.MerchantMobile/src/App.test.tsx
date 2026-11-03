@@ -43,6 +43,7 @@ describe('Mono merchant mobile P0', () => {
     await user.click(screen.getByRole('tab', { name: 'ناموفق' }))
     expect(screen.getByRole('button', { name: /سفارش ۸۴۱۲/ })).toHaveTextContent('ناموفق')
     await user.click(screen.getByRole('tab', { name: 'فعال' }))
+    await user.click(screen.getByRole('button', { name: 'خانه' }))
 
     await user.click(screen.getByRole('button', { name: 'ثبت ارسال جدید' }))
     expect(screen.getByRole('heading', { name: 'ثبت ارسال جدید' })).toBeInTheDocument()
