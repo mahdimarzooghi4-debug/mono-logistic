@@ -216,3 +216,17 @@ body:has(.demo-shell) { background:#e9eff1; }
 .demo-toggle.on{background:var(--teal)}
 .demo-toggle.on i{transform:translateX(-20px)}
 .demo-critical-notice{display:flex;min-height:64px;align-items:center;margin-top:26px;padding:12px 15px;border:1px solid #dce8ea;border-radius:12px;background:#f6f9f9;color:#53636a;font-size:9px;line-height:1.8}
+
+
+.demo-security-device{display:flex;min-height:104px;align-items:center;justify-content:space-between;gap:12px;margin:0 0 18px;padding:15px 16px;border:1px solid var(--border);border-radius:14px;background:#fff}
+.demo-security-copy{display:grid;gap:6px}
+.demo-security-copy strong,.demo-security-session strong{color:#26363d;font-size:10px}
+.demo-security-copy span,.demo-security-session small{color:#52636a;font-size:9px}
+.demo-security-copy small{color:#718087;font-size:8px}
+.demo-security-active{padding:5px 10px;border-radius:999px;background:#e8f7ed;color:#287748;font-size:9px;font-weight:700}
+.demo-security-section-title{margin:18px 0 11px;color:#394a50;font-size:12px}
+.demo-security-session{display:flex;width:100%;min-height:94px;align-items:center;justify-content:space-between;padding:14px 16px;border:1px solid var(--border);border-radius:13px;background:#fff;text-align:right}
+.demo-security-session>span{display:grid;gap:7px}
+.demo-security-session>b{color:#74838a;font-size:21px;font-weight:400}
+.demo-security-access-title{margin-top:22px}
+.demo-security-signout{width:100%;min-height:48px;margin-top:14px;border:1px solid #f0d2ca;border-radius:11px;background:#fff8f6;color:var(--danger);font-size:10px;font-weight:700}
