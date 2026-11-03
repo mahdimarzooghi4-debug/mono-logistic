@@ -39,9 +39,20 @@ describe('Mono merchant mobile P0', () => {
 
     await user.click(screen.getByRole('button', { name: 'ارسال‌ها' }))
     await user.click(screen.getByRole('tab', { name: 'تکمیل‌شده' }))
-    expect(screen.getByRole('button', { name: /سفارش ۸۴۱۸/ })).toHaveTextContent('تحویل‌شده')
+    const completedOrder = screen.getByRole('button', { name: /سفارش ۸۴۱۸/ })
+    expect(completedOrder).toHaveTextContent('تحویل‌شده')
+    await user.click(completedOrder)
+    expect(screen.getByRole('heading', { name: 'جزئیات ارسال' })).toBeInTheDocument()
+    expect(screen.getByText('تحویل به گیرنده انجام شد')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ارسال‌ها' }))
     await user.click(screen.getByRole('tab', { name: 'ناموفق' }))
-    expect(screen.getByRole('button', { name: /سفارش ۸۴۱۲/ })).toHaveTextContent('ناموفق')
+    const failedOrder = screen.getByRole('button', { name: /سفارش ۸۴۱۲/ })
+    expect(failedOrder).toHaveTextContent('ناموفق')
+    await user.click(failedOrder)
+    expect(screen.getByText('ارسال ناموفق شد')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'ارسال‌ها' }))
     await user.click(screen.getByRole('tab', { name: 'فعال' }))
     await user.click(screen.getByRole('button', { name: 'خانه' }))
 
