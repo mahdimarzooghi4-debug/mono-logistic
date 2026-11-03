@@ -260,19 +260,19 @@ function MerchantMobileDemo() {
   const [demoPhone,setDemoPhone]=useState('۰۹۱۲ ۱۲۳ ۴۵۶۷')
   const [demoDestination,setDemoDestination]=useState('سعادت‌آباد، بلوار دریا')
   const nav:[DemoMobileScreen,string,string][]=[['more','بیشتر','more'],['notifications','اعلان‌ها','bell'],['create','ثبت','plus'],['deliveries','ارسال‌ها','list'],['home','خانه','home']]
-  const orders=activeBranch==='ونک'?[
-    {id:'۸۴۳۰',route:'ونک ← یوسف‌آباد',destination:'یوسف‌آباد',promiseTime:'۱۹:۲۰',detail:'تحویل تا ۱۹:۲۰',status:'فعال',warning:false},
-    {id:'۸۴۲۱',route:'ونک ← جردن',destination:'جردن',promiseTime:'۱۸:۴۵',detail:'تعهد ۱۸:۴۵ • ۱۲ دقیقه ریسک',status:'در معرض دیرکرد',warning:true},
-    {id:'۸۴۱۸',route:'ونک ← میرداماد',destination:'میرداماد',promiseTime:'۱۹:۵۸',detail:'تحویل شد ۱۹:۵۸',status:'تحویل‌شده',warning:false},
-    {id:'۸۴۱۵',route:'ونک ← سعادت‌آباد',destination:'سعادت‌آباد',promiseTime:'۲۰:۳۰',detail:'تحویل تا ۲۰:۳۰',status:'فعال',warning:false},
-    {id:'۸۴۱۲',route:'ونک ← تهران‌پارس',destination:'تهران‌پارس',promiseTime:'ناموفق',detail:'ارسال لغو شد • ۱۸:۲۰',status:'ناموفق',warning:true},
-    {id:'۸۴۱۰',route:'ونک ← شهرک غرب',destination:'شهرک غرب',promiseTime:'۲۰:۴۰',detail:'تحویل تا ۲۰:۴۰',status:'فعال',warning:false},
-  ]:activeBranch==='جردن'?[
-    {id:'۸۴۵۲',route:'جردن ← قلهک',destination:'قلهک',promiseTime:'۲۰:۰۵',detail:'تحویل تا ۲۰:۰۵',status:'فعال',warning:false},
-    {id:'۸۴۵۱',route:'جردن ← میرداماد',destination:'میرداماد',promiseTime:'۲۰:۲۰',detail:'تحویل تا ۲۰:۲۰',status:'فعال',warning:false},
-  ]:activeBranch==='پاسداران'?[
-    {id:'۸۴۴۸',route:'پاسداران ← هروی',destination:'هروی',promiseTime:'۱۹:۵۰',detail:'تحویل تا ۱۹:۵۰',status:'فعال',warning:false},
-  ]:[]
+  const allOrders=[
+    {id:'۸۴۳۰',branchName:'ونک',route:'ونک ← یوسف‌آباد',destination:'یوسف‌آباد',promiseTime:'۱۹:۲۰',detail:'تحویل تا ۱۹:۲۰',status:'فعال',warning:false},
+    {id:'۸۴۲۱',branchName:'ونک',route:'ونک ← جردن',destination:'جردن',promiseTime:'۱۸:۴۵',detail:'تعهد ۱۸:۴۵ • ۱۲ دقیقه ریسک',status:'در معرض دیرکرد',warning:true},
+    {id:'۸۴۱۸',branchName:'ونک',route:'ونک ← میرداماد',destination:'میرداماد',promiseTime:'۱۹:۵۸',detail:'تحویل شد ۱۹:۵۸',status:'تحویل‌شده',warning:false},
+    {id:'۸۴۱۵',branchName:'ونک',route:'ونک ← سعادت‌آباد',destination:'سعادت‌آباد',promiseTime:'۲۰:۳۰',detail:'تحویل تا ۲۰:۳۰',status:'فعال',warning:false},
+    {id:'۸۴۱۲',branchName:'ونک',route:'ونک ← تهران‌پارس',destination:'تهران‌پارس',promiseTime:'ناموفق',detail:'ارسال لغو شد • ۱۸:۲۰',status:'ناموفق',warning:true},
+    {id:'۸۴۱۰',branchName:'ونک',route:'ونک ← شهرک غرب',destination:'شهرک غرب',promiseTime:'۲۰:۴۰',detail:'تحویل تا ۲۰:۴۰',status:'فعال',warning:false},
+    {id:'۸۴۵۲',branchName:'جردن',route:'جردن ← قلهک',destination:'قلهک',promiseTime:'۲۰:۰۵',detail:'تحویل تا ۲۰:۰۵',status:'فعال',warning:false},
+    {id:'۸۴۵۱',branchName:'جردن',route:'جردن ← میرداماد',destination:'میرداماد',promiseTime:'۲۰:۲۰',detail:'تحویل تا ۲۰:۲۰',status:'فعال',warning:false},
+    {id:'۸۴۴۸',branchName:'پاسداران',route:'پاسداران ← هروی',destination:'هروی',promiseTime:'۱۹:۵۰',detail:'تحویل تا ۱۹:۵۰',status:'فعال',warning:false},
+  ]
+  const orders=allOrders.filter(item=>item.branchName===activeBranch)
+  const selectedOrder=allOrders.find(item=>item.id===order)
 
   const demoNotifications=[
     {id:'risk-8421',day:'today',kind:'action' as const,title:'ریسک دیرکرد برای سفارش ۸۴۲۱',detail:'تعهد ۱۸:۴۵ • شعبه ونک',orderId:'۸۴۲۱'},
@@ -282,7 +282,7 @@ function MerchantMobileDemo() {
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
   const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':'بیشتر'
-  const headerSubtitle=screen==='exception'?'سفارش '+order:screen==='branch'?'فروشگاه سپهر':`شعبه ${activeBranch}`
+  const headerSubtitle=screen==='exception'?'سفارش '+order:screen==='branch'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
     setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
@@ -291,10 +291,9 @@ function MerchantMobileDemo() {
   }
   function review(){setScreen('review');setToast('')}
   function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('detail');setToast('درخواست نمایشی ثبت شد؛ در نسخهٔ واقعی باید به حساب مشتری متصل باشد.')}
-  const visibleOrders=orders.filter(item=>filter==='active'?['فعال','در معرض دیرکرد'].includes(item.status):filter==='failed'?item.status==='ناموفق':item.status==='تحویل‌شده')
-  const selectedOrder=orders.find(item=>item.id===order)
+  const visibleOrders=allOrders.filter(item=>filter==='active'?['فعال','در معرض دیرکرد'].includes(item.status):filter==='failed'?item.status==='ناموفق':item.status==='تحویل‌شده')
   const activeCount=orders.filter(item=>['فعال','در معرض دیرکرد'].includes(item.status)).length
-  const attentionCount=orders.filter(item=>item.warning).length
+  const attentionCount=orders.filter(item=>item.status==='در معرض دیرکرد').length
   const detailStatus=confirmed?'در انتظار تخصیص پیک':selectedOrder?.status||(order==='۸۴۱۸'?'تحویل‌شده':order==='۸۴۱۲'?'ناموفق':'در معرض دیرکرد')
   const detailPromise=confirmed?'۱۹:۳۵':selectedOrder?.promiseTime||(order==='۸۴۱۸'?'۱۹:۵۸':order==='۸۴۱۲'?'ناموفق':'۱۸:۴۵')
   const detailDestination=confirmed?demoDestination:selectedOrder?.destination||(order==='۸۴۱۸'?'میرداماد':order==='۸۴۱۲'?'تهران‌پارس':order==='۸۴۱۵'?'سعادت‌آباد':order==='۸۴۱۰'?'شهرک غرب':'یوسف‌آباد، خیابان شصت‌وچهارم')
@@ -325,7 +324,7 @@ function MerchantMobileDemo() {
         <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${!confirmed&&detailStatus!=='فعال'?'warning':''}`}>{detailStatus}</span></div>
         <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':detailStatus==='تحویل‌شده'?'زمان تحویل':detailStatus==='ناموفق'?'وضعیت ارسال':'تعهد تحویل'}</span><strong>{detailPromise}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':detailStatus==='تحویل‌شده'?'تحویل به گیرنده انجام شد':detailStatus==='ناموفق'?'ارسال لغو شد؛ نیاز به بررسی دارد':detailStatus==='فعال'?'ارسال در جریان؛ دادهٔ نمایشی':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
         <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:detailStatus==='تحویل‌شده'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۲۰</small></span></div><div className="done"><i/><span><strong>تحویل به پیک</strong><small>۱۹:۱۰</small></span></div><div className="done"><i/><span><strong>تحویل به گیرنده</strong><small>۱۹:۵۸</small></span></div></>:detailStatus==='ناموفق'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۰۵</small></span></div><div className="late"><i/><span><strong>ارسال ناموفق شد</strong><small>۱۸:۲۰</small></span></div></>:detailStatus==='فعال'?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>در حال اجرا</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
-        <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه {activeBranch}</strong></div><div><small>مقصد</small><strong>{confirmed?demoDestination:order==='۸۴۱۸'?'میرداماد':order==='۸۴۱۲'?'تهران‌پارس':order==='۸۴۱۵'?'سعادت‌آباد':order==='۸۴۱۰'?'شهرک غرب':'یوسف‌آباد، خیابان شصت‌وچهارم'}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
+        <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه {confirmed?activeBranch:selectedOrder?.branchName||activeBranch}</strong></div><div><small>مقصد</small><strong>{detailDestination}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
         <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>پشتیبانی</button><button className="primary-button" onClick={()=>order==='۸۴۲۱'?setScreen('exception'):setToast('برای این ارسال نمونه، استثنای فعالی ثبت نشده است.')}>مشاهده اقدام‌ها</button></div>
         {confirmed&&<p className="demo-confirmed-note">درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.</p>}
       </>}
