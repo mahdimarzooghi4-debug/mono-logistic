@@ -929,3 +929,46 @@ tbody tr:hover { background: #fbfdfd; }
 /* Figma parity: notification settings use a wider event column. */
 .demo-settings-notifications .demo-settings-columns { grid-template-columns:minmax(0,1fr) minmax(0,1.8fr); }
 @media(max-width:900px) { .demo-settings-notifications .demo-settings-columns { grid-template-columns:1fr; } }
+
+/* Figma parity: merchant integration dashboard frame 241:2. */
+.demo-settings-integrations .demo-settings-columns { grid-template-columns:minmax(0,1fr) minmax(0,1.24fr); gap:14px; }
+.demo-settings-integrations .demo-settings-stack { gap:10px; }
+.demo-settings-integrations .demo-integration-kpis { min-height:72px; }
+.demo-settings-integrations .demo-integration-kpis > .demo-setting { min-height:70px; padding:8px 12px; }
+.demo-settings-integrations .demo-integration-kpis .demo-setting strong { color:#008c54; font-size:12px; }
+.demo-settings-integrations .demo-integration-api { min-height:242px; padding:13px 14px; }
+.demo-integration-card-heading { display:flex; flex-direction:row-reverse; align-items:center; justify-content:space-between; min-height:32px; margin-bottom:6px; }
+.demo-settings-integrations .demo-integration-card-heading h2 { margin:0; }
+.demo-integration-status { display:grid; min-width:64px; min-height:32px; place-items:center; border-radius:999px; color:#178a58; background:#e8f6f0; font-size:8px; }
+.demo-api-fields { display:grid; width:min(288px,100%); gap:6px; margin-right:auto; }
+.demo-settings-integrations .demo-api-fields .demo-setting { min-height:54px; padding:6px 10px; }
+.demo-api-key > small { display:block; margin:2px 10px 0; color:#708087; font-size:7px; }
+.demo-settings-integrations .demo-settings-actions { direction:ltr; justify-content:flex-start; margin-top:6px; }
+.demo-settings-integrations .demo-settings-actions button { min-height:36px; padding-inline:10px; font-size:8px; }
+.demo-settings-integrations .demo-integration-webhook { min-height:266px; padding:13px 14px; }
+.demo-settings-integrations .demo-integration-webhook h2 { margin:0 0 5px; }
+.demo-webhook-url { display:grid; min-height:62px; align-content:center; gap:4px; border:1px solid #e2e9eb; border-radius:8px; padding:7px 11px; background:#f8fafb; text-align:right; }
+.demo-webhook-url small { color:#7c898e; font-size:8px; }
+.demo-webhook-url strong { overflow:hidden; color:#22343b; text-overflow:ellipsis; white-space:nowrap; font-size:9px; }
+.demo-settings-integrations .demo-integration-row { display:flex; min-height:28px; align-items:center; justify-content:space-between; gap:12px; border:0; color:#718087; font-size:8px; }
+.demo-integration-row strong { color:#26373d; font-size:8px; font-weight:500; }
+.demo-integration-row strong.healthy,.healthy { color:#168a52; }
+.demo-settings-integrations .demo-integration-webhook .demo-integration-row { padding:0; }
+.demo-settings-integrations .demo-chip-row { gap:5px; margin-top:5px; }
+.demo-settings-integrations .demo-chip-row span { padding:5px 8px; font-size:7px; }
+.demo-settings-integrations .demo-integration-webhook .demo-settings-actions { gap:7px; margin-top:6px; }
+.demo-settings-integrations .demo-integration-webhook .demo-settings-actions button { white-space:nowrap; }
+.demo-settings-integrations .demo-integration-ownership { min-height:188px; padding:13px 14px; }
+.demo-integration-ownership p { margin:6px 0 0; color:#718087; font-size:8px; line-height:1.7; }
+.demo-settings-integrations .demo-integration-health { min-height:188px; padding:13px 14px; }
+.demo-settings-integrations .demo-integration-health h2,.demo-settings-integrations .demo-integration-retry h2 { margin-bottom:6px; }
+.demo-settings-integrations .demo-webhook-table { min-height:328px; padding:13px 14px; }
+.demo-settings-integrations .demo-webhook-table h2 { margin-bottom:4px; }
+.demo-integration-table { direction:ltr; width:100%; }
+.demo-integration-table-head,.demo-integration-table-row { display:grid; grid-template-columns:74px 78px minmax(0,1fr) 122px; align-items:center; min-height:44px; border-top:1px solid #edf1f2; text-align:center; font-size:7px; }
+.demo-integration-table-head { min-height:42px; border-top:0; background:#f5f8f9; color:#718087; }
+.demo-integration-table-row span { overflow:hidden; padding:0 3px; text-overflow:ellipsis; white-space:nowrap; }
+.demo-settings-integrations .demo-integration-retry { min-height:194px; padding:13px 14px; }
+.demo-settings-integrations .demo-integration-retry p { margin:6px 0 0; color:#718087; font-size:7px; line-height:1.6; }
+@media(max-width:900px) { .demo-settings-integrations .demo-settings-columns { grid-template-columns:1fr; } }
+@media(max-width:620px) { .demo-integration-table-head,.demo-integration-table-row { grid-template-columns:54px 60px minmax(0,1fr) 82px; font-size:6px; } }
