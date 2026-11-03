@@ -142,6 +142,27 @@ describe('Mono merchant mobile P0', () => {
     expect(screen.queryByRole('button', { name: /پونک.*موقتاً غیرفعال/ })).toBeDisabled()
   })
 
+  it('opens the Figma financial summary from More with clearly marked demo amounts', async () => {
+    window.history.replaceState({}, '', '/?demo=1')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'بیشتر' }))
+    expect(screen.getByRole('button', { name: /مالی، خلاصه هزینه‌ها/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /مالی، خلاصه هزینه‌ها/ }))
+
+    expect(screen.getByRole('heading', { name: 'خلاصه این ماه' })).toBeInTheDocument()
+    expect(screen.getByText('۳٬۸۴۰٬۰۰۰', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('۳٬۲۰۰٬۰۰۰', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('۶۴۰٬۰۰۰', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('سفارش ۸۴۳۰')).toBeInTheDocument()
+    expect(screen.getByText('سفارش ۸۴۱۵')).toBeInTheDocument()
+    expect(screen.getByText(/مبالغ این صفحه نمونهٔ نمایشی هستند/)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('does not invent account data before connecting', () => {
     render(<App />)
     expect(screen.getByRole('heading', { name: /ارسال‌هایتان را/ })).toBeInTheDocument()
