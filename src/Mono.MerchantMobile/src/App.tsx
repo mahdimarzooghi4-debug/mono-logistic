@@ -11,7 +11,7 @@ type DeliveryPage = { items: Delivery[]; next_cursor: string | null }
 type Quote = { quote_id: string; version: number; expires_at: string; is_expired: boolean; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number }
 type PromiseRecord = { promise_id: string; version: number; committed_delivery_at: string; outcome: string }
 type Detail = Delivery & { quote: Quote | null; promise: PromiseRecord | null }
-type View = 'home' | 'deliveries' | 'create' | 'notifications' | 'more'
+type View = 'home' | 'deliveries' | 'create' | 'notifications' | 'finance' | 'more'
 type ApiError = { error?: { code?: string; message?: string } }
 
 const fa = new Intl.NumberFormat('fa-IR')
@@ -281,8 +281,8 @@ function MerchantMobileDemo() {
     {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
     {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
   ]
-  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':'بیشتر'
-  const headerSubtitle=screen==='exception'?'سفارش '+order:screen==='branch'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':'بیشتر'
+  const headerSubtitle=screen==='exception'?'سفارش '+order:screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
   function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
   function openDemoNotification(item:typeof demoNotifications[number]) {
     setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
@@ -303,7 +303,7 @@ function MerchantMobileDemo() {
   return <main className="mobile-shell demo-shell">
     <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
     <section className="page-content demo-page" aria-live="polite">
-      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
+      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
       {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
       {screen==='home'&&<>
         <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
@@ -362,7 +362,31 @@ function MerchantMobileDemo() {
         {(['today','yesterday'] as const).map(day=>{const items=filteredDemoNotifications.filter(item=>item.day===day);return items.length>0&&<section className="demo-notification-group" key={day} aria-label={day==='today'?'امروز':'دیروز'}><h2>{day==='today'?'امروز':'دیروز'}</h2><div className="demo-notification-list">{items.map(item=>{const isRead=readNotificationIds.includes(item.id);return <button key={item.id} className="demo-notification-card" aria-label={item.title} onClick={()=>openDemoNotification(item)}><span className={'demo-notification-dot '+(isRead?'read':'')} aria-label={isRead?'خوانده شده':'خوانده نشده'}/><span className="demo-notification-copy"><strong>{item.title}</strong><small>{item.detail}</small></span><span className="demo-notification-arrow" aria-hidden="true">‹</span></button>})}</div></section>})}
         {!filteredDemoNotifications.length&&<EmptyState title="اعلانی در این دسته نیست" body="با انتخاب دستهٔ دیگر، اعلان‌های بیشتری می‌بینید."/>}
       </>}
-      {screen==='more'&&<><div className="section-head compact demo-page-heading"><h1>بیشتر</h1></div><div className="settings-card"><p><span>شعبهٔ انتخاب‌شده</span><strong>شعبه ونک</strong></p><button className="branch-option"><span>شعبه ونک</span><span>✓</span></button><small>نسخهٔ نمایشی با داده‌های نمونه</small></div></>}
+      {screen==='more'&&<>
+        <div className="section-head compact demo-page-heading"><h1>بیشتر</h1></div>
+        <div className="demo-profile-card"><span className="demo-profile-avatar">س</span><span><strong>مهدی کاظمی</strong><small>مدیر حساب • فروشگاه سپهر</small></span><b>شعبه {activeBranch}</b></div>
+        <div className="demo-more-list">
+          <button className="demo-more-item" onClick={()=>setScreen('branch')}><span className="demo-more-icon">⌂</span><span><strong>شعب</strong><small>مشاهده و تغییر شعبه فعال</small></span><b>‹</b></button>
+          <button className="demo-more-item" aria-label="مالی، خلاصه هزینه‌ها و وضعیت تسویه" onClick={()=>setScreen('finance')}><span className="demo-more-icon">▤</span><span><strong>مالی</strong><small>خلاصه هزینه‌ها و وضعیت تسویه</small></span><b>‹</b></button>
+          <button className="demo-more-item" onClick={()=>setToast('بخش پشتیبانی در نسخهٔ نمایشی در دسترس نیست.')}><span className="demo-more-icon">؟</span><span><strong>پشتیبانی</strong><small>درخواست‌ها و ارتباط با پشتیبانی</small></span><b>‹</b></button>
+          <button className="demo-more-item" onClick={()=>setToast('تنظیمات سازمانی از پنل وب مدیریت می‌شود.')}><span className="demo-more-icon">⚙</span><span><strong>تنظیمات</strong><small>اعلان‌ها، امنیت و ترجیحات</small></span><b>‹</b></button>
+          <div className="demo-more-web"><strong>تنظیمات سازمانی کامل</strong><small>مدیریت اعضا، اتصال‌ها و هویت بصری در پنل وب</small></div>
+        </div>
+      </>}
+      {screen==='finance'&&<>
+        <div className="section-head compact demo-page-heading"><h1>خلاصه این ماه</h1></div>
+        <section className="demo-finance-summary" aria-label="خلاصه مالی نمایشی">
+          <span>هزینه ارسال‌ها</span><strong className="demo-finance-total">۳٬۸۴۰٬۰۰۰ <small>تومان</small></strong>
+          <div className="demo-finance-divider"/>
+          <div className="demo-finance-breakdown"><span>تسویه‌شده<strong>۳٬۲۰۰٬۰۰۰ <small>تومان</small></strong></span><span>باقی‌مانده<strong>۶۴۰٬۰۰۰ <small>تومان</small></strong></span></div>
+        </section>
+        <div className="section-head compact demo-finance-heading"><h2>آخرین هزینه‌ها</h2></div>
+        <div className="demo-finance-list">
+          {[['۸۴۳۰','۴۲٬۵۰۰'],['۸۴۲۱','۳۵٬۰۰۰'],['۸۴۱۸','۲۷٬۵۰۰'],['۸۴۱۵','۵۰٬۰۰۰']].map(([id,amount])=><article className="demo-finance-entry" key={id}><span className="demo-finance-icon">▤</span><span className="demo-finance-order"><strong>سفارش {id}</strong><small>تحویل‌شده</small></span><strong className="demo-finance-amount">{amount}<small>تومان</small></strong></article>)}
+        </div>
+        <p className="demo-finance-note">برای صورتحساب کامل و تطبیق مالی از پنل وب استفاده کنید.</p>
+        <small className="demo-finance-demo-label">مبالغ این صفحه نمونهٔ نمایشی هستند.</small>
+      </>}
     </section>
     <nav className="bottom-nav demo-bottom-nav" aria-label="ناوبری اصلی">{nav.map(([id,title,icon])=><button key={id} className={(screen===id?'active ':'')+(id==='create'?'create-tab':'')} onClick={()=>{setScreen(id);setToast('')}} aria-current={screen===id?'page':undefined}><DemoNavIcon name={icon}/><small>{title}</small></button>)}</nav>
   </main>
