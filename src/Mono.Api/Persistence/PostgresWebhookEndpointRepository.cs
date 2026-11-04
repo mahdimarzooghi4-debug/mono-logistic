@@ -16,6 +16,15 @@ public sealed record WebhookEndpointPage(
     IReadOnlyList<StoredWebhookEndpoint> Items,
     string? NextCursor);
 
+public sealed record WebhookEndpointLifecycleEvent(
+    long EventId,
+    string Action,
+    DateTimeOffset OccurredAt);
+
+public sealed record WebhookEndpointLifecycleEventPage(
+    IReadOnlyList<WebhookEndpointLifecycleEvent> Items,
+    string? NextCursor);
+
 public sealed record WebhookEndpointMutationResult(
     StoredWebhookEndpoint? Endpoint,
     bool Changed);
@@ -109,6 +118,43 @@ public sealed class PostgresWebhookEndpointRepository(NpgsqlDataSource dataSourc
         command.Parameters.AddWithValue("endpoint_id", NpgsqlDbType.Text, endpointId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? ReadEndpoint(reader) : null;
+    }
+
+    public async Task<WebhookEndpointLifecycleEventPage> ListLifecycleEventsAsync(
+        string customerId,
+        string endpointId,
+        int limit,
+        long? beforeEventId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT event_id, action, occurred_at
+            FROM webhook_endpoint_events
+            WHERE customer_id = @customer_id AND endpoint_id = @endpoint_id
+              AND (@before_event_id IS NULL OR event_id < @before_event_id)
+            ORDER BY event_id DESC
+            LIMIT @limit;
+            """;
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("customer_id", NpgsqlDbType.Text, customerId);
+        command.Parameters.AddWithValue("endpoint_id", NpgsqlDbType.Text, endpointId);
+        command.Parameters.AddWithValue("before_event_id", NpgsqlDbType.Bigint, (object?)beforeEventId ?? DBNull.Value);
+        command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit + 1);
+
+        var items = new List<WebhookEndpointLifecycleEvent>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            items.Add(new WebhookEndpointLifecycleEvent(
+                reader.GetInt64(0), reader.GetString(1), reader.GetFieldValue<DateTimeOffset>(2)));
+
+        string? nextCursor = null;
+        if (items.Count > limit)
+        {
+            items.RemoveAt(items.Count - 1);
+            nextCursor = WebhookEndpointLifecycleCursor.Encode(items[^1].EventId);
+        }
+        return new WebhookEndpointLifecycleEventPage(items, nextCursor);
     }
 
     public async Task<WebhookEndpointMutationResult> DisableAsync(
@@ -273,6 +319,32 @@ public static class WebhookEndpointCursor
             return true;
         }
         catch (Exception exception) when (exception is FormatException or ArgumentOutOfRangeException)
+        {
+            return false;
+        }
+    }
+}
+
+public static class WebhookEndpointLifecycleCursor
+{
+    public static string Encode(long eventId) => Convert.ToBase64String(
+            System.Text.Encoding.UTF8.GetBytes(eventId.ToString(System.Globalization.CultureInfo.InvariantCulture)))
+        .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    public static bool TryDecode(string? cursor, out long eventId)
+    {
+        eventId = 0;
+        if (string.IsNullOrWhiteSpace(cursor) || cursor.Length > 64)
+            return false;
+        try
+        {
+            var value = cursor.Replace('-', '+').Replace('_', '/');
+            value += new string('=', (4 - value.Length % 4) % 4);
+            return long.TryParse(System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(value)),
+                System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out eventId)
+                && eventId > 0;
+        }
+        catch (FormatException)
         {
             return false;
         }

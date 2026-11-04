@@ -18,7 +18,7 @@ dotnet run --project tools/Mono.ApiKeyProvisioner -- \
   --expires-at <ISO-8601_TIMESTAMP>
 ```
 
-The command displays the customer, scopes, and expiry and requires typing `ISSUE`. It prints the complete API key only after PostgreSQL confirms the insert. The database stores only the SHA-256 hash of the complete key. Copy the value directly to the approved secret store; it cannot be retrieved later.
+The command displays the customer, scopes, and expiry and requires typing `ISSUE`. It refuses to provision if stdin, stdout, or stderr is redirected, preventing the one-time credential from being written to a pipe or file. It prints the complete API key only after PostgreSQL confirms the insert. The database stores only the SHA-256 hash of the complete key. Copy the value directly to the approved secret store; it cannot be retrieved later.
 
 Only scopes in the source-controlled scope catalog are accepted. The catalog contains `branches.read`, `delivery-requests.write`, `delivery-requests.read`, `missions.cancel`, and `webhooks.manage`; grant only the scopes needed by each integration. `webhooks.manage` is required to register callback endpoints and does not grant access to delivery or mission data.
 

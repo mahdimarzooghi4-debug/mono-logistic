@@ -14,6 +14,7 @@ describe('OnboardingWorkbench', () => {
   it('lists API customer records and loads customer audit and branch registry', async () => {
     vi.mocked(fetch).mockImplementation(async (input) => {
       const url = String(input)
+      if (url.includes('/api-keys')) return ok({ apiKeys: [{ keyId: 'mk_live_abc123', customerId: customer.customerId, scopes: ['deliveries:write'], createdAt: '2026-10-20T10:00:00Z', expiresAt: '2027-10-20T10:00:00Z', revokedAt: null, secret: 'must-never-render' }] })
       if (url.includes('/audit')) return ok({ entries: [{ auditId: 'aud_1', action: 'CREATED', actorId: 'admin', reason: 'verified', occurredAt: '2026-10-21T10:00:00Z' }] })
       if (url.endsWith('/branches')) return ok({ branches: [branch] })
       return ok({ customers: [customer], nextCursor: null })
@@ -22,6 +23,9 @@ describe('OnboardingWorkbench', () => {
     expect(await screen.findByText('نمونه')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /نمونه/ }))
     expect(await screen.findByText('شعبه مرکزی')).toBeInTheDocument()
+    expect(await screen.findByText('mk_live_abc123')).toBeInTheDocument()
+    expect(screen.getByText('deliveries:write')).toBeInTheDocument()
+    expect(screen.queryByText('must-never-render')).not.toBeInTheDocument()
     expect(screen.getByText(/admin · verified/)).toBeInTheDocument()
     const listCall = vi.mocked(fetch).mock.calls.find(([input]) => String(input).includes('/operations/v1/customers?'))
     expect(new Headers(listCall?.[1]?.headers).get('Authorization')).toBe('Bearer admin-token')

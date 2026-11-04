@@ -28,6 +28,15 @@ public sealed record WebhookEndpointListResponse(
     [property: JsonPropertyName("items")] IReadOnlyList<WebhookEndpointResponse> Items,
     [property: JsonPropertyName("next_cursor")] string? NextCursor);
 
+public sealed record WebhookEndpointLifecycleEventResponse(
+    [property: JsonPropertyName("event_id")] long EventId,
+    [property: JsonPropertyName("action")] string Action,
+    [property: JsonPropertyName("occurred_at")] DateTimeOffset OccurredAt);
+
+public sealed record WebhookEndpointLifecycleEventListResponse(
+    [property: JsonPropertyName("items")] IReadOnlyList<WebhookEndpointLifecycleEventResponse> Items,
+    [property: JsonPropertyName("next_cursor")] string? NextCursor);
+
 public sealed record WebhookEndpointSecretRotatedResponse(
     [property: JsonPropertyName("endpoint_id")] string EndpointId,
     [property: JsonPropertyName("signing_secret")] string SigningSecret,
@@ -72,6 +81,36 @@ public static class WebhookEndpointEndpoints
             {
                 var endpoint = await repository.FindAsync(customer.CustomerId, endpointId, cancellationToken);
                 return endpoint is null ? Results.NotFound() : Results.Ok(ToResponse(endpoint));
+            })
+            .RequireAuthorization(MonoAuthorizationPolicies.WebhooksManage);
+
+        endpoints.MapGet("/v1/webhook-endpoints/{endpointId}/audit", async Task<IResult> (
+                string endpointId,
+                ICustomerContext customer,
+                PostgresWebhookEndpointRepository repository,
+                int? limit,
+                string? cursor,
+                CancellationToken cancellationToken) =>
+            {
+                var pageSize = limit ?? 50;
+                if (pageSize is < 1 or > 100)
+                    return Results.BadRequest(new ApiErrorResponse(new ApiError("INVALID_LIMIT", "Limit must be between 1 and 100.")));
+
+                long? beforeEventId = null;
+                if (cursor is not null)
+                {
+                    if (!WebhookEndpointLifecycleCursor.TryDecode(cursor, out var decodedEventId))
+                        return Results.BadRequest(new ApiErrorResponse(new ApiError("INVALID_CURSOR", "The webhook endpoint audit cursor is invalid.")));
+                    beforeEventId = decodedEventId;
+                }
+
+                if (await repository.FindAsync(customer.CustomerId, endpointId, cancellationToken) is null)
+                    return Results.NotFound();
+                var page = await repository.ListLifecycleEventsAsync(
+                    customer.CustomerId, endpointId, pageSize, beforeEventId, cancellationToken);
+                return Results.Ok(new WebhookEndpointLifecycleEventListResponse(
+                    page.Items.Select(item => new WebhookEndpointLifecycleEventResponse(
+                        item.EventId, item.Action, item.OccurredAt)).ToArray(), page.NextCursor));
             })
             .RequireAuthorization(MonoAuthorizationPolicies.WebhooksManage);
 

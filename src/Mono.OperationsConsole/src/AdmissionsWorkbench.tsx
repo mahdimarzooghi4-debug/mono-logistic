@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import './admissions-workbench.css'
 import PublicRegistrationQueue from './PublicRegistrationQueue'
+import AdmissionsDashboardDemo from './AdmissionsDashboardDemo'
 
 type Customer = { customerId: string; legalName: string; displayName: string | null; status: string; createdAt: string }
 type Courier = { courier_id: string; status: string; mode: string; created_at: string; updated_at: string }
 type Row = { type: 'business' | 'courier'; id: string; name: string; status: string; createdAt: string; updatedAt: string }
-type Props = { token: string; reloadKey: number; onConnected: (connected: boolean) => void; onOpenBusinesses: () => void; onOpenCouriers: () => void }
+type Props = { token: string; reloadKey: number; onConnected: (connected: boolean) => void; onOpenBusinesses: () => void; onOpenCouriers: () => void; onOpenDashboard?: () => void; demoMode?: boolean }
 type ErrorBody = { error?: { code?: string; message?: string } }
 
 const fa = new Intl.NumberFormat('fa-IR')
@@ -25,7 +26,7 @@ async function getJson<T>(path: string, token: string): Promise<T> {
 function readableStatus(status: string) { return stages[status] || status }
 function readableDate(value: string) { const date = new Date(value); return Number.isNaN(date.valueOf()) ? '—' : dateTime.format(date) }
 
-export default function AdmissionsWorkbench({ token, reloadKey, onConnected, onOpenBusinesses, onOpenCouriers }: Props) {
+export default function AdmissionsWorkbench({ token, reloadKey, onConnected, onOpenBusinesses, onOpenCouriers, onOpenDashboard, demoMode = false }: Props) {
   const [rows, setRows] = useState<Row[]>([])
   const [searchDraft, setSearchDraft] = useState('')
   const [search, setSearch] = useState('')
@@ -61,6 +62,12 @@ export default function AdmissionsWorkbench({ token, reloadKey, onConnected, onO
   useEffect(() => { void load() }, [load, reloadKey])
   const filtered = useMemo(() => rows.filter((row) => tab === 'all' || row.type === tab), [rows, tab])
   const counts = useMemo(() => ({ businesses: rows.filter((row) => row.type === 'business').length, couriers: rows.filter((row) => row.type === 'courier').length, pending: rows.filter((row) => row.status !== 'ACTIVE' && row.status !== 'REJECTED').length, earlyStage: rows.filter((row) => row.status === 'PENDING' || row.status === 'REGISTERED' || row.status === 'DOCUMENTS_SUBMITTED').length, readyCouriers: rows.filter((row) => row.type === 'courier' && row.status === 'MONO_APPROVED').length }), [rows])
+
+  if (demoMode) return <AdmissionsDashboardDemo onNavigate={(view) => {
+    if (view === 'couriers') onOpenCouriers()
+    else if (view === 'onboarding') onOpenBusinesses()
+    else onOpenDashboard?.()
+  }} />
 
   function submitSearch(event: React.FormEvent) { event.preventDefault(); setSearch(searchDraft.trim()) }
 

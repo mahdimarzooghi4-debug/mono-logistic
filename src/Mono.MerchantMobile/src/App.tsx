@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 
 type Branch = { branchId: string; name: string; address: string | null; status: string }
 type BranchPage = { branches: Branch[] }
@@ -11,7 +11,7 @@ type DeliveryPage = { items: Delivery[]; next_cursor: string | null }
 type Quote = { quote_id: string; version: number; expires_at: string; is_expired: boolean; distance_meters: number; fare_toman: number; buyer_share_toman: number; seller_share_toman: number }
 type PromiseRecord = { promise_id: string; version: number; committed_delivery_at: string; outcome: string }
 type Detail = Delivery & { quote: Quote | null; promise: PromiseRecord | null }
-type View = 'home' | 'deliveries' | 'create' | 'notifications' | 'more'
+type View = 'home' | 'deliveries' | 'create' | 'notifications' | 'finance' | 'profile' | 'settings' | 'support' | 'more'
 type ApiError = { error?: { code?: string; message?: string } }
 
 const fa = new Intl.NumberFormat('fa-IR')
@@ -55,6 +55,7 @@ function newIdempotencyKey() {
 }
 
 export default function App() {
+  const [demoPreview] = useState(() => new URLSearchParams(window.location.search).get('demo') === '1')
   const [token, setToken] = useState('')
   const [tokenDraft, setTokenDraft] = useState('')
   const [view, setView] = useState<View>('home')
@@ -173,6 +174,8 @@ export default function App() {
     { id: 'create', title: 'ثبت', icon: '+' }, { id: 'deliveries', title: 'ارسال‌ها', icon: '▤' }, { id: 'home', title: 'خانه', icon: '⌂' },
   ]
 
+  if (demoPreview) return <MerchantMobileDemo />
+
   return <main className="mobile-shell">
     <header className="app-header">
       <div className="brand-mark" aria-hidden="true">م</div>
@@ -239,6 +242,277 @@ export default function App() {
 
     {token && <nav className="bottom-nav" aria-label="ناوبری اصلی">{nav.map(item => <button key={item.id} className={`${view === item.id ? 'active' : ''} ${item.id === 'create' ? 'create-tab' : ''}`} onClick={() => { setView(item.id); setError(''); setNotice('') }} aria-current={view === item.id ? 'page' : undefined}><span>{item.icon}</span><small>{item.title}</small></button>)}</nav>}
   </main>
+}
+
+type DemoMobileScreen = 'home' | 'deliveries' | 'detail' | 'exception' | 'branch' | 'create' | 'loading' | 'error' | 'infeasible' | 'cancelConfirm' | 'success' | 'review' | 'notifications' | 'finance' | 'profile' | 'settings' | 'notificationSettings' | 'security' | 'support' | 'more'
+
+function MerchantMobileDemo() {
+  const [screen,setScreen]=useState<DemoMobileScreen>(()=>{const state=new URLSearchParams(window.location.search).get('state');return state==='empty'?'deliveries':state==='loading'?'loading':state==='error'?'error':state==='infeasible'?'infeasible':state==='cancel'?'cancelConfirm':state==='success'?'success':'home'})
+  const [filter,setFilter]=useState<'active'|'completed'|'failed'>('active')
+  const [search,setSearch]=useState('')
+  const [order,setOrder]=useState(()=>new URLSearchParams(window.location.search).get('state')==='cancel'?'۸۴۳۰':new URLSearchParams(window.location.search).get('state')==='success'?'۸۴۳۱':'۸۴۲۱')
+  const [activeBranch,setActiveBranch]=useState('ونک')
+  const [confirmed,setConfirmed]=useState(()=>new URLSearchParams(window.location.search).get('state')==='success')
+  const [toast,setToast]=useState('')
+  const [notificationPrefs,setNotificationPrefs]=useState({risk:true,assignment:true,pickup:true,completion:true,finance:false})
+  const [notificationFilter,setNotificationFilter]=useState<'all'|'action'|'info'>('all')
+  const [readNotificationIds,setReadNotificationIds]=useState<string[]>([])
+  const [demoRecipient,setDemoRecipient]=useState('مریم اکبری')
+  const [demoPhone,setDemoPhone]=useState('۰۹۱۲ ۱۲۳ ۴۵۶۷')
+  const [demoDestination,setDemoDestination]=useState('سعادت‌آباد، بلوار دریا')
+  const [demoReadyTime,setDemoReadyTime]=useState('همین حالا')
+  const pinnedLoadingPreview=new URLSearchParams(window.location.search).get('state')==='loading'
+  useEffect(()=>{if(screen!=='loading'||pinnedLoadingPreview)return;const timer=window.setTimeout(()=>setScreen(current=>current==='loading'?'review':current),1800);return()=>window.clearTimeout(timer)},[screen,pinnedLoadingPreview])
+  const nav:[DemoMobileScreen,string,string][]=[['more','بیشتر','more'],['notifications','اعلان‌ها','bell'],['create','ثبت','plus'],['deliveries','ارسال‌ها','list'],['home','خانه','home']]
+  const allOrders=[
+    {id:'۸۴۳۰',branchName:'ونک',route:'ونک ← یوسف‌آباد',destination:'یوسف‌آباد',promiseTime:'۱۹:۲۰',detail:'تحویل تا ۱۹:۲۰',status:'فعال',warning:false},
+    {id:'۸۴۲۱',branchName:'ونک',route:'ونک ← جردن',destination:'جردن',promiseTime:'۱۸:۴۵',detail:'تعهد ۱۸:۴۵ • ۱۲ دقیقه ریسک',status:'در معرض دیرکرد',warning:true},
+    {id:'۸۴۱۸',branchName:'ونک',route:'ونک ← میرداماد',destination:'میرداماد',promiseTime:'۱۹:۵۸',detail:'تحویل شد ۱۹:۵۸',status:'تحویل‌شده',warning:false},
+    {id:'۸۴۱۵',branchName:'ونک',route:'ونک ← سعادت‌آباد',destination:'سعادت‌آباد',promiseTime:'۲۰:۳۰',detail:'تحویل تا ۲۰:۳۰',status:'فعال',warning:false},
+    {id:'۸۴۱۲',branchName:'ونک',route:'ونک ← تهران‌پارس',destination:'تهران‌پارس',promiseTime:'ناموفق',detail:'ارسال لغو شد • ۱۸:۲۰',status:'ناموفق',warning:true},
+    {id:'۸۴۱۰',branchName:'ونک',route:'ونک ← شهرک غرب',destination:'شهرک غرب',promiseTime:'۲۰:۴۰',detail:'تحویل تا ۲۰:۴۰',status:'فعال',warning:false},
+    {id:'۸۴۵۲',branchName:'جردن',route:'جردن ← قلهک',destination:'قلهک',promiseTime:'۲۰:۰۵',detail:'تحویل تا ۲۰:۰۵',status:'فعال',warning:false},
+    {id:'۸۴۵۱',branchName:'جردن',route:'جردن ← میرداماد',destination:'میرداماد',promiseTime:'۲۰:۲۰',detail:'تحویل تا ۲۰:۲۰',status:'فعال',warning:false},
+    {id:'۸۴۴۸',branchName:'پاسداران',route:'پاسداران ← هروی',destination:'هروی',promiseTime:'۱۹:۵۰',detail:'تحویل تا ۱۹:۵۰',status:'فعال',warning:false},
+  ]
+  const orders=allOrders.filter(item=>item.branchName===activeBranch)
+  const selectedOrder=allOrders.find(item=>item.id===order)
+
+  const demoNotifications=[
+    {id:'risk-8421',day:'today',kind:'action' as const,title:'ریسک دیرکرد برای سفارش ۸۴۲۱',detail:'تعهد ۱۸:۴۵ • شعبه ونک',orderId:'۸۴۲۱'},
+    {id:'assigned-8430',day:'today',kind:'info' as const,title:'سفارش ۸۴۳۰ به پیک تخصیص داده شد',detail:'تحویل تا ۱۹:۲۰',orderId:'۸۴۳۰'},
+    {id:'handoff-8418',day:'today',kind:'info' as const,title:'سفارش ۸۴۱۸ از شعبه تحویل شد',detail:'در مسیر مقصد',orderId:'۸۴۱۸'},
+    {id:'delivered-8398',day:'yesterday',kind:'info' as const,title:'سفارش ۸۳۹۸ تحویل شد',detail:'گیرنده: کیانا مرادی',orderId:'۸۳۹۸'},
+    {id:'invoice-1',day:'yesterday',kind:'info' as const,title:'صورتحساب هفتگی صادر شد',detail:'دوره ۲۲ تا ۲۸ شهریور'},
+  ]
+  const headerTitle=screen==='home'?'سلام، فروشگاه سپهر':screen==='deliveries'?'ارسال‌ها':screen==='detail'?'سفارش '+order:screen==='create'?'ثبت ارسال':screen==='loading'?'بررسی هزینه و زمان':screen==='error'?'ثبت ارسال':screen==='infeasible'?'نتیجه بررسی':screen==='cancelConfirm'?'لغو ارسال':screen==='success'?'ارسال ثبت شد':screen==='review'?'بررسی و تأیید':screen==='exception'?'استثنای ارسال':screen==='branch'?'انتخاب شعبه':screen==='notifications'?'اعلان‌ها':screen==='finance'?'مالی':screen==='profile'?'پروفایل':screen==='settings'?'تنظیمات':screen==='notificationSettings'?'تنظیمات اعلان‌ها':screen==='security'?'امنیت و نشست‌ها':screen==='support'?'پشتیبانی':'بیشتر'
+  const headerSubtitle=screen==='exception'||screen==='support'||screen==='cancelConfirm'?'سفارش '+order:screen==='success'?'شعبه '+activeBranch:screen==='profile'?'حساب کاربری':screen==='settings'?'حساب و برنامه':screen==='notificationSettings'?'عملیاتی':screen==='security'?'حساب کاربری':screen==='branch'||screen==='finance'?'فروشگاه سپهر':`شعبه ${screen==='detail'?(selectedOrder?.branchName||activeBranch):activeBranch}`
+  function openDetail(id:string){setOrder(id);setScreen('detail');setToast('')}
+  function openDemoNotification(item:typeof demoNotifications[number]) {
+    setReadNotificationIds(ids=>ids.includes(item.id)?ids:[...ids,item.id])
+    if(item.orderId) openDetail(item.orderId)
+    else setToast('این صورتحساب فقط نمونهٔ نمایشی است و دادهٔ مالی واقعی نیست.')
+  }
+  function review(){setScreen('loading');setToast('')}
+  function confirm(){setConfirmed(true);setOrder('۸۴۳۱');setScreen('success');setToast('')}
+  const visibleOrders=allOrders.filter(item=>filter==='active'?['فعال','در معرض دیرکرد'].includes(item.status):filter==='failed'?item.status==='ناموفق':item.status==='تحویل‌شده')
+  const activeCount=orders.filter(item=>['فعال','در معرض دیرکرد'].includes(item.status)).length
+  const attentionCount=orders.filter(item=>item.status==='در معرض دیرکرد').length
+  const detailStatus=confirmed?'در انتظار تخصیص پیک':selectedOrder?.status||(order==='۸۴۱۸'?'تحویل‌شده':order==='۸۴۱۲'?'ناموفق':'در معرض دیرکرد')
+  const detailPromise=confirmed?'۱۹:۳۵':selectedOrder?.promiseTime||(order==='۸۴۱۸'?'۱۹:۵۸':order==='۸۴۱۲'?'ناموفق':'۱۸:۴۵')
+  const detailDestination=confirmed?demoDestination:selectedOrder?.destination||(order==='۸۴۱۸'?'میرداماد':order==='۸۴۱۲'?'تهران‌پارس':order==='۸۴۱۵'?'سعادت‌آباد':order==='۸۴۱۰'?'شهرک غرب':'یوسف‌آباد، خیابان شصت‌وچهارم')
+  const query=search.trim().toLocaleLowerCase()
+  const filteredDemoOrders=visibleOrders.filter(item=>!query||`${item.id} ${item.route} ${item.detail} ${item.status}`.toLocaleLowerCase().includes(query))
+  const filteredDemoNotifications=demoNotifications.filter(item=>notificationFilter==='all'||item.kind===notificationFilter)
+  return <main className="mobile-shell demo-shell">
+    <header className="app-header"><div className="brand-mark" aria-hidden="true">س</div><div className="header-copy"><strong>{headerTitle}</strong><span>{headerSubtitle}</span></div></header>
+    <section className="page-content demo-page" aria-live="polite">
+      {screen!=='detail'&&screen!=='exception'&&screen!=='branch'&&screen!=='review'&&screen!=='create'&&screen!=='finance'&&screen!=='profile'&&screen!=='settings'&&screen!=='notificationSettings'&&screen!=='security'&&screen!=='support'&&screen!=='loading'&&screen!=='error'&&screen!=='infeasible'&&screen!=='cancelConfirm'&&screen!=='success'&&<button className="demo-branch-chip" onClick={()=>setScreen('branch')}>{activeBranch} <span>⌄</span></button>}
+      {toast&&<div className="feedback success" role="status">{toast}<button onClick={()=>setToast('')} aria-label="بستن پیام">×</button></div>}
+      {screen==='home'&&<>
+        <div className="section-head compact demo-page-heading"><h1>امروز چه چیزی نیاز به توجه دارد؟</h1></div>
+        {attentionCount>0&&<button className="risk-card demo-risk" onClick={()=>openDetail('۸۴۲۱')}><span className="risk-icon">!</span><span><strong>یک ارسال در معرض دیرکرد</strong><small>سفارش ۸۴۲۱ • تعهد تا ۱۸:۴۵</small></span><b>‹</b></button>}
+        <div className="section-head compact demo-section-title"><h2>ارسال‌های فعال</h2></div>
+        <div className="summary-card demo-summary"><div><b>{fa.format(activeCount)}</b><span>در حال اجرا</span></div><i/><div><b className="warning-number">{fa.format(attentionCount)}</b><span>نیازمند توجه</span></div></div>
+        <button className="primary-button full" onClick={()=>setScreen('create')}>ثبت ارسال جدید</button>
+        <div className="section-head compact demo-section-title"><h2>آخرین ارسال‌ها</h2></div>
+        <div className="delivery-list demo-delivery-list">{orders.slice(0,2).map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}{!orders.length&&<EmptyState title="ارسالی برای این شعبه نیست" body="از شعبهٔ دیگری انتخاب کنید یا ارسال جدید ثبت کنید."/>}</div>
+      </>}
+      {screen==='deliveries'&&<>
+        <div className="section-head compact demo-page-heading"><h1>ارسال‌ها</h1><span className="eyebrow">همه شعب</span></div>
+        <div className="filter-tabs" role="tablist">{([['active','فعال'],['completed','تکمیل‌شده'],['failed','ناموفق']] as const).map(([key,label])=><button role="tab" aria-selected={filter===key} className={filter===key?'selected':''} key={key} onClick={()=>setFilter(key)}>{label}</button>)}</div>
+        {new URLSearchParams(window.location.search).get('state')!=='empty'&&<label className="search-box"><span>⌕</span><input aria-label="جست‌وجوی سفارش" placeholder="جست‌وجوی شماره یا نشانی" value={search} onChange={event=>setSearch(event.target.value)} /></label>}
+        <div className="delivery-list demo-delivery-list">{new URLSearchParams(window.location.search).get('state')==='empty'&&filter==='active'?<section className="demo-empty-deliveries" aria-label="ارسال‌های فعال خالی"><div className="demo-empty-icon" aria-hidden="true"><span>↙</span></div><h2>هنوز ارسال فعالی ندارید</h2><p>اولین ارسال را ثبت کنید تا وضعیت و تعهد تحویل را همین‌جا دنبال کنید.</p><button className="primary-button" onClick={()=>setScreen('create')}>ثبت اولین ارسال</button></section>:<>{filteredDemoOrders.map(item=><DemoOrderCard key={item.id} item={item} onClick={()=>openDetail(item.id)}/>)}{!filteredDemoOrders.length&&<EmptyState title="ارسالی پیدا نشد" body="شماره سفارش یا نشانی دیگری را جست‌وجو کنید."/>}</>}</div>
+      </>}
+      {screen==='success'&&<section className="demo-success" aria-label="ثبت موفق ارسال"><div className="demo-success-icon" aria-hidden="true">✓</div><h1>ارسال با موفقیت ثبت شد</h1><p>تعهد تحویل ثبت شده و عملیات تخصیص آغاز شده است.</p><section className="demo-success-card" aria-label="جزئیات ارسال ثبت‌شده"><div><span>شناسه سفارش</span><strong>۸۴۳۱</strong><b>در انتظار تخصیص</b></div><div><span>تعهد تحویل</span><strong>تا ۱۹:۳۵</strong></div></section><button className="primary-button" onClick={()=>{setScreen('detail');setToast('')}}>مشاهده ارسال</button><button className="secondary-button" onClick={()=>{setConfirmed(false);setOrder('۸۴۳۲');setScreen('create');setToast('')}}>ثبت ارسال دیگر</button></section>}
+      {screen==='detail'&&<>
+        <div className="section-head compact demo-page-heading"><h1>جزئیات ارسال</h1><span className={`status-badge ${!confirmed&&detailStatus!=='فعال'?'warning':''}`}>{detailStatus}</span></div>
+        <section className="demo-detail-promise"><span>{confirmed?'پیشنهاد تحویل':detailStatus==='تحویل‌شده'?'زمان تحویل':detailStatus==='ناموفق'?'وضعیت ارسال':'تعهد تحویل'}</span><strong>{detailPromise}</strong><small>{confirmed?'زمان پیشنهادی مونو؛ نمونهٔ نمایشی':detailStatus==='تحویل‌شده'?'تحویل به گیرنده انجام شد':detailStatus==='ناموفق'?'ارسال لغو شد؛ نیاز به بررسی دارد':detailStatus==='فعال'?'ارسال در جریان؛ دادهٔ نمایشی':'زمان فعلی برآوردی: ۱۸:۵۷'}</small></section>
+        <section className="demo-detail-card"><h2>وضعیت</h2><div className="demo-timeline">{confirmed?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div><i/><span><strong>در انتظار تخصیص پیک</strong><small>پس از اتصال به حساب مشتری</small></span></div><div><i/><span><strong>تحویل به پیک</strong><small>پس از تخصیص</small></span></div></>:detailStatus==='تحویل‌شده'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۲۰</small></span></div><div className="done"><i/><span><strong>تحویل به پیک</strong><small>۱۹:۱۰</small></span></div><div className="done"><i/><span><strong>تحویل به گیرنده</strong><small>۱۹:۵۸</small></span></div></>:detailStatus==='ناموفق'?<><div className="done"><i/><span><strong>درخواست ثبت شد</strong><small>۱۸:۰۵</small></span></div><div className="late"><i/><span><strong>ارسال ناموفق شد</strong><small>۱۸:۲۰</small></span></div></>:detailStatus==='فعال'?<><div className="done"><i/><span><strong>درخواست ارسال ثبت شد</strong><small>در محیط نمایشی</small></span></div><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>در حال اجرا</small></span></div></>:<><div className="done"><i/><span><strong>پیک تخصیص داده شد</strong><small>۱۷:۵۸</small></span></div><div className="done"><i/><span><strong>تحویل از شعبه انجام شد</strong><small>۱۸:۱۲</small></span></div><div className="done"><i/><span><strong>در مسیر مقصد</strong><small>۱۸:۲۴</small></span></div><div className="late"><i/><span><strong>ریسک دیرکرد شناسایی شد</strong><small>۱۸:۳۷</small></span></div></>}</div></section>
+        <section className="demo-detail-card demo-addresses"><div><small>مبدأ</small><strong>شعبه {confirmed?activeBranch:selectedOrder?.branchName||activeBranch}</strong></div><div><small>مقصد</small><strong>{detailDestination}</strong></div>{confirmed&&<div><small>گیرنده</small><strong>{demoRecipient}</strong></div>}</section>
+        <div className="demo-detail-actions"><button className="secondary-button" onClick={()=>{setScreen('support');setToast('')}}>پشتیبانی</button><button className="primary-button" onClick={()=>order==='۸۴۲۱'?setScreen('exception'):setToast('برای این ارسال نمونه، استثنای فعالی ثبت نشده است.')}>مشاهده اقدام‌ها</button></div>
+        {!confirmed&&detailStatus==='فعال'&&<button className="demo-cancel-entry" onClick={()=>{setToast('');setScreen('cancelConfirm')}}>لغو ارسال</button>}
+        {confirmed&&<p className="demo-confirmed-note">درخواست نمایشی تأیید شد؛ هنوز به سرور ثبت نشده است.</p>}
+      </>}
+      {screen==='exception'&&<>
+        <section className="demo-exception-overview"><span className="demo-exception-badge">نیازمند توجه</span><strong>۱۲ دقیقه ریسک دیرکرد</strong><small>تعهد: ۱۸:۴۵ • برآورد فعلی: ۱۸:۵۷</small></section>
+        <section className="demo-exception-section"><h2>چه اتفاقی افتاده؟</h2><div className="demo-exception-card"><strong>کندی مسیر و تراکم ترافیکی</strong><p>مونو مسیر و زمان تحویل را دوباره ارزیابی کرده و وضعیت را تحت پایش نگه داشته است.</p></div></section>
+        <section className="demo-exception-section"><h2>اقدام مونو</h2><div className="demo-exception-card demo-exception-action"><strong>پایش مسیر جایگزین و کنترل تعهد</strong><p>اگر نیاز به مداخله باشد، تیم عملیات اقدام می‌کند.</p></div></section>
+        <section className="demo-exception-section demo-exception-user"><h2>اقدام شما</h2><div className="demo-exception-actions"><button className="secondary-button" onClick={()=>setToast('راه‌های تماس با پشتیبانی در این پیش‌نمایش نمایشی‌اند.')}>تماس با پشتیبانی</button><button className="primary-button" onClick={()=>{setScreen('detail');setToast('')}}>بازگشت به ارسال</button></div></section>
+      </>}
+      {screen==='infeasible'&&<section className="demo-infeasible" aria-label="نتیجه بررسی ارسال">
+        <span className="demo-infeasible-badge">قابل اجرا نیست</span>
+        <h1>در حال حاضر نمی‌توانیم برای این ارسال تعهد بدهیم</h1>
+        <section className="demo-infeasible-reason"><small>دلیل</small><strong>ظرفیت موثر این محدوده در بازه انتخاب‌شده تکمیل است.</strong><span>اطلاعات واردشده حفظ می‌شود.</span></section>
+        <h2>چه کاری می‌توانید انجام دهید؟</h2>
+        <section className="demo-infeasible-guidance"><strong>زمان آمادگی را تغییر دهید</strong><p>یا مقصد / شعبه مبدأ را اصلاح کنید و دوباره بررسی را انجام دهید.</p></section>
+        <button className="primary-button" onClick={()=>setScreen('create')}>ویرایش و بررسی دوباره</button>
+      </section>}
+      {screen==='cancelConfirm'&&<section className="demo-cancel-confirm" aria-label="تأیید لغو ارسال">
+        <section className="demo-cancel-eligibility"><strong>لغو این ارسال هنوز مجاز است</strong><p>تحویل از مبدأ هنوز انجام نشده است.</p></section>
+        <h2>پیامد لغو</h2>
+        <section className="demo-cancel-consequences"><p>• مأموریت متوقف می‌شود.</p><p>• پیک از این ارسال آزاد می‌شود.</p><p>• وضعیت مالی براساس سیاست لغو به‌روزرسانی می‌شود.</p><strong>این اقدام قابل بازگشت نیست.</strong></section>
+        <div className="demo-cancel-confirm-note">برای ادامه، لغو ارسال را تأیید کنید.</div>
+        <div className="demo-cancel-actions"><button className="secondary-button" onClick={()=>{setScreen('detail');setToast('')}}>انصراف</button><button className="demo-cancel-approve" onClick={()=>{setScreen('detail');setToast('لغو ارسال در نسخهٔ نمایشی ثبت نشد؛ وضعیت سفارش تغییری نکرد.')}}>تأیید لغو ارسال</button></div>
+      </section>}
+      {screen==='error'&&<section className="demo-error" role="alert" aria-label="بررسی ارسال انجام نشد">
+        <div className="demo-error-icon" aria-hidden="true">!</div>
+        <h1>بررسی ارسال انجام نشد</h1>
+        <p>ارتباط با سرویس موقتاً قطع شده است. اطلاعات واردشده حفظ شده و می‌توانید دوباره تلاش کنید.</p>
+        <section className="demo-error-preserved" aria-label="حفظ اطلاعات فرم"><strong>اطلاعات فرم شما حفظ شده است</strong><span>مبدأ، مقصد، گیرنده و بسته پاک نشده‌اند.</span></section>
+        <button className="primary-button" onClick={()=>setScreen('loading')}>تلاش دوباره</button>
+        <button className="secondary-button" onClick={()=>setScreen('create')}>بازگشت به فرم</button>
+      </section>}
+      {screen==='loading'&&<section className="demo-checking" role="status" aria-live="polite" aria-label="در حال بررسی امکان اجرا">
+        <h1>در حال بررسی امکان اجرا</h1>
+        <div className="demo-checking-spinner" aria-hidden="true"><span/></div>
+        <p>مونو پوشش، ظرفیت، مسیر و زمان تحویل را بررسی می‌کند.</p>
+        <section className="demo-checking-route" aria-label="مسیر ارسال"><div><small>مبدأ</small><strong>شعبه {activeBranch}</strong></div><div><small>مقصد</small><strong>{demoDestination}</strong></div></section>
+        <small className="demo-checking-hint">این مرحله معمولاً چند ثانیه طول می‌کشد.</small>
+      </section>}
+      {screen==='create'&&<>
+        <div className="section-head compact demo-page-heading"><div><span className="eyebrow">۱ از ۲</span><h1>ثبت ارسال جدید</h1></div><span className="step-pill">اطلاعات ارسال</span></div>
+        <form className="stack-form create-form demo-create-form" onSubmit={event=>{event.preventDefault();review()}}>
+          <section className="form-section"><b>مبدأ</b><label>شعبه مبدأ<select aria-label="شعبه مبدأ" value={activeBranch} onChange={event=>setActiveBranch(event.target.value)}><option>ونک</option><option>جردن</option><option>میرداماد</option><option>پاسداران</option></select></label><label>نام گیرنده<input value={demoRecipient} onChange={event=>setDemoRecipient(event.target.value)} /></label><label>شماره تماس<input inputMode="tel" value={demoPhone} onChange={event=>setDemoPhone(event.target.value)} /></label></section>
+          <section className="form-section"><b>مقصد</b><label>نشانی مقصد<input value={demoDestination} onChange={event=>setDemoDestination(event.target.value)} /></label></section>
+          <section className="form-section"><b>بسته</b><label>نوع بسته<input value="بسته معمولی • ۲ کیلوگرم" readOnly /></label><label>زمان آمادگی<select aria-label="زمان آمادگی" value={demoReadyTime} onChange={event=>setDemoReadyTime(event.target.value)}><option>همین حالا</option><option>۳۰ دقیقه دیگر</option><option>یک ساعت دیگر</option></select></label></section>
+          <button className="primary-button" type="submit">بررسی هزینه و زمان</button>
+        </form>
+      </>}
+      {screen==='review'&&<>
+        <div className="section-head compact demo-page-heading"><h1>پیشنهاد مونو</h1><span className="status-badge">قابل اجرا</span></div>
+        <section className="demo-offer"><div><span>تعهد تحویل</span><strong>تا ۱۹:۳۵</strong></div><div><span>هزینه ارسال</span><strong>۴۲٬۵۰۰ تومان</strong></div></section>
+        <section className="demo-detail-card demo-review-summary"><h2>خلاصه ارسال</h2><div><span>مبدأ</span><strong>شعبه {activeBranch}</strong></div><div><span>مقصد</span><strong>{demoDestination}</strong></div><div><span>گیرنده</span><strong>{demoRecipient}</strong></div><div><span>تعهد</span><strong>فقط پس از تأیید ثبت می‌شود.</strong></div></section>
+        <div className="demo-review-actions"><button className="secondary-button" onClick={()=>setScreen('create')}>بازگشت</button><button className="primary-button" onClick={confirm}>تأیید و ثبت ارسال</button></div>
+      </>}
+      {screen==='branch'&&<>
+        <div className="section-head compact demo-page-heading"><h1>شعبه فعال</h1></div>
+        <button className="demo-branch-card selected" aria-label={`شعبه ${activeBranch}، انتخاب‌شده`} onClick={()=>{setScreen('home');setToast('')}}><span className="demo-branch-radio"/><span className="demo-branch-copy"><strong>شعبه {activeBranch}</strong><small>آماده ارسال • {activeBranch==='ونک'?'۴':activeBranch==='جردن'?'۲':activeBranch==='پاسداران'?'۱':'۰'} ارسال فعال</small></span></button>
+        <div className="section-head compact demo-branch-other-title"><h2>شعب دیگر</h2></div>
+        <div className="demo-branch-list">{[{name:'جردن',count:'۲',available:true},{name:'میرداماد',count:'۰',available:true},{name:'پونک',count:'۰',available:false},{name:'پاسداران',count:'۱',available:true}].filter(branch=>branch.name!==activeBranch).map(branch=><button className="demo-branch-card" key={branch.name} disabled={!branch.available} aria-label={`${branch.name}؛ ${branch.available?`آماده ارسال • ${branch.count} ارسال فعال`:'موقتاً غیرفعال'}`} onClick={()=>{setActiveBranch(branch.name);setScreen('home');setToast('')}}><span className="demo-branch-copy"><strong>{branch.name}</strong><small>{branch.available?`آماده ارسال • ${branch.count} ارسال فعال`:'موقتاً غیرفعال'}</small></span><span className="demo-branch-arrow" aria-hidden="true">‹</span></button>)}</div>
+        <p className="demo-branch-note">ارسال جدید از شعبهٔ انتخاب‌شده ثبت می‌شود.</p>
+      </>}
+      {screen==='security'&&<>
+        <div className="section-head compact demo-page-heading"><h1>امنیت</h1></div>
+        <section className="demo-security-device" aria-label="این دستگاه">
+          <div className="demo-security-copy"><strong>این دستگاه</strong><span>آیفون • تهران</span><small>آخرین فعالیت: همین حالا</small></div>
+          <span className="demo-security-active">فعال</span>
+        </section>
+        <h2 className="demo-security-section-title">نشست‌های دیگر</h2>
+        <button className="demo-security-session" onClick={()=>setToast('نشست مرورگر فقط نمونه است و به حساب واقعی وصل نیست.')}><span><strong>مرورگر وب</strong><small>تهران • امروز ۱۲:۴۵</small></span><b aria-hidden="true">‹</b></button>
+        <h2 className="demo-security-section-title demo-security-access-title">ورود و امنیت</h2>
+        <div className="demo-settings-list">
+          <button className="demo-settings-item" onClick={()=>setToast('تغییر رمز عبور در نسخهٔ نمایشی انجام نمی‌شود.')}><span className="demo-settings-icon">⌑</span><span><strong>تغییر رمز عبور</strong><small>به‌روزرسانی رمز حساب</small></span><b>‹</b></button>
+          <button className="demo-settings-item" onClick={()=>setToast('خروج از نشست‌های دیگر در نسخهٔ نمایشی انجام نمی‌شود.')}><span className="demo-settings-icon">↗</span><span><strong>خروج از همه دستگاه‌ها</strong><small>به‌جز این دستگاه</small></span><b>‹</b></button>
+        </div>
+        <button className="demo-security-signout" onClick={()=>setToast('خروج از حساب در نسخهٔ نمایشی انجام نمی‌شود.')}>خروج از حساب</button>
+        <small className="demo-settings-demo-label">نشست‌ها و اطلاعات این صفحه نمونهٔ نمایشی هستند.</small>
+      </>}
+      {screen==='notificationSettings'&&<>
+        <div className="section-head compact demo-page-heading"><h1>چه اعلان‌هایی دریافت کنید؟</h1></div>
+        <div className="demo-notification-preferences" aria-label="ترجیحات اعلان‌های عملیاتی">
+          {([
+            ['risk','ریسک دیرکرد و استثنا','همیشه برای موارد نیازمند توجه'],
+            ['assignment','تخصیص پیک','وقتی پیک به ارسال تخصیص داده شد'],
+            ['pickup','تحویل از شعبه','وقتی سفارش از مبدأ تحویل گرفته شد'],
+            ['completion','تحویل نهایی','پس از تحویل موفق یا ناموفق'],
+            ['finance','مالی','صورتحساب و اعلان‌های مالی'],
+          ] as const).map(([key,title,description])=><button type="button" role="switch" aria-checked={notificationPrefs[key]} aria-label={title} className="demo-notification-preference" key={key} onClick={()=>setNotificationPrefs(prefs=>({...prefs,[key]:!prefs[key]}))}><span className="demo-notification-preference-copy"><strong>{title}</strong><small>{description}</small></span><span className={'demo-toggle '+(notificationPrefs[key]?'on':'')} aria-hidden="true"><i/></span></button>)}
+        </div>
+        <div className="demo-critical-notice">اعلان‌های بحرانی عملیاتی حتی در حالت کم‌صدا نمایش داده می‌شوند.</div>
+        <small className="demo-settings-demo-label">ترجیحات در این نسخهٔ نمایشی ذخیره نمی‌شوند.</small>
+      </>}
+      {screen==='support'&&<>
+        <div className="section-head compact demo-page-heading"><h1>زمینه ارسال به‌صورت خودکار متصل شد</h1></div>
+        <section className="demo-support-order" aria-label={`سفارش ${order}`}>
+          <strong>سفارش {order}</strong>
+          <span>{order==='۸۴۲۱'?'در معرض دیرکرد • تعهد ۱۸:۴۵':selectedOrder?.detail||'در حال ارسال'}</span>
+        </section>
+        <fieldset className="demo-support-topics">
+          <legend>موضوع درخواست</legend>
+          {['تاخیر در تحویل','تغییر اطلاعات گیرنده','مشکل در لغو','موضوع دیگر'].map(topic=><label className="demo-support-topic" key={topic}><input type="radio" name="support-topic" value={topic} defaultChecked={topic==='تاخیر در تحویل'}/><span>{topic}</span></label>)}
+        </fieldset>
+        <label className="demo-support-description">توضیح کوتاه<textarea aria-label="توضیح کوتاه" placeholder="در صورت نیاز توضیح بیشتری اضافه کنید…"/></label>
+        <button className="demo-support-submit" onClick={()=>setToast('درخواست پشتیبانی نمایشی ثبت شد؛ هنوز به سامانهٔ پشتیبانی وصل نیست.')}>ثبت درخواست پشتیبانی</button>
+        <small className="demo-support-demo-label">ارسال درخواست در این نسخه فقط نمایشی است.</small>
+      </>}
+      {screen==='notifications'&&<>
+        <div className="section-head compact demo-page-heading"><h1>اعلان‌ها</h1></div>
+        <div className="demo-notification-filters" role="tablist" aria-label="دسته‌بندی اعلان‌ها">{([['all','همه'],['action','نیازمند اقدام'],['info','اطلاع‌رسانی']] as const).map(([key,label])=><button key={key} role="tab" aria-selected={notificationFilter===key} className={notificationFilter===key?'selected':''} onClick={()=>setNotificationFilter(key)}>{label}</button>)}</div>
+        {(['today','yesterday'] as const).map(day=>{const items=filteredDemoNotifications.filter(item=>item.day===day);return items.length>0&&<section className="demo-notification-group" key={day} aria-label={day==='today'?'امروز':'دیروز'}><h2>{day==='today'?'امروز':'دیروز'}</h2><div className="demo-notification-list">{items.map(item=>{const isRead=readNotificationIds.includes(item.id);return <button key={item.id} className="demo-notification-card" aria-label={item.title} onClick={()=>openDemoNotification(item)}><span className={'demo-notification-dot '+(isRead?'read':'')} aria-label={isRead?'خوانده شده':'خوانده نشده'}/><span className="demo-notification-copy"><strong>{item.title}</strong><small>{item.detail}</small></span><span className="demo-notification-arrow" aria-hidden="true">‹</span></button>})}</div></section>})}
+        {!filteredDemoNotifications.length&&<EmptyState title="اعلانی در این دسته نیست" body="با انتخاب دستهٔ دیگر، اعلان‌های بیشتری می‌بینید."/>}
+      </>}
+      {screen==='more'&&<>
+        <div className="section-head compact demo-page-heading"><h1>بیشتر</h1></div>
+        <div className="demo-profile-card"><span className="demo-profile-avatar">س</span><span><strong>مهدی کاظمی</strong><small>مدیر حساب • فروشگاه سپهر</small></span><b>شعبه {activeBranch}</b></div>
+        <div className="demo-more-list">
+          <button className="demo-more-item" aria-label="پروفایل، مشخصات فردی و نقش" onClick={()=>setScreen('profile')}><span className="demo-more-icon">م</span><span><strong>پروفایل</strong><small>مشخصات فردی و نقش</small></span><b>‹</b></button>
+          <button className="demo-more-item" onClick={()=>setScreen('branch')}><span className="demo-more-icon">⌂</span><span><strong>شعب</strong><small>مشاهده و تغییر شعبه فعال</small></span><b>‹</b></button>
+          <button className="demo-more-item" aria-label="مالی، خلاصه هزینه‌ها و وضعیت تسویه" onClick={()=>setScreen('finance')}><span className="demo-more-icon">▤</span><span><strong>مالی</strong><small>خلاصه هزینه‌ها و وضعیت تسویه</small></span><b>‹</b></button>
+          <button className="demo-more-item" onClick={()=>{setOrder('۸۴۲۱');setScreen('support');setToast('')}}><span className="demo-more-icon">؟</span><span><strong>پشتیبانی</strong><small>درخواست‌ها و ارتباط با پشتیبانی</small></span><b>‹</b></button>
+          <button className="demo-more-item" onClick={()=>setScreen('settings')}><span className="demo-more-icon">⚙</span><span><strong>تنظیمات</strong><small>اعلان‌ها، امنیت و ترجیحات</small></span><b>‹</b></button>
+          <div className="demo-more-web"><strong>تنظیمات سازمانی کامل</strong><small>مدیریت اعضا، اتصال‌ها و هویت بصری در پنل وب</small></div>
+        </div>
+      </>}
+      {screen==='settings'&&<>
+        <div className="section-head compact demo-page-heading"><h1>تنظیمات</h1></div>
+        <h2 className="demo-settings-section-title">تنظیمات</h2>
+        <div className="demo-settings-list">
+          <button className="demo-settings-item" aria-label="اعلان‌ها، انتخاب اعلان‌های عملیاتی و مالی" onClick={()=>{setScreen('notificationSettings');setToast('')}}><span className="demo-settings-icon">♧</span><span><strong>اعلان‌ها</strong><small>انتخاب اعلان‌های عملیاتی و مالی</small></span><b>‹</b></button>
+          <button className="demo-settings-item" aria-label={`شعبه پیش‌فرض، شعبه ${activeBranch}`} onClick={()=>setScreen('branch')}><span className="demo-settings-icon">⌂</span><span><strong>شعبه پیش‌فرض</strong><small>شعبه {activeBranch}</small></span><b>‹</b></button>
+          <button className="demo-settings-item" aria-label="امنیت و نشست‌ها، دستگاه‌ها و خروج از نشست" onClick={()=>setScreen('security')}><span className="demo-settings-icon">▣</span><span><strong>امنیت و نشست‌ها</strong><small>دستگاه‌ها و خروج از نشست</small></span><b>‹</b></button>
+          <button className="demo-settings-item" aria-label="ظاهر برنامه، حالت روشن" onClick={()=>setToast('حالت روشن در این نسخه فعال است.')}><span className="demo-settings-icon">☼</span><span><strong>ظاهر برنامه</strong><small>حالت روشن</small></span><b>‹</b></button>
+          <button className="demo-settings-item" aria-label="درباره برنامه، نسخه و قوانین" onClick={()=>setToast('نسخهٔ نمایشی مونو • اطلاعات حقوقی در پنل وب.')}><span className="demo-settings-icon">i</span><span><strong>درباره برنامه</strong><small>نسخه، قوانین و حریم خصوصی</small></span><b>‹</b></button>
+        </div>
+        <h2 className="demo-settings-section-title demo-settings-org-title">تنظیمات سازمان</h2>
+        <div className="demo-settings-org-note">مدیریت اعضا، دسترسی‌ها، اتصال‌ها و هویت بصری از پنل وب انجام می‌شود.</div>
+        <small className="demo-settings-demo-label">این گزینه‌ها در محیط نمایشی به تنظیمات حساب واقعی متصل نیستند.</small>
+      </>}
+      {screen==='profile'&&<>
+        <div className="section-head compact demo-page-heading"><h1>پروفایل</h1></div>
+        <section className="demo-profile-details" aria-label="پروفایل نمایشی">
+          <div className="demo-profile-identity"><span className="demo-profile-large-avatar">م</span><strong>مهدی کاظمی</strong><small>مدیر حساب</small><b>دسترسی مدیریتی</b></div>
+          <h2>اطلاعات حساب</h2>
+          <div className="demo-profile-field"><span>شماره همراه</span><strong dir="ltr">۰۹۱۲ ۱۲۳ ۴۵۶۷</strong></div>
+          <div className="demo-profile-field"><span>ایمیل</span><strong dir="ltr">m.kazemi@example.com</strong></div>
+          <div className="demo-profile-field"><span>کسب‌وکار</span><strong>فروشگاه سپهر</strong></div>
+          <div className="demo-profile-field"><span>شعبه پیش‌فرض</span><strong>{activeBranch}</strong></div>
+          <button className="demo-profile-edit" onClick={()=>setToast('ویرایش اطلاعات حساب در نسخهٔ نمایشی انجام نمی‌شود.')}>ویرایش مشخصات</button>
+          <small className="demo-profile-demo-label">اطلاعات این صفحه نمونهٔ نمایشی هستند.</small>
+        </section>
+      </>}
+      {screen==='finance'&&<>
+        <div className="section-head compact demo-page-heading"><h1>خلاصه این ماه</h1></div>
+        <section className="demo-finance-summary" aria-label="خلاصه مالی نمایشی">
+          <span>هزینه ارسال‌ها</span><strong className="demo-finance-total">۳٬۸۴۰٬۰۰۰ <small>تومان</small></strong>
+          <div className="demo-finance-divider"/>
+          <div className="demo-finance-breakdown"><span>تسویه‌شده<strong>۳٬۲۰۰٬۰۰۰ <small>تومان</small></strong></span><span>باقی‌مانده<strong>۶۴۰٬۰۰۰ <small>تومان</small></strong></span></div>
+        </section>
+        <div className="section-head compact demo-finance-heading"><h2>آخرین هزینه‌ها</h2></div>
+        <div className="demo-finance-list">
+          {[['۸۴۳۰','۴۲٬۵۰۰'],['۸۴۲۱','۳۵٬۰۰۰'],['۸۴۱۸','۲۷٬۵۰۰'],['۸۴۱۵','۵۰٬۰۰۰']].map(([id,amount])=><article className="demo-finance-entry" key={id}><span className="demo-finance-icon">▤</span><span className="demo-finance-order"><strong>سفارش {id}</strong><small>تحویل‌شده</small></span><strong className="demo-finance-amount">{amount}<small>تومان</small></strong></article>)}
+        </div>
+        <p className="demo-finance-note">برای صورتحساب کامل و تطبیق مالی از پنل وب استفاده کنید.</p>
+        <small className="demo-finance-demo-label">مبالغ این صفحه نمونهٔ نمایشی هستند.</small>
+      </>}
+    </section>
+    <nav className="bottom-nav demo-bottom-nav" aria-label="ناوبری اصلی">{nav.map(([id,title,icon])=><button key={id} className={(screen===id?'active ':'')+(id==='create'?'create-tab':'')} onClick={()=>{setScreen(id);setToast('')}} aria-current={screen===id?'page':undefined}><DemoNavIcon name={icon}/><small>{title}</small></button>)}</nav>
+  </main>
+}
+
+function DemoOrderCard({item,onClick}:{item:{id:string;route:string;detail:string;status:string;warning:boolean};onClick:()=>void}) {
+  return <button className="delivery-card demo-order-card" onClick={onClick}><span className="delivery-symbol">↙</span><span className="delivery-main"><strong>سفارش {item.id}</strong><small>{item.route}</small><small>{item.detail}</small></span><span className={'status-badge '+(item.warning?'warning':'')}>{item.status}</span></button>
+}
+
+function DemoNavIcon({name}:{name:string}) {
+  if(name==='plus') return <span className="demo-plus-icon">＋</span>
+  const paths:Record<string,ReactNode>={
+    home:<><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
+    list:<><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
+    bell:<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></>,
+    more:<><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
+  }
+  return <svg className="demo-nav-svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>
 }
 
 function DeliveryCard({ item, onClick }: { item: Delivery; onClick: () => void }) {

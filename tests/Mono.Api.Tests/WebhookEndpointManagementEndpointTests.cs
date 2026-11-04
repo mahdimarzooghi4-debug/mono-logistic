@@ -111,6 +111,24 @@ public sealed class WebhookEndpointManagementEndpointTests
         Assert.Equal(new[] { "CREATED", "SECRET_ROTATED", "DISABLED" },
             await audit.ExecuteScalarAsync() as string[]);
 
+        using var auditPageResponse = await ownerClient.GetAsync(path + "/audit?limit=2");
+        Assert.Equal(HttpStatusCode.OK, auditPageResponse.StatusCode);
+        var auditPageJson = await auditPageResponse.Content.ReadAsStringAsync();
+        Assert.DoesNotContain(originalSecret, auditPageJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(rotatedSecret, auditPageJson, StringComparison.Ordinal);
+        using var auditPageDocument = JsonDocument.Parse(auditPageJson);
+        var auditPage = auditPageDocument.RootElement.GetProperty("items");
+        Assert.Equal(new[] { "DISABLED", "SECRET_ROTATED" }, auditPage.EnumerateArray()
+            .Select(item => item.GetProperty("action").GetString()).ToArray());
+        var auditCursor = auditPageDocument.RootElement.GetProperty("next_cursor").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(auditCursor));
+        using var olderAuditPage = await ownerClient.GetAsync(path + "/audit?limit=2&cursor=" + Uri.EscapeDataString(auditCursor!));
+        Assert.Equal(HttpStatusCode.OK, olderAuditPage.StatusCode);
+        Assert.Contains("CREATED", await olderAuditPage.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.NotFound, (await otherClient.GetAsync(path + "/audit?limit=2")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ownerClient.GetAsync(path + "/audit?cursor=invalid!")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await ownerClient.GetAsync(path + "/audit?limit=101")).StatusCode);
+
         await using var mutation = new NpgsqlCommand("""
             UPDATE webhook_endpoint_events SET action = 'CREATED'
             WHERE customer_id = @customer_id AND endpoint_id = @endpoint_id;

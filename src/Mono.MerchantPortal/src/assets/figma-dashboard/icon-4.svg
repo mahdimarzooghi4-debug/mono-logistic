@@ -1,0 +1,25 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/&#216;&#180;&#216;&#185;&#216;&#168;">
+<rect id="Rectangle" x="4.75" y="5.75" width="12.5" height="13.5" rx="1.25" stroke="white" stroke-width="1.5"/>
+<path id="Vector" d="M8 5V1.8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+<path id="Vector_2" d="M14 5V1.8" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+<g id="Rectangle_2">
+<mask id="path-4-inside-1_0_15" fill="white">
+<rect x="7" y="9" width="2.5" height="2.5" rx="0.8"/>
+</mask>
+<rect x="7" y="9" width="2.5" height="2.5" rx="0.8" stroke="white" stroke-width="2" mask="url(#path-4-inside-1_0_15)"/>
+</g>
+<g id="Rectangle_3">
+<mask id="path-5-inside-2_0_15" fill="white">
+<rect x="12.5" y="9" width="2.5" height="2.5" rx="0.8"/>
+</mask>
+<rect x="12.5" y="9" width="2.5" height="2.5" rx="0.8" stroke="white" stroke-width="2" mask="url(#path-5-inside-2_0_15)"/>
+</g>
+<g id="Rectangle_4">
+<mask id="path-6-inside-3_0_15" fill="white">
+<rect x="9.2" y="14" width="3.6" height="6" rx="0.8"/>
+</mask>
+<rect x="9.2" y="14" width="3.6" height="6" rx="0.8" stroke="white" stroke-width="2.4" mask="url(#path-6-inside-3_0_15)"/>
+</g>
+</g>
+</svg>
