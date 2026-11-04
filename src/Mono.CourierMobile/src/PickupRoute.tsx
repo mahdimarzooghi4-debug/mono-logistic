@@ -27,7 +27,7 @@ export default function PickupRoute({ onNotice, onArrive }: PickupRouteProps) {
       <img className="route-marker route-marker-destination" src="/figma/route-destination.svg" alt="فروشگاه حنا" />
       <span className="map-time-chip">۶ دقیقه تا مبدا</span>
       <span className="map-caption">مسیر پیشنهادی مونو</span>
-      <a className="navigation-button" href={getNavigationUrl(destinationAddress)} aria-label="مسیریابی به فروشگاه">مسیریابی <span aria-hidden="true">↗</span></a>
+      <a className="navigation-button" href={getNavigationUrl(destinationAddress)} aria-label="مسیریابی به فروشگاه">مسیریابی</a>
     </div>
 
     <section className="pickup-info-card">
