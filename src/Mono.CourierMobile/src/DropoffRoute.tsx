@@ -27,7 +27,7 @@ export default function DropoffRoute({ onNotice, onArrive }: DropoffRouteProps) 
       <img className="dropoff-marker destination" src="/figma/dropoff-destination-marker.svg" alt="مقصد تحویل" />
       <span className="dropoff-time-chip">۱۸ دقیقه تا مقصد</span>
       <span className="dropoff-map-caption">مسیر پیشنهادی مونو</span>
-      <a className="navigation-button" href={getNavigationUrl(destinationAddress)} aria-label="مسیریابی به گیرنده">مسیریابی <span aria-hidden="true">↗</span></a>
+      <a className="navigation-button" href={getNavigationUrl(destinationAddress)} aria-label="مسیریابی به گیرنده">مسیریابی</a>
     </div>
 
     <section className="recipient-card">
